@@ -1,0 +1,205 @@
+---
+title: "muscle_gaze_map"
+subtitle: "G, the static map: where the eye would come to rest if these six drives were held."
+---
+
+::: {.op-head}
+![](../figures/icons/aggregate.png){.op-logo}
+
+[`aggregate`]{.op-badge} [`acts on: muscle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+G, the static map: where the eye would come to rest if these six drives were held.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\textstyle\sum_\pi$ **aggregate**: children &rarr; parent, up the containment $\pi$.
+- **Acts on** &mdash; `muscle` (the set the operator acts on).
+- **Reads** &mdash; `fit`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+muscle -> eye: reads every muscle's `drive`, writes its parent eye's `gaze_inf`. The relation
+traversed is the containment map from a muscle to the eye that owns it.
+
+    g^k(m) = sum_i a^k_i m_i  +  sum_{i<=j} b^k_ij m_i m_j,     k in (theta, phi, psi)
+
+m_i is muscle i's drive, dimensionless; a^k_i is that muscle's linear pull on axis k, in
+degrees per unit drive; b^k_ij is the quadratic term, in degrees per unit drive squared, with
+i == j the muscle's own curvature and i < j the interaction between two muscles. The 27
+coefficients per axis are `beta`, packed as the six linear terms, the six squares, then the
+fifteen crosses in the order of `PAIRS`, so the three sums are one matrix multiply.
+
+IT IS A FULL QUADRATIC AND THE CROSS TERMS ARE THE POINT. The eye this was fitted against was
+screened for additivity and failed on all fifteen muscle pairs, which is why the fit is a
+joint quadratic over a space-filling sweep of the six-dimensional drive cube rather than six
+marginals with a few interactions bolted on. A model without the crosses leaves several
+degrees on the table against a per-axis noise floor an order of magnitude smaller.
+
+A QUADRATIC AGGREGATE, WHICH IS WORTH SAYING OUT LOUD. Aggregate is a whole reading its
+parts, and that is exactly what this is. It is not, however, a plain `sum_pi` of a per-child
+quantity: the fifteen cross terms are products of SIBLINGS, pairs of muscles within one eye.
+They stay well defined because a fibre `pi^-1(eye)` is that eye's own six muscles and nothing
+crosses between eyes, and keeping them here keeps all 27 coefficients of an axis in one
+place. The alternative -- a `muscle_pair` relation given entity status, a lateral computing
+the products, then a linear aggregate over both -- is more literally `sum_pi` and splits one
+measured object across two operators for nothing; nothing else will ever want the bare
+products.
+
+THE MUSCLE ORDER IS A CONTRACT. `beta` was fitted against drives ordered LR, SR, MR, IR, SO,
+IO, and this operator takes a muscle's position within its parent's fibre as its index into
+that order. A spec that declares the six in another order gets a different eye with no error
+raised anywhere, so the count is checked here and the order is stated in `MUSCLES`.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `fit` | eye_characterisation_json | **required** |
+| `parent` | eye_set_name | "eye" |
+| `gain` | scale_on_every_coefficient | 1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: muscle_gaze_map, at: muscle, fit: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`oculomotor`]{.op-badge} [`muscle`]{.op-badge} [`static_map`]{.op-badge} [`hammerstein`]{.op-badge} [`quadratic_synergy`]{.op-badge}  
+
+## Related operators
+
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`paint_children`](paint_children.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+
+## Source
+
+[`src/plexus/operators/muscle_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/muscle_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("muscle_gaze_map", family="oculomotor", set="muscle", kind="aggregate")
+class MuscleGazeMap(Aggregate):
+    """g, the static map: where the eye would come to rest if these six drives were held.
+
+    muscle -> eye: reads every muscle's `drive`, writes its parent eye's `gaze_inf`. The relation
+    traversed is the containment map from a muscle to the eye that owns it.
+
+        g^k(m) = sum_i a^k_i m_i  +  sum_{i<=j} b^k_ij m_i m_j,     k in (theta, phi, psi)
+
+    m_i is muscle i's drive, dimensionless; a^k_i is that muscle's linear pull on axis k, in
+    degrees per unit drive; b^k_ij is the quadratic term, in degrees per unit drive squared, with
+    i == j the muscle's own curvature and i < j the interaction between two muscles. The 27
+    coefficients per axis are `beta`, packed as the six linear terms, the six squares, then the
+    fifteen crosses in the order of `PAIRS`, so the three sums are one matrix multiply.
+
+    IT IS A FULL QUADRATIC AND THE CROSS TERMS ARE THE POINT. The eye this was fitted against was
+    screened for additivity and failed on all fifteen muscle pairs, which is why the fit is a
+    joint quadratic over a space-filling sweep of the six-dimensional drive cube rather than six
+    marginals with a few interactions bolted on. A model without the crosses leaves several
+    degrees on the table against a per-axis noise floor an order of magnitude smaller.
+
+    A QUADRATIC AGGREGATE, WHICH IS WORTH SAYING OUT LOUD. Aggregate is a whole reading its
+    parts, and that is exactly what this is. It is not, however, a plain `sum_pi` of a per-child
+    quantity: the fifteen cross terms are products of SIBLINGS, pairs of muscles within one eye.
+    They stay well defined because a fibre `pi^-1(eye)` is that eye's own six muscles and nothing
+    crosses between eyes, and keeping them here keeps all 27 coefficients of an axis in one
+    place. The alternative -- a `muscle_pair` relation given entity status, a lateral computing
+    the products, then a linear aggregate over both -- is more literally `sum_pi` and splits one
+    measured object across two operators for nothing; nothing else will ever want the bare
+    products.
+
+    THE MUSCLE ORDER IS A CONTRACT. `beta` was fitted against drives ordered LR, SR, MR, IR, SO,
+    IO, and this operator takes a muscle's position within its parent's fibre as its index into
+    that order. A spec that declares the six in another order gets a different eye with no error
+    raised anywhere, so the count is checked here and the order is stated in `MUSCLES`.
+    """
+
+    EMIT = None                        # writes the parent's gaze_inf; no integrable delta
+    INPUTS = ["muscle"]
+    OUTPUTS = ["eye"]
+    READS = ["drive"]
+    WRITES = ["gaze_inf"]
+    SUPPORTED_DIMS = [2, 3]            # acts on angles, not on the world's coordinates
+    DIFFERENTIABLE = True
+    MAY_MUTATE_INTEGRATED_STATE = True  # writes a block on the parent -- that is what it is for
+    REQUIRES_PARAMS = ["fit"]
+    MECHANISM_TAGS = ["oculomotor", "muscle", "static_map", "hammerstein", "quadratic_synergy"]
+    PARAM_ROLES = {"fit": "eye_characterisation_json", "parent": "eye_set_name",
+                   "gain": "scale_on_every_coefficient"}
+    REFERENCE = ("The static half of a Hammerstein cascade -- a measured memoryless "
+                 "nonlinearity ahead of a linear body. Coefficients fitted from the soft-body "
+                 "eye characterisation in Plexus prototype/eye/.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "muscle")
+        self.parent = params.get("parent", "eye")
+        self.gain = float(params.get("gain", 1.0))       # one scalar on every coefficient
+        spec = _load_fit(params["fit"])
+        beta = torch.as_tensor(spec["beta"], dtype=torch.float32, device=device)
+        self.register_buffer_like = None                  # operators are not nn.Modules here
+        self._beta = beta * self.gain                     # (27, 3), FROZEN
+        self._pairs = torch.as_tensor(np.asarray(PAIRS), dtype=torch.long, device=device)
+
+    def forward(self, H, mask=None):
+        mus = H.level(self.at)
+        eye = H.level(self.parent)
+        if self.parent not in H.ancestors(mus.name):
+            raise ValueError(
+                f"muscle_gaze_map: {self.at!r} is not contained in {self.parent!r} (its chain is "
+                f"{' -> '.join(H.ancestors(mus.name)) or '(none)'}). This operator aggregates a "
+                f"muscle onto the eye that owns it; without the containment map there is no "
+                f"fibre to read.")
+        pidx = H.lift_index(mus.name, self.parent)        # (n_muscle,) -> eye index
+        if mus.n != eye.n * N_MUSCLE:
+            raise ValueError(
+                f"muscle_gaze_map: {mus.n} muscles for {eye.n} eyes. The fit is a map from "
+                f"EXACTLY {N_MUSCLE} drives {MUSCLES}, so set `per_parent: {N_MUSCLE}` -- a "
+                f"different count would index `beta` with a muscle the eye does not have.")
+        dev, dt_ = mus.state.device, mus.state.dtype
+        beta = self._beta.to(device=dev, dtype=dt_)
+        # A muscle's ordinal WITHIN its own eye is its index into MUSCLES. With per_parent = 6 the
+        # children of one parent are contiguous, which is what makes the reshape below the fibre.
+        m = (mus.get("drive")[:, 0] * mus.occ).reshape(eye.n, N_MUSCLE)      # (n_eye, 6)
+        if mask is not None:
+            m = m * mask.reshape(eye.n, N_MUSCLE).to(m.dtype)
+        cross = m[:, self._pairs[:, 0]] * m[:, self._pairs[:, 1]]            # (n_eye, 15)
+        design = torch.cat([m, m ** 2, cross], dim=-1)                       # (n_eye, 27)
+        gaze_inf = design @ beta                                             # (n_eye, 3), degrees
+        g0, g1 = eye.state_schema["gaze_inf"]
+        if torch.is_grad_enabled():
+            # Clone-and-reassign so the tape keeps the previous state alive; see
+            # `aggregate_centroid` for why the forward path must NOT do this.
+            st = eye.state.clone()
+            st[:, g0:g1] = gaze_inf
+            eye.state = st
+        else:
+            eye.state[:, g0:g1] = gaze_inf
+        _ = pidx                                          # the fibre is the reshape; kept for the check above
+        return {}
+```

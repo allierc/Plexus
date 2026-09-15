@@ -103,7 +103,7 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`paint_children`](paint_children.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`muscle_gaze_map`](muscle_gaze_map.qmd), [`paint_children`](paint_children.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
 
 ## Source
 

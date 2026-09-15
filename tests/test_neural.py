@@ -348,3 +348,101 @@ def test_phi_and_psi_sum_into_one_voltage_step():
 # readout). The operator is now `aggregate_centroid` and reads/writes `pos` only; that capability
 # was removed from the code, so the tests were red since the rename and pinned nothing that exists.
 # See tests/REGRESSION_PLAN.md section 1.
+
+
+# --------------------------------------------------------------------------- #
+#  per-neuron tau, and the Dale sign-lock
+#
+#  Both exist because a per-TYPE table cannot say what a connectome needs said, and both are
+#  tested the same way: not "does it run", but "does it give a DIFFERENT circuit than the
+#  type table does". An option that agrees with the default in every case is not an option.
+# --------------------------------------------------------------------------- #
+def test_per_neuron_tau_overrides_the_type_tables_leak():
+    """`tau:` names a state block in SECONDS; the leak becomes 1/tau, per neuron.
+
+    Three neurons of ONE type, so the type table can only offer them one leak. Giving each its
+    own tau must produce three different decay rates -- which is the whole point, and is what a
+    fitted 285-cell integrator needs and an eight-row table cannot express.
+    """
+    sim, H = _circuit([[0, 1]], [0.0], n=3, dt=1.0, sets_extra=None)
+    lvl = H.level("neuron")
+    # one type, one leak: a = 2.0 for every neuron
+    _types(H, [0, 0, 0], [[2.0, 0.0, 1.0, 0.0, 1.0, 0.0]])
+    _set_v(H, [1.0, 1.0, 1.0])
+    by_type = get_operator("neuron_update")({"_at": "neuron"}).forward(H)["neuron"].squeeze(-1)
+    assert torch.allclose(by_type, torch.full((3,), -2.0)), "the type table's own leak"
+
+    # now a per-neuron tau block: tau = 0.5, 1.0, 2.0 s -> leak 2, 1, 0.5 per second
+    lvl.state_schema = dict(lvl.state_schema)
+    width = lvl.state.shape[1]
+    lvl.state = torch.cat([lvl.state, torch.tensor([[0.5], [1.0], [2.0]])], dim=1)
+    lvl.state_schema["tau"] = (width, width + 1)
+    by_neuron = get_operator("neuron_update")(
+        {"_at": "neuron", "tau": "tau"}).forward(H)["neuron"].squeeze(-1)
+    assert torch.allclose(by_neuron, torch.tensor([-2.0, -1.0, -0.5])), by_neuron
+    assert not torch.allclose(by_neuron, by_type), (
+        "per-neuron tau produced the per-type answer; the option is doing nothing")
+
+
+def test_tau_naming_a_block_that_does_not_exist_is_refused():
+    """A misspelt block must not fall back to the type table and run a different model."""
+    sim, H = _circuit([[0, 1]], [1.0], n=2, dt=1.0)
+    _set_v(H, [1.0, 1.0])
+    op = get_operator("neuron_update")({"_at": "neuron", "tau": "taus"})
+    with pytest.raises(ValueError, match="names a state block"):
+        op.forward(H)
+
+
+def _dale_circuit(signs, weights):
+    """Two types (one per sign), one synapse from neuron 0 to neuron 1."""
+    sim, H = _circuit([[0, 1]], weights, n=2, dt=1.0)
+    _types(H, [0, 1], [[1.0, 0.0, 1.0, 0.0, 1.0, 0.0]] * 2)   # registers node_type first
+    H.level("neuron")._type_table = [{"name": "A", "sign": signs[0]},
+                                     {"name": "B", "sign": signs[1]}]
+    return H
+
+
+def test_dale_takes_the_sign_from_the_presynaptic_type_not_from_the_weight():
+    """A NEGATIVE stored weight on an EXCITATORY sender must arrive positive.
+
+    This is the case that matters: once `w` is learned, a gradient step can carry a measured
+    excitatory cell's weight through zero. With `dale: true` that cannot change what the cell
+    IS -- only how strongly it speaks.
+    """
+    H = _dale_circuit(["E", "I"], [-0.75])          # sender is type A = excitatory
+    _set_v(H, [1.0, 0.0])
+    plain = get_operator("neuron_signal", model="shared")(
+        {"_at": "neuron", "edge_set": "synapse", "activation": "identity"}).forward(H)["neuron"]
+    locked = get_operator("neuron_signal", model="shared")(
+        {"_at": "neuron", "edge_set": "synapse", "activation": "identity",
+         "dale": True}).forward(H)["neuron"]
+    assert plain[1].item() == pytest.approx(-0.75), "the stored sign, unlocked"
+    assert locked[1].item() == pytest.approx(+0.75), "sign-locked to the excitatory sender"
+
+
+def test_dale_makes_an_inhibitory_sender_negative_whatever_the_weight_sign():
+    H = _dale_circuit(["I", "E"], [0.4])            # sender is type A = inhibitory
+    _set_v(H, [1.0, 0.0])
+    locked = get_operator("neuron_signal", model="shared")(
+        {"_at": "neuron", "edge_set": "synapse", "activation": "identity",
+         "dale": True}).forward(H)["neuron"]
+    assert locked[1].item() == pytest.approx(-0.4)
+
+
+def test_dale_without_a_sign_on_every_type_is_refused():
+    """E/I is the circuit owner's claim, and must not be guessed from the weights."""
+    H = _dale_circuit(["E", "I"], [1.0])
+    H.level("neuron")._type_table = [{"name": "A"}, {"name": "B", "sign": "I"}]
+    op = get_operator("neuron_signal", model="shared")(
+        {"_at": "neuron", "edge_set": "synapse", "dale": True})
+    with pytest.raises(ValueError, match="declare no `sign:`"):
+        op.forward(H)
+
+
+def test_dale_is_off_by_default_so_no_existing_spec_moves():
+    H = _dale_circuit(["E", "I"], [-0.75])
+    _set_v(H, [1.0, 0.0])
+    op = get_operator("neuron_signal", model="shared")(
+        {"_at": "neuron", "edge_set": "synapse", "activation": "identity"})
+    assert op.dale is False
+    assert op.forward(H)["neuron"][1].item() == pytest.approx(-0.75)

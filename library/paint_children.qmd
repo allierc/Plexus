@@ -72,11 +72,11 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`muscle_gaze_map`](muscle_gaze_map.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
 
 ## Source
 
-[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+[`src/plexus/operators/neuron_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neuron_ops.py) &mdash; the registered operator.
 
 ```python
 @register_operator("paint_children", family="observation", set="points", kind="aggregate")

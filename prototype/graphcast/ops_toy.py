@@ -379,7 +379,7 @@ class GradientGain(Exchange):
 
         p = lvl.node_type_params if hasattr(lvl, "node_type_params") else None
         if p is None:
-            from plexus.operators.neural import _type_params
+            from plexus.operators.neuron_ops import _type_params
             p = _type_params(lvl, self.params)
         leak, gain = p[:, 0], p[:, 2]                    # p = [a=1/tau, b, g, s, w, h]
         v = lvl.get(self.block).squeeze(-1)

@@ -64,7 +64,7 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`paint_children`](paint_children.qmd), [`reaction_rate`](reaction_rate.qmd).
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`muscle_gaze_map`](muscle_gaze_map.qmd), [`paint_children`](paint_children.qmd), [`reaction_rate`](reaction_rate.qmd).
 
 ## Source
 
