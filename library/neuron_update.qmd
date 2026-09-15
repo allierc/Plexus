@@ -78,6 +78,8 @@ the activity of neural assemblies, eqn. (simulation); the NeuralGraph PDE_N4 gen
 | `s` | self_coupling_strength | &ndash; |
 | `noise` | process_noise_sd_per_step | 0.0 |
 | `block` | membrane_state_block | "voltage" |
+| `tau` | per_neuron_time_constant_block_seconds | None |
+| `tau_min` | clamp_on_tau_seconds | 1e-4 |
 
 ## Minimal spec
 
@@ -96,7 +98,7 @@ Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd),
 
 ## Source
 
-[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+[`src/plexus/operators/neuron_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neuron_ops.py) &mdash; the registered operator.
 
 ```python
 @register_operator("neuron_update", family="signalling", set="neuron", kind="lateral",
@@ -147,6 +149,7 @@ class NeuronUpdate(Lateral):
     PARAM_ROLES = {
         "a": "leak_rate_inverse_tau", "b": "constant_drive", "s": "self_coupling_strength",
         "noise": "process_noise_sd_per_step", "block": "membrane_state_block",
+        "tau": "per_neuron_time_constant_block_seconds", "tau_min": "clamp_on_tau_seconds",
     }
     REFERENCE = ("Allier, C. et al. Graph neural networks uncover structure and function "
                  "underlying the activity of neural assemblies, eqn. (simulation); the "
@@ -157,12 +160,37 @@ class NeuronUpdate(Lateral):
         self.at = params.get("_at", "neuron")
         self.block = params.get("block", "voltage")
         self.noise = float(params.get("noise", 0.0))       # sd of eta_i PER STEP (see forward)
+        # PER-NEURON tau, naming a state block, INSTEAD of the per-type leak. See `forward`.
+        self.tau_block = params.get("tau", None)
+        self.tau_min = float(params.get("tau_min", 1e-4))  # seconds; guards 1/tau
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         x = lvl.get(self.block)                            # [N, 1]
         p = _type_params(lvl, self.params)                 # [N, 6]
         a, b, s = p[:, 0:1], p[:, 1:2], p[:, 3:4]
+        if self.tau_block is not None:
+            # A LEAK PER NEURON, NOT PER TYPE. `a` above is column 0 of the type table, so a set
+            # with eight cell types has eight membrane time constants however many thousand
+            # neurons it holds. That is the right granularity when tau is a property of a cell
+            # CLASS and the wrong one when it is fitted per cell -- and the difference is not
+            # cosmetic. On the 285-cell oculomotor integrator, fitting tau per neuron and per
+            # type give different circuits: which INDIVIDUAL neurons training made fast is what
+            # decides whether the trained recurrence carries an unstable oscillatory mode, and
+            # the instability could not be reproduced by swapping whole-population tau between
+            # fits. A per-type table cannot express that at all.
+            #
+            # `tau:` therefore names a state BLOCK -- per neuron, in seconds, integrated by
+            # nothing -- and when it is given the type table's `a` is unused rather than
+            # combined with it, because two leaks would be a silent third model.
+            if self.tau_block not in lvl.state_schema:
+                raise ValueError(
+                    f"neuron_update: `tau: {self.tau_block!r}` names a state block the set "
+                    f"{self.at!r} does not have (it has "
+                    f"{sorted(lvl.state_schema)}). Declare it in the spec's `state:` -- one "
+                    f"column, integration none -- or drop `tau:` and give the leak as column 0 "
+                    f"of each type's `p`.")
+            a = 1.0 / lvl.get(self.tau_block).clamp_min(self.tau_min)
         dx = -a * x + b + s * torch.tanh(x)
         if self.noise > 0.0:
             # The noise is a per-step DISPLACEMENT, not a rate, and dividing by dt is what

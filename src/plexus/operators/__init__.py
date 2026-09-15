@@ -25,7 +25,7 @@ other is how anyone can tell which one a specification is getting.
                          angles, as a measured static map and the damped body that travels
                          to it. A fit of the MPM eye in prototype/eye/, cheap enough to
                          train a controller through
-    neural               a recurrent circuit: the seed that places a connectome region, the
+    neuron_ops           a recurrent circuit: the seed that places a connectome region, the
                          local update, the signalling through W, and the field modulating it
 
 Every module opens with its own contracts listed IN THE ORDER THEY APPEAR IN THE FILE, then the
@@ -73,7 +73,7 @@ from . import cell_ops             # noqa: F401  compartment (entity), seed_cell
 from . import muscle_ops            # noqa: F401  the reduced oculomotor plant: muscle_gaze_map
 #                                                 (the measured static map g) + eye_mechanics
 #                                                 (the damped body), and the eye/muscle sets
-from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
+from . import neuron_ops            # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
 from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
                                     #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
 #                                                 (psi: shared | type_pre | type_pairwise),
@@ -88,4 +88,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "neural", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "neuron_ops", "continuous_engine"]

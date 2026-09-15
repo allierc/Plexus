@@ -11,7 +11,7 @@ learnable object has a known answer --
     b_i         per-neuron stimulus gain   -> G13
 
 NOTHING IS REIMPLEMENTED. The dynamics are `neuron_update` (leaky_tanh) + `neuron_signal` +
-`neuron_field_input` + `activation_pulse`, all already registered in `plexus.operators.neural`,
+`neuron_field_input` + `activation_pulse`, all already registered in `plexus.operators.neuron_ops`,
 run by `plexus.engine.run`. This module only builds the spatial graph they need and records the
 ground truth alongside the trajectory.
 

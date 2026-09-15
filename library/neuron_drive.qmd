@@ -74,7 +74,7 @@ Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qm
 
 ## Source
 
-[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+[`src/plexus/operators/neuron_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neuron_ops.py) &mdash; the registered operator.
 
 ```python
 @register_operator("neuron_drive", family="signalling", set="neuron", kind="exchange")

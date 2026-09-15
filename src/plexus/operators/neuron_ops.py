@@ -55,6 +55,20 @@ A set with no `types:` falls back to one row read off the operator line, with
 a = 1, b = 0, g = 1, s = 0, w = 1, h = 0 -- a plain leaky integrator with tanh coupling -- so a
 typeless smoke specification is expressible. Types are the intended case.
 
+TWO THINGS A TYPE TABLE CANNOT SAY, and the two options that say them:
+
+    neuron_update  `tau:`   a per-NEURON membrane time constant, naming a state block in
+                            seconds, used instead of the type table's `a`. Eight cell types
+                            give eight time constants however many thousand neurons a set
+                            holds, which is right when tau is a property of a cell class and
+                            wrong when it is fitted per cell.
+    neuron_signal  `dale:`  sign-lock W to the presynaptic type's `sign: E|I`, so the message
+                            uses |w| times the SENDER's sign. Excitatory or inhibitory is a
+                            property of the cell, not of the synapse, and keeping it in `w` as
+                            a signed weight loses it the moment anything learns `w`.
+
+Both are off by default and neither changes an existing specification.
+
 Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
 the activity of neural assemblies. Equations (simulation) and (simulation3); forward
 implementations in the NeuralGraph generators PDE_N2, PDE_N4 and PDE_N5.
@@ -156,6 +170,7 @@ class NeuronUpdate(Lateral):
     PARAM_ROLES = {
         "a": "leak_rate_inverse_tau", "b": "constant_drive", "s": "self_coupling_strength",
         "noise": "process_noise_sd_per_step", "block": "membrane_state_block",
+        "tau": "per_neuron_time_constant_block_seconds", "tau_min": "clamp_on_tau_seconds",
     }
     REFERENCE = ("Allier, C. et al. Graph neural networks uncover structure and function "
                  "underlying the activity of neural assemblies, eqn. (simulation); the "
@@ -166,12 +181,37 @@ class NeuronUpdate(Lateral):
         self.at = params.get("_at", "neuron")
         self.block = params.get("block", "voltage")
         self.noise = float(params.get("noise", 0.0))       # sd of eta_i PER STEP (see forward)
+        # PER-NEURON tau, naming a state block, INSTEAD of the per-type leak. See `forward`.
+        self.tau_block = params.get("tau", None)
+        self.tau_min = float(params.get("tau_min", 1e-4))  # seconds; guards 1/tau
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         x = lvl.get(self.block)                            # [N, 1]
         p = _type_params(lvl, self.params)                 # [N, 6]
         a, b, s = p[:, 0:1], p[:, 1:2], p[:, 3:4]
+        if self.tau_block is not None:
+            # A LEAK PER NEURON, NOT PER TYPE. `a` above is column 0 of the type table, so a set
+            # with eight cell types has eight membrane time constants however many thousand
+            # neurons it holds. That is the right granularity when tau is a property of a cell
+            # CLASS and the wrong one when it is fitted per cell -- and the difference is not
+            # cosmetic. On the 285-cell oculomotor integrator, fitting tau per neuron and per
+            # type give different circuits: which INDIVIDUAL neurons training made fast is what
+            # decides whether the trained recurrence carries an unstable oscillatory mode, and
+            # the instability could not be reproduced by swapping whole-population tau between
+            # fits. A per-type table cannot express that at all.
+            #
+            # `tau:` therefore names a state BLOCK -- per neuron, in seconds, integrated by
+            # nothing -- and when it is given the type table's `a` is unused rather than
+            # combined with it, because two leaks would be a silent third model.
+            if self.tau_block not in lvl.state_schema:
+                raise ValueError(
+                    f"neuron_update: `tau: {self.tau_block!r}` names a state block the set "
+                    f"{self.at!r} does not have (it has "
+                    f"{sorted(lvl.state_schema)}). Declare it in the spec's `state:` -- one "
+                    f"column, integration none -- or drop `tau:` and give the leak as column 0 "
+                    f"of each type's `p`.")
+            a = 1.0 / lvl.get(self.tau_block).clamp_min(self.tau_min)
         dx = -a * x + b + s * torch.tanh(x)
         if self.noise > 0.0:
             # The noise is a per-step DISPLACEMENT, not a rate, and dividing by dt is what
@@ -226,7 +266,7 @@ class _NeuronSignal(Lateral):
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["edge_set"]
-    OPTIONAL_TYPE_PROPS = ["p"]        # see `NeuronUpdate` -- optional, and declared so `p:` is known
+    OPTIONAL_TYPE_PROPS = ["p", "sign"]   # `p` as in `NeuronUpdate`; `sign` read only with `dale: true`
     MECHANISM_TAGS = ["synaptic_transmission", "connectome", "recurrent", "rate_model"]
     PARAM_ROLES = {
         "edge_set": "connectivity_matrix_as_edge_set", "weight": "synaptic_weight_block",
@@ -250,9 +290,52 @@ class _NeuronSignal(Lateral):
         # schedule `neuron_field_input` before this operator: the block is written each tick and
         # starts at zero.
         self.field_block = params.get("field", None)
+        # DALE'S PRINCIPLE, off by default. See `_dale_sign` for what it does and why the sign
+        # cannot live in `w`. A generated network whose weights are already signed leaves this
+        # alone; a connectome whose magnitudes are measured and whose E/I is a claim sets it.
+        self.dale = bool(params.get("dale", False))
+        self._dale_cache = None
 
     def psi(self, x_pre, p_pre, p_post):
         raise NotImplementedError
+
+    def _dale_sign(self, lvl, es):
+        """+1/-1 PER EDGE, from the PRESYNAPTIC neuron's cell type. Cached after the first call.
+
+        Dale's principle: a neuron releases the same transmitter at all of its terminals, so
+        excitatory or inhibitory is a property of the SENDING CELL and every synapse it makes
+        carries that sign. It is therefore not a property of the synapse, and storing it in `w`
+        -- as a signed weight -- loses it the moment anything learns `w`: one gradient step can
+        turn a measured excitatory cell inhibitory, and the result is still a legal connectome
+        that no longer describes the tissue it came from.
+
+        With `dale: true` the operator reads the sign from the presynaptic type's `sign: E|I`
+        and uses `|w| * sign_pre`, so a magnitude is free to move and a sign is not. The sign is
+        a claim the circuit's owner makes about the biology; it is read from the specification's
+        `types:` block and never inferred from the weights.
+        """
+        if self._dale_cache is not None:
+            return self._dale_cache
+        table = getattr(lvl, "_type_table", None)
+        nt = getattr(lvl, "node_type", None)
+        if table is None or nt is None:
+            raise ValueError(
+                f"neuron_signal[dale]: the set {self.at!r} declares no `types:`, so there is no "
+                f"cell type to take a sign from. Dale's principle is a statement about cell "
+                f"classes; without them, sign-locking has nothing to lock to.")
+        missing = [t.get("name", i) for i, t in enumerate(table) if "sign" not in t]
+        if missing:
+            raise ValueError(
+                f"neuron_signal[dale]: types {missing} declare no `sign:`. Every type needs "
+                f"`sign: E` or `sign: I` -- the E/I assignment is the circuit owner's claim "
+                f"about the biology and cannot be guessed from the weights.")
+        bad = sorted({str(t["sign"]) for t in table} - {"E", "I"})
+        if bad:
+            raise ValueError(f"neuron_signal[dale]: `sign:` must be E or I, got {bad}.")
+        per_type = torch.tensor([1.0 if str(t["sign"]) == "E" else -1.0 for t in table],
+                                dtype=torch.float32, device=nt.device)
+        self._dale_cache = per_type[nt][es.pre][:, None]             # [E, 1]
+        return self._dale_cache
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -260,6 +343,9 @@ class _NeuronSignal(Lateral):
         p = _type_params(lvl, self.params)                          # [N, 6]
         x_pre = H.gather(self.edge_set, "pre", self.block)          # [E, 1] lift along `pre`
         w_e = es.get(self.weight_block)                             # [E, 1] W_e
+        if self.dale:
+            # eq:sign-lock -- the magnitude is whatever `w` holds, the sign is the sender's.
+            w_e = w_e.abs() * self._dale_sign(lvl, es).to(w_e.dtype)
         edge_msg = w_e * self.psi(x_pre, p[es.pre], p[es.post])     # [E, 1]
         msg = H.scatter_along(self.edge_set, "post", edge_msg)      # [N, 1] sum along `post`
         g = p[:, 2:3]

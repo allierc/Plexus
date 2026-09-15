@@ -60,6 +60,7 @@ W @ phi(u) with no per-type term inside phi.
 | `activation` | transfer_nonlinearity | "tanh" |
 | `field` | external_modulation_block | None |
 | `block` | membrane_state_block | "voltage" |
+| `dale` | &ndash; | False |
 
 ## Models
 
@@ -87,7 +88,7 @@ Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd),
 
 ## Source
 
-[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+[`src/plexus/operators/neuron_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neuron_ops.py) &mdash; the registered operator.
 
 ```python
 @register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",

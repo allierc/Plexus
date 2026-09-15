@@ -1,0 +1,233 @@
+---
+title: "eye_mechanics"
+subtitle: "The plant: a damped second-order body pulled toward the commanded equilibrium."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: eye`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The plant: a damped second-order body pulled toward the commanded equilibrium.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `eye` (the set the operator acts on).
+- **Reads** &mdash; `fit`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+eye -> eye: reads `gaze`, `gaze_rate` and `gaze_inf`, emits the gaze acceleration.
+
+u is `gaze`, the three angles (theta horizontal, phi vertical, psi torsion) in degrees;
+u_dot is `gaze_rate`, in degrees per second; u_inf is `gaze_inf`, the equilibrium
+`muscle_gaze_map` wrote, in degrees. K is the stiffness, a 3x3 in inverse seconds squared --
+how hard the eye is pulled toward u_inf. C is the damping, a 3x3 in inverse seconds -- how
+hard it resists moving. Both are full matrices and not diagonal: the axes are coupled, which
+is the same fact that makes a horizontal movement leak into torsion.
+
+The fit this was built against gives natural frequencies sqrt(eig K) of 5.78, 6.18 and 7.29
+radians per second -- 0.92 to 1.16 cycles per second -- at damping ratios eig C / (2 w_n) of
+0.40, 0.41 and 0.39. So the eye is UNDERDAMPED: it overshoots and rings at about 1 Hz before
+settling, and that ~1 Hz corner is also what low-passes anything faster than the plant out of
+a gaze-based objective.
+
+IT IS REGISTERED `lateral` AND THAT IS THE WRONG WORD, for the same reason `neuron_update`'s
+is. Lateral means what neighbours do to each other; this law has no neighbour in it. Each eye
+reads its own three blocks and nothing else -- no gather, no scatter, no relation traversed.
+It is filed under `lateral` because `KINDS` has no name for an entity's own dynamics, which
+is where `drag`, `gravity`, `glide`, `velocity_cruise`, `metabolite_homeostasis` and the
+`cell_cycle` timers all sit too.
+
+SECOND ORDER, AND THE ENGINE OWNS THE INTEGRATION. `EMIT = "acceleration"` is the whole of
+this operator's contract with the clock: it hands back u_ddot and the engine advances
+`gaze_rate += dt * a; gaze += dt * gaze_rate`. Getting that wrong is not subtle -- a
+first-order eye has no overshoot, no ringing and almost no lag, and the control problem it
+poses stops being the one a real eye poses.
+
+THE DAMPING IS TAKEN IMPLICITLY, AND THAT IS THE DEFAULT. This body returns the acceleration
+that the implicit update `u_dot' = (I + dt C)^-1 (u_dot + dt K (u_inf - u))` would produce,
+i.e. `a = (u_dot' - u_dot) / dt`, so the engine's own explicit step `u_dot += dt * a` lands
+exactly where the implicit one would. The dt cancels, which is what makes this expressible
+without the engine knowing anything about it.
+
+TWO REASONS, AND ONLY ONE OF THEM IS ABOUT STABILITY. Explicit damping is stable only while
+dt * max(eig C) < 2, and a fitter minimising error at one timestep will walk C toward that
+edge; an earlier fit of this eye reached 1.980 of the limit of 2 at its own 0.009 s step and
+then diverged when a controller rolled it out at 1/60 s. THE FIT IN USE IS NOWHERE NEAR THAT:
+max(eig C) is 5.741 per second, so dt * max(eig C) is 0.096 at dt = 1/60 s, a factor of 21
+inside the limit, and an explicit step is perfectly stable on it. What the implicit form buys
+on THIS eye is not stability but agreement -- it is the discretisation the reference
+implementation uses, so it is the one that reproduces a trajectory the reference produced,
+and a parity check against a trained controller is only worth running if the plant underneath
+it is stepped the same way.
+
+`implementation: explicit` is registered below and evaluates -C u_dot at the rate the eye
+already has. Keeping it is deliberate: it makes the difference measurable rather than
+asserted. Run both over one trial and report the gaze difference in degrees; if it is under
+the fit's own residual, the choice is genuinely free and the run may say so.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `fit` | eye_characterisation_json | **required** |
+| `damping_scale` | multiplier_on_C | 1.0 |
+| `stiffness_scale` | multiplier_on_K | 1.0 |
+
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `explicit` | The same mechanics with the damping taken EXPLICITLY: -C u_dot at the rate the eye has. | &ndash; |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: eye_mechanics, at: eye, fit: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`oculomotor`]{.op-badge} [`plant`]{.op-badge} [`second_order`]{.op-badge} [`damped_oscillator`]{.op-badge} [`hammerstein`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/muscle_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/muscle_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("eye_mechanics", family="oculomotor", set="eye", kind="lateral")
+class EyeMechanics(Lateral):
+    """The plant: a damped second-order body pulled toward the commanded equilibrium.
+
+    eye -> eye: reads `gaze`, `gaze_rate` and `gaze_inf`, emits the gaze acceleration.
+
+        u_ddot + C u_dot + K u = K u_inf      i.e.      u_ddot = K (u_inf - u) - C u_dot
+
+    u is `gaze`, the three angles (theta horizontal, phi vertical, psi torsion) in degrees;
+    u_dot is `gaze_rate`, in degrees per second; u_inf is `gaze_inf`, the equilibrium
+    `muscle_gaze_map` wrote, in degrees. K is the stiffness, a 3x3 in inverse seconds squared --
+    how hard the eye is pulled toward u_inf. C is the damping, a 3x3 in inverse seconds -- how
+    hard it resists moving. Both are full matrices and not diagonal: the axes are coupled, which
+    is the same fact that makes a horizontal movement leak into torsion.
+
+    The fit this was built against gives natural frequencies sqrt(eig K) of 5.78, 6.18 and 7.29
+    radians per second -- 0.92 to 1.16 cycles per second -- at damping ratios eig C / (2 w_n) of
+    0.40, 0.41 and 0.39. So the eye is UNDERDAMPED: it overshoots and rings at about 1 Hz before
+    settling, and that ~1 Hz corner is also what low-passes anything faster than the plant out of
+    a gaze-based objective.
+
+    IT IS REGISTERED `lateral` AND THAT IS THE WRONG WORD, for the same reason `neuron_update`'s
+    is. Lateral means what neighbours do to each other; this law has no neighbour in it. Each eye
+    reads its own three blocks and nothing else -- no gather, no scatter, no relation traversed.
+    It is filed under `lateral` because `KINDS` has no name for an entity's own dynamics, which
+    is where `drag`, `gravity`, `glide`, `velocity_cruise`, `metabolite_homeostasis` and the
+    `cell_cycle` timers all sit too.
+
+    SECOND ORDER, AND THE ENGINE OWNS THE INTEGRATION. `EMIT = "acceleration"` is the whole of
+    this operator's contract with the clock: it hands back u_ddot and the engine advances
+    `gaze_rate += dt * a; gaze += dt * gaze_rate`. Getting that wrong is not subtle -- a
+    first-order eye has no overshoot, no ringing and almost no lag, and the control problem it
+    poses stops being the one a real eye poses.
+
+    THE DAMPING IS TAKEN IMPLICITLY, AND THAT IS THE DEFAULT. This body returns the acceleration
+    that the implicit update `u_dot' = (I + dt C)^-1 (u_dot + dt K (u_inf - u))` would produce,
+    i.e. `a = (u_dot' - u_dot) / dt`, so the engine's own explicit step `u_dot += dt * a` lands
+    exactly where the implicit one would. The dt cancels, which is what makes this expressible
+    without the engine knowing anything about it.
+
+    TWO REASONS, AND ONLY ONE OF THEM IS ABOUT STABILITY. Explicit damping is stable only while
+    dt * max(eig C) < 2, and a fitter minimising error at one timestep will walk C toward that
+    edge; an earlier fit of this eye reached 1.980 of the limit of 2 at its own 0.009 s step and
+    then diverged when a controller rolled it out at 1/60 s. THE FIT IN USE IS NOWHERE NEAR THAT:
+    max(eig C) is 5.741 per second, so dt * max(eig C) is 0.096 at dt = 1/60 s, a factor of 21
+    inside the limit, and an explicit step is perfectly stable on it. What the implicit form buys
+    on THIS eye is not stability but agreement -- it is the discretisation the reference
+    implementation uses, so it is the one that reproduces a trajectory the reference produced,
+    and a parity check against a trained controller is only worth running if the plant underneath
+    it is stepped the same way.
+
+    `implementation: explicit` is registered below and evaluates -C u_dot at the rate the eye
+    already has. Keeping it is deliberate: it makes the difference measurable rather than
+    asserted. Run both over one trial and report the gaze difference in degrees; if it is under
+    the fit's own residual, the choice is genuinely free and the run may say so.
+    """
+
+    EMIT = "acceleration"              # second-order: the eye has inertia
+    INTEGRAND = "gaze"                 # not the set's spatial coordinate -- the angles
+    INPUTS = ["eye"]
+    OUTPUTS = ["eye"]
+    READS = ["gaze", "gaze_rate", "gaze_inf"]
+    WRITES = ["gaze"]
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["fit"]
+    MECHANISM_TAGS = ["oculomotor", "plant", "second_order", "damped_oscillator",
+                      "hammerstein"]
+    PARAM_ROLES = {"fit": "eye_characterisation_json",
+                   "damping_scale": "multiplier_on_C", "stiffness_scale": "multiplier_on_K"}
+    REFERENCE = ("The linear half of a Hammerstein cascade. C and K fitted to the step "
+                 "responses of the soft-body eye in Plexus prototype/eye/.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "eye")
+        spec = _load_fit(params["fit"])
+        c_s = float(params.get("damping_scale", 1.0))
+        k_s = float(params.get("stiffness_scale", 1.0))
+        self._C = torch.as_tensor(spec["C"], dtype=torch.float32, device=device) * c_s
+        self._K = torch.as_tensor(spec["K"], dtype=torch.float32, device=device) * k_s
+
+    def _accel(self, u, u_dot, u_inf, dt):
+        """The implicit-damping acceleration: what `u_dot += dt * a` must be to equal
+        `u_dot' = (I + dt C)^-1 (u_dot + dt K (u_inf - u))`."""
+        C = self._C.to(device=u.device, dtype=u.dtype)
+        K = self._K.to(device=u.device, dtype=u.dtype)
+        eye3 = torch.eye(3, device=u.device, dtype=u.dtype)
+        minv = torch.linalg.inv(eye3 + dt * C)
+        target = u_dot + dt * ((u_inf - u) @ K.T)
+        return ((target @ minv.T) - u_dot) / dt
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        u = lvl.get("gaze")
+        u_dot = lvl.get("gaze_rate")
+        u_inf = lvl.get("gaze_inf")
+        dt = float(getattr(H.config, "dt", 1.0)) or 1.0
+        a = self._accel(u, u_dot, u_inf, dt) * lvl.occ[:, None]
+        if mask is not None:
+            a = a * mask[:, None].to(a.dtype)
+        return {self.at: a}
+```
