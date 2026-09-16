@@ -89,6 +89,12 @@ class Spec:
     # plexus.<N>_engine.run. A mode of RUNNING, not a different physics -- `continuous` still
     # delegates to the same loop and exists only to refuse specs its operators cannot check.
     engine: str = "default"
+    # WHAT IS FITTED. Empty on every forward spec, which is all of them until one declares
+    # otherwise -- the forward description is unchanged by training, and that is the property
+    # `learnable:` exists to preserve. Two forms, validated in `_parse_learnable`:
+    #   {block: w, of: recurrent}        a state block becomes a tensor leaf
+    #   {replaces: neuron_signal, ...}   an operator is stood in for by a fitted approximator
+    learnable: list = field(default_factory=list)
     record_cap: int = 10000                          # max recorded SET (position) frames; the trajectory is strided if n_frames exceeds it
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
     # THE PHYSICAL SCALE, declared once under `general.units:` and never inferred. Three base scales
@@ -105,6 +111,63 @@ _RESERVED = {"op", "at", "to", "from", "implementation", "model"}
 # now, and integration is implicit (end of tick). Every schedule token must resolve
 # to a declared operator.
 _BUILTIN_STEPS: set = set()
+
+
+def _parse_learnable(block, raw):
+    """Validate `learnable:` and return it as a list of dicts. Nothing is built here.
+
+    TWO FORMS, because there are two things a fit can be about:
+
+        {block: w, of: recurrent}
+            a STATE BLOCK becomes a tensor leaf. This is parameter recovery -- fit the synaptic
+            weights, the time constants, the conductances -- and it is the case connectome work
+            actually needs: the mechanism is stated and its constants are not.
+
+        {replaces: neuron_signal, at: neuron, with: siren_edge, params: {...}}
+            an OPERATOR is stood in for by a fitted approximator. This is mechanism discovery --
+            the law itself is not stated. Checked against the operator's contract and its
+            MEASURED relations in `plexus.learnables.check_substitution`; the check cannot run
+            here because it needs a built Hierarchy to have watched the operator run.
+
+    Refusals are for the things that would otherwise fit something other than what was meant: a
+    block of a set that does not exist, an operator no schedule names, and the two forms mixed in
+    one entry.
+    """
+    if not block:
+        return []
+    if not isinstance(block, list):
+        raise ValueError("`learnable:` is a LIST of entries, one per thing fitted")
+    sets, ops = raw.get("sets", {}), {o.get("op") for o in (raw.get("operators") or [])}
+    out = []
+    for i, e in enumerate(block):
+        if not isinstance(e, dict):
+            raise ValueError(f"learnable[{i}] is not a mapping")
+        has_block, has_op = "block" in e, "replaces" in e
+        if has_block == has_op:
+            raise ValueError(
+                f"learnable[{i}] must be EITHER {{block:, of:}} (fit a constant) OR "
+                f"{{replaces:, with:}} (fit a law), not both and not neither. They are different "
+                f"claims: one says the mechanism is right and its numbers are not, the other says "
+                f"the mechanism is unknown.")
+        if has_block:
+            for k in ("block", "of"):
+                if k not in e:
+                    raise ValueError(f"learnable[{i}] needs `{k}:`")
+            if e["of"] not in sets:
+                raise ValueError(
+                    f"learnable[{i}] fits block {e['block']!r} of {e['of']!r}, which is not a "
+                    f"declared set. Declared: {sorted(sets)}")
+        else:
+            for k in ("replaces", "with"):
+                if k not in e:
+                    raise ValueError(f"learnable[{i}] needs `{k}:`")
+            if e["replaces"] not in ops:
+                raise ValueError(
+                    f"learnable[{i}] replaces {e['replaces']!r}, which no operator line declares. "
+                    f"Declared: {sorted(ops)}. A substitution for an operator the spec does not "
+                    f"run would fit nothing and report no error.")
+        out.append(dict(e))
+    return out
 
 
 def load(path: str) -> Spec:
@@ -576,6 +639,7 @@ def load(path: str) -> Spec:
         dim=dim,
         world_size=world_size,
         plotting=raw.get("plotting", {}),
+        learnable=_parse_learnable(raw.get("learnable"), raw),
         engine=str(gv("engine", "default")).lower(),
         record_cap=int(gv("record_cap", 10000)),
         field_record_cap=int(gv("field_record_cap", 256)),

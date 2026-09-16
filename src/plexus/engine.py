@@ -1887,6 +1887,62 @@ def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None, re
            "name": sim.name}
 
 
+def apply_learnable_blocks(H, sim) -> list:
+    """`learnable: {block: w, of: recurrent}` -> an nn.Parameter the loss can reach.
+
+    A Level keeps ONE state tensor and a schema of column ranges, so "this block is fitted" cannot
+    be expressed by making the tensor a parameter -- that would fit every block at once, including
+    the ones that are measurements. Instead the block's current columns are lifted out into a
+    parameter held on the Level, and written back in each time the run starts. The write is
+    functional (clone, assign, publish), so the tape connects the parameter to every use of the
+    state downstream and a loss on the final frame differentiates back to it.
+
+    THE INITIAL VALUE IS WHATEVER THE SPEC PUT THERE, and that matters as much as the mechanism.
+    A connectome's `w` comes from an npz of measured synapse areas, so a fit STARTS at the
+    measurement and what training does is move away from it -- which is the readable quantity, the
+    one `plot_recovery_panels` puts on an axis. Initialising at random would discard the only
+    thing that makes the result interpretable.
+
+    Returns the parameters it created, in spec order.
+    """
+    made = []
+    held = getattr(sim, "fitted", None)
+    if held is None:
+        held = sim.fitted = {}
+    for e in getattr(sim, "learnable", []):
+        if "block" not in e:
+            continue                                   # an operator substitution; handled at instantiation
+        lvl = H.level(e["of"])
+        blk = e["block"]
+        if blk not in lvl.state_schema:
+            raise ValueError(
+                f"learnable: block {blk!r} is not a block of set {e['of']!r} "
+                f"(it has {sorted(lvl.state_schema)}).")
+        a, b = lvl.state_schema[blk]
+        # THE PARAMETER IS HELD ON THE SPEC, NOT REMADE PER RUN, and that is what makes training
+        # possible at all. `engine.run` rebuilds the Hierarchy every call -- which is what makes a
+        # run reproducible -- so a parameter created inside one rollout does not survive into the
+        # next. An optimiser given the first rollout's tensors would then be moving objects no
+        # later rollout reads, the loss would wander, and nothing would say why. Holding it on the
+        # Spec means every rollout of one training run writes the SAME leaf into state.
+        key = f"{e['of']}.{blk}"
+        par = held.get(key)
+        if par is None:
+            par = held[key] = nn.Parameter(lvl.state[:, a:b].detach().clone())
+        if not hasattr(lvl, "_fitted"):
+            lvl._fitted = nn.ParameterDict()
+        lvl._fitted[blk] = par
+        st = lvl.state.clone()
+        st[:, a:b] = par
+        lvl.state = st
+        made.append(par)
+        if getattr(sim, "_learnable_announced", False) is False:
+            print(f"[learnable] {e['of']}.{blk}: {par.numel()} value(s) fitted, "
+                  f"starting at the spec's own", flush=True)
+    sim._learnable_announced = True        # once per spec, not once per rollout
+    return made
+
+
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False,
         grad: bool = False) -> tuple[Hierarchy, dict]:
@@ -1919,6 +1975,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             vel = _init_velocity(vinit, lvl, H.world_size, H.rng, device)
             st = lvl.state.clone(); st[:vel.shape[0], vx0:vx1] = vel; lvl.state = st
             lvl._vel_init = None
+    apply_learnable_blocks(H, sim)            # 1.7) `learnable: {block:, of:}` -> tensor leaves
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)
