@@ -264,3 +264,81 @@ def statespace(u, dt, A=None, B=None, C=None, D=None, **_):
 
 statespace.poles = lambda dt, A=None, **_: np.linalg.eigvals(np.atleast_2d(np.asarray(A, float)))
 statespace.n_targets = lambda channels, C=None, **_: int(np.atleast_2d(np.asarray(C, float)).shape[0])
+
+
+# --------------------------------------------------------------------------- #
+#  the electrical realisation
+# --------------------------------------------------------------------------- #
+# A CONVENTIONAL CAPACITANCE, so the other two values are determined. A transfer function fixes
+# only the RATIOS -- (R, L, C) and (kR, kL, C/k) realise the same H(s) -- so one component has to
+# be chosen before any of them is a number. 1 uF is the usual bench choice and puts audio-band
+# poles at kilo-ohms and milli-henries, which is what the values below come out as.
+C_REF = 1e-6
+
+
+def rlc_stages(poles):
+    """The R-L-C ladder that realises a set of poles: one stage per pole or conjugate pair.
+
+    Every rational H(s) factors into first- and second-order sections, and each section is a
+    textbook network:
+
+        real pole at -a          an RC low-pass, output across C.   tau = RC = 1/a
+        complex pair at
+        -zeta w0 +- j w0 sqrt()  a series RLC, output across C.
+                                 w0 = 1/sqrt(LC)      -> L = 1/(w0^2 C)
+                                 zeta = (R/2)sqrt(C/L) -> R = 2 zeta sqrt(L/C)
+
+    So the whole task library is a cascade of these, and "order N" is literally N/2 boxes on a
+    breadboard. That is not a metaphor laid over the maths afterwards -- it is where the filter
+    families came from, and the reason an existing filter-design library was the right source for
+    a task vocabulary.
+
+    A pole at the origin (the perfect integrator, 1/s) is NOT an RLC network: no passive
+    combination gives infinite DC gain, which is why a real integrator needs an op-amp with a
+    capacitor in feedback. It is reported as its own kind rather than forced into the ladder.
+    """
+    poles = [complex(p) for p in np.atleast_1d(poles)]
+    stages, used = [], set()
+    for i, p in enumerate(poles):
+        if i in used:
+            continue
+        if abs(p) < 1e-9:                                  # a pole AT the origin
+            stages.append({"kind": "integrator", "R": 1e4, "C": C_REF,
+                           "note": "ideal integrator: op-amp, R in, C in feedback"})
+            continue
+        if abs(p.imag) < 1e-9:                             # real pole -> RC
+            tau = 1.0 / abs(p.real)
+            stages.append({"kind": "RC", "R": tau / C_REF, "C": C_REF,
+                           "tau_s": tau, "f_hz": abs(p.real) / (2 * np.pi)})
+            continue
+        # complex pair -> series RLC; consume the conjugate so it is one stage, not two
+        for j in range(i + 1, len(poles)):
+            if j not in used and abs(poles[j] - p.conjugate()) < 1e-6 * max(abs(p), 1.0):
+                used.add(j)
+                break
+        w0 = abs(p)
+        zeta = -p.real / w0 if w0 > 0 else 0.0
+        L = 1.0 / (w0 ** 2 * C_REF)
+        stages.append({"kind": "RLC", "R": 2 * zeta * np.sqrt(L / C_REF), "L": L, "C": C_REF,
+                       "w0": w0, "zeta": zeta, "f_hz": w0 / (2 * np.pi),
+                       # L = 1/(w0^2 C) grows as the square of the period, so a 1 Hz pole at a
+                       # bench capacitance needs tens of kilohenries -- an inductor that does not
+                       # exist. The TOPOLOGY is still the right one; what it says is that at
+                       # biological timescales the passive realisation is impractical and a real
+                       # one is active, an op-amp with a capacitor in feedback. That is not a
+                       # defect of the analogy, it is why analog computers integrated with
+                       # op-amps instead of with coils.
+                       "passive_practical": bool(L < 100.0)})
+    return stages
+
+
+def eng(x, unit):
+    """`4.7 kohm`, `220 mH`, `1.0 uF` -- engineering notation, because a value printed as
+    4700.0 is a number and a value printed as 4.7 k is a component you could go and buy."""
+    if x == 0 or not np.isfinite(x):
+        return f"0 {unit}"
+    p = int(np.floor(np.log10(abs(x)) / 3) * 3)
+    p = max(-12, min(9, p))
+    pre = {-12: "p", -9: "n", -6: "u", -3: "m", 0: "", 3: "k", 6: "M", 9: "G"}[p]
+    v = x / 10.0 ** p
+    return f"{v:.3g} {pre}{unit}"
