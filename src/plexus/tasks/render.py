@@ -13,6 +13,9 @@ Five panels, and the middle one is the reason the figure exists:
         marked, so "this mode cannot be identified" is a thing you SEE rather than a line of json
     d   the teacher's own Bode magnitude, known in closed form, over the same axis as (c)
     e   the condition grid and the split counts, as text
+    f   THE R-L-C LADDER that realises the teacher -- one section per pole or conjugate pair,
+        with component values. These tasks are not LIKE electronic filters, they ARE them, and
+        this is the panel that shows it rather than asserting it.
 
 Panel (c) against (d) is the whole argument of this package in one picture: the teacher's poles
 have to sit where the stimulus has power, and both are computable before any circuit exists.
@@ -67,8 +70,8 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
     T, dt = spec.T, spec.dt
     t = np.arange(T) * dt
     cells = spec.cells
-    fig = plt.figure(figsize=(13, 7.2), facecolor=BG)
-    gs = fig.add_gridspec(2, 3, hspace=0.32, wspace=0.24)
+    fig = plt.figure(figsize=(16, 7.4), facecolor=BG)
+    gs = fig.add_gridspec(2, 4, hspace=0.36, wspace=0.28)
 
     # -- a, b: traces, a few per cell ------------------------------------------------------
     axa, axb = _ax(fig.add_subplot(gs[0, 0]), ylabel="stimulus", letter="a"), None
@@ -82,7 +85,7 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
     axa.set_xticklabels([])
 
     # -- c: the spectrum, with the poles on it ---------------------------------------------
-    axc = _ax(fig.add_subplot(gs[0, 1:]), ylabel="stimulus power (dB rel peak)", letter="c")
+    axc = _ax(fig.add_subplot(gs[0, 1:3]), ylabel="stimulus power (dB rel peak)", letter="c")
     f = np.fft.rfftfreq(T, d=dt)
     psd = (np.abs(np.fft.rfft(U, axis=1)) ** 2).mean(axis=(0, 2))
     db = 10 * np.log10(np.maximum(psd, 1e-300) / max(psd.max(), 1e-300))
@@ -121,7 +124,7 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
         axd.set_xticks([]); axd.set_yticks([])
 
     # -- e: what this corpus IS, in words ---------------------------------------------------
-    axe = _ax(fig.add_subplot(gs[1, 2]), letter="e")
+    axe = _ax(fig.add_subplot(gs[0, 3]), letter="e")
     axe.set_xticks([]); axe.set_yticks([])
     lines = ["", f"{spec.name}",
              f"split {split}: {U.shape[0]} trials x {T} frames ({spec.duration_s} s, dt={dt:.5f})",
@@ -137,6 +140,26 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
             lines.append(f"   {k}: {s[:34] + '...' if len(s) > 34 else s}")
     axe.text(0.05, 0.92, "\n".join(_wrap(lines, 44)), transform=axe.transAxes, va="top",
              ha="left", color=INK, fontsize=7.5, family="monospace")
+
+    # -- f: the network that realises the teacher ------------------------------------------
+    axf = _ax(fig.add_subplot(gs[1, 2:]), letter="f")
+    from plexus.tasks import get_teacher
+    from plexus.tasks.lti import rlc_stages
+    law = get_teacher(spec.law_name)
+    # THE FIRST CELL ONLY, and it says so. A grid over the TEACHER has a different network in
+    # every cell -- a sweep over filter order is 1, 2 and 4 sections -- and drawing the first
+    # without saying which would show the simplest member as if it were the family.
+    n_cells = len(spec.cells)
+    note = None
+    if n_cells > 1:
+        pk = sorted(set(spec.conditions) - set(spec.stimulus))
+        note = (f"cell 1 of {n_cells}: " + ", ".join(f"{k}={spec.cells[0][k]}" for k in pk)
+                if pk else f"cell 1 of {n_cells} (the grid varies the stimulus, not the network)")
+    try:
+        pl = law.poles(spec.dt, **spec.teacher) if hasattr(law, "poles") else []
+        draw_rlc(axf, rlc_stages(pl), cell_note=note)
+    except Exception:                                            # noqa: BLE001
+        draw_rlc(axf, [], cell_note=note)
 
     fig.savefig(out_path, dpi=130, facecolor=BG, bbox_inches="tight")
     plt.close(fig)
@@ -205,3 +228,133 @@ def _bode(spec, f):
         return 20 * np.log10(np.maximum(np.abs(h), 1e-30))
     except Exception:                                            # noqa: BLE001
         return None
+
+
+# --------------------------------------------------------------------------- #
+#  the R-L-C schematic
+# --------------------------------------------------------------------------- #
+# Component symbols, drawn from primitives rather than pulled from a library, because the only
+# ones needed are three and a schematic package would be a dependency for six polylines.
+def _wire(ax, x0, y0, x1, y1, c=INK, lw=1.0):
+    ax.plot([x0, x1], [y0, y1], color=c, lw=lw, solid_capstyle="round")
+
+
+def _resistor(ax, x0, x1, y, label=None, n=6, h=0.055):
+    """The zigzag, IEC's rectangle being harder to read small."""
+    xs = np.linspace(x0, x1, 2 * n + 2)
+    ys = [y] + [y + h * (-1) ** i for i in range(2 * n)] + [y]
+    ax.plot(xs, ys, color=INK, lw=1.0, solid_capstyle="round")
+    if label:
+        ax.text((x0 + x1) / 2, y + h + 0.05, label, ha="center", va="bottom",
+                fontsize=6.5, color=INK)
+
+
+def _inductor(ax, x0, x1, y, label=None, n=4, r=0.045):
+    """Four half-loops on top of the wire."""
+    for i in range(n):
+        cx = x0 + (i + 0.5) * (x1 - x0) / n
+        th = np.linspace(np.pi, 0, 24)
+        ax.plot(cx + r * np.cos(th), y + r * np.sin(th), color=INK, lw=1.0)
+    _wire(ax, x0, y, x1, y)
+    if label:
+        ax.text((x0 + x1) / 2, y + r + 0.06, label, ha="center", va="bottom",
+                fontsize=6.5, color=INK)
+
+
+def _capacitor(ax, x, y0, y1, label=None, w=0.07):
+    """Two plates on a vertical shunt leg. `w` is the plate half-width, in x data units."""
+    """Two plates, drawn across a vertical shunt leg."""
+    ym = (y0 + y1) / 2
+    _wire(ax, x, y0, x, ym + 0.035)
+    _wire(ax, x, ym - 0.035, x, y1)
+    _wire(ax, x - w, ym + 0.035, x + w, ym + 0.035)
+    _wire(ax, x - w, ym - 0.035, x + w, ym - 0.035)
+    if label:
+        ax.text(x + w * 1.4, ym, label, ha="left", va="center", fontsize=6.5, color=INK)
+
+
+def _ground(ax, x, y, w=0.075):
+    for i, k in enumerate((1.0, 0.6, 0.25)):
+        _wire(ax, x - w * k, y - i * 0.035, x + w * k, y - i * 0.035)
+
+
+def draw_rlc(ax, stages, max_stages=3, aspect=2.25, cell_note=None):
+    """`aspect` is the panel's width/height. Symbol sizes are in DATA units and the panel is far
+    wider than tall, so without it a coil is an ellipse and a capacitor's plates sit a third of
+    the panel apart. Setting xlim to the aspect makes one x unit equal one y unit."""
+    """The ladder that realises the teacher, one section per pole or conjugate pair.
+
+    This is the panel that makes the claim concrete: these tasks are not LIKE electronic filters,
+    they ARE them -- the 160 named laws in `lti.py` are canonical R-L-C networks reduced to
+    transfer functions, and this draws one back out. `order N` on a spec is N/2 boxes here.
+    """
+    from plexus.tasks.lti import eng
+    W = float(aspect)
+    ax.set_xlim(0, W); ax.set_ylim(0, 1)
+    ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    if not stages:
+        ax.text(0.5, 0.5, "no poles:\nno R-L-C realisation", ha="center", va="center",
+                color=MUTED, fontsize=8)
+        return
+    if stages[0]["kind"] == "integrator":
+        # 1/s is not a passive network: no combination of R, L and C gives infinite DC gain.
+        y, ytop = 0.46, 0.80
+        _wire(ax, 0.06 * W, y, 0.18 * W, y)
+        _resistor(ax, 0.18 * W, 0.36 * W, y, "R")
+        _wire(ax, 0.36 * W, y, 0.46 * W, y)
+        _wire(ax, 0.46 * W, y, 0.46 * W, ytop)
+        _wire(ax, 0.46 * W, ytop, 0.56 * W, ytop)
+        _capacitor(ax, 0.60 * W, ytop + 0.07, ytop - 0.07, "C", w=0.05 * W)
+        _wire(ax, 0.64 * W, ytop, 0.76 * W, ytop)
+        _wire(ax, 0.76 * W, ytop, 0.76 * W, y)
+        ax.add_patch(plt_polygon([(0.46 * W, y - 0.17), (0.46 * W, y + 0.17), (0.72 * W, y)]))
+        _wire(ax, 0.72 * W, y, 0.90 * W, y)
+        ax.text(0.5 * W, 0.12, "1/s is ACTIVE, not passive: no R-L-C gives infinite DC gain.\n"
+                               "An op-amp with C in feedback is the realisation.",
+                ha="center", va="center", fontsize=6.5, color=MUTED)
+        ax.text(0.03 * W, y, "in", ha="right", va="center", fontsize=7, color=MUTED)
+        ax.text(0.93 * W, y, "out", ha="left", va="center", fontsize=7, color=MUTED)
+        return
+
+    shown = stages[:max_stages]
+    n = len(shown)
+    y, ygnd = 0.60, 0.26
+    span = W / n
+    warn = False
+    for k, st in enumerate(shown):
+        x0 = k * span + 0.03 * W / n
+        w = span - 0.06 * W / n
+        if st["kind"] == "RC":
+            _wire(ax, x0, y, x0 + 0.10 * w, y)
+            _resistor(ax, x0 + 0.10 * w, x0 + 0.50 * w, y, eng(st["R"], "Ω"))
+            _wire(ax, x0 + 0.50 * w, y, x0 + 0.72 * w, y)
+        else:
+            _wire(ax, x0, y, x0 + 0.06 * w, y)
+            _resistor(ax, x0 + 0.06 * w, x0 + 0.34 * w, y, eng(st["R"], "Ω"))
+            _inductor(ax, x0 + 0.38 * w, x0 + 0.66 * w, y, eng(st["L"], "H"))
+            _wire(ax, x0 + 0.66 * w, y, x0 + 0.72 * w, y)
+            warn |= not st.get("passive_practical", True)
+        xc = x0 + 0.72 * w
+        _capacitor(ax, xc, y, ygnd, eng(st["C"], "F"), w=0.035 * W)
+        _ground(ax, xc, ygnd, w=0.04 * W)
+        _wire(ax, xc, y, x0 + w, y)
+        ax.text(x0 + 0.5 * w, 0.94, f"{st['f_hz']:.3g} Hz"
+                + (f"  ζ={st['zeta']:.2f}" if "zeta" in st else ""),
+                ha="center", va="top", fontsize=6.5, color=MUTED)
+    ax.text(0.0, y, "in", ha="right", va="center", fontsize=7, color=MUTED)
+    ax.text(W, y, "out", ha="left", va="center", fontsize=7, color=MUTED)
+    tail = f"  (+{len(stages) - n} more section{'s' if len(stages) - n > 1 else ''})" \
+        if len(stages) > n else ""
+    note = f"{len(stages)} section{'s' if len(stages) != 1 else ''}{tail}"
+    if cell_note:
+        note += f"  —  {cell_note}"
+    if warn:
+        note += "  —  L is impractically large at this frequency: realise actively"
+    ax.text(0.5 * W, 0.04, note, ha="center", va="bottom", fontsize=6.5, color=MUTED)
+
+
+def plt_polygon(pts):
+    from matplotlib.patches import Polygon
+    return Polygon(pts, closed=True, fill=False, edgecolor=INK, lw=1.0)

@@ -311,3 +311,60 @@ def test_trainer_circuit_is_arithmetically_the_operators():
     assert err < 1e-5, (
         f"CircuitRNN departs from project/neuron_update/neuron_signal/readout by {err:.3e}. The "
         f"trainer's claim to be evaluating the spec is then false.")
+
+
+# --------------------------------------------------------------------------- #
+#  the R-L-C realisation
+# --------------------------------------------------------------------------- #
+def test_a_second_order_pole_pair_gives_back_its_own_w0_and_zeta():
+    """The ladder is derived from the poles, so it must reproduce them.
+
+    A series RLC has w0 = 1/sqrt(LC) and zeta = (R/2)sqrt(C/L). Deriving L and R from a pole
+    pair and then recomputing those two is a round trip: if it closes, the schematic is of the
+    teacher and not of something adjacent to it.
+    """
+    from plexus.tasks.lti import rlc_stages
+    f_n, zeta = 1.0, 0.4
+    wn = 2 * np.pi * f_n
+    poles = T.get_teacher("laplace").poles(
+        DT, num=[wn ** 2], den=[1.0, 2 * zeta * wn, wn ** 2])
+    st = rlc_stages(poles)
+    assert len(st) == 1, "a conjugate PAIR is one section, not two"
+    s0 = st[0]
+    assert s0["kind"] == "RLC"
+    w0_back = 1.0 / np.sqrt(s0["L"] * s0["C"])
+    zeta_back = (s0["R"] / 2) * np.sqrt(s0["C"] / s0["L"])
+    assert w0_back == pytest.approx(wn, rel=1e-6), "L, C do not give back w0"
+    assert zeta_back == pytest.approx(zeta, rel=1e-6), "R does not give back zeta"
+
+
+def test_a_real_pole_gives_an_rc_whose_time_constant_is_right():
+    from plexus.tasks.lti import rlc_stages
+    tau = 8.0
+    st = rlc_stages(T.get_teacher("integrate").poles(DT, tau_s=tau))
+    assert len(st) == 1 and st[0]["kind"] == "RC"
+    assert st[0]["R"] * st[0]["C"] == pytest.approx(tau, rel=1e-9), "RC is not tau"
+
+
+def test_a_pole_at_the_origin_is_not_a_passive_network():
+    """1/s has infinite DC gain, which no combination of R, L and C provides."""
+    from plexus.tasks.lti import rlc_stages
+    st = rlc_stages(T.get_teacher("integrate").poles(DT))
+    assert len(st) == 1 and st[0]["kind"] == "integrator"
+    assert "op-amp" in st[0]["note"]
+
+
+def test_order_is_the_number_of_sections():
+    """`order: N` on a spec is N/2 boxes on a breadboard -- the difficulty axis, made literal."""
+    from plexus.tasks.lti import rlc_stages
+    for order, expect in ((2, 1), (4, 2), (8, 4)):
+        st = rlc_stages(T.get_teacher("lti").poles(
+            DT, family="butter", band="lowpass", order=order, cutoff_hz=1.0))
+        assert len(st) == expect, f"order {order} should be {expect} section(s), got {len(st)}"
+
+
+def test_engineering_notation_reads_as_a_component():
+    from plexus.tasks.lti import eng
+    assert eng(4700.0, "Ω").startswith("4.7 k")
+    assert eng(1e-6, "F").startswith("1 u")
+    assert eng(0.22, "H").startswith("220 m")
