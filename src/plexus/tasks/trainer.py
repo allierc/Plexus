@@ -311,6 +311,12 @@ def test(run, root=None, device=None):
 # --------------------------------------------------------------------------- #
 #  plot
 # --------------------------------------------------------------------------- #
+def _f(v, w=8):
+    """`+0.0042`, or `n/a` -- a law with no poles (a delay, a static gain) has no real part to
+    report, and formatting None crashed the figure after the run had already trained."""
+    return f"{v:+.4f}" if isinstance(v, (int, float)) else "     n/a"
+
+
 def plot(run, root=None, device=None, n_show=4):
     import matplotlib
     matplotlib.use("Agg")
@@ -391,9 +397,9 @@ def plot(run, root=None, device=None, n_show=4):
              "",
              f"teacher poles  {np.round(res.get('teacher_pole_freq_hz', []), 4).tolist()} Hz",
              f"circuit slowest{np.round(res.get('circuit_slowest_pole_freq_hz', [])[:4], 4).tolist()} Hz",
-             f"max Re(lam)    circuit {res.get('circuit_max_real_eig', float('nan')):+.4f} 1/s",
-             f"               teacher {res.get('teacher_max_real_pole', float('nan')):+.4f} 1/s",
-             f"               gap     {res.get('max_real_gap', float('nan')):+.4f} 1/s",
+             f"max Re(lam)    circuit {_f(res.get('circuit_max_real_eig'))} 1/s",
+             f"               teacher {_f(res.get('teacher_max_real_pole'))} 1/s",
+             f"               gap     {_f(res.get('max_real_gap'))} 1/s",
              "",
              ("corpus IDENTIFIABLE" if res.get("identifiable", True) else
               "corpus NOT IDENTIFIABLE -- a low\nerror here does not mean the\ncircuit has the "
