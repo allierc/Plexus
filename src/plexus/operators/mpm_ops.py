@@ -698,27 +698,12 @@ class MPMScatter(MPMWrites, Exchange):
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
         # the rest of the run no longer reads. That failure is SILENT: capture succeeds, nothing
         # raises, and the checksum is simply wrong.
-        # FUNCTIONAL UNDER GRAD, IN PLACE OTHERWISE, and the two are the same numbers. The
-        # in-place form exists for CUDA-graph capture, which holds the addresses it saw -- and
-        # capture is off under `grad=True` by construction, since the warp bodies register no
-        # backward. Autograd cannot use it either way: the grid is zeroed and re-accumulated every
-        # substep, so the tensor a later substep needs for its backward has already been
-        # overwritten, and an inverse rollout dies with "a variable needed for gradient computation
-        # has been modified by an inplace operation ... [40, 40, 40]". Rebinding fresh tensors is
-        # what makes deformation-gradient control possible at all; it costs one grid allocation a
-        # substep, and only while a tape is being kept.
-        #
-        # WHAT IT IS FOR: papers/Xu_2024_mpm_shape_morphing.pdf makes the per-particle F the CONTROL
-        # variable of an optimisation and takes the loss on this grid's own nodal mass rather than on
-        # particle positions -- a target shape has no particle correspondence, so a position loss has
-        # nothing to match against exactly where the two shapes differ. Every line of that needs the
-        # rollout to be differentiable, and the rollout is not differentiable while the grid is
-        # rebuilt in place. See tools/shape_control.py for the smallest instance of the loop.
-        # Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material Point
-        # Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
-        # Xu, M. & Levin, D. I. W. (2023). Deformation Gradient Control of Physically Simulated
-        # Amorphous Solids. SCA '23, doi 10.1145/3606037.3606840; the render-guided variant is
-        # papers/Song_2025_physmorph_gs.pdf.
+        # FUNCTIONAL UNDER GRAD, IN PLACE OTHERWISE, and the two are the same numbers. Autograd
+        # cannot use the in-place form: the grid is zeroed and re-accumulated every substep, so the
+        # tensor a later substep needs for its backward has already been overwritten, and an
+        # inverse rollout dies on "a variable needed for gradient computation has been modified by
+        # an inplace operation". The `differentiable` implementations at the end of this file are
+        # where that trade-off, its cost and its citations live.
         gm, gmv, gc = g.m, g.mv, g.c
         liquid = getattr(p, "is_liquid", None)
         lw = ((weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
@@ -1361,9 +1346,6 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
 @register_operator("mpm_grid_update", implementation="nosync", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateNoSync(MPMGridUpdate):
-    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
-    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
-    HONOURS_WALL_FRICTION = False
     """The grid solve with a sync-free 2D wall boundary condition: the same physics, with the
     host synchronisation that the default 2D path incurs removed. Identical in 3D, where the
     default already has none.
@@ -1371,6 +1353,10 @@ class MPMGridUpdateNoSync(MPMGridUpdate):
     A host sync inside a substep blocks CUDA graph capture, so removing it is what lets the whole
     substep be captured.
     """
+
+    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
+    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
+    HONOURS_WALL_FRICTION = False
 
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "sync_free"]
 
@@ -2516,11 +2502,11 @@ class MLSMPMMechanics(Exchange):
 # ==========================================================================================================
 # The four MPM operators in Warp: `mpm_scatter`, `mpm_gather`, `mpm_grid_update`, `mpm_strain`.
 #
-# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
-# variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
-# a warp registration above `MPMScatter` and `mpm_scatter[default]` silently becomes the warp kernel,
-# and since R1(c) the contract's `.signature` is the default's too. The registry snapshot in this
-# commit's message is the check that it did not happen.
+# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE, here and in every backend
+# section below. A contract's `default` is whichever variant registers FIRST, so appending the
+# backends after the torch bodies is not a style choice: a warp registration placed above
+# `MPMScatter` makes `mpm_scatter[default]` silently become the warp kernel, and the contract's
+# `.signature` is the default's too.
 # ==========================================================================================================
 try:
     import warp as wp
@@ -3153,7 +3139,7 @@ class MPMStrainWarp(MPMStrain):
 # default implementation, which is why this is an `implementation:` and not a rewrite.
 #
 # NOT BIT-IDENTICAL to `default`: same operations in the same order per cell, but float addition is
-# not associative across a different lowering. `tools/mpm_grid_gate.py` measures the difference
+# not associative across a different lowering. `tools/mpm_grid_probe.py` measures the difference
 # against the torch operator on real state rather than asserting it.
 # ==========================================================================================================
 if HAVE_WARP:
@@ -3335,11 +3321,6 @@ if HAVE_WARP:
 @register_operator("mpm_grid_update", implementation="warp", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateWarp(MPMGridUpdate):
-    # `wall_friction` is imposed in `grid_solve`, mirroring the torch loop axis for axis. This is
-    # the implementation the engine selects when a spec leaves it unset, so it had to be -- the
-    # first friction measurement ran entirely on this path and the base __init__'s refusal was the
-    # only thing that stopped a frictionless run being read as a null result.
-    HONOURS_WALL_FRICTION = True
     """The 3D grid solve -- mass normalisation, the continuum surface force, box walls, obstacles
     and buoyancy -- as two Warp kernels rather than several dozen whole-grid torch operations.
 
@@ -3348,6 +3329,12 @@ class MPMGridUpdateWarp(MPMGridUpdate):
 
     CUDA-only, and 3D only.
     """
+
+    # `wall_friction` is imposed in `grid_solve`, mirroring the torch loop axis for axis. This is
+    # the implementation the engine selects when a spec leaves it unset, so it had to be -- the
+    # first friction measurement ran entirely on this path and the base __init__'s refusal was the
+    # only thing that stopped a frictionless run being read as a null result.
+    HONOURS_WALL_FRICTION = True
 
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "fused_kernel"]
     SUPPORTED_DIMS = [3]
@@ -3439,11 +3426,7 @@ class MPMGridUpdateWarp(MPMGridUpdate):
 # ==========================================================================================================
 # `mpm_scatter` in Triton: one fused kernel, and an atomic-free colour-ordered variant.
 #
-# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
-# variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
-# a warp registration above `MPMScatter` and `mpm_scatter[default]` silently becomes the warp kernel,
-# and since R1(c) the contract's `.signature` is the default's too. The registry snapshot in this
-# commit's message is the check that it did not happen.
+# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE -- see the Warp section for why.
 # ==========================================================================================================
 try:
     import triton
@@ -3839,11 +3822,7 @@ class MPMScatterTritonColour(MPMScatterTriton):
 # `mpm_gather[torch_loop27]`: the 27-stencil loop, kept as the readable reference and the
 # low-memory path.
 #
-# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
-# variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
-# a warp registration above `MPMScatter` and `mpm_scatter[default]` silently becomes the warp kernel,
-# and since R1(c) the contract's `.signature` is the default's too. The registry snapshot in this
-# commit's message is the check that it did not happen.
+# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE -- see the Warp section for why.
 # ==========================================================================================================
 @register_operator("mpm_gather", implementation="torch_loop27", family="mpm",
                    set="particle", kind="exchange")
@@ -4646,9 +4625,17 @@ class MPMDensityPressure(Lateral):
 # points over 12 frames, forward and backward, with `compile: true` on the substep block: 0.51 s an
 # optimiser iteration against 1.01 s uncompiled, and 3.20 s for the same work at 50,000 points.
 #
-# WHAT IT IS FOR: papers/Xu_2024_mpm_shape_morphing.pdf -- deformation-gradient control, where the
-# per-particle F is the control variable of an optimisation and the loss is taken on the grid's own
-# nodal mass. tools/shape_control.py and tools/morph_gallery.py are that loop.
+# WHAT IT IS FOR: deformation-gradient control, where the per-particle F is the control variable of
+# an optimisation and the loss is taken on the grid's own NODAL MASS rather than on particle
+# positions -- a target shape has no particle correspondence, so a position loss has nothing to
+# match against exactly where the two shapes differ. `plexus.morph` is that loop: the optimiser,
+# the two verified speed wins, and the renderer that makes a result judgeable.
+#
+# Reference: Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A differentiable material
+# point method framework for shape morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+# Xu, M. & Levin, D. I. W. (2023). Deformation gradient control of physically simulated amorphous
+# solids. SCA '23, doi:10.1145/3606037.3606840. The render-guided variant is
+# papers/Song_2025_physmorph_gs.pdf.
 
 
 @register_operator("mpm_scatter", "p2g", implementation="differentiable", family="mpm",
@@ -4686,9 +4673,6 @@ class MPMScatterDiff(MPMScatter):
 @register_operator("mpm_grid_update", implementation="differentiable", family="mpm", set="field",
                    kind="field")
 class MPMGridUpdateDiff(MPMGridUpdate):
-    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
-    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
-    HONOURS_WALL_FRICTION = False
     """The grid solve, with the wall written as a stack rather than into a view.
 
     The boundary already computes its values with `torch.where`; the default writes them back as
@@ -4698,6 +4682,10 @@ class MPMGridUpdateDiff(MPMGridUpdate):
 
     See the section header above for why this is an implementation and not a mode.
     """
+
+    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
+    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
+    HONOURS_WALL_FRICTION = False
     FUNCTIONAL = True
     DIFFERENTIABLE = True
 
