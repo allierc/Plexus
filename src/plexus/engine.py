@@ -38,6 +38,7 @@ import os
 import math
 import numpy as np
 import torch
+from torch import nn
 
 # BIT-REPRODUCIBLE RUNS ARE NOW OPT-IN, and the reason is a measured factor of 4.4 on a real spec.
 #
@@ -1585,6 +1586,7 @@ def seed(H: Hierarchy, sim: Spec, device: str = "cpu") -> None:
                 f"seed: {o.op!r} resolved to kind={getattr(cls, 'KIND', None)!r}, not "
                 f"\"seed\" -- refusing to run a dynamics operator as a seed.")
         op = cls({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device)
+        H._active_op = o.op                          # see `Hierarchy.record_maps`
         deltas = op(H, _selector_mask(H, o.on))
         # THE SAME `(set, block)` KEY AS THE TICK LOOP, and it is here for the reason the two paths
         # are ever allowed to differ: they are not. A seed that establishes a second dynamical block
@@ -1943,6 +1945,20 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              _gate(o))                                   # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]
 
+    # THE OPERATORS BECOME CHILDREN OF THE HIERARCHY, so `H.parameters()` finds any tensor leaf
+    # they hold. Every operator is already an `nn.Module` -- they carry `register_buffer` and are
+    # called through `__call__` -- but until now the engine kept them in this plain list, so an
+    # operator with a fitted parameter had nowhere to be found from: a caller holding H could
+    # differentiate a loss and then have nothing to hand an optimiser. Registering them as a
+    # ModuleList costs one attribute and makes the standard torch idiom work.
+    #
+    # THE ORDER IS THE SPEC'S and is part of the contract: `H.operator_names` lines up index for
+    # index with `H.operators`, so a caller can select "the parameters of neuron_signal" without
+    # re-deriving which instance that was. For the ~146 operators holding no parameter this
+    # changes nothing at all.
+    H.operators = nn.ModuleList([ob for _nm, ob, _sel, _g in inst])
+    H.operator_names = [nm for nm, _ob, _sel, _g in inst]
+
     # WHICH SCATTER CLEARS THE SHARED GRID, decided once, here, instead of every substep.
     #
     # Several particle sets can scatter into one `mpm_grid` -- that is what makes a composed cell
@@ -2189,6 +2205,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 continue                                 # multi-rate: run this operator only every `every` ticks
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
+            H._active_op = nm                        # so `H.gather` can record WHO walked a relation
             deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})
             # `INTEGRAND` IS THE OPERATOR'S DEFAULT BLOCK, NOT ITS ONLY ONE. It is a class attribute,
             # so before this it was applied to EVERY delta the operator returned: one operator could
