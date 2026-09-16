@@ -529,6 +529,12 @@ class Hierarchy(nn.Module):
         the identity of the underlying `parent` buffers, so a structural operator that reallocates
         one rebuilds the composition instead of returning a stale index.
         """
+        # CONTAINMENT IS A RELATION TOO, and an Aggregate traverses it here rather than through
+        # `gather`. Recording only the incidence maps would report `muscle_pose_map` as walking
+        # nothing, which is exactly the claim a learnable replacing it must not be allowed to
+        # make: a net reading the eye's own state satisfies its blocks while never looking at a
+        # muscle. Logged under the `parent` role to distinguish it from `pre`/`post`.
+        self._note_map(f"{name}->{ancestor}", "parent")
         chain = []
         cur = name
         while cur != ancestor:
@@ -555,11 +561,39 @@ class Hierarchy(nn.Module):
         cache[key] = (sig, idx)
         return idx
 
+    # --- which relations an operator actually walks, MEASURED ------------------------ #
+    #
+    # THERE WAS A DECLARED `MAPS` AND IT COULD NOT BE TRUSTED: 23 of ~150 operators filled it in,
+    # so an empty one meant either "checked, walks nothing" or "nobody looked", and the two are
+    # indistinguishable. It was removed. This is the same question answered by MEASUREMENT --
+    # `gather` and `scatter_along` are the only ways to traverse a relation, so recording what
+    # passes through them records what an operator traverses, and it cannot drift from the code.
+    #
+    # The consumer is substitutability. A learnable may replace an operator only if it walks the
+    # same relations: an MLP on each neuron's own state satisfies every declared block of
+    # `neuron_signal` while silently dropping the connectome, and only this distinguishes them.
+    #
+    # Off by default and free when off -- one attribute test per gather.
+    def record_maps(self, on: bool = True) -> None:
+        self._maps_log = {} if on else None
+
+    def _note_map(self, edge_set: str, role: str) -> None:
+        log = getattr(self, "_maps_log", None)
+        if log is None:
+            return
+        log.setdefault(getattr(self, "_active_op", "?"), set()).add((edge_set, role))
+
+    def measured_maps(self) -> dict:
+        """{operator name: sorted [(edge_set, role), ...]} since `record_maps(True)`."""
+        log = getattr(self, "_maps_log", None) or {}
+        return {k: sorted(v) for k, v in log.items()}
+
     # --- incidence maps: gather/scatter along a named map (pre/post), not containment -- #
     def gather(self, edge_set: str, role: str, block: str) -> torch.Tensor:
         """Gather an endpoint set's `block` state onto each edge along its `role`
         incidence map -- a lift along an incidence map. Returns `[E, w]`: the pre/post
         endpoint's block value per edge (e.g. `v_pre`, `v_post` for a synapse_ode)."""
+        self._note_map(edge_set, role)
         es = self.level(edge_set)
         idx = es.incidence(role)                          # [E] endpoint index per edge
         ep = self.level(es.incidence_name(role))
@@ -570,6 +604,7 @@ class Hierarchy(nn.Module):
         incidence map -- an Aggregate along an incidence map (e.g. synaptic current onto
         the post neuron). Occupancy-weighted, so dormant edges contribute nothing.
         Returns `[N_endpoint, w]`."""
+        self._note_map(edge_set, role)
         es = self.level(edge_set)
         idx = es.incidence(role)
         ep = self.level(es.incidence_name(role))
