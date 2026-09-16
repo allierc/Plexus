@@ -223,3 +223,91 @@ def test_a_name_cannot_be_registered_twice():
     """Two laws under one name is the defect a registry exists to prevent."""
     with pytest.raises(ValueError, match="already registered"):
         T.register_teacher("integrate")(lambda u, dt, **k: u)
+
+
+# --------------------------------------------------------------------------- #
+#  the trainer's circuit, against the registered operators
+# --------------------------------------------------------------------------- #
+def test_trainer_circuit_is_arithmetically_the_operators():
+    """`CircuitRNN` claims to be `project -> neuron_update -> neuron_signal -> readout`.
+
+    That claim is what licenses training outside the engine, so it is asserted against the
+    REGISTERED operators rather than restated in a docstring. If the two ever diverge, a spec and
+    the thing fitted to it stop describing one model and nothing downstream would notice.
+    """
+    import torch
+    import plexus.operators                                    # noqa: F401  self-registers
+    from plexus.models.registry import get_operator
+    from plexus.tasks.trainer import CircuitRNN
+
+    torch.manual_seed(0)
+    H_UNITS, N_IN, N_OUT, T_F, dt = 6, 2, 1, 40, 1 / 60
+    m = CircuitRNN(N_IN, N_OUT, hidden=H_UNITS, tau0=0.25, dt=dt, w_init="random", seed=1)
+    with torch.no_grad():                      # a zero W would make the recurrent half vacuous
+        m.W.copy_(torch.randn(H_UNITS, H_UNITS) * 0.3)
+    u = torch.randn(1, T_F, N_IN) * 0.5
+    ref = m(u)[0].detach().numpy()
+
+    # the same three steps, each taken from the operator that owns it
+    class _L:
+        def __init__(s, n, sch, wdt, name):
+            s.n, s.name = n, name
+            s.state = torch.zeros(n, wdt); s.state_schema = sch; s.occ = torch.ones(n)
+        def get(s, b):
+            a, z = s.state_schema[b]; return s.state[:, a:z]
+
+    class _E(_L):
+        def __init__(s, pre, post, w, pre_name, post_name):
+            super().__init__(len(w), {"w": (0, 1)}, 1, "edges")
+            s.pre, s.post = torch.as_tensor(pre), torch.as_tensor(post)
+            s.pre_name, s.post_name = pre_name, post_name
+            s.state[:, 0] = torch.as_tensor(w, dtype=torch.float32)
+        def incidence(s, role): return s.pre if role == "pre" else s.post
+        def incidence_name(s, role): return s.pre_name if role == "pre" else s.post_name
+
+    class _H:
+        def __init__(s, lv): s.levels = lv; s.config = type("C", (), {"dt": dt})()
+        def level(s, n): return s.levels[n]
+        def gather(s, es, role, blk):
+            e = s.levels[es]; return s.levels[e.incidence_name(role)].get(blk)[e.incidence(role)]
+        def scatter_along(s, es, role, vals):
+            e = s.levels[es]; ep = s.levels[e.incidence_name(role)]
+            out = torch.zeros(ep.n, vals.shape[-1]); out.index_add_(0, e.incidence(role), vals)
+            return out
+
+    src = _L(N_IN, {"signal": (0, 1)}, 1, "src")
+    neu = _L(H_UNITS, {"voltage": (0, 1), "tau": (1, 2)}, 2, "neuron")
+    out = _L(N_OUT, {"y": (0, 1)}, 1, "out")
+    with torch.no_grad():
+        neu.state[:, 1] = m.log_tau.exp()
+    aff = _E(*zip(*[(j, i) for i in range(H_UNITS) for j in range(N_IN)]),
+             [float(m.W_in[i, j].detach()) for i in range(H_UNITS) for j in range(N_IN)], "src", "neuron")
+    rec = _E(*zip(*[(j, i) for i in range(H_UNITS) for j in range(H_UNITS)]),
+             [float(m.W[i, j].detach()) for i in range(H_UNITS) for j in range(H_UNITS)], "neuron", "neuron")
+    jnc = _E(*zip(*[(j, k) for k in range(N_OUT) for j in range(H_UNITS)]),
+             [float(m.W_out[k, j].detach()) for k in range(N_OUT) for j in range(H_UNITS)], "neuron", "out")
+    Hh = _H({"src": src, "neuron": neu, "out": out, "aff": aff, "rec": rec, "jnc": jnc})
+
+    proj = get_operator("project")({"_at": "neuron", "edge_set": "aff", "block": "signal"})
+    upd = get_operator("neuron_update")({"_at": "neuron", "tau": "tau"})
+    sig = get_operator("neuron_signal", model="shared")(
+        {"_at": "neuron", "edge_set": "rec", "activation": "tanh"})
+    rd = get_operator("readout")({"_at": "out", "edge_set": "jnc", "block": "voltage",
+                                  "into": "y", "send": "tanh"})
+    got = []
+    for t in range(T_F):
+        src.state[:, 0] = u[0, t]
+        # the SAME 1/tau scales the leak, the input and the recurrent message, as the reference
+        # writes it: v += (dt/tau)(-v + W r + I)
+        inv_tau = (1.0 / neu.get("tau"))
+        d = (proj.forward(Hh)["neuron"] * inv_tau + upd.forward(Hh)["neuron"]
+             + sig.forward(Hh)["neuron"] * inv_tau)
+        rd.forward(Hh)
+        got.append(float(out.get("y")[0, 0]))
+        neu.state[:, 0:1] = neu.state[:, 0:1] + dt * d
+    got = np.asarray(got)
+    err = np.abs(got - ref[:, 0]).max()
+    assert np.abs(ref).max() > 0.01, "the reference barely moves; the comparison would be vacuous"
+    assert err < 1e-5, (
+        f"CircuitRNN departs from project/neuron_update/neuron_signal/readout by {err:.3e}. The "
+        f"trainer's claim to be evaluating the spec is then false.")
