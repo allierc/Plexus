@@ -17,8 +17,10 @@ Five panels, and the middle one is the reason the figure exists:
 Panel (c) against (d) is the whole argument of this package in one picture: the teacher's poles
 have to sit where the stimulus has power, and both are computable before any circuit exists.
 
-House style, as everywhere else in this repository: black background, no titles, white panel
-letters top-left.
+STYLE. White background, no box around the axes, and the panel letter set ABOVE the frame rather
+than inside it -- a letter placed inside competes with the data for the same corner, and on a
+dense trace panel it lands on top of a curve. Not bold: at this size the weight adds nothing the
+position does not already give.
 """
 from __future__ import annotations
 
@@ -26,26 +28,33 @@ import os
 
 import numpy as np
 
-BG = "black"
-FG = "white"
+BG = "white"
+FG = "black"
 LABEL_SIZE = 11
-# Condition cells get distinct hues; a single-cell task gets one neutral colour, per the plotting
-# convention that a lone trace carries no comparison and so needs no coded colour.
-CYCLE = ("#4fa3ff", "#ff7a4f", "#5fd68a", "#e0c04f", "#c07fe0", "#4fd6d6")
+INK = "0.15"          # traces and text on white
+MUTED = "0.45"        # axis furniture
+# Condition cells get distinct hues, darkened for a white ground; a single-cell task gets one
+# neutral colour, per the convention that a lone trace carries no comparison and needs no code.
+CYCLE = ("#1f6fb8", "#c0522a", "#2e8b4f", "#9a7d1a", "#7a4fa0", "#1a8a8a")
 
 
 def _ax(ax, xlabel=None, ylabel=None, letter=None):
+    """One panel in the house style: white, no box, letter above the frame."""
     ax.set_facecolor(BG)
-    for s in ax.spines.values():
-        s.set_color("0.35")
-    ax.tick_params(colors="0.75", labelsize=8)
+    for side, sp in ax.spines.items():
+        sp.set_visible(side in ("left", "bottom"))
+        sp.set_color(MUTED)
+    ax.tick_params(colors=MUTED, labelsize=8)
+    for lbl in ax.get_xticklabels() + ax.get_yticklabels():
+        lbl.set_color(INK)
     if xlabel:
-        ax.set_xlabel(xlabel, color="0.75", fontsize=9)
+        ax.set_xlabel(xlabel, color=INK, fontsize=9)
     if ylabel:
-        ax.set_ylabel(ylabel, color="0.75", fontsize=9)
+        ax.set_ylabel(ylabel, color=INK, fontsize=9)
     if letter:
-        ax.text(0.015, 0.97, letter, transform=ax.transAxes, color=FG, fontsize=LABEL_SIZE,
-                fontweight="bold", va="top", ha="left")
+        # ABOVE the frame, not in it: inside, a letter competes with the data for the corner.
+        ax.text(0.0, 1.04, letter, transform=ax.transAxes, color=FG, fontsize=LABEL_SIZE,
+                va="bottom", ha="left")
     return ax
 
 
@@ -66,7 +75,7 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
     axb = _ax(fig.add_subplot(gs[1, 0]), xlabel="time (s)", ylabel="target", letter="b")
     for c in range(len(cells)):
         idx = np.where(cond == c)[0][:n_show]
-        col = CYCLE[c % len(CYCLE)] if len(cells) > 1 else "0.80"
+        col = CYCLE[c % len(CYCLE)] if len(cells) > 1 else INK
         for i in idx:
             axa.plot(t, U[i, :, 0], color=col, lw=0.7, alpha=0.85)
             axb.plot(t, Y[i, :, 0], color=col, lw=0.7, alpha=0.85)
@@ -77,9 +86,9 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
     f = np.fft.rfftfreq(T, d=dt)
     psd = (np.abs(np.fft.rfft(U, axis=1)) ** 2).mean(axis=(0, 2))
     db = 10 * np.log10(np.maximum(psd, 1e-300) / max(psd.max(), 1e-300))
-    axc.plot(f[1:], db[1:], color="0.80", lw=0.9)
+    axc.plot(f[1:], db[1:], color=INK, lw=0.9)
     axc.axhline(excitation.get("per_cell", [{}])[0].get("floor_db", -20.0),
-                color="0.45", lw=0.8, ls="--")
+                color=MUTED, lw=0.8, ls="--")
     seen = set()
     for rep in excitation.get("per_cell", []):
         for p in rep.get("poles", []):
@@ -87,7 +96,7 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
             if key in seen:
                 continue
             seen.add(key)
-            col = "#5fd68a" if p["excited"] else "#ff4f4f"
+            col = "#2e8b4f" if p["excited"] else "#c0272a"
             axc.axvline(max(p["freq_hz"], f[1]), color=col, lw=1.1, alpha=0.9)
             axc.text(max(p["freq_hz"], f[1]), 4, f"{p['freq_hz']:.2f} Hz", color=col,
                      fontsize=7, rotation=90, va="bottom", ha="center")
@@ -97,18 +106,18 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
     verdict = ("IDENTIFIABLE" if excitation.get("identifiable") else
                "NOT IDENTIFIABLE - a pole sits where the stimulus has no power")
     axc.text(0.985, 0.05, verdict, transform=axc.transAxes, ha="right", va="bottom",
-             fontsize=9, color="#5fd68a" if excitation.get("identifiable") else "#ff4f4f")
+             fontsize=9, color="#2e8b4f" if excitation.get("identifiable") else "#c0272a")
 
     # -- d: the teacher's own magnitude response, closed form -------------------------------
     axd = _ax(fig.add_subplot(gs[1, 1]), xlabel="frequency (Hz)", ylabel="|H| (dB)", letter="d")
     mag = _bode(spec, f[1:])
     if mag is not None:
-        axd.plot(f[1:], mag, color="#4fa3ff", lw=1.1)
+        axd.plot(f[1:], mag, color="#1f6fb8", lw=1.1)
         axd.set_xscale("log")
         axd.set_xlim(max(f[1], 1e-2), 0.5 / dt)
     else:
         axd.text(0.5, 0.5, "no H(s):\nstatic or pure delay", transform=axd.transAxes,
-                 ha="center", va="center", color="0.55", fontsize=9)
+                 ha="center", va="center", color=MUTED, fontsize=9)
         axd.set_xticks([]); axd.set_yticks([])
 
     # -- e: what this corpus IS, in words ---------------------------------------------------
@@ -127,7 +136,7 @@ def render_split(spec, split, U, Y, cond, excitation, out_path, n_show=3):
             s = str(v)
             lines.append(f"   {k}: {s[:34] + '...' if len(s) > 34 else s}")
     axe.text(0.05, 0.92, "\n".join(_wrap(lines, 44)), transform=axe.transAxes, va="top",
-             ha="left", color="0.85", fontsize=7.5, family="monospace")
+             ha="left", color=INK, fontsize=7.5, family="monospace")
 
     fig.savefig(out_path, dpi=130, facecolor=BG, bbox_inches="tight")
     plt.close(fig)

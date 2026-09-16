@@ -315,7 +315,7 @@ def plot(run, root=None, device=None, n_show=4):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from plexus.tasks.render import BG, FG, _ax
+    from plexus.tasks.render import BG, INK, MUTED, _ax
 
     dev = torch.device(device or "cpu")
     out = log_dir(run["name"], root)
@@ -338,26 +338,26 @@ def plot(run, root=None, device=None, n_show=4):
     # prediction is white -- the convention reserves green/black for GT vs predicted.
     axa = _ax(fig.add_subplot(gs[0, 0]), ylabel="target / prediction", letter="a")
     for i in range(min(n_show, U.shape[0])):
-        axa.plot(t, Y[i, :, 0].cpu(), color="#5fd68a", lw=1.2, alpha=0.9)
-        axa.plot(t, P[i, :, 0].cpu(), color="0.92", lw=0.8, ls="--")
+        axa.plot(t, Y[i, :, 0].cpu(), color="#2e8b4f", lw=1.3, alpha=0.9)
+        axa.plot(t, P[i, :, 0].cpu(), color=INK, lw=0.8, ls="--")
     axa.text(0.985, 0.04, "green: teacher   dashed: circuit", transform=axa.transAxes,
-             ha="right", va="bottom", color="0.7", fontsize=8)
+             ha="right", va="bottom", color=MUTED, fontsize=8)
 
     # b: the residual, on the same scale, so "close" is a number and not an impression
     axb = _ax(fig.add_subplot(gs[1, 0]), xlabel="time (s)", ylabel="residual", letter="b")
     for i in range(min(n_show, U.shape[0])):
-        axb.plot(t, (P[i, :, 0] - Y[i, :, 0]).cpu(), color="#ff7a4f", lw=0.8)
+        axb.plot(t, (P[i, :, 0] - Y[i, :, 0]).cpu(), color="#c0522a", lw=0.8)
     axb.set_ylim(axa.get_ylim())
 
     # c: learning curve
     axc = _ax(fig.add_subplot(gs[0, 1]), ylabel="mse", letter="c")
     ep = [h["epoch"] for h in rep["history"]]
-    axc.plot(ep, [h["train_mse"] for h in rep["history"]], color="#4fa3ff", lw=1.1, label="train")
-    axc.plot(ep, [h["val_mse"] for h in rep["history"]], color="#e0c04f", lw=1.1, label="val")
+    axc.plot(ep, [h["train_mse"] for h in rep["history"]], color="#1f6fb8", lw=1.1, label="train")
+    axc.plot(ep, [h["val_mse"] for h in rep["history"]], color="#9a7d1a", lw=1.1, label="val")
     axc.set_yscale("log")
     lg = axc.legend(frameon=False, fontsize=8, loc="upper right")
     for txt in lg.get_texts():
-        txt.set_color("0.8")
+        txt.set_color(INK)
 
     # d: THE RECOVERY PANEL. The circuit's own eigenvalues against the teacher's poles, in one
     # plane. A small loss with the poles in the wrong place is the failure mode an
@@ -365,18 +365,18 @@ def plot(run, root=None, device=None, n_show=4):
     axd = _ax(fig.add_subplot(gs[1, 1]), xlabel="Re(lambda)  (1/s)", ylabel="Im/2pi  (Hz)",
               letter="d")
     got = model.jacobian_poles()
-    axd.scatter(got.real, got.imag / (2 * np.pi), s=9, color="0.75", alpha=0.75,
+    axd.scatter(got.real, got.imag / (2 * np.pi), s=10, color=MUTED, alpha=0.8,
                 label="circuit")
     truth = torch.load(os.path.join(task_dir(run["task"]), "teacher.pt"), weights_only=False)
     for cellrec in truth["per_cell"]:
         axd.scatter(cellrec["poles_real"], np.asarray(cellrec["poles_imag"]) / (2 * np.pi),
-                    s=70, marker="x", color="#5fd68a", lw=1.8, label="teacher", zorder=5)
-    axd.axvline(0, color="#ff4f4f", lw=0.8, ls="--")
+                    s=80, marker="x", color="#2e8b4f", lw=2.0, label="teacher", zorder=5)
+    axd.axvline(0, color="#c0272a", lw=0.8, ls="--")
     h_, l_ = axd.get_legend_handles_labels()
     seen = dict(zip(l_, h_))
     lg = axd.legend(seen.values(), seen.keys(), frameon=False, fontsize=8, loc="upper left")
     for txt in lg.get_texts():
-        txt.set_color("0.8")
+        txt.set_color(INK)
 
     # e: the numbers
     axe = _ax(fig.add_subplot(gs[:, 2]), letter="e")
@@ -399,7 +399,7 @@ def plot(run, root=None, device=None, n_show=4):
               "corpus NOT IDENTIFIABLE -- a low\nerror here does not mean the\ncircuit has the "
               "right dynamics")]
     axe.text(0.05, 0.95, "\n".join(lines), transform=axe.transAxes, va="top", ha="left",
-             color="0.85", fontsize=8, family="monospace")
+             color=INK, fontsize=8, family="monospace")
 
     p = os.path.join(out, "results", f"{run['name']}_{split}.png")
     fig.savefig(p, dpi=130, facecolor=BG, bbox_inches="tight")
