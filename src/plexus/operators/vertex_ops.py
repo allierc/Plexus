@@ -685,6 +685,11 @@ def build_strip_mesh(n, r=1.0, jitter=0.0, seed=0, kind="plane", width=0.5, twis
 
 
 def face_geometry_3d(pos, es, et, ef, nF, eocc=None, apex=None):
+    """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
+    volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
+    The lumen volume is just sum_f v_f, but keeping it per-cell lets each cell carry its own volume
+    elasticity (a distributed term that resists local buckling). All differentiable in `pos`."""
+
     # CENTRED ON THE APEX FIRST, and not only for the wedge. The Newell area vector is a sum of
     # cross products of positions; about a box centre 58 units out each product is ~3400 and
     # they cancel to a face area of order 1, which in float32 keeps three digits of it (K_A's
@@ -694,10 +699,6 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None, apex=None):
     if apex is not None:
         pos = pos - apex
         apex = None
-    """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
-    volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
-    The lumen volume is just sum_f v_f, but keeping it per-cell lets each cell carry its own volume
-    elasticity (a distributed term that resists local buckling). All differentiable in `pos`."""
     s = pos[es]; t = pos[et]
     length = (t - s).norm(dim=-1)
     cross = torch.cross(s, t, dim=-1)                        # consecutive-vertex cross products

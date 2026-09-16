@@ -105,8 +105,8 @@ DATASETS = {
     },
     "fish2": {
         "server": "https://neuprint-fish2.janelia.org",
-        # papers/fishFuncEM/fishfuncem/utils/coords.py, as quoted by
-        # connectome-gnn/figures/zebrafish/fetch_zebrafish_anatomy_HD.py:13 --
+        # The fishFuncEM voxel-to-nanometre convention, as used by the zebrafish anatomy
+        # fetcher in connectome-gnn --
         #     x_nm = x_vox * 16 - 21120 * 8 ;  y_nm = y_vox * 16 - 19200 * 8 ;  z_nm = z_vox * 15
         "scale_nm": (16.0, 16.0, 15.0),
         "offset_nm": (-21120.0 * 8, -19200.0 * 8, 0.0),

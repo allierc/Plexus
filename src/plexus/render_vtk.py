@@ -760,10 +760,7 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     _lut, _blend, _cut = style_of(run_dir)
     _pl = plot_style(run_dir)
     _ec = str(_pl.get("edge_color", "") or "").lower()          # myosin | type | ""
-    # DIVISION MARKS OFF WHEN SOMETHING ELSE IS BEING SHOWN. `show_div` paints mothers and daughters
-    # red/blue over the face colour, which is the right default for watching a tissue grow and
-    # exactly wrong while the picture is about myosin: two unrelated quantities on one surface, and
-    # the reader cannot tell which is which. Declared, so a spec says what its picture is about.
+    # DIVISION MARKS OFF WHEN SOMETHING ELSE IS BEING SHOWN -- see `evolve` for why.
     _div = bool(_pl.get("show_division", True))
     if not fr:
         return "no trajectory"

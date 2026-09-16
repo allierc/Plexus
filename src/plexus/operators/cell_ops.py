@@ -2514,7 +2514,7 @@ class DeformControl(Lateral):
         F <- G F,     G = expm(-A dt)
 
     `polar_growth` is this with A constrained to a stretch along one direction; this is the general
-    linear rate, and it exists because it is what an OPTIMISER produces. `tools/shape_control.py`
+    linear rate, and it exists because it is what an OPTIMISER produces. `plexus.morph`
     differentiates a rollout with respect to these six numbers against a target shape, and writes
     the answer into a spec as this operator -- so the optimisation's result is a runnable model
     rather than a number in a log.
@@ -2549,7 +2549,7 @@ class DeformControl(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "particle")
         # A LEARNED FIELD INSTEAD OF SIX NUMBERS. `field:` names an .npz written by
-        # tools/morph_gallery.py: a K^3 x 6 cube of symmetric rates, read at each particle's own
+        # `plexus.morph`: a K^3 x 6 cube of symmetric rates, read at each particle's own
         # MATERIAL coordinate -- its position the first time this operator runs, never its current
         # one. That is what makes the control Lagrangian, and it is why a control optimised on a
         # 50,000-point proxy can be applied to a 2.4 M-point cell: the field means the same thing
