@@ -215,3 +215,64 @@ self-contained; parameter collection next because it is small and R2 needs it; t
 relation check before the registry**, because without it the registry would accept the
 connectome-dropping MLP and the first thing anyone tries would be wrong in a way that trains
 fine. R0, R1 and R3 are each worth having even if `learnable:` is never written.
+
+---
+
+# Progress
+
+## Done
+
+**R1, R3** (`f03f084e`) — `H.operators` / `H.parameters()`, and `H.measured_maps()`. The whole
+promoted library returns zero parameters, asserted, so a future operator quietly acquiring one is
+a red test. Relations are measured through `gather` / `scatter_along` / `lift_index`; instrumenting
+`lift_index` was not optional, since an Aggregate traverses containment there and
+`muscle_pose_map` would otherwise have measured as walking nothing.
+
+**R2** (`c140fb43`) — six learnable families (three nets × two shapes) and `check_substitution`.
+The refusals are the content: pointwise-for-relational, relational-for-pointwise, wrong `EMIT`,
+widened `READS`, a relational substitution with no edge set. A live substitution on
+`ctrnn_eyeG_rig` measures the same legs as `neuron_signal` itself.
+
+**R4** (`5c78e63c`, `39f4f88b`) — `learnable:` in the spec language, both forms, plus
+`spec_trainer` and the eye rig.
+
+## The eye rig, measured
+
+`config/run/eye_rig_fit*.yaml` fits W_in, W and W_out of the 64-unit circuit through the frozen
+eye against `t5_gaze_tracking`, by running the spec — not a transcription of it.
+
+| | best val | of variance | what changed |
+|---|---|---|---|
+| 12 epochs, no curriculum | — | 0.647 | the starting point |
+| 60 epochs, curriculum, `accum: 1` | 18.06 deg² | 0.446 | truncated BPTT, 60 → 480 frames |
+| 60 epochs, curriculum, `accum: 8` | **2.48 deg²** | **0.061** | gradient averaged over 8 trials |
+
+Two things that mattered more than expected. **The horizon curriculum** is not a refinement: a
+480-step rollout from an unfitted W sends every late frame's gradient through hundreds of tanh's
+and it arrives uninformative. **Stepping per trial cost a factor of seven** — validation bouncing
+27 → 76 deg² between consecutive epochs was an optimiser handed a different task each step, not a
+failure to learn.
+
+Gradient accumulation is **not** a substitute for R0. Both 60-epoch runs took 1831 s for the same
+3,360 rollouts; it buys the variance reduction and none of the wall-clock. Training at the scale
+`tasks.trainer` uses (512 trials) still needs the engine to carry B trials in one rollout.
+
+## Still open
+
+**R0 — the batch axis.** Now the only thing between this and training at scale. The gate stands:
+`ctrnn_eyeG_rig` at B = 32 must reproduce 32 separate B = 1 runs to 1e-6 of gaze.
+
+**R5 — tester and analyser.** `spec_trainer` has `-o train` only. The analyser is the one that
+says whether the law was recovered rather than whether the output is close, and for these tasks
+the truth is analytic and in `teacher.pt`.
+
+**Contextual unidentifiability**, unchanged: grids over the *teacher* average 0.326 normalised MSE
+against 0.0009 for no grid, and `spectral_coverage` passes all of them.
+
+## Two traps worth not repeating
+
+`python3` is the system interpreter and has neither torch nor yaml. A heredoc using it failed
+silently and a training run launched against a spec that was never written.
+
+A command piped through `grep` reports **grep's** exit code. A run that crashed was recorded as
+successful, and the traceback was filtered out by the pattern meant to summarise it.
