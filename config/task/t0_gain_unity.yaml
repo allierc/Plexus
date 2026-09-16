@@ -1,0 +1,7 @@
+general: {name: t0_gain_unity, duration_s: 8.0, dt: 0.0166666666666667, channels: 1}
+stimulus: {process: band_limited_noise, f_max_hz: 2.0, amplitude: 1.0}
+teacher: {law: gain, k: 1.0}
+splits:
+  train: {n_per_cond: 512, seed0: 0}
+  val: {n_per_cond: 15, seed0: 5000000}
+  test: {n_per_cond: 20, seed0: 9000000}

@@ -1,0 +1,8 @@
+general: {name: t4_unexcited_12hz, duration_s: 8.0, dt: 0.0166666666666667, channels: 1}
+stimulus: {process: band_limited_noise, f_max_hz: 0.5}
+teacher:
+  law: laplace
+  num: [5685.0]
+  den: [1.0, 9.4, 5685.0]
+splits:
+  train: {n_per_cond: 512, seed0: 0}

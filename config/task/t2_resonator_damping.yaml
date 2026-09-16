@@ -1,0 +1,15 @@
+general: {name: t2_resonator_damping, duration_s: 8.0, dt: 0.0166666666666667, channels: 1}
+stimulus: {process: band_limited_noise, f_max_hz: 2.0, amplitude: 1.0}
+teacher:
+  law: laplace
+  num: [39.4784]
+  den: [1.0, 5.0265, 39.4784]
+conditions:
+  den:
+  - [1.0, 1.2566, 39.4784]
+  - [1.0, 5.0265, 39.4784]
+  - [1.0, 11.3097, 39.4784]
+splits:
+  train: {n_per_cond: 171, seed0: 0}
+  val: {n_per_cond: 15, seed0: 5000000}
+  test: {n_per_cond: 20, seed0: 9000000}
