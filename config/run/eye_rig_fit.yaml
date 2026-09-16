@@ -1,0 +1,16 @@
+name: eye_rig_fit
+spec: config/neural/ctrnn_eyeG_rig.yaml
+task: t5_gaze_tracking
+learnable:
+- {block: w, of: afferent}
+- {block: w, of: recurrent}
+- {block: w, of: junction}
+io: {drive_set: retina, drive_block: signal, read_set: eye, read_block: pose, read_channel: 0}
+training:
+  epochs: 60
+  n_trials: 48
+  n_val: 8
+  lr: 0.02
+  seed: 0
+  curriculum: [0.125, 0.25, 0.5, 0.75, 1.0]
+  horizon_min: 60
