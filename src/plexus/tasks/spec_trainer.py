@@ -119,6 +119,7 @@ def train(run, root=None, device="cpu"):
     print(f"[data] ONE TRIAL PER STEP -- engine.run has no batch axis (R0), so this is the "
           f"correct model rather than a fast one")
 
+    engine.quiet(True)          # one banner per RUN, not one per rollout -- see engine.quiet
     sim = build(run, device)
     probe, _ = rollout(sim, U[0], io["drive_set"], io["drive_block"],
                        io["read_set"], io["read_block"], device, grad=True)
@@ -141,10 +142,12 @@ def train(run, root=None, device="cpu"):
     # and not; leaving it out was worth 0.65 of target variance against 0.0008 on a task of
     # comparable difficulty. Duplicates dropped so a floor collapsing the early stages costs no
     # epochs -- the defect that pinned the reference's horizon at 60 frames for a whole run.
+    accum = max(1, int(tr.get("accum", 8)))      # trials averaged before a step; see the loop
     T_full = int(sim.n_frames)
     sched = sorted({max(int(tr.get("horizon_min", 60)), int(T_full * f))
                     for f in tr.get("curriculum", [0.125, 0.25, 0.5, 0.75, 1.0])})
-    print(f"[fit] horizon curriculum {sched} frames of {T_full}")
+    print(f"[fit] horizon curriculum {sched} frames of {T_full};  "
+          f"gradient averaged over {accum} trials per step")
     opt = torch.optim.Adam(params, lr=float(tr.get("lr", 1e-2)))
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     ch = int(io.get("read_channel", 0))
@@ -155,13 +158,24 @@ def train(run, root=None, device="cpu"):
         sim.n_frames = h
         perm = torch.randperm(n_tr)
         tot = 0.0
-        for i in perm.tolist():
+        # GRADIENT ACCUMULATION, WHICH IS NOT THE BATCH AXIS AND DOES NOT PRETEND TO BE. R0 would
+        # make a rollout carry B trials and cost one rollout; this still costs `accum` rollouts,
+        # so it buys no wall-clock at all. What it buys is the ONLY other thing a batch gives:
+        # a gradient averaged over several trials instead of one. Stepping per trial made the
+        # validation error bounce 27 -> 76 deg^2 between consecutive epochs -- not a failure to
+        # learn but an optimiser being handed a different task each step. Averaging first is a
+        # three-line change against an engine refactor, and it fixes the half of the problem
+        # that was actually hurting.
+        opt.zero_grad()
+        for k, i in enumerate(perm.tolist()):
             H, y = rollout(sim, U[i], io["drive_set"], io["drive_block"],
                            io["read_set"], io["read_block"], device, grad=True)
-            loss = _mse(y, Y[i], ch)
-            opt.zero_grad(); loss.backward()
-            torch.nn.utils.clip_grad_norm_(params, 1.0)
-            opt.step(); tot += float(loss.detach())
+            loss = _mse(y, Y[i], ch) / accum
+            loss.backward()
+            tot += float(loss.detach()) * accum
+            if (k + 1) % accum == 0 or k == len(perm) - 1:
+                torch.nn.utils.clip_grad_norm_(params, 1.0)
+                opt.step(); opt.zero_grad()
         sch.step()
         sim.n_frames = T_full            # ALWAYS SCORED ON THE FULL TRIAL, whatever it trained on
         with torch.no_grad():

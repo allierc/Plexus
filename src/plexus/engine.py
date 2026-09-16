@@ -1772,15 +1772,33 @@ def _setup_recording(sim: Spec, H: Hierarchy):
     rec_mesh: dict[str, list] = {name: [] for name, lvl in H.levels.items()
                                  if getattr(lvl, "mesh", None) is not None}
     rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
-    print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride {sstride}), "
-          f"fields every {fstride} steps (<= {field_cap})", flush=True)
+    if not _QUIET:
+        print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride "
+              f"{sstride}), fields every {fstride} steps (<= {field_cap})", flush=True)
     return rec_index, rec_sets, occ_sets, rec_state, rec_mesh, fstride, rec_fields
+
+
+# THE BANNER IS FOR A RUN, NOT FOR A ROLLOUT. `engine.run` prints the spec's header every call,
+# which is right when a call IS the run and useless when ten thousand of them are one training
+# job: the log becomes headers with the loss buried in it. `quiet(True)` silences the per-run
+# summary and the recording line and nothing else -- errors, warnings and operator output are
+# untouched, because a training loop that hides those is worse than a noisy one.
+_QUIET = False
+
+
+def quiet(on: bool = True) -> bool:
+    """Silence the per-run banner. Returns the previous value, so a caller can restore it."""
+    global _QUIET
+    was, _QUIET = _QUIET, bool(on)
+    return was
 
 
 def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
     """One-time neat banner: the world, the sets (with live counts), the fields, and the
     operators (grouped by family) of this run -- so a glance shows what is being simulated."""
     ws = "[" + ", ".join(f"{float(w):g}" for w in H.world_size.tolist()) + "]"
+    if _QUIET:
+        return
     print(f"[engine] === {sim.name} ===  dim={H.dim}  world={ws}  boundary={sim.boundary}  "
           f"dt={sim.dt:g}  frames={sim.n_frames}", flush=True)
     # THE PHYSICAL SCALE, printed with the run rather than left to a reader's assumption. A run with
