@@ -992,8 +992,14 @@ class SeedStateRandom(Seed):
         g = torch.Generator(device="cpu").manual_seed(self.seed)
         v = torch.rand(lvl.n, b1 - b0, generator=g) * (self.hi - self.lo) + self.lo
         lvl.state[:, b0:b1] = v.to(lvl.state.device)
-        print(f"[seed_state_random] {lvl.name}.{self.block} ~ U({self.lo:g}, {self.hi:g}) "
-              f"over {lvl.n:,} elements", flush=True)
+        # SILENT UNDER `engine.quiet`, because a trainer builds the world once per step and this
+        # line would otherwise print thousands of times per fit. Imported here and not at module
+        # scope: `engine` imports the operator registry, so the dependency only closes at call
+        # time, by which point the module is loaded.
+        from plexus import engine as _eng
+        if not _eng._QUIET:
+            print(f"[seed_state_random] {lvl.name}.{self.block} ~ U({self.lo:g}, {self.hi:g}) "
+                  f"over {lvl.n:,} elements", flush=True)
         return {}
 
 

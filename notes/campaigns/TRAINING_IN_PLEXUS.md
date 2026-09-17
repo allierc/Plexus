@@ -260,11 +260,13 @@ than `repeat` would share storage and make eight identical runs agree with thems
 `config/run/eye_rig_fit*.yaml` fits W_in, W and W_out of the 64-unit circuit through the frozen
 eye against `t5_gaze_tracking`, by running the spec — not a transcription of it.
 
-| | best val | of variance | what changed |
-|---|---|---|---|
-| 12 epochs, no curriculum | — | 0.647 | the starting point |
-| 60 epochs, curriculum, `accum: 1` | 18.06 deg² | 0.446 | truncated BPTT, 60 → 480 frames |
-| 60 epochs, curriculum, `accum: 8` | **2.48 deg²** | **0.061** | gradient averaged over 8 trials |
+| | best val | of variance | seconds | what changed |
+|---|---|---|---|---|
+| 12 epochs, no curriculum | — | 0.647 | — | the starting point |
+| 60 epochs, curriculum, `accum: 1` | 18.06 deg² | 0.446 | 1831 | truncated BPTT, 60 → 480 frames |
+| 60 epochs, curriculum, `accum: 8` | 2.48 deg² | 0.061 | 1831 | gradient averaged over 8 trials |
+| 60 epochs, curriculum, `batch: 8` | 2.72 deg² | 0.067 | **327** | the same 8 trials, one rollout |
+| the same, `rec_gain: 1` start | 2.68 deg² | 0.066 | 327 | recurrent W from N(0, 1/N) |
 
 Two things that mattered more than expected. **The horizon curriculum** is not a refinement: a
 480-step rollout from an unfitted W sends every late frame's gradient through hundreds of tanh's
@@ -272,22 +274,37 @@ and it arrives uninformative. **Stepping per trial cost a factor of seven** — 
 27 → 76 deg² between consecutive epochs was an optimiser handed a different task each step, not a
 failure to learn.
 
-Gradient accumulation is **not** a substitute for R0. Both 60-epoch runs took 1831 s for the same
-3,360 rollouts; it buys the variance reduction and none of the wall-clock. Training at the scale
-`tasks.trainer` uses (512 trials) still needs the engine to carry B trials in one rollout.
+**`accum: 8` and `batch: 8` are the same arithmetic at 5.6× different cost** — 1831 s against
+327 s for the same 60 epochs, 6 optimiser steps each, gradients that agree to 1e-16 relative in
+float64 (`tests/test_batch_gradient.py`). The two land at 0.067 and 0.061 of target variance,
+which is the optimisation's own sensitivity to float32 rounding compounded over 60 epochs, not a
+difference in what is being fitted. `accum:` is still read, as the same *quantity* at the new
+price.
+
+**The recurrent weights start at exactly zero** in the files the recorded fits used, and nothing
+in the repository made those files — `tools/make_rig_edges.py` is now the missing half of the
+spec, reproducing the structure exactly and the draw law by declaration. A zero start means no
+recurrence at epoch 0, so every bit of the dynamics is built from flat; the standard ctRNN start
+is W ~ N(0, g²/N) with g ≈ 1, on the edge of chaos. Fitting from g = 1 (`eye_rig_fit_g1`) does
+**not** help: validation is the same to 2% and held out it is *worse*, 0.053 against 0.043 of
+variance, with a worst trial of 8.2 against 4.0 deg². One seed each, so the honest reading is
+that there is no evidence the zero start costs anything here.
+
+The one place g = 1 does better is the question the analyser exists to ask. Its slowest linearised
+pole at the operating point is −0.136 /s against the teacher's −0.125, where the zero-start fit
+sits at −0.087. **Lower held-out error, worse dynamics** — the two come apart, which is the whole
+argument for panel d.
 
 ## Still open
 
-**R0 in the trainer.** The axis exists and is proven inert; `spec_trainer.rollout` still runs one
-trial per step and has to be rewritten to drive B at once. Until it is, the 18.4× is available
-and unspent.
-
-**R5 — tester and analyser.** `spec_trainer` has `-o train` only. The analyser is the one that
-says whether the law was recovered rather than whether the output is close, and for these tasks
-the truth is analytic and in `teacher.pt`.
-
 **Contextual unidentifiability**, unchanged: grids over the *teacher* average 0.326 normalised MSE
-against 0.0009 for no grid, and `spectral_coverage` passes all of them.
+against 0.0009 for no grid, and `spectral_coverage` passes all of them. The check belongs in
+`tasks/schema.py`: refuse a teacher-varying grid unless the stimulus varies with it, or the cell
+identity is an input channel. `t1_integrator_tau_sweep`, `t2_resonator_damping` and
+`t3_lowpass_order` would each have to be re-specified.
+
+**Learnable families `ngp` and `gnn`**, and `init_from: operator` through the spec — the method
+exists and is tested, the spec path is not wired.
 
 ## Two traps worth not repeating
 
