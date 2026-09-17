@@ -122,9 +122,9 @@ class _Project(Lateral):
     def forward(self, H, mask=None):
         es = H.level(self.edge_set)
         post = H.level(es.post_name)
-        x_pre = self.send(H.gather(self.edge_set, "pre", self.block))   # [E, w] lift, then send()
-        w_e = es.get(self.weight_block)                              # [E, 1]
-        msg = H.scatter_along(self.edge_set, "post", w_e * x_pre)    # [N_post, w] sum along post
+        x_pre = self.send(H.gather(self.edge_set, "pre", self.block))   # [.., E, w]; send() first
+        w_e = es.get(self.weight_block)                              # [.., E, 1]
+        msg = H.scatter_along(self.edge_set, "post", w_e * x_pre)    # [.., N_post, w] along post
         y = self.act(self.gain * msg + self.bias) * post.occ[:, None]
         if mask is not None:
             y = y * mask[:, None].to(y.dtype)
@@ -133,17 +133,20 @@ class _Project(Lateral):
             # the tape keeps the previous state alive (see `aggregate_centroid` for why the
             # forward path must not clone).
             b0, b1 = post.state_schema[self.to_block]
-            if b1 - b0 != y.shape[1]:
+            # THE WIDTH IS THE LAST AXIS, not axis 1: a batched run carries y as [B, N, w], where
+            # axis 1 is the receiver count and comparing it to the block width would reject every
+            # batched run whose receiver count differs from its block width.
+            if b1 - b0 != y.shape[-1]:
                 raise ValueError(
-                    f"readout: the message is {y.shape[1]} wide but {es.post_name}."
+                    f"readout: the message is {y.shape[-1]} wide but {es.post_name}."
                     f"{self.to_block!r} is {b1 - b0}. The width comes from the SENDER's "
                     f"{self.block!r} block, so these must agree.")
             if torch.is_grad_enabled():
                 st = post.state.clone()
-                st[:, b0:b1] = y
+                st[..., b0:b1] = y
                 post.state = st
             else:
-                post.state[:, b0:b1] = y
+                post.state[..., b0:b1] = y
             return {}
         return {es.post_name: y}
 

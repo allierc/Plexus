@@ -11,7 +11,7 @@ eye arrives, the target has moved.
 
 The two entities they act on are registered here as well:
 
-    eye       gaze (3) | pose_rate (3) | pose_target (3)     one eye
+    organ     pose (3) | pose_rate (3) | pose_target (3)    `eye` is an alias
     muscle    drive (1)                                    six per eye, its extraocular muscles
 
 THE EYE THIS WAS FITTED FROM IS IN `prototype/eye/`, AND IT IS A RICHER OBJECT. There, an eye is a
@@ -86,15 +86,15 @@ AXES = ("theta", "phi", "psi")                           # horizontal, vertical,
 
 # --------------------------------------------------------------------------- the entities
 def organ_schema(dim: int) -> StateSchema:
-    """`gaze` | `pose_rate` | `pose_target`, three degrees each, whatever the world's dimension.
+    """`pose` | `pose_rate` | `pose_target`, three degrees each, whatever the world's dimension.
 
     THE WIDTH IS 3 AND IT IS NOT `dim`. A rigid body has three rotational degrees of freedom no matter how many
     spatial dimensions the run declares, so these blocks do not narrow to 2 in a 2-D world the
     way `pos` does. The third angle is torsion, and it is not decoration: on a real eye the
     muscle synergies leak into it hard enough that a two-angle plant cannot be fitted.
 
-    `gaze` is the coordinate and `pose_rate` its rate, paired as a second-order block so the
-    engine integrates `pose_rate += dt * a; gaze += dt * pose_rate` from whatever
+    `pose` is the coordinate and `pose_rate` its rate, paired as a second-order block so the
+    engine integrates `pose_rate += dt * a; pose += dt * pose_rate` from whatever
     `eye_mechanics` emits. `boundary` is FREE on both, because these are DEGREES and not
     positions -- wrapping them into the world box would fold the gaze back on itself.
 
@@ -310,21 +310,25 @@ class MusclePoseMap(Aggregate):
         beta = self._beta.to(device=dev, dtype=dt_)
         # A muscle's ordinal WITHIN its own eye is its index into MUSCLES. With per_parent = 6 the
         # children of one parent are contiguous, which is what makes the reshape below the fibre.
-        m = (mus.get("drive")[:, 0] * mus.occ).reshape(eye.n, N_MUSCLE)      # (n_eye, 6)
+        # RESHAPED AROUND THE LEADING AXES, not from position 0: a batched run carries `drive` as
+        # [B, n_muscle, 1], and a flat reshape(eye.n, 6) would fold the trials into the fibre and
+        # give every eye six drives belonging to six different trials.
+        lead = mus.state.shape[:-2]                                          # () or (B,)
+        m = (mus.get("drive")[..., 0] * mus.occ).reshape(*lead, eye.n, N_MUSCLE)
         if mask is not None:
             m = m * mask.reshape(eye.n, N_MUSCLE).to(m.dtype)
-        cross = m[:, self._pairs[:, 0]] * m[:, self._pairs[:, 1]]            # (n_eye, 15)
-        design = torch.cat([m, m ** 2, cross], dim=-1)                       # (n_eye, 27)
-        pose_target = design @ beta                                             # (n_eye, 3), degrees
+        cross = m[..., self._pairs[:, 0]] * m[..., self._pairs[:, 1]]        # (.., n_eye, 15)
+        design = torch.cat([m, m ** 2, cross], dim=-1)                       # (.., n_eye, 27)
+        pose_target = design @ beta                                          # (.., n_eye, 3), degrees
         g0, g1 = eye.state_schema["pose_target"]
         if torch.is_grad_enabled():
             # Clone-and-reassign so the tape keeps the previous state alive; see
             # `aggregate_centroid` for why the forward path must NOT do this.
             st = eye.state.clone()
-            st[:, g0:g1] = pose_target
+            st[..., g0:g1] = pose_target
             eye.state = st
         else:
-            eye.state[:, g0:g1] = pose_target
+            eye.state[..., g0:g1] = pose_target
         _ = pidx                                          # the fibre is the reshape; kept for the check above
         return {}
 

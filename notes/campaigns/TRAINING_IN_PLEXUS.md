@@ -236,6 +236,25 @@ widened `READS`, a relational substitution with no edge set. A live substitution
 **R4** (`5c78e63c`, `39f4f88b`) — `learnable:` in the spec language, both forms, plus
 `spec_trainer` and the eye rig.
 
+**R0** — the batch axis. `Level.state` is `[B, N, W]`, created by `expand_batch` *after* build and
+seed so not one of the dozens of seeding paths that write `state[:, a:b]` had to change. Every
+state read moved to the right (`state[..., a:b]`), and so did `Level.n`, which was
+`state.shape[0]` and would otherwise report the trial count. Four operators and the two incidence
+maps followed. The trajectory records trial 0 only: it exists to be rendered, and every reader of
+it expects `[T, N, dim]`.
+
+**18.4× at B = 32** on the eye rig, 171 → 9.3 ms per trial of 120 frames. That is the profile's
+prediction — the rollout was Python dispatch on 64-neuron tensors, so the arithmetic was free
+and only the dispatch was being paid for, once per trial instead of once per batch.
+
+The gate passes *twice*, and the second one is the real one. In float32 the two paths differ by
+2.8e-7 of the gaze's own scale, about 2 units in the last place: a batched `design @ beta`
+dispatches to a different BLAS kernel and sums the same terms in a different order. In float64
+the same comparison closes to 1.8e-15 degrees on a gaze of 7 degrees — again ~2 ulp. An error
+that shrinks with the mantissa is arithmetic; a leaked batch axis would not move.
+`tests/test_batch_axis.py` also asserts the eight trials actually *differ*, since `expand` rather
+than `repeat` would share storage and make eight identical runs agree with themselves.
+
 ## The eye rig, measured
 
 `config/run/eye_rig_fit*.yaml` fits W_in, W and W_out of the 64-unit circuit through the frozen
@@ -259,8 +278,9 @@ Gradient accumulation is **not** a substitute for R0. Both 60-epoch runs took 18
 
 ## Still open
 
-**R0 — the batch axis.** Now the only thing between this and training at scale. The gate stands:
-`ctrnn_eyeG_rig` at B = 32 must reproduce 32 separate B = 1 runs to 1e-6 of gaze.
+**R0 in the trainer.** The axis exists and is proven inert; `spec_trainer.rollout` still runs one
+trial per step and has to be rewritten to drive B at once. Until it is, the 18.4× is available
+and unspent.
 
 **R5 — tester and analyser.** `spec_trainer` has `-o train` only. The analyser is the one that
 says whether the law was recovered rather than whether the output is close, and for these tasks
