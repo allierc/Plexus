@@ -1677,21 +1677,21 @@ def _integrate(H: Hierarchy, dt: float) -> None:
             continue                                       # no engine-integrated state
         rate = schema.rate                                 # the rate block of a 2nd-order set (vel), or None (1st-order)
         cx0, cx1 = schema.slice(coord.name)
-        x = lvl.state[:, cx0:cx1]
+        x = lvl.state[..., cx0:cx1]
         new = lvl.state.clone()
         if rate is not None:
             # inertial (2nd-order) set -- the pos/vel path, byte-identical to before:
             #   EMIT=velocity     -> the rate block IS the delta (overdamped)
             #   EMIT=acceleration -> integrate the delta into the rate block
             vx0, vx1 = schema.slice(rate.name)
-            v = lvl.state[:, vx0:vx1]
+            v = lvl.state[..., vx0:vx1]
             v = out if emit == "velocity" else v + dt * out
             vmax = getattr(lvl, "vmax", None)              # optional speed clamp (anti-overshoot)
             if vmax:
                 sp = v.norm(dim=-1, keepdim=True)
                 v = v * (sp.clamp(max=vmax) / sp.clamp(min=1e-9))
             x = x + dt * v
-            new[:, vx0:vx1] = v
+            new[..., vx0:vx1] = v
         else:
             # first-order (overdamped) set -- the delta is dx/dt directly (voltage, gating, conc)
             x = x + dt * out
@@ -1703,7 +1703,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
                 pass                                       # unbounded: particles drift in open space
             else:
                 x = torch.minimum(x.clamp(min=0.0), box)   # wall: clamp each axis to [0, w_k]
-        new[:, cx0:cx1] = x
+        new[..., cx0:cx1] = x
         lvl.state = new
 
     # extra (non-coordinate) dynamical blocks: `pos` was integrated above; chem / a0 / ...
@@ -1715,7 +1715,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
         new = lvl.state.clone()
         for bname, d in blocks.items():
             cx0, cx1 = schema.slice(bname)
-            new[:, cx0:cx1] = new[:, cx0:cx1] + dt * d
+            new[..., cx0:cx1] = new[..., cx0:cx1] + dt * d
         lvl.state = new
 
 
@@ -1905,6 +1905,46 @@ def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None, re
            "name": sim.name}
 
 
+def _rec0(t: torch.Tensor) -> torch.Tensor:
+    """Trial 0 of a batched block `[B, N, W]`; an unbatched `[N, W]` unchanged.
+
+    THE RECORDED TRAJECTORY IS ONE TRIAL AND NOT ALL B, on purpose. The trajectory exists to be
+    rendered and diffed -- one movie, one twin comparison -- and every consumer of it (the
+    renderers, `test_plot`, the regression fingerprints) reads `[T, N, dim]`. Keeping all B would
+    multiply a long run's npz by the trial count for frames no renderer draws, and would break
+    that shape for every existing reader. A batch is a TRAINING device: the thing worth keeping
+    from it is the loss, which reaches the caller through `H`, not through the record.
+    """
+    return t[0] if t.dim() == 3 else t
+
+
+def expand_batch(H, B: int) -> int:
+    """Give every set a leading batch axis: [N, W] -> [B, N, W]. Returns B.
+
+    THE AXIS IS CREATED AFTER BUILD AND SEED, DELIBERATELY. Every seeding path -- placing somata
+    from a region, scattering a lattice, drawing types -- writes `state[:, a:b]` on a 2-D tensor,
+    and there are dozens of them. Expanding afterwards means not one of them changes: a trial is
+    seeded once and then copied, which is also the correct semantics (B trials of ONE world start
+    identically and diverge only through their inputs).
+
+    `repeat`, NOT `expand`: an expanded tensor shares storage across the batch, so the first
+    operator writing a block in place would write it into all B trials at once and every trial
+    would be the same run. The copy is the point.
+
+    A BATCH IS A NUMERICAL FACT AND NOT A BIOLOGICAL ONE. 32 trials are 32 runs of one world, not
+    32 worlds coexisting -- so this appears nowhere in the spec language, `Aggregate` never sees
+    it, and `H.dim` is unchanged. The alternative, trials as contained entities, would have made
+    the hierarchy assert something false.
+    """
+    if B <= 1:
+        return 1
+    for lvl in H.levels.values():
+        lvl.state = lvl.state.unsqueeze(0).repeat(B, *([1] * (lvl.state.dim())))
+    H.batch = int(B)
+    H.zero_delta()
+    return int(B)
+
+
 def apply_learnable_blocks(H, sim) -> list:
     """`learnable: {block: w, of: recurrent}` -> an nn.Parameter the loss can reach.
 
@@ -1963,7 +2003,7 @@ def apply_learnable_blocks(H, sim) -> list:
 
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False,
-        grad: bool = False) -> tuple[Hierarchy, dict]:
+        grad: bool = False, batch: int = 1) -> tuple[Hierarchy, dict]:
     """Forward-simulate `sim`. Returns (Hierarchy, recorded trajectory).
 
     `grad=True` keeps the autograd tape across the whole rollout, so a loss on the FINAL state
@@ -1994,6 +2034,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             st = lvl.state.clone(); st[:vel.shape[0], vx0:vx1] = vel; lvl.state = st
             lvl._vel_init = None
     apply_learnable_blocks(H, sim)            # 1.7) `learnable: {block:, of:}` -> tensor leaves
+    expand_batch(H, int(batch))               # 1.8) [N, W] -> [B, N, W], after every seeding path
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)
@@ -2620,7 +2661,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # the trajectory is a RECORD, never a path for the gradient (which reaches the
                     # caller through H). Without it, `.numpy()` raises on the first frame.
                     if name in rec_sets:                              # spatial: the pos trajectory
-                        rec_sets[name][ri] = lvl.get("pos").detach().cpu().numpy()
+                        rec_sets[name][ri] = _rec0(lvl.get("pos")).detach().cpu().numpy()
                     occ_sets[name][ri] = lvl.active.detach().cpu().numpy()
                     # THE TYPE COLUMN PER ROW, for a set whose types change during the run (a
                     # protein reservoir labels a slot with its species at birth). Kept only
@@ -2629,7 +2670,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                         H._type_hist.setdefault(name, {})[ri] = lvl.node_type.detach().cpu().numpy().astype(np.int16)
                     if name in rec_state:                            # non-pos recorded state blocks (voltage, ...)
                         for bname, arr in rec_state[name].items():
-                            arr[ri] = lvl.get(bname).detach().cpu().numpy()
+                            arr[ri] = _rec0(lvl.get(bname)).detach().cpu().numpy()
                     # THE MESH IS RECORDED IF ONE EXISTS, not only if the SPEC SAID SO. `rec_mesh`
                     # is keyed at setup from `lvl.mesh`, which `_provision_mesh` creates only when
                     # the set declares `mesh: half_edge`. But `seed_mesh` builds its table

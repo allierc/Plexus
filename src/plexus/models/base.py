@@ -268,13 +268,25 @@ class Level(nn.Module):
 
     @property
     def n(self) -> int:
-        """Buffer size (allocated slots, live or dormant)."""
-        return self.state.shape[0]
+        """Buffer size (allocated slots, live or dormant).
+
+        READ FROM THE RIGHT, because a batched run carries `state` as [B, N, W]: axis 0 is
+        then the trial count, not the element count, and `shape[0]` would report B --
+        making `scatter_along` allocate a B-row accumulator and `index_add_` raise
+        "index out of range" the moment B < N.
+        """
+        return self.state.shape[-2]
 
     def get(self, block: str) -> torch.Tensor:
-        """A view of a named state block (e.g. 'pos', 'vel') per the schema."""
+        """A view of a named state block (e.g. 'pos', 'vel') per the schema.
+
+        INDEXED FROM THE RIGHT, so the same call works whether `state` is [N, W] or [B, N, W].
+        A batch is a NUMERICAL fact and not a biological one -- 32 trials are 32 runs of one
+        world, not 32 worlds -- so it belongs on the tensor and nowhere in the language, and
+        every consumer that reaches a block through here needs no change to tolerate it.
+        """
         a, b = self.state_schema[block]
-        return self.state[:, a:b]
+        return self.state[..., a:b]
 
     @property
     def is_edge_set(self) -> bool:
@@ -597,7 +609,7 @@ class Hierarchy(nn.Module):
         es = self.level(edge_set)
         idx = es.incidence(role)                          # [E] endpoint index per edge
         ep = self.level(es.incidence_name(role))
-        return ep.get(block)[idx]
+        return ep.get(block)[..., idx, :]                 # [..., E, w]; batch-transparent
 
     def scatter_along(self, edge_set: str, role: str, values: torch.Tensor) -> torch.Tensor:
         """Sum per-edge `values` `[E, w]` onto the endpoint set along the `role`
@@ -608,8 +620,10 @@ class Hierarchy(nn.Module):
         es = self.level(edge_set)
         idx = es.incidence(role)
         ep = self.level(es.incidence_name(role))
-        out = torch.zeros(ep.n, values.shape[-1], device=values.device)
-        out.index_add_(0, idx, values * es.occ[:, None])
+        lead = values.shape[:-2]                          # () at B=1, (B,) when batched
+        out = torch.zeros(*lead, ep.n, values.shape[-1], device=values.device,
+                          dtype=values.dtype)
+        out.index_add_(-2, idx, values * es.occ[:, None])
         return out
 
     # --- per-level delta accumulators (the integration scratch) ----------- #
@@ -625,7 +639,12 @@ class Hierarchy(nn.Module):
         level's delta is sized to its coordinate block (pos for a spatial set, voltage
         for a neuron), not a global spatial dim."""
         dev = next(iter(self.levels.values())).state.device
-        self._delta = {name: torch.zeros(l.n, self._delta_dim(l) if dim is None else dim, device=dev)
+        # A DELTA IS SHAPED LIKE THE STATE IT INTEGRATES INTO, batch axis included -- otherwise
+        # `add_delta` would broadcast a [N, W] accumulator against a [B, N, W] contribution and
+        # silently sum the batch away, which reads as a working run with every trial averaged.
+        lead = {name: tuple(l.state.shape[:-2]) for name, l in self.levels.items()}
+        self._delta = {name: torch.zeros(*lead[name], l.n,
+                                         self._delta_dim(l) if dim is None else dim, device=dev)
                        for name, l in self.levels.items()}
         self._delta_blocks = {}                            # extra (non-coordinate) block deltas, filled lazily
 
@@ -724,7 +743,8 @@ class Hierarchy(nn.Module):
         """The accumulated delta for a level (zeros if nothing wrote it)."""
         if level_name not in self._delta:
             lvl = self.levels[level_name]
-            self._delta[level_name] = torch.zeros(lvl.n, self._delta_dim(lvl), device=lvl.state.device)
+            self._delta[level_name] = torch.zeros(*lvl.state.shape[:-2], lvl.n,
+                                                  self._delta_dim(lvl), device=lvl.state.device)
         return self._delta[level_name]
 
 
