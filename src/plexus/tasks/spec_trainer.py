@@ -11,11 +11,12 @@ thing being trained IS the thing `Plexus_Main.py -o generate` would run, operato
     task             a corpus under graphs_data/task/
     run spec         names the three and the hyperparameters
 
-WHY THIS IS SLOW AND WHAT IT COSTS, stated rather than discovered: `engine.run` carries no batch
-axis, so a step is one trial. That is R0 of notes/campaigns/TRAINING_IN_PLEXUS.md and it is not
-done. The consequence is a per-step cost of a full 480-frame rollout, so this trains on tens of
-trials where `tasks.trainer` trains on hundreds. It is the correct model rather than a fast one,
-and the two are checked against each other rather than trusted.
+B TRIALS IN ONE ROLLOUT. `engine.run(batch=B)` gives every set a leading trial axis, so a step
+costs one rollout however many trials it averages -- R0 of notes/campaigns/TRAINING_IN_PLEXUS.md,
+measured at 18.4x on this rig at B = 32 (171 -> 9.3 ms per trial of 120 frames). The axis is a
+numerical fact and appears nowhere in the spec: the file being trained is the same file
+`Plexus_Main.py -o generate` would run, operator for operator, so nothing can drift between the
+model and the thing fitted.
 
 THE STIMULUS ENTERS THROUGH A BLOCK, NOT THROUGH A SPEC EDIT. The rig's `retina.signal` is written
 each frame from the corpus by a callback the engine already supports (`on_frame`), so the spec
@@ -64,28 +65,38 @@ def build(run, device="cpu"):
 
 
 def rollout(sim, u, drive_set, drive_block, read_set, read_block, device="cpu", grad=True):
-    """One trial: write the stimulus into a block each frame, return the read-out trace.
+    """Write the stimulus into a block each frame, return the read-out trace.
+
+    `u` is `[T, C]` for one trial or `[B, T, C]` for B of them -- B frames of the same world run
+    side by side on a leading tensor axis, NOT B worlds. The return matches: `[T, w]` or
+    `[B, T, w]`, the read-out set's element 0 every frame.
 
     `on_frame` is the engine's own per-frame hook, so driving a run from outside costs no change
     to the engine and no edit to the spec.
     """
+    batch = int(u.shape[0]) if u.dim() == 3 else 1
     trace = []
 
     def hook(H, frame):
         lvl = H.level(drive_set)
         a, b = lvl.state_schema[drive_block]
-        t = min(frame, u.shape[0] - 1)
+        t = min(frame, u.shape[-2] - 1)
         st = lvl.state.clone()
-        st[:, a:b] = u[t].expand(lvl.n, b - a)
+        # `u[..., t, :]` is [C] or [B, C]; unsqueezing the ELEMENT axis (not the batch one) gives
+        # every element of the drive set the same stimulus, per trial.
+        st[..., a:b] = u[..., t, :].unsqueeze(-2).expand(*st.shape[:-1], b - a)
         lvl.state = st
-        trace.append(H.level(read_set).get(read_block)[0].clone())
+        trace.append(H.level(read_set).get(read_block)[..., 0, :].clone())
 
-    H, _ = engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook)
-    return H, torch.stack(trace) if trace else None
+    H, _ = engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook, batch=batch)
+    if not trace:
+        return H, None
+    y = torch.stack(trace)                                 # [T, w] or [T, B, w]
+    return H, y.transpose(0, 1) if batch > 1 else y        # trial-major, like the corpus
 
 
 def _mse(y, target, ch):
-    """Aligned at frame 0 and truncated to the shorter.
+    """Aligned at frame 0 and truncated to the shorter; batch-transparent.
 
     THE ENGINE RECORDS ONE FRAME MORE THAN IT STEPS: `on_frame` fires before any dynamics, so
     trace[0] is the initial state and trace[1..n] are the n steps. The teacher's y[0] is likewise
@@ -93,9 +104,13 @@ def _mse(y, target, ch):
     TOGETHER and the extra frame is on the end. Truncating is therefore correct and padding would
     not be; the alternative -- dropping trace[0] -- would shift the whole comparison by one step
     and report a lag the model does not have.
+
+    Indexed from the right, so `[T, w]` against `[T, 1]` and `[B, T, w]` against `[B, T, 1]` are
+    the same call. The mean is over frames AND trials, which is exactly the gradient that
+    accumulating B single-trial losses used to produce.
     """
-    n = min(y.shape[0], target.shape[0])
-    return ((y[:n, ch] - target[:n, 0]) ** 2).mean()
+    n = min(y.shape[-2], target.shape[-2])
+    return ((y[..., :n, ch] - target[..., :n, 0]) ** 2).mean()
 
 
 def train(run, root=None, device="cpu"):
@@ -116,8 +131,6 @@ def train(run, root=None, device="cpu"):
     n_va = min(int(tr.get("n_val", 8)), Uv.shape[0])
     print(f"[data] task {run['task']}: using {n_tr} of {U.shape[0]} train trials, "
           f"{n_va} val  ({U.shape[1]} frames each)")
-    print(f"[data] ONE TRIAL PER STEP -- engine.run has no batch axis (R0), so this is the "
-          f"correct model rather than a fast one")
 
     engine.quiet(True)          # one banner per RUN, not one per rollout -- see engine.quiet
     sim = build(run, device)
@@ -142,12 +155,16 @@ def train(run, root=None, device="cpu"):
     # and not; leaving it out was worth 0.65 of target variance against 0.0008 on a task of
     # comparable difficulty. Duplicates dropped so a floor collapsing the early stages costs no
     # epochs -- the defect that pinned the reference's horizon at 60 frames for a whole run.
-    accum = max(1, int(tr.get("accum", 8)))      # trials averaged before a step; see the loop
+    # TRIALS PER STEP. `batch:` is the name now that the engine carries the axis; `accum:` is the
+    # old name for the same QUANTITY -- the number of trials the gradient is averaged over before
+    # the optimiser moves -- and is honoured so the recorded A/B runs keep their meaning. What
+    # changed is the price: `accum: 8` cost eight rollouts, `batch: 8` costs one.
+    batch = max(1, int(tr.get("batch", tr.get("accum", 8))))
     T_full = int(sim.n_frames)
     sched = sorted({max(int(tr.get("horizon_min", 60)), int(T_full * f))
                     for f in tr.get("curriculum", [0.125, 0.25, 0.5, 0.75, 1.0])})
     print(f"[fit] horizon curriculum {sched} frames of {T_full};  "
-          f"gradient averaged over {accum} trials per step")
+          f"gradient averaged over {batch} trials per step, ONE rollout per step")
     opt = torch.optim.Adam(params, lr=float(tr.get("lr", 1e-2)))
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     ch = int(io.get("read_channel", 0))
@@ -157,36 +174,36 @@ def train(run, root=None, device="cpu"):
         h = sched[min(len(sched) - 1, int(len(sched) * ep / max(epochs, 1)))]
         sim.n_frames = h
         perm = torch.randperm(n_tr)
-        tot = 0.0
-        # GRADIENT ACCUMULATION, WHICH IS NOT THE BATCH AXIS AND DOES NOT PRETEND TO BE. R0 would
-        # make a rollout carry B trials and cost one rollout; this still costs `accum` rollouts,
-        # so it buys no wall-clock at all. What it buys is the ONLY other thing a batch gives:
-        # a gradient averaged over several trials instead of one. Stepping per trial made the
-        # validation error bounce 27 -> 76 deg^2 between consecutive epochs -- not a failure to
-        # learn but an optimiser being handed a different task each step. Averaging first is a
-        # three-line change against an engine refactor, and it fixes the half of the problem
-        # that was actually hurting.
-        opt.zero_grad()
-        for k, i in enumerate(perm.tolist()):
-            H, y = rollout(sim, U[i], io["drive_set"], io["drive_block"],
+        tot, n_step = 0.0, 0
+        # ONE ROLLOUT PER STEP, B TRIALS WIDE. The loss is the mean over frames AND trials, which
+        # is the same gradient the old accumulation produced by summing B single-trial losses
+        # divided by B -- the arithmetic is unchanged and only the dispatch is saved. Averaging
+        # over trials is what matters for the optimiser: stepping per trial made the validation
+        # error bounce 27 -> 76 deg^2 between consecutive epochs, an optimiser handed a different
+        # task each step rather than a failure to learn.
+        #
+        # A SHORT LAST GROUP IS DROPPED, not padded: `n_tr` trials in groups of `batch` leaves a
+        # remainder that would take a step on fewer trials and a noisier gradient, at the end of
+        # every epoch. The trials are permuted each epoch, so nothing is systematically unseen.
+        for k in range(0, n_tr - batch + 1, batch):
+            idx = perm[k:k + batch]
+            H, y = rollout(sim, U[idx], io["drive_set"], io["drive_block"],
                            io["read_set"], io["read_block"], device, grad=True)
-            loss = _mse(y, Y[i], ch) / accum
+            loss = _mse(y, Y[idx], ch)
+            opt.zero_grad()
             loss.backward()
-            tot += float(loss.detach()) * accum
-            if (k + 1) % accum == 0 or k == len(perm) - 1:
-                torch.nn.utils.clip_grad_norm_(params, 1.0)
-                opt.step(); opt.zero_grad()
+            torch.nn.utils.clip_grad_norm_(params, 1.0)
+            opt.step()
+            tot += float(loss.detach()); n_step += 1
         sch.step()
         sim.n_frames = T_full            # ALWAYS SCORED ON THE FULL TRIAL, whatever it trained on
         with torch.no_grad():
-            v = 0.0
-            for i in range(n_va):
-                _, yv = rollout(sim, Uv[i], io["drive_set"], io["drive_block"],
-                                io["read_set"], io["read_block"], device, grad=False)
-                v += float(_mse(yv, Yv[i], ch))
-            v /= max(n_va, 1)
-        hist.append({"epoch": ep, "horizon": h, "train_mse": tot / n_tr, "val_mse": v})
-        print(f"  ep {ep:3d}  horizon {h:4d}  train {tot / n_tr:10.5f}  val {v:10.5f}  deg^2")
+            _, yv = rollout(sim, Uv[:n_va], io["drive_set"], io["drive_block"],
+                            io["read_set"], io["read_block"], device, grad=False)
+            v = float(_mse(yv, Yv[:n_va], ch))
+        tr_mse = tot / max(n_step, 1)
+        hist.append({"epoch": ep, "horizon": h, "train_mse": tr_mse, "val_mse": v})
+        print(f"  ep {ep:3d}  horizon {h:4d}  train {tr_mse:10.5f}  val {v:10.5f}  deg^2")
         if v < best:
             best = v
             best_state = {k: p.detach().clone() for k, p in sim.fitted.items()}
@@ -195,7 +212,7 @@ def train(run, root=None, device="cpu"):
                 "learnable": run["learnable"], "io": io},
                os.path.join(out, "models", "best.pt"))
     rep = {"name": run["name"], "spec": run["spec"], "task": run["task"],
-           "n_params": n_par, "n_trials": n_tr, "epochs": epochs,
+           "n_params": n_par, "n_trials": n_tr, "epochs": epochs, "batch": batch,
            "best_val_mse": best, "history": hist,
            "target_variance": float((Y[:n_tr] ** 2).mean()),
            "seconds": round(time.time() - t0, 1)}
@@ -255,14 +272,14 @@ def test(run, root=None, device="cpu"):
     n = min(int(run["training"].get("n_test", 24)), U.shape[0])
     ch = int(io.get("read_channel", 0))
 
-    per, traces = [], []
+    # ALL n TRIALS IN ONE ROLLOUT, then scored one at a time. The per-trial number is the point --
+    # a mean hides the trial the fit failed on -- but computing it does not require running the
+    # trials separately now that the engine carries them side by side.
     with torch.no_grad():
-        for i in range(n):
-            _, y = rollout(sim, U[i], io["drive_set"], io["drive_block"],
+        _, Ypred = rollout(sim, U[:n], io["drive_set"], io["drive_block"],
                            io["read_set"], io["read_block"], device, grad=False)
-            per.append(float(_mse(y, Y[i], ch)))
-            if i < 6:
-                traces.append(y[:, ch].cpu().numpy())
+    per = [float(_mse(Ypred[i], Y[i], ch)) for i in range(n)]
+    traces = [Ypred[i, :, ch].cpu().numpy() for i in range(min(n, 6))]
     var = float((Y[:n] ** 2).mean())
     res = {"name": run["name"], "spec": run["spec"], "task": run["task"], "split": split,
            "n_trials": n, "mse": float(np.mean(per)), "mse_per_trial": per,
@@ -310,9 +327,9 @@ def analyse(run, root=None, device="cpu"):
     res = json.load(open(res_p)) if os.path.exists(res_p) else {}
 
     with torch.no_grad():
-        preds = [rollout(sim, U[i], io["drive_set"], io["drive_block"], io["read_set"],
-                         io["read_block"], device, grad=False)[1][:, int(io.get("read_channel", 0))]
-                 .cpu().numpy() for i in range(4)]
+        _, Yp = rollout(sim, U[:4], io["drive_set"], io["drive_block"], io["read_set"],
+                        io["read_block"], device, grad=False)
+    preds = [Yp[i, :, int(io.get("read_channel", 0))].cpu().numpy() for i in range(4)]
     dt = float(sim.dt)
     t = np.arange(len(preds[0])) * dt
 
@@ -369,8 +386,12 @@ def analyse(run, root=None, device="cpu"):
     for x in lg.get_texts():
         x.set_color(INK)
 
+    # NO AXES AT ALL on the text panel. `_ax` drops the top and right spines, which is right for a
+    # plot; a panel that carries only words should not draw the other two either -- the reader is
+    # shown a frame around text that has no axis to be framed by. The letter is drawn in figure
+    # coordinates by `_ax`, so it survives turning the axes off.
     axe = _ax(fig.add_subplot(gs[:, 2]), letter="e")
-    axe.set_xticks([]); axe.set_yticks([])
+    axe.axis("off")
     lines = ["", f"{run['name']}", f"spec   {os.path.basename(run['spec'])}",
              f"task   {run['task']}", f"split  {split}", "",
              f"fitted {rep['n_params']} values over {len(ck['fitted'])} block(s):"]
