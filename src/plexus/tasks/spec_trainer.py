@@ -218,7 +218,7 @@ def main():
     ap.add_argument("--root", default=None)
     ap.add_argument("--device", default="cpu")
     a = ap.parse_args()
-    fns = {"train": train}
+    fns = {"train": train, "test": test, "analyse": analyse}
     phases = [o for o in a.option if o in fns] or ["train"]
     specs = [o for o in a.option if o not in fns]
     paths = [p for s in specs for p in (glob.glob(s) if any(c in s for c in "*?[") else [s])]
@@ -229,6 +229,246 @@ def main():
         for ph in phases:
             fns[ph](run, root=a.root, device=a.device)
 
+
+
+def _restore(run, device="cpu"):
+    """The Spec with the checkpoint's fitted values installed, ready to roll out.
+
+    `sim.fitted` is what `engine.apply_learnable_blocks` reuses, so writing the checkpoint's
+    tensors there before the first run is the whole of "load a model" -- there is no separate
+    state_dict, because what was fitted is a block of the spec's own state.
+    """
+    out = log_dir(run["name"])
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    sim = build(run, device)
+    sim.fitted = {k: torch.nn.Parameter(v.to(device)) for k, v in ck["fitted"].items()}
+    return sim, ck, out
+
+
+def test(run, root=None, device="cpu"):
+    """Roll the checkpoint out on held-out trials. One number per trial, never only a mean."""
+    engine.quiet(True)
+    sim, ck, out = _restore(run, device)
+    io = run["io"]
+    split = "test" if os.path.isdir(os.path.join(task_dir(run["task"]), "test")) else "train"
+    U, Y, cond = load_split(run["task"], split, device)
+    n = min(int(run["training"].get("n_test", 24)), U.shape[0])
+    ch = int(io.get("read_channel", 0))
+
+    per, traces = [], []
+    with torch.no_grad():
+        for i in range(n):
+            _, y = rollout(sim, U[i], io["drive_set"], io["drive_block"],
+                           io["read_set"], io["read_block"], device, grad=False)
+            per.append(float(_mse(y, Y[i], ch)))
+            if i < 6:
+                traces.append(y[:, ch].cpu().numpy())
+    var = float((Y[:n] ** 2).mean())
+    res = {"name": run["name"], "spec": run["spec"], "task": run["task"], "split": split,
+           "n_trials": n, "mse": float(np.mean(per)), "mse_per_trial": per,
+           "target_variance": var, "normalised_mse": float(np.mean(per)) / var,
+           "fitted": {k: {"n": int(v.numel()), "mean": float(v.mean()), "sd": float(v.std())}
+                      for k, v in ck["fitted"].items()}}
+    p = os.path.join(out, "results", f"{run['name']}_{split}.json")
+    json.dump(res, open(p, "w"), indent=2)
+    np.save(os.path.join(out, "results", f"{run['name']}_{split}_traces.npy"), np.array(traces))
+    print(f"[test] {split}: {n} trials  mse {res['mse']:.4f} deg^2  "
+          f"({res['normalised_mse']:.4f} of target variance)")
+    print(f"[test] per-trial spread {min(per):.3f} .. {max(per):.3f} deg^2")
+    print(f"[test] wrote {p}")
+    return res
+
+
+def analyse(run, root=None, device="cpu"):
+    """Did it recover the law, or only reduce the error? Those are different questions.
+
+    Four panels, and only the last two are the analyser's own work -- the first two are what the
+    tester already measured, drawn.
+
+        a   target vs the fitted chain's gaze, held out
+        b   the residual, on the same scale
+        c   WHAT TRAINING DID TO EACH FITTED BLOCK: learned against its starting value, which for
+            a measured connectome is learned-against-measured. The `plot_recovery_panels`
+            template of connectome-gnn, at the one panel that applies when there is no synthetic
+            ground truth: the departure IS the result.
+        d   the circuit's own linearised poles against the teacher's, in one plane. A small error
+            with the poles in the wrong place is what an unidentifiable task produces, and it is
+            only visible here.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from plexus.tasks.render import BG, INK, MUTED, _ax
+
+    engine.quiet(True)
+    sim, ck, out = _restore(run, device)
+    io = run["io"]
+    split = "test" if os.path.isdir(os.path.join(task_dir(run["task"]), "test")) else "train"
+    U, Y, _ = load_split(run["task"], split, device)
+    rep = json.load(open(os.path.join(out, "results", "report.json")))
+    res_p = os.path.join(out, "results", f"{run['name']}_{split}.json")
+    res = json.load(open(res_p)) if os.path.exists(res_p) else {}
+
+    with torch.no_grad():
+        preds = [rollout(sim, U[i], io["drive_set"], io["drive_block"], io["read_set"],
+                         io["read_block"], device, grad=False)[1][:, int(io.get("read_channel", 0))]
+                 .cpu().numpy() for i in range(4)]
+    dt = float(sim.dt)
+    t = np.arange(len(preds[0])) * dt
+
+    fig = plt.figure(figsize=(14.5, 7.0), facecolor=BG)
+    gs = fig.add_gridspec(2, 3, hspace=0.38, wspace=0.30)
+
+    axa = _ax(fig.add_subplot(gs[0, 0]), ylabel="gaze theta (deg)", letter="a")
+    for i, p in enumerate(preds):
+        n = min(len(p), Y.shape[1])
+        axa.plot(t[:n], Y[i, :n, 0].cpu(), color="#2e8b4f", lw=1.3, alpha=0.9)
+        axa.plot(t[:n], p[:n], color=INK, lw=0.8, ls="--")
+    axa.text(0.985, 0.04, "green: target   dashed: fitted chain", transform=axa.transAxes,
+             ha="right", va="bottom", color=MUTED, fontsize=8)
+
+    axb = _ax(fig.add_subplot(gs[1, 0]), xlabel="time (s)", ylabel="residual (deg)", letter="b")
+    for i, p in enumerate(preds):
+        n = min(len(p), Y.shape[1])
+        axb.plot(t[:n], p[:n] - Y[i, :n, 0].cpu().numpy(), color="#c0522a", lw=0.8)
+    axb.set_ylim(axa.get_ylim())
+
+    # c: the departure from the starting value, per fitted block
+    axc = _ax(fig.add_subplot(gs[0, 1]), xlabel="initial (the spec's own)", ylabel="learned",
+              letter="c")
+    plain = engine.run(build(run, device), device=device, progress=False)[0]
+    for k, v in ck["fitted"].items():
+        sname, blk = k.split(".")
+        init = plain.level(sname).get(blk).detach().cpu().numpy().ravel()
+        got = v.detach().cpu().numpy().ravel()
+        axc.scatter(init, got, s=4, alpha=0.4, label=f"{k} (n={got.size})")
+    lim = axc.get_xlim() + axc.get_ylim()
+    lo, hi = min(lim), max(lim)
+    axc.plot([lo, hi], [lo, hi], color=MUTED, lw=0.8, ls="--")
+    lg = axc.legend(frameon=False, fontsize=7, loc="upper left")
+    for x in lg.get_texts():
+        x.set_color(INK)
+
+    # d: the circuit's poles against the teacher's
+    axd = _ax(fig.add_subplot(gs[1, 1]), xlabel="Re(lambda) (1/s)", ylabel="Im/2pi (Hz)",
+              letter="d")
+    slope, v_typ = operating_slope(sim, run, U[0], device)
+    poles = _circuit_poles(sim, plain, ck, slope=slope)
+    if poles is not None:
+        at_op, at_origin = poles
+        axd.scatter(at_origin.real, at_origin.imag / (2 * np.pi), s=10, color="0.78", alpha=0.7,
+                    label="circuit, at v=0")
+        axd.scatter(at_op.real, at_op.imag / (2 * np.pi), s=12, color=MUTED, alpha=0.9,
+                    label="circuit, at its operating point")
+    truth = torch.load(os.path.join(task_dir(run["task"]), "teacher.pt"), weights_only=False)
+    tp = truth["per_cell"][0]
+    axd.scatter(tp["poles_real"], np.asarray(tp["poles_imag"]) / (2 * np.pi), s=80, marker="x",
+                color="#2e8b4f", lw=2.0, label="teacher", zorder=5)
+    axd.axvline(0, color="#c0272a", lw=0.8, ls="--")
+    lg = axd.legend(frameon=False, fontsize=8, loc="upper left")
+    for x in lg.get_texts():
+        x.set_color(INK)
+
+    axe = _ax(fig.add_subplot(gs[:, 2]), letter="e")
+    axe.set_xticks([]); axe.set_yticks([])
+    lines = ["", f"{run['name']}", f"spec   {os.path.basename(run['spec'])}",
+             f"task   {run['task']}", f"split  {split}", "",
+             f"fitted {rep['n_params']} values over {len(ck['fitted'])} block(s):"]
+    for k, v in ck["fitted"].items():
+        lines.append(f"   {k:16s} n={v.numel():5d}")
+    lines += ["", f"best val    {rep['best_val_mse']:9.4f} deg^2",
+              f"{split} mse     {res.get('mse', float('nan')):9.4f} deg^2",
+              f"normalised  {res.get('normalised_mse', float('nan')):9.4f} of target variance",
+              f"trained on  {rep['n_trials']} trials, {rep['epochs']} epochs",
+              f"            {rep['seconds']:.0f} s"]
+    if poles is not None:
+        at_op, at_origin = poles
+        lines += ["", f"|v| at operation   {v_typ:8.3f}   (rho' = {float(slope.mean()):.3f})",
+                  f"max Re(lam)  at v=0     {float(max(p.real for p in at_origin)):+8.4f} 1/s",
+                  f"             operating  {float(max(p.real for p in at_op)):+8.4f} 1/s",
+                  f"             teacher    {max(tp['poles_real']):+8.4f} 1/s"]
+    axe.text(0.05, 0.95, "\n".join(lines), transform=axe.transAxes, va="top", ha="left",
+             color=INK, fontsize=8, family="monospace")
+
+    p = os.path.join(out, "results", f"{run['name']}_{split}.png")
+    fig.savefig(p, dpi=130, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"[analyse] wrote {p}")
+    return p
+
+
+def _circuit_poles(sim, H, ck, slope=None):
+    """The fitted circuit's poles, linearised where it ACTUALLY OPERATES.
+
+        A = -diag(a) + diag(g) W diag(rho'(v))
+
+    a is the leak and g the coupling gain, separate columns of the type table `p`; conflating
+    them is right only when they are equal, which they happen to be in `ctrnn_eyeG_rig` (both
+    2.0 = 1/tau0) and need not be anywhere else.
+
+    `slope` is rho'(v) = 1 - tanh(v)^2 averaged over a rollout. THIS ARGUMENT IS THE WHOLE POINT
+    AND OMITTING IT GAVE A WRONG ANSWER. An earlier version linearised at v = 0 and said so --
+    "taken at the origin because that is where the task holds the state" -- which was simply
+    false for this fit: the trained circuit runs at |v| mean 4.4 and max 23.9, where tanh' is
+    0.272, not 1. At the origin it reported max Re(lambda) = +14.46 1/s and 2 unstable modes; at
+    the operating point the same matrix gives +0.0094 1/s and 1. The first number describes a
+    point the dynamics never visit, and it is the more alarming of the two, so reporting it alone
+    would have been a false alarm dressed as a measurement.
+
+    Both are returned, because the DIFFERENCE is diagnostic: a circuit whose two linearisations
+    agree is operating in its linear regime, and one whose they do not is relying on saturation.
+
+    Returns (poles_at_operating_point, poles_at_origin), or None when no recurrent block was
+    fitted -- a spec without one has no circuit poles, and inventing some would be worse.
+    """
+    rec = next((k for k in ck["fitted"] if "recurrent" in k), None)
+    if rec is None:
+        return None
+    W = ck["fitted"][rec].detach().cpu().numpy()
+    es = H.level(rec.split(".")[0])
+    n = H.level(es.post_name).n
+    M = np.zeros((n, n))
+    M[es.post.cpu().numpy(), es.pre.cpu().numpy()] = W.ravel()
+    lvl = H.level(es.post_name)
+    # THE LEAK AND THE COUPLING GAIN ARE SEPARATE COLUMNS OF `p`, and conflating them is right
+    # only by coincidence. `neuron_update` contributes -a v and `neuron_signal` contributes
+    # g W tanh(v), so the linearisation at v = 0 is
+    #
+    #     A = -diag(a) + diag(g) W          NOT   diag(a) (-I + W)
+    #
+    # The two agree exactly when a == g, which they do in `ctrnn_eyeG_rig` (both 2.0 = 1/tau0),
+    # so the wrong form would have produced the right number here and a silently wrong one on
+    # any spec whose gain differs from its leak.
+    P = (lvl.type_params[lvl.node_type] if getattr(lvl, "type_params", None) is not None
+         else torch.tensor([[1.0, 0.0, 1.0, 0.0, 1.0, 0.0]]).expand(n, 6))
+    a = P[:, 0].detach().cpu().numpy()                  # leak, 1/s
+    g = P[:, 2].detach().cpu().numpy()                  # coupling gain, dimensionless
+    rho = np.ones(n) if slope is None else np.asarray(slope, float).reshape(n)
+    at_op = np.linalg.eigvals(-np.diag(a) + np.diag(g) @ M @ np.diag(rho))
+    at_origin = np.linalg.eigvals(-np.diag(a) + np.diag(g) @ M)
+    return at_op, at_origin
+
+
+def operating_slope(sim, run, U, device="cpu"):
+    """rho'(v) per unit, averaged over one rollout -- where the circuit actually sits.
+
+    Measured rather than assumed, because assuming it is 1 is exactly the error above.
+    """
+    io = run["io"]
+    vs = []
+
+    def hook(H, frame):
+        lvl = H.level(io["drive_set"])
+        a, b = lvl.state_schema[io["drive_block"]]
+        st = lvl.state.clone()
+        st[:, a:b] = U[min(frame, U.shape[0] - 1)].expand(lvl.n, b - a)
+        lvl.state = st
+        vs.append(H.level("neuron").get("voltage").squeeze(-1).clone())
+
+    with torch.no_grad():
+        engine.run(sim, device=device, progress=False, grad=False, on_frame=hook)
+    V = torch.stack(vs)
+    return (1.0 - torch.tanh(V) ** 2).mean(0).cpu().numpy(), float(V.abs().mean())
 
 if __name__ == "__main__":
     main()

@@ -119,10 +119,19 @@ class CircuitRNN(nn.Module):
         """The continuous-time poles of the linearisation at v = 0: eig(diag(1/tau)(-I + W)).
 
         At v = 0, tanh'(0) = 1, so the linearised system is dv/dt = diag(1/tau)(-I + W) v. Its
-        eigenvalues are what the circuit's OWN time constants and resonances are, in the same
-        units as the teacher's poles, and so are directly comparable with them. Taken at the
-        origin because that is where the task holds the state; a strongly driven circuit
-        linearises elsewhere and this number would not describe it.
+        eigenvalues are in the same units as a teacher's poles and so are directly comparable.
+
+        IT IS THE ORIGIN'S JACOBIAN AND THAT IS ONLY MEANINGFUL WHILE THE CIRCUIT SITS NEAR THE
+        ORIGIN. An earlier version of this docstring claimed the task holds the state there; on
+        the oculomotor rig that was false by a wide margin -- the trained circuit runs at |v|
+        mean 4.4, where tanh' is 0.272 -- and the origin's Jacobian reported max Re(lambda) =
+        +14.46 1/s and two unstable modes where the operating point gives +0.0094 and one. The
+        alarming number described a point the dynamics never visit.
+
+        Check it before quoting it: if |v| is not small, linearise at the operating point
+        instead, A = -diag(a) + diag(g) W diag(tanh'(v)), as `spec_trainer._circuit_poles` does.
+        The DIFFERENCE between the two is itself diagnostic -- a circuit whose linearisations
+        agree is working in its linear regime, one whose do not is relying on saturation.
         """
         with torch.no_grad():
             A = torch.diag(1.0 / self.log_tau.exp()) @ (-torch.eye(self.hidden) + self.W)
