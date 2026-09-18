@@ -263,6 +263,18 @@ def train(run, root=None, device=None):
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step(); tot += float(loss.detach()) * len(j)
         sch.step()
+        # A FIGURE WHILE IT TRAINS, not only when it is over. `plot_trainer` owns the layout and
+        # the naming. ITS OWN CADENCE, not the validation block's: nested inside `ep % 10` it
+        # would fire only where the two coincide, so `snapshot_every: 2` would mean every tenth
+        # epoch and say so nowhere. One forward on four trials is cheap enough to pay separately.
+        if int(tr.get("snapshot_every", 0)) and ep % int(tr["snapshot_every"]) == 0:
+            from plexus.tasks import plot_trainer as PT
+            model.eval()
+            with torch.no_grad():
+                Pv = model(Uv[:4])
+            PT.snapshot(out, ep, ep * max(1, len(perm) // batch),
+                        Uv[:4, :, :1].cpu().numpy(), Yv[:4].cpu().numpy(), Pv.cpu().numpy(),
+                        dt=dt, title=f"{run['name']}  epoch {ep}")
         if ep % 10 == 0 or ep == epochs - 1:
             model.eval()
             with torch.no_grad():

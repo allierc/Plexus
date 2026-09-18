@@ -260,6 +260,13 @@ def train(run, root=None, device="cpu"):
             _, yv = rollout(sim, Uv[:n_va], io["drive_set"], io["drive_block"],
                             io["read_set"], io["read_block"], device, grad=False)
             v = float(_mse(yv, Yv[:n_va], ch))
+        if int(tr.get("snapshot_every", 0)) and ep % int(tr["snapshot_every"]) == 0:
+            # See `tasks.trainer`: one module owns every figure this repository draws of a fit.
+            from plexus.tasks import plot_trainer as PT
+            PT.snapshot(out, ep, ep * max(n_step, 1),
+                        Uv[:4, :, :1].cpu().numpy(), Yv[:4].cpu().numpy(),
+                        yv[:4].detach().cpu().numpy(), dt=float(sim.dt), unit=U1.strip(),
+                        title=f"{run['name']}  epoch {ep}")
         tr_mse = tot / max(n_step, 1)
         hist.append({"epoch": ep, "horizon": h, "train_mse": tr_mse, "val_mse": v})
         print(f"  ep {ep:3d}  horizon {h:4d}  train {tr_mse:10.5f}  val {v:10.5f}{U2}"

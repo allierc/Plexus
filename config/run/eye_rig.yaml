@@ -19,3 +19,6 @@ training:
   seed: 0
   curriculum: [0.25, 0.5, 0.75, 1.0]
   horizon_min: 60
+  rollout_frames: 960
+  rollout_trials: 4
+  test_task: ''
