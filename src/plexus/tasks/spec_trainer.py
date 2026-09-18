@@ -326,11 +326,25 @@ def test(run, root=None, device="cpu"):
     # -- so both are written, and the mean absolute error is the one to line up against the note.
     nn_ = min(Ypred.shape[-2], Y.shape[-2])
     err = (Ypred[:n, :nn_, ch] - Y[:n, :nn_, 0]).cpu().numpy()
+    # THE SETTLED SCORE, BESIDE THE FULL ONE. Every rollout starts from the spec's seeded state
+    # while the ground truth starts wherever its own law puts it, so the opening fraction of a
+    # second is the circuit catching up from rest. It costs nothing when the ground truth also
+    # starts at zero -- which is every task here whose teacher is a filter -- and everything on an
+    # ALL-PASS law, where `tasks.trainer` measures the transient at 226x the settled residual
+    # power. See `tasks.trainer.test` for the measurement; both are kept because both are true and
+    # they answer different questions.
+    settle_s = float(run["training"].get("settle_s", 0.5))
+    k = min(int(round(settle_s / float(sim.dt))), nn_ - 1)
+    yl = Y[:n, k:nn_, 0].cpu().numpy()
+    mse_settled = float((err[:, k:] ** 2).mean())
+    var_settled = float((yl ** 2).mean())
     res = {"name": run["name"], "spec": run["spec"], "task": run["task"], "split": split,
            "n_trials": n, "mse": float(np.mean(per)), "mse_per_trial": per,
            "mae": float(np.abs(err).mean()), "rmse": float(np.sqrt(np.mean(per))),
            "unit": (run.get("io") or {}).get("unit"),
            "target_variance": var, "normalised_mse": float(np.mean(per)) / var,
+           "settle_s": settle_s, "mse_settled": mse_settled,
+           "normalised_mse_settled": mse_settled / var_settled if var_settled > 0 else None,
            "fitted": {k: {"n": int(v.numel()), "mean": float(v.mean()), "sd": float(v.std())}
                       for k, v in ck["fitted"].items()}}
     p = os.path.join(out, "results", f"{run['name']}_{split}.json")
@@ -340,6 +354,8 @@ def test(run, root=None, device="cpu"):
     print(f"[test] {split}: mean |err| {res['mae']:.4f}{U1}   rmse {res['rmse']:.4f}{U1}")
     print(f"[test] {split}: {n} trials  mse {res['mse']:.4f}{U2}  "
           f"({res['normalised_mse']:.4f} of target variance)")
+    print(f"[test] settled (after {settle_s:g} s, the start-from-rest transient dropped): "
+          f"{res['normalised_mse_settled']:.5f} of target variance")
     print(f"[test] per-trial spread {min(per):.3f} .. {max(per):.3f}{U2}")
     print(f"[test] wrote {p}")
     return res
@@ -468,6 +484,8 @@ def analyse(run, root=None, device="cpu"):
               f"best val    {rep['best_val_mse']:9.4f}{U2}",
               f"{split} mse     {res.get('mse', float('nan')):9.4f}{U2}",
               f"normalised  {res.get('normalised_mse', float('nan')):9.4f} of target variance",
+              f"  settled   {res.get('normalised_mse_settled', float('nan')):9.5f} "
+              f"(after {res.get('settle_s', 0.5):g} s from rest)",
               f"trained on  {rep['n_trials']} trials, {rep['epochs']} epochs",
               f"            {rep['seconds']:.0f} s"]
     if poles is not None:
