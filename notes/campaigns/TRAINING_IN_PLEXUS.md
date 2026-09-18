@@ -307,11 +307,18 @@ were bad are exactly the grids that vary the **teacher**, and they were unanswer
 saw trials from four time constants / three dampings / six family×order pairs with nothing in the
 input saying which, so the best any causal predictor can do is the average over teachers.
 
-Two measurements say so rather than one. Restricting `t1_integrator_tau_sweep` to its τ = 8 s cell
-alone, same circuit and same hyperparameters, gives **0.0005 against 0.2598** — a factor of 520.
-And appending a constant one-hot of the condition cell to the stimulus gives **0.0011**, with the
-slowest pole back at −0.0298 /s against the teacher's −0.0312 where the grid had left it fifteen
-times too fast.
+Two measurements say so rather than one, because "the task is ill-posed" is the kind of claim that
+excuses a bad result and so has to be paid for.
+
+1. **One teacher instead of four: 0.0005 against 0.2598, a factor of 520.** Same circuit, same
+   hyperparameters, same 200 epochs. Reproduce it by generating `t1_integrator_tau_sweep` with its
+   `conditions:` block deleted and `n_per_cond: 512`, then pointing
+   `config/run/t1_integrator_perfect_ctrnn64.yaml` at it. The corpus and its log directory were a
+   one-off and are not kept — `t1_integrator_perfect` already stands as the permanent single-law
+   control at 0.0008.
+2. **The condition cell as an input: 0.0011**, with the slowest pole back at −0.0298 /s against
+   the teacher's −0.0312 where the grid had left it fifteen times too fast. This one is the
+   default and is re-run by `-o train test plot config/run/t1_integrator_tau_sweep_ctrnn64.yaml`.
 
 The context channel is on by default for a corpus with more than one cell; `context: false` keeps
 the unanswerable version measurable, because it is a real and instructive failure. This closes the
