@@ -41,7 +41,7 @@ import plexus.operators                                          # noqa: F401  s
 from plexus import engine
 from plexus.schema import load
 from plexus.tasks.generate import task_dir
-from plexus.tasks.trainer import load_split, log_dir
+from plexus.tasks.trainer import load_split, log_dir, n_condition_cells, with_context
 
 
 def load_run(path) -> dict:
@@ -82,9 +82,22 @@ def rollout(sim, u, drive_set, drive_block, read_set, read_block, device="cpu", 
         a, b = lvl.state_schema[drive_block]
         t = min(frame, u.shape[-2] - 1)
         st = lvl.state.clone()
-        # `u[..., t, :]` is [C] or [B, C]; unsqueezing the ELEMENT axis (not the batch one) gives
-        # every element of the drive set the same stimulus, per trial.
-        st[..., a:b] = u[..., t, :].unsqueeze(-2).expand(*st.shape[:-1], b - a)
+        # ONE CHANNEL PER SENSORY ELEMENT, not one value broadcast over all of them. A corpus with
+        # C channels -- a stimulus plus, for a teacher-varying grid, a one-hot of the condition
+        # cell -- has to arrive on C DIFFERENT lines or the circuit cannot tell them apart, which
+        # is the whole point of sending the context at all. Element i takes channel i; a drive set
+        # wider than the corpus leaves its spare lines at whatever they were seeded to, so one
+        # spec with a fixed sensory bank serves tasks of several widths.
+        C = u.shape[-1]
+        if C == 1:
+            st[..., a:b] = u[..., t, :].unsqueeze(-2).expand(*st.shape[:-1], b - a)
+        else:
+            if lvl.n < C:
+                raise ValueError(
+                    f"the corpus has {C} input channels but `{drive_set}` has only {lvl.n} "
+                    f"element(s). Give the drive set at least one element per channel -- with a "
+                    f"context one-hot the channel count is 1 + the number of condition cells.")
+            st[..., :C, a:a + 1] = u[..., t, :].unsqueeze(-1)
         lvl.state = st
         trace.append(H.level(read_set).get(read_block)[..., 0, :].clone())
 
@@ -139,9 +152,16 @@ def train(run, root=None, device="cpu"):
     print(f"[run] {run['name']} -> {out}")
 
     io = run["io"]
-    U, Y, _ = load_split(run["task"], "train", device)
+    U, Y, cU = load_split(run["task"], "train", device)
     has_val = os.path.isdir(os.path.join(task_dir(run["task"]), "val"))
-    Uv, Yv, _ = load_split(run["task"], "val", device) if has_val else (U[:8], Y[:8], None)
+    Uv, Yv, cV = load_split(run["task"], "val", device) if has_val else (U[:8], Y[:8], cU[:8])
+    # See `trainer.with_context`: a grid over the TEACHER is unanswerable unless the circuit is
+    # told which cell it is in. On by default whenever the corpus has more than one.
+    n_cond = n_condition_cells(run["task"]) if run.get("context", True) else 1
+    if n_cond > 1:
+        print(f"[data] {n_cond} condition cells -> a one-hot context channel is appended "
+              f"({U.shape[2]} -> {U.shape[2] + n_cond} inputs)")
+    U, Uv = with_context(U, cU, n_cond), with_context(Uv, cV, n_cond)
     n_tr = min(int(tr.get("n_trials", 32)), U.shape[0])
     n_va = min(int(tr.get("n_val", 8)), Uv.shape[0])
     print(f"[data] task {run['task']}: using {n_tr} of {U.shape[0]} train trials, "
@@ -226,7 +246,7 @@ def train(run, root=None, device="cpu"):
             best_state = {k: p.detach().clone() for k, p in sim.fitted.items()}
 
     torch.save({"fitted": best_state, "spec": run["spec"], "task": run["task"],
-                "learnable": run["learnable"], "io": io},
+                "learnable": run["learnable"], "io": io, "n_cond": int(n_cond)},
                os.path.join(out, "models", "best.pt"))
     rep = {"name": run["name"], "spec": run["spec"], "task": run["task"],
            "n_params": n_par, "n_trials": n_tr, "epochs": epochs, "batch": batch,
@@ -286,6 +306,7 @@ def test(run, root=None, device="cpu"):
     io = run["io"]
     split = "test" if os.path.isdir(os.path.join(task_dir(run["task"]), "test")) else "train"
     U, Y, cond = load_split(run["task"], split, device)
+    U = with_context(U, cond, int(ck.get("n_cond", 1)))   # the width the FIT was made at
     n = min(int(run["training"].get("n_test", 24)), U.shape[0])
     ch = int(io.get("read_channel", 0))
 
@@ -349,7 +370,8 @@ def analyse(run, root=None, device="cpu"):
     sim, ck, out = _restore(run, device)
     io = run["io"]
     split = "test" if os.path.isdir(os.path.join(task_dir(run["task"]), "test")) else "train"
-    U, Y, _ = load_split(run["task"], split, device)
+    U, Y, cA = load_split(run["task"], split, device)
+    U = with_context(U, cA, int(ck.get("n_cond", 1)))
     rep = json.load(open(os.path.join(out, "results", "report.json")))
     res_p = os.path.join(out, "results", f"{run['name']}_{split}.json")
     res = json.load(open(res_p)) if os.path.exists(res_p) else {}
@@ -361,71 +383,86 @@ def analyse(run, root=None, device="cpu"):
     dt = float(sim.dt)
     t = np.arange(len(preds[0])) * dt
 
-    fig = plt.figure(figsize=(14.5, 7.0), facecolor=BG)
-    gs = fig.add_gridspec(2, 3, hspace=0.38, wspace=0.30)
+    # 3 x 2, the same layout `tasks.trainer.plot` uses. TOP ROW IS WHAT THE RUN WAS -- what went
+    # in, what came out, the numbers. BOTTOM ROW IS WHETHER IT WORKED -- dynamics, error, history.
+    U1, U2 = units(run)
+    fig = plt.figure(figsize=(14.5, 7.6), facecolor=BG)
+    gs = fig.add_gridspec(2, 3, hspace=0.34, wspace=0.28)
 
-    axa = _ax(fig.add_subplot(gs[0, 0]), ylabel="gaze theta (deg)", letter="a")
-    for i, p in enumerate(preds):
-        n = min(len(p), Y.shape[1])
-        axa.plot(t[:n], Y[i, :n, 0].cpu(), color="#2e8b4f", lw=1.3, alpha=0.9)
-        axa.plot(t[:n], p[:n], color=INK, lw=0.8, ls="--")
-    axa.text(0.985, 0.04, "green: target   dashed: fitted chain", transform=axa.transAxes,
+    # a: the stimulus the circuit actually saw
+    axa = _ax(fig.add_subplot(gs[0, 0]), ylabel="input", letter="a")
+    for i in range(4):
+        axa.plot(t[:U.shape[1]], U[i, :, 0].cpu(), color="#4a4a4a", lw=0.7, alpha=0.8)
+    if U.shape[2] > 1:
+        axa.text(0.985, 0.04, f"channel 1 of {U.shape[2]}", transform=axa.transAxes,
+                 ha="right", va="bottom", color=MUTED, fontsize=8)
+
+    # b: target against prediction. Green is ground truth and thicker, so a good fit reads as a
+    # black line sitting inside a green one rather than as two lines that disagree.
+    axb = _ax(fig.add_subplot(gs[0, 1]), ylabel=f"gaze theta{U1}", letter="b")
+    for i, pr in enumerate(preds):
+        n = min(len(pr), Y.shape[1])
+        axb.plot(t[:n], Y[i, :n, 0].cpu(), color="#2e8b4f", lw=2.2, alpha=0.9)
+        axb.plot(t[:n], pr[:n], color="#000000", lw=0.9)
+    axb.text(0.985, 0.04, "green: ground truth   black: circuit", transform=axb.transAxes,
              ha="right", va="bottom", color=MUTED, fontsize=8)
 
-    axb = _ax(fig.add_subplot(gs[1, 0]), xlabel="time (s)", ylabel="residual (deg)", letter="b")
-    for i, p in enumerate(preds):
-        n = min(len(p), Y.shape[1])
-        axb.plot(t[:n], p[:n] - Y[i, :n, 0].cpu().numpy(), color="#c0522a", lw=0.8)
-    axb.set_ylim(axa.get_ylim())
-
-    # c: the departure from the starting value, per fitted block
-    axc = _ax(fig.add_subplot(gs[0, 1]), xlabel="initial (the spec's own)", ylabel="learned",
-              letter="c")
-    plain = engine.run(build(run, device), device=device, progress=False)[0]
-    for k, v in ck["fitted"].items():
-        sname, blk = k.split(".")
-        init = plain.level(sname).get(blk).detach().cpu().numpy().ravel()
-        got = v.detach().cpu().numpy().ravel()
-        axc.scatter(init, got, s=4, alpha=0.4, label=f"{k} (n={got.size})")
-    lim = axc.get_xlim() + axc.get_ylim()
-    lo, hi = min(lim), max(lim)
-    axc.plot([lo, hi], [lo, hi], color=MUTED, lw=0.8, ls="--")
-    lg = axc.legend(frameon=False, fontsize=7, loc="upper left")
-    for x in lg.get_texts():
-        x.set_color(INK)
-
-    # d: the circuit's poles against the teacher's
-    axd = _ax(fig.add_subplot(gs[1, 1]), xlabel="Re(lambda) (1/s)", ylabel="Im/2pi (Hz)",
+    # d: the recovery panel. Each point is an eigenvalue lambda = sigma + i omega of the circuit's
+    # linearisation, so a mode behaves as exp(sigma t)(cos omega t + i sin omega t):
+    #   Re, the x-axis in 1/s, is the ENVELOPE -- negative decays with time constant 1/|sigma|
+    #     seconds, positive diverges, zero neither, which is what a perfect memory is.
+    #   Im/2pi, the y-axis in Hz, is the RINGING inside it -- zero is a pure exponential.
+    # Mirror-symmetric about y = 0 because the matrix is real and complex eigenvalues come in
+    # conjugate pairs; a pair is ONE oscillating mode. Dashed red at Re = 0 is the stability
+    # boundary. A small error with the poles in the wrong place is what an unidentifiable task
+    # produces, and it is visible nowhere else.
+    axd = _ax(fig.add_subplot(gs[1, 0]), xlabel="Re(lambda) (1/s)", ylabel="Im/2pi (Hz)",
               letter="d")
+    plain = engine.run(build(run, device), device=device, progress=False)[0]
     slope, v_typ = operating_slope(sim, run, U[0], device)
     poles = _circuit_poles(sim, plain, ck, slope=slope)
     if poles is not None:
         at_op, at_origin = poles
-        axd.scatter(at_origin.real, at_origin.imag / (2 * np.pi), s=10, color="0.78", alpha=0.7,
-                    label="circuit, at v=0")
-        axd.scatter(at_op.real, at_op.imag / (2 * np.pi), s=12, color=MUTED, alpha=0.9,
-                    label="circuit, at its operating point")
+        axd.scatter(at_origin.real, at_origin.imag / (2 * np.pi), s=10, color="0.72", alpha=0.7)
+        axd.scatter(at_op.real, at_op.imag / (2 * np.pi), s=12, color="#000000", alpha=0.9)
     truth = torch.load(os.path.join(task_dir(run["task"]), "teacher.pt"), weights_only=False)
     tp = truth["per_cell"][0]
     axd.scatter(tp["poles_real"], np.asarray(tp["poles_imag"]) / (2 * np.pi), s=80, marker="x",
-                color="#2e8b4f", lw=2.0, label="teacher", zorder=5)
+                color="#2e8b4f", lw=2.0, zorder=5)
     axd.axvline(0, color="#c0272a", lw=0.8, ls="--")
-    lg = axd.legend(frameon=False, fontsize=8, loc="upper left")
+    # CAPTIONED, NOT LEGENDED, like panel b: a legend box goes in a corner of the axes and this
+    # cloud fills the plane, so it sat on the data whichever corner it chose.
+    axd.text(0.985, 0.04, "green: ground truth   black: circuit at its operating point   "
+                          "grey: at v=0", transform=axd.transAxes,
+             ha="right", va="bottom", color=MUTED, fontsize=7.5)
+
+    # e: the residual, on the target's own scale
+    axe = _ax(fig.add_subplot(gs[1, 1]), xlabel="time (s)", ylabel=f"residual{U1}", letter="e")
+    for i, pr in enumerate(preds):
+        n = min(len(pr), Y.shape[1])
+        axe.plot(t[:n], pr[:n] - Y[i, :n, 0].cpu().numpy(), color="#c0522a", lw=0.8)
+    axe.set_ylim(axb.get_ylim())
+
+    # f: the learning curve
+    axf = _ax(fig.add_subplot(gs[1, 2]), xlabel="epoch", ylabel="mse", letter="f")
+    ep = [h["epoch"] for h in rep["history"]]
+    axf.plot(ep, [h["train_mse"] for h in rep["history"]], color="#1f6fb8", lw=1.1, label="train")
+    axf.plot(ep, [h["val_mse"] for h in rep["history"]], color="#9a7d1a", lw=1.1, label="val")
+    axf.set_yscale("log")
+    lg = axf.legend(frameon=False, fontsize=8, loc="upper right")
     for x in lg.get_texts():
         x.set_color(INK)
 
-    # NO AXES AT ALL on the text panel. `_ax` drops the top and right spines, which is right for a
-    # plot; a panel that carries only words should not draw the other two either -- the reader is
-    # shown a frame around text that has no axis to be framed by. The letter is drawn in figure
-    # coordinates by `_ax`, so it survives turning the axes off.
-    axe = _ax(fig.add_subplot(gs[:, 2]), letter="e")
-    axe.axis("off")
+    # c: the numbers. No axes at all -- a frame around text has no axis to be a frame for.
+    axc = _ax(fig.add_subplot(gs[0, 2]), letter="c")
+    axc.axis("off")
+    # THE BLOCK LIST IS WRAPPED, NOT ONE LINE EACH. Seven fitted blocks plus the pole block ran
+    # this panel off the bottom and into panel f's legend.
+    blocks = [f"{k.split('.')[0]}.{k.split('.')[1]}({v.numel()})" for k, v in ck["fitted"].items()]
     lines = ["", f"{run['name']}", f"spec   {os.path.basename(run['spec'])}",
              f"task   {run['task']}", f"split  {split}", "",
              f"fitted {rep['n_params']} values over {len(ck['fitted'])} block(s):"]
-    for k, v in ck["fitted"].items():
-        lines.append(f"   {k:16s} n={v.numel():5d}")
-    U1, U2 = units(run)
+    lines += ["   " + "  ".join(blocks[i:i + 2]) for i in range(0, len(blocks), 2)]
     lines += ["", f"mean |err|  {res.get('mae', float('nan')):9.4f}{U1}   <- the comparable number",
               f"rmse        {res.get('rmse', float('nan')):9.4f}{U1}",
               f"best val    {rep['best_val_mse']:9.4f}{U2}",
@@ -435,11 +472,11 @@ def analyse(run, root=None, device="cpu"):
               f"            {rep['seconds']:.0f} s"]
     if poles is not None:
         at_op, at_origin = poles
-        lines += ["", f"|v| at operation   {v_typ:8.3f}   (rho' = {float(slope.mean()):.3f})",
-                  f"max Re(lam)  at v=0     {float(max(p.real for p in at_origin)):+8.4f} 1/s",
-                  f"             operating  {float(max(p.real for p in at_op)):+8.4f} 1/s",
-                  f"             teacher    {max(tp['poles_real']):+8.4f} 1/s"]
-    axe.text(0.05, 0.95, "\n".join(lines), transform=axe.transAxes, va="top", ha="left",
+        lines += ["", f"|v| at operation {v_typ:.3f}  (rho' = {float(slope.mean()):.3f})",
+                  f"max Re(lam)  v=0 {float(max(p.real for p in at_origin)):+.4f}   "
+                  f"op {float(max(p.real for p in at_op)):+.4f}   "
+                  f"truth {max(tp['poles_real']):+.4f}  1/s"]
+    axc.text(0.02, 0.95, "\n".join(lines), transform=axc.transAxes, va="top", ha="left",
              color=INK, fontsize=8, family="monospace")
 
     p = os.path.join(out, "results", f"{run['name']}_{split}.png")
