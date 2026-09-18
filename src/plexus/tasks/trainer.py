@@ -451,8 +451,11 @@ def plot(run, root=None, device=None, n_show=4):
         txt.set_color(INK)
 
     # e: the numbers
+    # NO AXES AT ALL on the text panel. `_ax` drops the top and right spines, which is right for
+    # a plot and wrong for words: the reader is shown a frame around text that has no axis to be
+    # framed by. The letter is drawn in axes coordinates by `_ax` and survives turning them off.
     axe = _ax(fig.add_subplot(gs[:, 2]), letter="e")
-    axe.set_xticks([]); axe.set_yticks([])
+    axe.axis("off")
     res_path = os.path.join(out, "results", f"{run['name']}_{split}.json")
     res = json.load(open(res_path)) if os.path.exists(res_path) else {}
     lines = ["", f"{run['name']}", f"task    {run['task']}", f"split   {split}",
