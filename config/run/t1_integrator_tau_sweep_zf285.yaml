@@ -1,0 +1,21 @@
+name: t1_integrator_tau_sweep_zf285
+spec: config/neural/zf_circuit_285.yaml
+task: t1_integrator_tau_sweep
+learnable:
+- {block: w, of: synapse}
+- {block: w, of: afferent}
+- {block: w, of: motor}
+- {block: tau, of: neuron}
+- {block: bias, of: neuron}
+- {block: bias, of: output}
+io: {drive_set: sensor, drive_block: signal, read_set: output, read_block: value, read_channel: 0}
+training:
+  epochs: 100
+  n_trials: 512
+  n_val: 60
+  n_test: 80
+  lr: 0.005
+  batch: 32
+  seed: 0
+  curriculum: [0.25, 0.5, 0.75, 1.0]
+  horizon_min: 60

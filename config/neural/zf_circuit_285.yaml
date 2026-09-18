@@ -1,0 +1,88 @@
+general:
+  name: zf_circuit_285
+  seed: 0
+  n_frames: 480
+  dt: 0.0166666666666667
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+sets:
+  brain: {n: 1}
+  sensor:
+    parent: brain
+    per_parent: 8
+    state:
+      signal: {width: 1, integration: none, boundary: free}
+  neuron:
+    parent: brain
+    per_parent: 285
+    type_layout: ordered
+    types:
+      AF5_ipsi:
+        count: 29
+        sign: E
+        role: afferent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      AF5_contra:
+        count: 12
+        sign: E
+        role: afferent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_ipsi_m:
+        count: 38
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_ipsi_i:
+        count: 27
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_contra_m:
+        count: 34
+        sign: I
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_contra_i:
+        count: 18
+        sign: I
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      AMN:
+        count: 92
+        sign: E
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      AIN:
+        count: 35
+        sign: E
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+    state:
+      pos: {width: 3, role: geometry, integration: none, boundary: world}
+      voltage: {width: 1, role: coordinate, integration: first_order, boundary: free}
+      omega: {width: 1, role: modulation, integration: none, boundary: free, record: false}
+      tau: {width: 1, integration: none, boundary: free, record: false}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  output:
+    parent: brain
+    per_parent: 1
+    state:
+      value: {width: 1, integration: none, boundary: free}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  synapse: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: neuron, edges_file: neural/zebrafish_om_285_edges.npz}
+  afferent: {parent: brain, edge_set: true, entity: connection, pre: sensor, post: neuron, edges_file: neural/zf_eyeG_285_task_in.npz}
+  motor: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: output, edges_file: neural/zf_eyeG_285_task_out.npz}
+fields: {}
+seed:
+- {op: seed_state_random, at: sensor, block: signal, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: neuron, block: tau, lo: 0.1, hi: 0.1}
+- {op: seed_state_random, at: neuron, block: bias, lo: -0.1768, hi: 0.1768}
+- {op: seed_state_random, at: output, block: bias, lo: 0.0, hi: 0.0}
+operators:
+- {op: project, at: neuron, edge_set: afferent, block: signal, gain: 10.0, bias: bias}
+- {op: neuron_update, at: neuron, model: leaky_tanh, tau: tau, tau_min: 0.05, noise: 0.0}
+- {op: neuron_signal, at: neuron, model: shared, edge_set: synapse, activation: tanh, dale: true}
+- {op: readout, at: output, edge_set: motor, block: voltage, into: value, send: tanh, activation: identity, bias: bias}
+schedule: [project, neuron_update, neuron_signal, readout]
+plotting: {renderer: none, max_frames: 0}
