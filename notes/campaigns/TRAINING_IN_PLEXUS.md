@@ -288,6 +288,44 @@ which is the optimisation's own sensitivity to float32 rounding compounded over 
 difference in what is being fitted. `accum:` is still read, as the same *quantity* at the new
 price.
 
+## t0–t4: the three bad ones were ill-posed, not under-trained
+
+| task | cells | before | after | | circuit vs slowest teacher pole |
+|---|---|---|---|---|---|
+| t0_delay_100ms | 1 | 0.0001 | 0.0001 | | — |
+| t0_gain_unity | 1 | 0.0033 | 0.0033 | | — |
+| t1_integrator_perfect | 1 | 0.0008 | 0.0008 | | +0.0042 vs +0.0000 /s |
+| **t1_integrator_tau_sweep** | 4 | 0.2598 | **0.0011** | **236×** | −0.0298 vs −0.0312 /s |
+| t2_eye_plant | 1 | 0.0002 | 0.0002 | | −1.3416 vs −2.3676 /s |
+| **t2_resonator_damping** | 3 | 0.2801 | **0.0003** | **934×** | −0.7268 vs −0.6283 /s |
+| **t3_lowpass_order** | 6 | 0.4377 | **0.0004** | **1094×** | −1.1505 vs −1.2258 /s |
+| t4_unexcited_12hz | 1 | 0.0001 | 0.0001 | | −1.6200 vs −4.7000 /s |
+
+Held-out normalised MSE. Five were already at the floor and the eye rig's recipe has nothing to
+give them — they already take ~3,200 optimiser steps and already learn τ per unit. The three that
+were bad are exactly the grids that vary the **teacher**, and they were unanswerable: the circuit
+saw trials from four time constants / three dampings / six family×order pairs with nothing in the
+input saying which, so the best any causal predictor can do is the average over teachers.
+
+Two measurements say so rather than one. Restricting `t1_integrator_tau_sweep` to its τ = 8 s cell
+alone, same circuit and same hyperparameters, gives **0.0005 against 0.2598** — a factor of 520.
+And appending a constant one-hot of the condition cell to the stimulus gives **0.0011**, with the
+slowest pole back at −0.0298 /s against the teacher's −0.0312 where the grid had left it fifteen
+times too fast.
+
+The context channel is on by default for a corpus with more than one cell; `context: false` keeps
+the unanswerable version measurable, because it is a real and instructive failure. This closes the
+**contextual unidentifiability** item — by making the well-posed form the default rather than by
+adding a refusal.
+
+Two things the poles now say that the errors do not. `t4_unexcited_12hz` is still the designed
+failure: 0.0001 of variance with its slowest mode at −1.62 /s against a teacher pole at −4.70,
+because the teacher's 12 Hz pole sits outside the stimulus band and a low error there means
+nothing. And the tester's verdict line is too blunt for `t2_eye_plant`: a 64-unit circuit has 64
+poles and only needs to CONTAIN the teacher's, so a spare slower mode the readout does not use is
+reported as "FASTER-GROWING than the teacher" when nothing is wrong. The right question is whether
+the teacher's poles are among the circuit's, which `max Re` cannot ask.
+
 ## What closed the gap to `train_eyeG`
 
 Four things, and the first is most of it.
