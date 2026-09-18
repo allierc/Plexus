@@ -154,6 +154,40 @@ def load_split(task, split, device="cpu"):
     return (torch.as_tensor(u).to(device), torch.as_tensor(y).to(device), c)
 
 
+def with_context(U, cond, n_cond):
+    """Append a one-hot of the trial's CONDITION CELL to every frame of the stimulus.
+
+    WHAT THIS FIXES IS AN ILL-POSED TASK, NOT A BADLY TRAINED ONE. A corpus whose `conditions:`
+    grid varies the TEACHER -- `t1_integrator_tau_sweep` over four time constants,
+    `t2_resonator_damping` over three dampings, `t3_lowpass_order` over six family x order pairs
+    -- shows the circuit trials from several different systems with nothing in the input saying
+    which. The best any causal predictor can do is the average over teachers, so a large residual
+    is the CORRECT answer and no amount of training removes it. Measured: the same circuit, the
+    same hyperparameters, `t1_integrator_tau_sweep` restricted to its tau = 8 s cell alone goes
+    from 0.2598 of target variance to 0.0005, a factor of 520, and its slowest pole comes back
+    (-0.121 against the teacher's -0.125 1/s) where the grid left it 15x too fast.
+
+    The one-hot is CONSTANT IN TIME, which is the point: it is context, not stimulus. It carries
+    no information about what the target does moment to moment and every bit of information about
+    which law is producing it -- so a circuit that still fails has failed at the dynamics rather
+    than at telling the trials apart.
+
+    The alternative is one run per condition cell, which answers a different question: it asks
+    whether the circuit can fit each law, not whether one circuit can hold all of them at once.
+    """
+    if n_cond <= 1:
+        return U
+    oh = torch.zeros(U.shape[0], n_cond, device=U.device, dtype=U.dtype)
+    oh[torch.arange(U.shape[0]), torch.as_tensor(cond, dtype=torch.long)] = 1.0
+    return torch.cat([U, oh[:, None, :].expand(-1, U.shape[1], -1)], dim=-1)
+
+
+def n_condition_cells(task) -> int:
+    """How many condition cells the corpus has, from its own provenance."""
+    prov = json.load(open(os.path.join(task_dir(task), "provenance.json")))
+    return max(1, len(prov.get("cells") or []))
+
+
 def load_run(path) -> dict:
     with open(path) as f:
         r = yaml.safe_load(f)
@@ -178,9 +212,18 @@ def train(run, root=None, device=None):
 
     prov = json.load(open(os.path.join(task_dir(run["task"]), "provenance.json")))
     dt = float(prov["dt"])
-    U, Y, _ = load_split(run["task"], "train", dev)
+    U, Y, cU = load_split(run["task"], "train", dev)
     has_val = os.path.isdir(os.path.join(task_dir(run["task"]), "val"))
-    Uv, Yv, _ = load_split(run["task"], "val", dev) if has_val else (U[:64], Y[:64], None)
+    Uv, Yv, cV = load_split(run["task"], "val", dev) if has_val else (U[:64], Y[:64], cU[:64])
+    # THE CONDITION CELL AS A CONSTANT INPUT CHANNEL, on by default for a corpus that has more
+    # than one. Without it a teacher-varying grid is not a hard task but an unanswerable one;
+    # see `with_context`. `context: false` in the run spec turns it off, which is how the
+    # unanswerable version stays measurable.
+    n_cond = n_condition_cells(run["task"]) if run.get("context", True) else 1
+    if n_cond > 1:
+        print(f"[data] {n_cond} condition cells -> a one-hot context channel is appended to the "
+              f"stimulus ({U.shape[2]} -> {U.shape[2] + n_cond} inputs)")
+    U, Uv = with_context(U, cU, n_cond), with_context(Uv, cV, n_cond)
     print(f"[run] {run['name']} -> {out}")
     print(f"[data] task {run['task']}: train {tuple(U.shape)}  val {tuple(Uv.shape)}"
           + ("" if has_val else "  (no val split -- scoring on a slice of train, reported as such)"))
@@ -232,7 +275,7 @@ def train(run, root=None, device=None):
         model.load_state_dict(best_state)
 
     torch.save({"state": model.state_dict(), "circuit": c, "task": run["task"], "dt": dt,
-                "n_in": int(U.shape[2]), "n_out": int(Y.shape[2])},
+                "n_in": int(U.shape[2]), "n_out": int(Y.shape[2]), "n_cond": int(n_cond)},
                os.path.join(out, "models", "best.pt"))
     rep = {"name": run["name"], "task": run["task"], "n_params": n_par,
            "best_val_mse": best, "epochs": epochs, "history": hist,
@@ -259,6 +302,10 @@ def test(run, root=None, device=None):
 
     split = "test" if os.path.isdir(os.path.join(task_dir(run["task"]), "test")) else "train"
     U, Y, cond = load_split(run["task"], split, dev)
+    # REBUILT FROM THE CHECKPOINT, not from the run spec: the model's W_in has the width the fit
+    # was made at, and a run spec edited between train and test would otherwise raise a shape
+    # error here or, worse, line the one-hot up against a different number of cells.
+    U = with_context(U, cond, int(ck.get("n_cond", 1)))
     with torch.no_grad():
         P = model(U)
     mse = float(((P - Y) ** 2).mean())
@@ -270,7 +317,13 @@ def test(run, root=None, device=None):
         per_cell[int(c)] = float(((P[m] - Y[m]) ** 2).mean())
 
     truth = torch.load(os.path.join(task_dir(run["task"]), "teacher.pt"), weights_only=False)
-    true_f = sorted(truth["per_cell"][0]["pole_freq_hz"])
+    # EVERY CELL'S TEACHER, NOT CELL 0's. With the context channel the circuit is asked to hold
+    # ALL the laws in the grid at once, so the timescale it has to be able to reach is the
+    # SLOWEST of them -- and comparing against cell 0 alone reported `t1_integrator_tau_sweep`'s
+    # circuit as 1.97 1/s faster-growing than "the" teacher when the teacher it was being judged
+    # against was the tau = 0.5 s cell and the grid also contains tau = 32 s.
+    cells = truth["per_cell"]
+    true_f = sorted({round(f, 6) for c in cells for f in c["pole_freq_hz"]})
     got = model.jacobian_poles()
     # the circuit's slowest modes are the ones a task's poles have to live among
     slow = sorted(got, key=lambda p: abs(p.real))[:8]
@@ -282,9 +335,9 @@ def test(run, root=None, device=None):
     # that "unstable" would mark the correct answer as a failure. What is meaningful is the GAP
     # between the circuit's slowest mode and the teacher's: for 1/s that gap is how far from a
     # true line attractor the circuit landed, in inverse seconds.
-    true_max_re = max([p.real for p in np.atleast_1d(
-        np.asarray(truth["per_cell"][0]["poles_real"], float)
-        + 1j * np.asarray(truth["per_cell"][0]["poles_imag"], float))], default=float("-inf"))
+    true_max_re = max([float(r) for c in cells
+                       for r in np.atleast_1d(np.asarray(c["poles_real"], float))],
+                      default=float("-inf"))
     circ_max_re = float(max(p.real for p in got))
     gap = circ_max_re - true_max_re if np.isfinite(true_max_re) else None
 
@@ -292,7 +345,7 @@ def test(run, root=None, device=None):
            "n_trials": int(U.shape[0]), "mse": mse, "target_variance": var,
            "normalised_mse": mse / var if var > 0 else None,
            "mse_per_cell": per_cell,
-           "teacher_pole_freq_hz": true_f,
+           "teacher_pole_freq_hz": true_f, "n_condition_cells": len(cells),
            "circuit_slowest_pole_freq_hz": got_f,
            "circuit_max_real_eig": circ_max_re,
            "teacher_max_real_pole": None if not np.isfinite(true_max_re) else float(true_max_re),
@@ -311,7 +364,7 @@ def test(run, root=None, device=None):
     else:
         verdict = ("matches the teacher's own boundary" if abs(gap) < 0.05 else
                    "SLOWER than the teacher" if gap < 0 else "FASTER-GROWING than the teacher")
-        print(f"[test] max Re(lambda): circuit {circ_max_re:+.4f} vs teacher "
+        print(f"[test] max Re(lambda): circuit {circ_max_re:+.4f} vs slowest teacher "
               f"{true_max_re:+.4f} 1/s   gap {gap:+.4f} -- {verdict}")
     print(f"[test] wrote {p}")
     return res
@@ -340,6 +393,10 @@ def plot(run, root=None, device=None, n_show=4):
     model.load_state_dict(ck["state"]); model.eval()
     split = "test" if os.path.isdir(os.path.join(task_dir(run["task"]), "test")) else "train"
     U, Y, cond = load_split(run["task"], split, dev)
+    # REBUILT FROM THE CHECKPOINT, not from the run spec: the model's W_in has the width the fit
+    # was made at, and a run spec edited between train and test would otherwise raise a shape
+    # error here or, worse, line the one-hot up against a different number of cells.
+    U = with_context(U, cond, int(ck.get("n_cond", 1)))
     with torch.no_grad():
         P, R = model(U, want_rates=True)
     rep = json.load(open(os.path.join(out, "results", "report.json")))
