@@ -257,8 +257,9 @@ than `repeat` would share storage and make eight identical runs agree with thems
 
 ## The eye rig, measured
 
-`config/run/eye_rig_fit*.yaml` fits W_in, W and W_out of the 64-unit circuit through the frozen
-eye against `t5_gaze_tracking`, by running the spec — not a transcription of it.
+`config/run/eye_rig.yaml` fits W_in, W, W_out, the per-neuron τ and the two bias vectors of the
+64-unit circuit through the frozen eye, by running the spec — not a transcription of it. The
+table below is the history of getting there; `eye_rig_fit*` no longer exist as configs.
 
 | | best val | of variance | seconds | what changed |
 |---|---|---|---|---|
@@ -267,6 +268,12 @@ eye against `t5_gaze_tracking`, by running the spec — not a transcription of i
 | 60 epochs, curriculum, `accum: 8` | 2.48 deg² | 0.061 | 1831 | gradient averaged over 8 trials |
 | 60 epochs, curriculum, `batch: 8` | 2.72 deg² | 0.067 | **327** | the same 8 trials, one rollout |
 | the same, `rec_gain: 1` start | 2.68 deg² | 0.066 | 327 | recurrent W from N(0, 1/N) |
+| **`eye_rig`, matched to train_eyeG** | **0.031 deg²** | **0.0007** | 5988 | 3600 trials, τ and both biases fitted |
+
+**Held out: mean \|error\| 0.135 deg**, against `train_eyeG`'s 0.088 deg — from 1.454 deg RMS, a
+factor of 10.8. The remaining 1.5× is not a like-for-like comparison: the reference scores
+‖(Δθ, Δφ)‖ over two supervised angles on a 24-condition dot corpus, this scores \|Δθ\| on a
+one-channel band-limited-noise task whose teacher is an 8 s integrator.
 
 Two things that mattered more than expected. **The horizon curriculum** is not a refinement: a
 480-step rollout from an unfitted W sends every late frame's gradient through hundreds of tanh's
@@ -280,6 +287,46 @@ float64 (`tests/test_batch_gradient.py`). The two land at 0.067 and 0.061 of tar
 which is the optimisation's own sensitivity to float32 rounding compounded over 60 epochs, not a
 difference in what is being fitted. `accum:` is still read, as the same *quantity* at the new
 price.
+
+## What closed the gap to `train_eyeG`
+
+Four things, and the first is most of it.
+
+**Optimiser steps: 360 against 4,200.** The reference runs 3,600 trials at batch 128 for 150
+epochs; the rig ran 48 at batch 8 for 60. `t5_gaze_tracking_big` is the same task specification at
+the corpus's own size. Everything else below is worth about a factor of two between them.
+
+**The per-receiver bias.** `CTRNNEyeG`'s two maps are `torch.nn.Linear`, which carries a bias
+vector; `project` and `readout` had a scalar. `bias:` now takes either a number or the name of a
+receiver state block. It matters most on the readout: with a scalar, every muscle's resting drive
+is softplus(0) = 0.693 — the same tonic contraction on all six — and the eye's resting gaze cannot
+be set at all.
+
+**The learned time constant**, one `learnable:` line since `tau:` already named a per-neuron block,
+plus `tau_min: 0.05` s (explicit Euler needs τ > dt/2 = 0.0083 s).
+
+**lr 2e-2 → 2e-3, batch 8 → 128.**
+
+**The horizon curriculum was not one of them.** `[120, 240, 360, 480]` in four equal quarters of
+the epoch budget, trained on the trajectory prefix from v = 0 and validated on the full
+trajectory, is what both do.
+
+## The zebrafish pool through the same eye
+
+`config/neural/zf_eyeG_285.yaml` — the Plexus form of `train_zebra_eyeG.ZebrafishCircuitRNN`. The
+285 measured cells and their 5,013 synapses were already in the repository with no input and no
+output, because a connectome does not have those; `tools/make_zf_eye_edges.py` writes the three
+maps that make it a controller. Sign-locked (`dale: true`), all 5,013 magnitudes fitted, 2 of 6
+muscles reachable and the other four held at exactly zero.
+
+**Held out: mean \|error\| 0.175 deg, 0.0013 of target variance** — 1.3× the free 64-unit ctRNN,
+on a circuit that cannot move four of the six muscles and may not flip a single sign.
+
+**And it did not recover the dynamics.** Its slowest linearised pole at the operating point is
+**−1.886 /s against the teacher's −0.125 /s** — fifteen times too fast. The free ctRNN reaches
+−0.100 /s. So the connectome-constrained pool solves the task by fast feed-through rather than by
+building the 8-second integrator, and only panel d says so; the traces, the residual and the error
+all look like success. This is the sharpest instance yet of the split the analyser exists to show.
 
 **The recurrent weights start at exactly zero** in the files the recorded fits used, and nothing
 in the repository made those files — `tools/make_rig_edges.py` is now the missing half of the
