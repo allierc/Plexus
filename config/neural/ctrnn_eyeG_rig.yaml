@@ -2,7 +2,7 @@ general:
   name: ctrnn_eyeG_rig
   seed: 0
   n_frames: 480
-  dt: 0.0167
+  dt: 0.0166666666666667
   dim: 3
   world: [1.0, 1.0, 1.0]
   boundary: wall
@@ -20,20 +20,34 @@ sets:
       ctrnn:
         fraction: 1.0
         p: [2.0, 0.0, 2.0, 0.0, 1.0, 0.0]
+    state:
+      pos: {width: 3, role: geometry, integration: none, boundary: world}
+      voltage: {width: 1, role: coordinate, integration: first_order, boundary: free}
+      omega: {width: 1, role: modulation, integration: none, boundary: free, record: false}
+      tau: {width: 1, integration: none, boundary: free, record: false}
+      bias: {width: 1, integration: none, boundary: free, record: false}
   eye: {parent: head, per_parent: 1}
-  muscle: {parent: eye, per_parent: 6}
+  muscle:
+    parent: eye
+    per_parent: 6
+    state:
+      drive: {width: 1, integration: none, boundary: free}
+      bias: {width: 1, integration: none, boundary: free, record: false}
   afferent: {parent: head, edge_set: true, entity: connection, pre: retina, post: neuron, edges_file: neural/ctrnn_eyeG_rig_win.npz}
   recurrent: {parent: head, edge_set: true, entity: connection, pre: neuron, post: neuron, edges_file: neural/ctrnn_eyeG_rig_rec.npz}
   junction: {parent: head, edge_set: true, entity: connection, pre: neuron, post: muscle, edges_file: neural/ctrnn_eyeG_rig_wout.npz}
 fields: {}
 seed:
 - {op: seed_state_random, at: retina, block: signal, lo: 0.35, hi: 0.35}
+- {op: seed_state_random, at: neuron, block: tau, lo: 0.5, hi: 0.5}
+- {op: seed_state_random, at: neuron, block: bias, lo: -0.3535534, hi: 0.3535534}
+- {op: seed_state_random, at: muscle, block: bias, lo: -0.125, hi: 0.125}
 operators:
-- {op: project, at: neuron, edge_set: afferent, block: signal, gain: 2.0}
-- {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.0}
+- {op: project, at: neuron, edge_set: afferent, block: signal, gain: 2.0, bias: bias}
+- {op: neuron_update, at: neuron, model: leaky_tanh, tau: tau, tau_min: 0.05, noise: 0.0}
 - {op: neuron_signal, at: neuron, model: shared, edge_set: recurrent, activation: tanh}
 - {op: readout, at: muscle, edge_set: junction, block: voltage, into: drive, send: tanh,
-    activation: softplus}
+    activation: softplus, bias: bias}
 - op: muscle_pose_map
   at: muscle
   parent: eye

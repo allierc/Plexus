@@ -1,0 +1,22 @@
+name: zf_eye_rig
+spec: config/neural/zf_eyeG_285.yaml
+task: t5_gaze_tracking_big
+learnable:
+- {block: w, of: synapse}
+- {block: w, of: afferent}
+- {block: w, of: junction_lr}
+- {block: w, of: junction_mr}
+- {block: tau, of: neuron}
+- {block: bias, of: neuron}
+- {block: bias, of: muscle}
+io: {drive_set: retina, drive_block: signal, read_set: eye, read_block: pose, read_channel: 0}
+training:
+  epochs: 150
+  n_trials: 3600
+  n_val: 128
+  n_test: 256
+  lr: 0.002
+  batch: 128
+  seed: 0
+  curriculum: [0.25, 0.5, 0.75, 1.0]
+  horizon_min: 60
