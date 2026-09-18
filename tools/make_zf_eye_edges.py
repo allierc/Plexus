@@ -44,6 +44,12 @@ from plexus.paths import graphs_data_path
 SPEC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "config", "neural", "zebrafish_om_285.yaml")
 N_RETINA = 2
+# THE TASK RIG'S SENSORY BANK IS WIDER THAN THE EYE RIG'S AND FIXED. A t-task corpus has one
+# stimulus channel, and a teacher-varying grid adds a one-hot of the condition cell on top --
+# six more for `t3_lowpass_order`, so seven lines at the widest. Eight covers every task in the
+# battery, and one that uses fewer simply leaves the spare lines at the zero they were seeded to.
+# One spec then serves the whole battery instead of one spec per input width.
+N_SENSOR = 8
 MUSCLE_INDEX = {"LR": 0, "SR": 1, "MR": 2, "IR": 3, "SO": 4, "IO": 5}   # muscle_ops.MUSCLES order
 
 
@@ -77,8 +83,16 @@ def build(seed: int = 0, spec_path=SPEC) -> dict:
     mr = _all_to_all(ain, [MUSCLE_INDEX["MR"]])
     # fan-in is the number of SENDERS reaching one receiver, which for an all-to-all map is the
     # size of the presynaptic set -- 2 retina cells into a neuron, 92 AMN cells into LR.
+    # the task rig: a wider sensory bank onto the same AF5 cells, and a LINEAR readout taking
+    # every output cell (AMN and AIN together) onto one signed scalar -- a task target is signed,
+    # where a muscle pulls or does nothing, so there is no rectifier and no per-muscle split.
+    out_cells = np.concatenate([amn, ain])
+    tin = _all_to_all(np.arange(N_SENSOR), af5)
+    tout = _all_to_all(out_cells, [0])
     return {
         "win": (win, rng.uniform(-1, 1, win.shape[1]) / np.sqrt(N_RETINA) * 0.5),
+        "task_in": (tin, rng.uniform(-1, 1, tin.shape[1]) / np.sqrt(N_SENSOR) * 0.5),
+        "task_out": (tout, rng.uniform(-1, 1, tout.shape[1]) / np.sqrt(len(out_cells))),
         "lr": (lr, rng.uniform(-1, 1, lr.shape[1]) / np.sqrt(len(amn))),
         "mr": (mr, rng.uniform(-1, 1, mr.shape[1]) / np.sqrt(len(ain))),
     }

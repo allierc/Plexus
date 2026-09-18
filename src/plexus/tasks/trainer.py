@@ -379,6 +379,18 @@ def _f(v, w=8):
     return f"{v:+.4f}" if isinstance(v, (int, float)) else "     n/a"
 
 
+def _wrap_poles(label, freqs, per_line=6):
+    """A pole list as several short lines. `t3_lowpass_order` has 14 of them across six condition
+    cells, and one line ran three panel-widths off the right edge of the figure."""
+    f = [f"{x:.3f}" for x in np.round(np.asarray(freqs, float).ravel(), 3)]
+    if not f:
+        return [f"{label} (none)"]
+    pad = " " * len(label)
+    return [f"{label if i == 0 else pad} {' '.join(f[i:i + per_line])}"
+            + (" Hz" if i + per_line >= len(f) else "")
+            for i in range(0, len(f), per_line)]
+
+
 def plot(run, root=None, device=None, n_show=4):
     import matplotlib
     matplotlib.use("Agg")
@@ -403,59 +415,79 @@ def plot(run, root=None, device=None, n_show=4):
     dt, T = ck["dt"], U.shape[1]
     t = np.arange(T) * dt
 
-    fig = plt.figure(figsize=(13.5, 7.4), facecolor=BG)
-    gs = fig.add_gridspec(2, 3, hspace=0.33, wspace=0.26)
+    # 3 x 2. TOP ROW IS WHAT THE RUN WAS -- what went in, what came out, and the numbers.
+    # BOTTOM ROW IS WHETHER IT WORKED -- the dynamics, the error, and the fit's own history.
+    fig = plt.figure(figsize=(14.5, 7.6), facecolor=BG)
+    gs = fig.add_gridspec(2, 3, hspace=0.34, wspace=0.28)
 
-    # a: target vs prediction. GREEN is ground truth, BLACK-on-dark would vanish, so the
-    # prediction is white -- the convention reserves green/black for GT vs predicted.
-    axa = _ax(fig.add_subplot(gs[0, 0]), ylabel="target / prediction", letter="a")
+    # a: THE STIMULUS, which no earlier version of this figure showed. A reader could not tell a
+    # band-limited noise task from a PRBS one, and `t4_unexcited_12hz` -- whose whole point is a
+    # stimulus too slow to excite the teacher -- looked exactly like a task that works.
+    axa = _ax(fig.add_subplot(gs[0, 0]), ylabel="input", letter="a")
     for i in range(min(n_show, U.shape[0])):
-        axa.plot(t, Y[i, :, 0].cpu(), color="#2e8b4f", lw=1.3, alpha=0.9)
-        axa.plot(t, P[i, :, 0].cpu(), color=INK, lw=0.8, ls="--")
-    axa.text(0.985, 0.04, "green: teacher   dashed: circuit", transform=axa.transAxes,
+        axa.plot(t, U[i, :, 0].cpu(), color="#4a4a4a", lw=0.7, alpha=0.8)
+    if U.shape[2] > 1:
+        axa.text(0.985, 0.04, f"channel 1 of {U.shape[2]}", transform=axa.transAxes,
+                 ha="right", va="bottom", color=MUTED, fontsize=8)
+
+    # b: target against prediction. GREEN IS GROUND TRUTH AND BLACK IS THE PREDICTION, the
+    # repository's convention; the teacher is drawn thicker and underneath so that a good fit
+    # reads as a black line sitting inside a green one rather than as two lines that disagree.
+    axb = _ax(fig.add_subplot(gs[0, 1]), ylabel="target / prediction", letter="b")
+    for i in range(min(n_show, U.shape[0])):
+        axb.plot(t, Y[i, :, 0].cpu(), color="#2e8b4f", lw=2.2, alpha=0.9)
+        axb.plot(t, P[i, :, 0].cpu(), color="#000000", lw=0.9)
+    axb.text(0.985, 0.04, "green: ground truth   black: circuit", transform=axb.transAxes,
              ha="right", va="bottom", color=MUTED, fontsize=8)
 
-    # b: the residual, on the same scale, so "close" is a number and not an impression
-    axb = _ax(fig.add_subplot(gs[1, 0]), xlabel="time (s)", ylabel="residual", letter="b")
-    for i in range(min(n_show, U.shape[0])):
-        axb.plot(t, (P[i, :, 0] - Y[i, :, 0]).cpu(), color="#c0522a", lw=0.8)
-    axb.set_ylim(axa.get_ylim())
-
-    # c: learning curve
-    axc = _ax(fig.add_subplot(gs[0, 1]), ylabel="mse", letter="c")
-    ep = [h["epoch"] for h in rep["history"]]
-    axc.plot(ep, [h["train_mse"] for h in rep["history"]], color="#1f6fb8", lw=1.1, label="train")
-    axc.plot(ep, [h["val_mse"] for h in rep["history"]], color="#9a7d1a", lw=1.1, label="val")
-    axc.set_yscale("log")
-    lg = axc.legend(frameon=False, fontsize=8, loc="upper right")
-    for txt in lg.get_texts():
-        txt.set_color(INK)
-
-    # d: THE RECOVERY PANEL. The circuit's own eigenvalues against the teacher's poles, in one
-    # plane. A small loss with the poles in the wrong place is the failure mode an
-    # unidentifiable task produces, and it is only visible here.
-    axd = _ax(fig.add_subplot(gs[1, 1]), xlabel="Re(lambda)  (1/s)", ylabel="Im/2pi  (Hz)",
+    # d: THE RECOVERY PANEL, and the only one that can tell a fit from a coincidence. Each point
+    # is an eigenvalue lambda = sigma + i omega of the circuit's linearisation, so a mode of the
+    # circuit behaves as exp(lambda t) = exp(sigma t)(cos omega t + i sin omega t):
+    #
+    #   Re(lambda), the x-axis in 1/s, is the ENVELOPE. Negative decays with time constant
+    #     1/|sigma| seconds, positive diverges, zero neither -- which is what a perfect memory is.
+    #     So -10 1/s is a 0.1 s transient and -0.1 1/s is a 10 s memory.
+    #   Im(lambda)/2pi, the y-axis in Hz, is the RINGING inside that envelope. Zero is a pure
+    #     exponential; nonzero oscillates at that many cycles per second.
+    #
+    # The panel is mirror-symmetric about y = 0 because the matrix is real and its complex
+    # eigenvalues come in conjugate pairs -- a pair is ONE oscillating mode, not two. The dashed
+    # red line at Re = 0 is the stability boundary.
+    axd = _ax(fig.add_subplot(gs[1, 0]), xlabel="Re(lambda)  (1/s)", ylabel="Im/2pi  (Hz)",
               letter="d")
     got = model.jacobian_poles()
-    axd.scatter(got.real, got.imag / (2 * np.pi), s=10, color=MUTED, alpha=0.8,
-                label="circuit")
+    axd.scatter(got.real, got.imag / (2 * np.pi), s=10, color="#000000", alpha=0.8)
     truth = torch.load(os.path.join(task_dir(run["task"]), "teacher.pt"), weights_only=False)
     for cellrec in truth["per_cell"]:
         axd.scatter(cellrec["poles_real"], np.asarray(cellrec["poles_imag"]) / (2 * np.pi),
-                    s=80, marker="x", color="#2e8b4f", lw=2.0, label="teacher", zorder=5)
+                    s=80, marker="x", color="#2e8b4f", lw=2.0, zorder=5)
     axd.axvline(0, color="#c0272a", lw=0.8, ls="--")
-    h_, l_ = axd.get_legend_handles_labels()
-    seen = dict(zip(l_, h_))
-    lg = axd.legend(seen.values(), seen.keys(), frameon=False, fontsize=8, loc="upper left")
+    # CAPTIONED, NOT LEGENDED, like panel b. A legend box is placed in a corner of the axes and
+    # this cloud fills the whole plane, so it sat on top of the data whichever corner it chose.
+    axd.text(0.985, 0.04, "green: ground truth   black: circuit", transform=axd.transAxes,
+             ha="right", va="bottom", color=MUTED, fontsize=8)
+
+    # e: the residual, ON THE TARGET'S OWN SCALE, so "close" is a number and not an impression.
+    axe = _ax(fig.add_subplot(gs[1, 1]), xlabel="time (s)", ylabel="residual", letter="e")
+    for i in range(min(n_show, U.shape[0])):
+        axe.plot(t, (P[i, :, 0] - Y[i, :, 0]).cpu(), color="#c0522a", lw=0.8)
+    axe.set_ylim(axb.get_ylim())
+
+    # f: the learning curve
+    axf = _ax(fig.add_subplot(gs[1, 2]), xlabel="epoch", ylabel="mse", letter="f")
+    ep = [h["epoch"] for h in rep["history"]]
+    axf.plot(ep, [h["train_mse"] for h in rep["history"]], color="#1f6fb8", lw=1.1, label="train")
+    axf.plot(ep, [h["val_mse"] for h in rep["history"]], color="#9a7d1a", lw=1.1, label="val")
+    axf.set_yscale("log")
+    lg = axf.legend(frameon=False, fontsize=8, loc="upper right")
     for txt in lg.get_texts():
         txt.set_color(INK)
 
-    # e: the numbers
-    # NO AXES AT ALL on the text panel. `_ax` drops the top and right spines, which is right for
-    # a plot and wrong for words: the reader is shown a frame around text that has no axis to be
-    # framed by. The letter is drawn in axes coordinates by `_ax` and survives turning them off.
-    axe = _ax(fig.add_subplot(gs[:, 2]), letter="e")
-    axe.axis("off")
+    # c: the numbers. NO AXES AT ALL -- `_ax` drops the top and right spines, which is right for
+    # a plot and wrong for words: a frame around text has no axis to be a frame for. The letter
+    # is drawn in axes coordinates and survives turning them off.
+    axc = _ax(fig.add_subplot(gs[0, 2]), letter="c")
+    axc.axis("off")
     res_path = os.path.join(out, "results", f"{run['name']}_{split}.json")
     res = json.load(open(res_path)) if os.path.exists(res_path) else {}
     lines = ["", f"{run['name']}", f"task    {run['task']}", f"split   {split}",
@@ -464,16 +496,16 @@ def plot(run, root=None, device=None, n_show=4):
              f"{split} mse       {res.get('mse', float('nan')):.6f}",
              f"normalised     {res.get('normalised_mse', float('nan')):.4f}  of target variance",
              "",
-             f"teacher poles  {np.round(res.get('teacher_pole_freq_hz', []), 4).tolist()} Hz",
+             ] + _wrap_poles("ground-truth poles", res.get("teacher_pole_freq_hz", [])) + [
              f"circuit slowest{np.round(res.get('circuit_slowest_pole_freq_hz', [])[:4], 4).tolist()} Hz",
              f"max Re(lam)    circuit {_f(res.get('circuit_max_real_eig'))} 1/s",
-             f"               teacher {_f(res.get('teacher_max_real_pole'))} 1/s",
+             f"               truth   {_f(res.get('teacher_max_real_pole'))} 1/s",
              f"               gap     {_f(res.get('max_real_gap'))} 1/s",
              "",
              ("corpus IDENTIFIABLE" if res.get("identifiable", True) else
               "corpus NOT IDENTIFIABLE -- a low\nerror here does not mean the\ncircuit has the "
               "right dynamics")]
-    axe.text(0.05, 0.95, "\n".join(lines), transform=axe.transAxes, va="top", ha="left",
+    axc.text(0.02, 0.95, "\n".join(lines), transform=axc.transAxes, va="top", ha="left",
              color=INK, fontsize=8, family="monospace")
 
     p = os.path.join(out, "results", f"{run['name']}_{split}.png")

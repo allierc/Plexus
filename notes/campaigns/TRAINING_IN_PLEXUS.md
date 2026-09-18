@@ -190,7 +190,6 @@ a demo:
 | `t0_gain_unity`, `t0_delay_100ms` | the harness works; a failure here invalidates everything above |
 | `t1_integrator_perfect` | a pole at the origin — a line attractor, the hardest thing to hold |
 | `t2_resonator_damping` | ζ = 0.1 / 0.4 / 0.9 — does the learnable get damping, or only frequency |
-| `t2_eye_plant` | 3-in 3-out **coupled** — the MIMO case, where a per-channel learnable must fail |
 | `t3_lowpass_order` | order 2 / 4 / 8 — how many poles can a learnable of a given size hold |
 | `t4_unexcited_12hz` | **the negative control.** Must score well and recover the poles badly. A learnable that "succeeds" here has told you the analyser is broken, not that the fit is good |
 
@@ -296,7 +295,6 @@ price.
 | t0_gain_unity | 1 | 0.0033 | 0.0033 | | — |
 | t1_integrator_perfect | 1 | 0.0008 | 0.0008 | | +0.0042 vs +0.0000 /s |
 | **t1_integrator_tau_sweep** | 4 | 0.2598 | **0.0011** | **236×** | −0.0298 vs −0.0312 /s |
-| t2_eye_plant | 1 | 0.0002 | 0.0002 | | −1.3416 vs −2.3676 /s |
 | **t2_resonator_damping** | 3 | 0.2801 | **0.0003** | **934×** | −0.7268 vs −0.6283 /s |
 | **t3_lowpass_order** | 6 | 0.4377 | **0.0004** | **1094×** | −1.1505 vs −1.2258 /s |
 | t4_unexcited_12hz | 1 | 0.0001 | 0.0001 | | −1.6200 vs −4.7000 /s |
@@ -328,10 +326,15 @@ adding a refusal.
 Two things the poles now say that the errors do not. `t4_unexcited_12hz` is still the designed
 failure: 0.0001 of variance with its slowest mode at −1.62 /s against a teacher pole at −4.70,
 because the teacher's 12 Hz pole sits outside the stimulus band and a low error there means
-nothing. And the tester's verdict line is too blunt for `t2_eye_plant`: a 64-unit circuit has 64
-poles and only needs to CONTAIN the teacher's, so a spare slower mode the readout does not use is
-reported as "FASTER-GROWING than the teacher" when nothing is wrong. The right question is whether
-the teacher's poles are among the circuit's, which `max Re` cannot ask.
+nothing. And the tester's verdict line is blunter than the question it is asked: a 64-unit circuit
+has 64 poles and only needs to CONTAIN the ground truth's, so a spare slower mode the readout
+never uses is reported as "FASTER-GROWING than the teacher" when nothing is wrong. The right
+question is whether the ground truth's poles are among the circuit's, which `max Re` cannot ask.
+
+`t2_eye_plant` was removed from the battery: it is the eye plant, and `eye_rig` / `zf_eye_rig` fit
+that same plant end to end with a circuit driving it, so scoring a bare circuit against it was
+asking a question the two rigs already answer better. It was also the only 3-in 3-out task, and
+the only one `spec_trainer` could not run at all — its rollout reads one element of one block.
 
 ## What closed the gap to `train_eyeG`
 
