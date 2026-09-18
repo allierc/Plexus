@@ -239,23 +239,44 @@ def test_the_ctrnn_rig_spec_reproduces_CTRNNEyeG():
     dt, tau, T = float(sim.dt), 0.5, int(sim.n_frames)
     drive_in = float(sim.seed[0].params["lo"]) if getattr(sim, "seed", None) else 0.35
 
+    H, _ = engine.run(sim, device="cpu", progress=False)
+
+    # THE TWO BIAS VECTORS ARE READ BACK FROM THE BUILT RUN, NOT REDRAWN HERE. `CTRNNEyeG`'s two
+    # maps are `torch.nn.Linear`, so each carries a bias the spec seeds from the same uniform --
+    # and an earlier version of this test simply left them out, which made it certify a chain the
+    # reference does not have. Reading the SEEDED values is not circular: what is under test is
+    # the per-frame arithmetic below, and the seeds are an initial condition both sides must
+    # share for the comparison to mean anything at all. `tau` is likewise a per-neuron block now,
+    # seeded flat at 0.5 s, so the scalar below is still the whole of it.
+    b_v = H.level("neuron").get("bias")[:, 0].detach().numpy().astype(np.float64)   # enc.bias
+    b_m = H.level("muscle").get("bias")[:, 0].detach().numpy().astype(np.float64)   # mot.bias
+
     minv = np.linalg.inv(np.eye(3) + dt * C)
-    I = Win @ np.full(2, drive_in)
+    I = Win @ np.full(2, drive_in)                    # I(t) = W_in p_dot, eq:input-map
     v, u, ud = np.zeros(64), np.zeros(3), np.zeros(3)
-    for _ in range(T):
+    # `n_frames + 1` STEPS, NOT `n_frames`: `engine.run` iterates `range(sim.n_frames + 1)`
+    # (engine.py:2363) and every tick integrates, so `n_frames` names the recorded rows after the
+    # first, not the Euler steps. This run settles under a constant drive, so the missing step was
+    # worth only ~1e-4 deg here and passed the old 1e-3 bound -- on the zebrafish pool, which is
+    # still moving at frame 240, the same omission cost 2e-3 deg.
+    for _ in range(T + 1):
         r = np.tanh(v)                                   # the RATES are what W_out sees
-        m = np.log1p(np.exp(Wout @ r))                   # softplus: a muscle pulls or does nothing
+        m = np.log1p(np.exp(Wout @ r + b_m))             # softplus: a muscle pulls or does nothing
         cross = np.array([m[i] * m[j] for i, j in PAIRS])
         u_inf = np.concatenate([m, m ** 2, cross]) @ beta
         ud = (ud + dt * (K @ (u_inf - u))) @ minv.T
         u = u + dt * ud
-        v = v + dt * ((1.0 / tau) * (-v + W @ r + I))     # a = g = 1/tau, the spec's p row
+        # THE INPUT BIAS SITS OUTSIDE THE 1/tau, where `torch.nn.Linear` composed with alpha would
+        # put it inside: `project` computes `gain * sum + bias`, so the offset is on the
+        # operator's OUTPUT and only the message is scaled. The two agree up to b_plexus =
+        # b_reference / tau, which is a reparameterisation a learned bias absorbs -- worth naming
+        # because it stops being a pure reparameterisation once tau itself is fitted per neuron.
+        v = v + dt * ((1.0 / tau) * (-v + W @ r + I) + b_v)   # a = g = gain = 1/tau, the p row
 
-    H, _ = engine.run(sim, device="cpu", progress=False)
     got = H.level("eye").get("pose")[0].detach().numpy().astype(np.float64)
     err = np.abs(got - u).max()
     assert abs(u[0]) > 1.0, f"the rig barely moves the eye (theta {u[0]:.3f} deg); vacuous"
-    assert err < 1e-3, (
+    assert err < 1e-5, (
         f"the spec departs from CTRNNEyeG by {err:.3e} deg of gaze over {T} frames. The chain "
         f"is W_in -> circuit -> W_out -> organ; a mismatch here means one link is not the "
         f"reference's arithmetic.")

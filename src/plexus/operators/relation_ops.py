@@ -94,7 +94,8 @@ class _Project(Lateral):
     PARAM_ROLES = {
         "edge_set": "the_relation_traversed", "block": "sender_state_block",
         "into": "receiver_state_block", "weight": "edge_weight_block",
-        "gain": "scalar_on_the_aggregated_sum", "bias": "scalar_offset_before_activation",
+        "gain": "scalar_on_the_aggregated_sum",
+        "bias": "offset_before_activation_scalar_or_a_receiver_state_block",
         "send": "nonlinearity_the_sender_applies_before_the_weights",
         "activation": "nonlinearity_the_receiver_applies_after_the_sum",
     }
@@ -111,7 +112,16 @@ class _Project(Lateral):
         self.to_block = params.get("into", self.block)
         self.weight_block = params.get("weight", "w")
         self.gain = float(params.get("gain", 1.0))
-        self.bias = float(params.get("bias", 0.0))
+        # `bias:` IS EITHER A NUMBER OR THE NAME OF A RECEIVER STATE BLOCK, the same choice
+        # `neuron_update` offers for `tau:`. A scalar says the offset is a property of the MAP;
+        # a block says it is a property of each receiving element, which is what `torch.nn.Linear`
+        # means by its bias vector and what the reference this rig reproduces
+        # (`train_eyeG.CTRNNEyeG`) learns on both of its maps. It matters most on `readout`:
+        # without a per-muscle offset every muscle's resting drive is softplus(0) = 0.693, the
+        # same tonic contraction on all six, and the eye's resting gaze cannot be set at all.
+        _b = params.get("bias", 0.0)
+        self.bias_block = _b if isinstance(_b, str) else None
+        self.bias = 0.0 if self.bias_block else float(_b)
         self.send = _ACT[params.get("send", "identity")]          # sender-side, before the weights
         self.act = _ACT[params.get("activation", "identity")]     # receiver-side, after the sum
         if self.WRITES_BLOCK and "into" not in params:
@@ -125,7 +135,17 @@ class _Project(Lateral):
         x_pre = self.send(H.gather(self.edge_set, "pre", self.block))   # [.., E, w]; send() first
         w_e = es.get(self.weight_block)                              # [.., E, 1]
         msg = H.scatter_along(self.edge_set, "post", w_e * x_pre)    # [.., N_post, w] along post
-        y = self.act(self.gain * msg + self.bias) * post.occ[:, None]
+        b = self.bias
+        if self.bias_block is not None:
+            if self.bias_block not in post.state_schema:
+                raise ValueError(
+                    f"{self.__class__.__name__}: `bias: {self.bias_block!r}` names a state block "
+                    f"the receiving set {es.post_name!r} does not have (it has: "
+                    f"{', '.join(bl.name for bl in post.state_schema.blocks)}). Declare it under "
+                    f"`sets.{es.post_name}.state:` -- one column, integration none -- or give "
+                    f"`bias:` as a number.")
+            b = post.get(self.bias_block)                            # [.., N_post, 1]
+        y = self.act(self.gain * msg + b) * post.occ[:, None]
         if mask is not None:
             y = y * mask[:, None].to(y.dtype)
         if self.WRITES_BLOCK:
@@ -141,12 +161,21 @@ class _Project(Lateral):
                     f"readout: the message is {y.shape[-1]} wide but {es.post_name}."
                     f"{self.to_block!r} is {b1 - b0}. The width comes from the SENDER's "
                     f"{self.block!r} block, so these must agree.")
+            # A MASKED `readout` WRITES ONLY THE ELEMENTS IT ACTS ON. `at: muscle[type=LR]` means
+            # this operator drives the lateral rectus; it does not mean every other muscle is
+            # driven to zero. Writing the whole block would make two readouts over disjoint
+            # muscles impossible -- the second would erase the first -- which is exactly what the
+            # zebrafish pool needs, AMN onto LR and AIN onto MR with the other four muscles left
+            # at the zero they were seeded with. `project` is unaffected: a delta of zero is
+            # already "contributes nothing".
+            keep = y if mask is None else torch.where(
+                mask[:, None].to(torch.bool), y, post.get(self.to_block))
             if torch.is_grad_enabled():
                 st = post.state.clone()
-                st[..., b0:b1] = y
+                st[..., b0:b1] = keep
                 post.state = st
             else:
-                post.state[..., b0:b1] = y
+                post.state[..., b0:b1] = keep
             return {}
         return {es.post_name: y}
 

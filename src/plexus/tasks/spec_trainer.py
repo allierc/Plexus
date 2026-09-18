@@ -1,6 +1,6 @@
 """Train a Plexus SPEC against a task, through `engine.run(grad=True)`.
 
-    python -m plexus.tasks.spec_trainer -o train test plot config/run/eye_rig_fit.yaml
+    python -m plexus.tasks.spec_trainer -o train test analyse config/run/eye_rig.yaml
 
 The difference from `tasks.trainer`, which is a standalone torch module: this one fits the model
 the spec describes, by running the engine. Nothing is transcribed, so nothing can drift -- the
@@ -98,12 +98,13 @@ def rollout(sim, u, drive_set, drive_block, read_set, read_block, device="cpu", 
 def _mse(y, target, ch):
     """Aligned at frame 0 and truncated to the shorter; batch-transparent.
 
-    THE ENGINE RECORDS ONE FRAME MORE THAN IT STEPS: `on_frame` fires before any dynamics, so
-    trace[0] is the initial state and trace[1..n] are the n steps. The teacher's y[0] is likewise
-    its output at t = 0, which for a strictly proper law is zero, so the two series START
-    TOGETHER and the extra frame is on the end. Truncating is therefore correct and padding would
-    not be; the alternative -- dropping trace[0] -- would shift the whole comparison by one step
-    and report a lag the model does not have.
+    THE TWO SERIES START TOGETHER AND THE EXTRA FRAME IS ON THE END. `engine.run` iterates
+    `range(n_frames + 1)` and `on_frame` fires at the top of each tick, so trace[k] is the state
+    after k integration steps -- trace[0] the initial condition, and the last tick's step never
+    recorded. The teacher's y[0] is likewise its output at t = 0, which for a strictly proper law
+    is zero. So trace[k] and y[k] name the same instant, truncating to the shorter is correct,
+    and padding would not be; the alternative -- dropping trace[0] -- would shift the whole
+    comparison by one step and report a lag the model does not have.
 
     Indexed from the right, so `[T, w]` against `[T, 1]` and `[B, T, w]` against `[B, T, 1]` are
     the same call. The mean is over frames AND trials, which is exactly the gradient that
@@ -281,14 +282,24 @@ def test(run, root=None, device="cpu"):
     per = [float(_mse(Ypred[i], Y[i], ch)) for i in range(n)]
     traces = [Ypred[i, :, ch].cpu().numpy() for i in range(min(n, 6))]
     var = float((Y[:n] ** 2).mean())
+    # IN DEGREES AS WELL AS DEGREES SQUARED. The reference this rig reproduces
+    # (`train_eyeG.py` on connectome-gnn's feat/oculomotor) reports `gaze_err_mean_deg`, the mean
+    # ABSOLUTE gaze error, and quotes 0.088 deg for a 64-unit ctRNN. A mean squared error in deg^2
+    # cannot be compared with that by eye -- 2.12 deg^2 reads smaller than 0.088 and is 16x worse
+    # -- so both are written, and the mean absolute error is the one to line up against the note.
+    nn_ = min(Ypred.shape[-2], Y.shape[-2])
+    err = (Ypred[:n, :nn_, ch] - Y[:n, :nn_, 0]).cpu().numpy()
     res = {"name": run["name"], "spec": run["spec"], "task": run["task"], "split": split,
            "n_trials": n, "mse": float(np.mean(per)), "mse_per_trial": per,
+           "mae_deg": float(np.abs(err).mean()), "rmse_deg": float(np.sqrt(np.mean(per))),
            "target_variance": var, "normalised_mse": float(np.mean(per)) / var,
            "fitted": {k: {"n": int(v.numel()), "mean": float(v.mean()), "sd": float(v.std())}
                       for k, v in ck["fitted"].items()}}
     p = os.path.join(out, "results", f"{run['name']}_{split}.json")
     json.dump(res, open(p, "w"), indent=2)
     np.save(os.path.join(out, "results", f"{run['name']}_{split}_traces.npy"), np.array(traces))
+    print(f"[test] {split}: mean |err| {res['mae_deg']:.4f} deg   rmse {res['rmse_deg']:.4f} deg "
+          f"  (train_eyeG reports 0.088 deg)")
     print(f"[test] {split}: {n} trials  mse {res['mse']:.4f} deg^2  "
           f"({res['normalised_mse']:.4f} of target variance)")
     print(f"[test] per-trial spread {min(per):.3f} .. {max(per):.3f} deg^2")

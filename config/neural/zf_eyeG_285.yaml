@@ -1,0 +1,142 @@
+general:
+  name: zf_eyeG_285
+  seed: 0
+  n_frames: 480
+  dt: 0.0166666666666667
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+sets:
+  brain: {n: 1}
+  retina:
+    parent: brain
+    per_parent: 2
+    state:
+      signal: {width: 1, integration: none, boundary: free}
+  neuron:
+    parent: brain
+    per_parent: 285
+    type_layout: ordered
+    types:
+      AF5_ipsi:
+        count: 29
+        sign: E
+        role: afferent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      AF5_contra:
+        count: 12
+        sign: E
+        role: afferent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_ipsi_m:
+        count: 38
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_ipsi_i:
+        count: 27
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_contra_m:
+        count: 34
+        sign: I
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      INTG_contra_i:
+        count: 18
+        sign: I
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      AMN:
+        count: 92
+        sign: E
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      AIN:
+        count: 35
+        sign: E
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+    state:
+      pos: {width: 3, role: geometry, integration: none, boundary: world}
+      voltage: {width: 1, role: coordinate, integration: first_order, boundary: free}
+      omega: {width: 1, role: modulation, integration: none, boundary: free, record: false}
+      tau: {width: 1, integration: none, boundary: free, record: false}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  eye: {parent: brain, per_parent: 1}
+  muscle:
+    parent: eye
+    per_parent: 6
+    type_layout: ordered
+    types:
+      LR: {count: 1}
+      SR: {count: 1}
+      MR: {count: 1}
+      IR: {count: 1}
+      SO: {count: 1}
+      IO: {count: 1}
+    state:
+      drive: {width: 1, integration: none, boundary: free}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  synapse: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: neuron, edges_file: neural/zebrafish_om_285_edges.npz}
+  afferent: {parent: brain, edge_set: true, entity: connection, pre: retina, post: neuron, edges_file: neural/zf_eyeG_285_win.npz}
+  junction_lr: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: muscle, edges_file: neural/zf_eyeG_285_lr.npz}
+  junction_mr: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: muscle, edges_file: neural/zf_eyeG_285_mr.npz}
+fields: {}
+seed:
+- {op: seed_state_random, at: retina, block: signal, lo: 0.35, hi: 0.35}
+- {op: seed_state_random, at: neuron, block: tau, lo: 0.1, hi: 0.1}
+- {op: seed_state_random, at: neuron, block: bias, lo: -0.3535534, hi: 0.3535534}
+- {op: seed_state_random, at: muscle, block: bias, lo: -0.1, hi: 0.1}
+operators:
+- {op: project, at: neuron, edge_set: afferent, block: signal, gain: 10.0, bias: bias}
+- {op: neuron_update, at: neuron, model: leaky_tanh, tau: tau, tau_min: 0.05, noise: 0.0}
+- {op: neuron_signal, at: neuron, model: shared, edge_set: synapse, activation: tanh, dale: true}
+- {op: readout, at: 'muscle[type=LR]', edge_set: junction_lr, block: voltage, into: drive, send: tanh, activation: softplus,
+  bias: bias}
+- {op: readout, at: 'muscle[type=MR]', edge_set: junction_mr, block: voltage, into: drive, send: tanh, activation: softplus,
+  bias: bias}
+- op: muscle_pose_map
+  at: muscle
+  parent: eye
+  beta:
+  - [13.6068, 0.191, -0.7034]
+  - [-3.0633, 1.1322, 0.0165]
+  - [-6.8641, 1.9101, -0.1742]
+  - [-2.5864, -4.5416, 1.7483]
+  - [-4.4223, 1.9722, 3.4804]
+  - [-5.0688, -0.5262, -3.2641]
+  - [7.3232, -0.4132, -0.6175]
+  - [-2.4091, 5.9767, -2.455]
+  - [-13.1327, 1.7759, -0.0873]
+  - [-3.6205, -3.677, 2.3639]
+  - [0.2179, 1.8477, 4.946]
+  - [-6.5549, -2.2461, -4.8624]
+  - [1.0818, -1.5814, 0.6081]
+  - [-2.6482, 1.4398, 0.0041]
+  - [0.355, 0.0908, -0.1321]
+  - [-1.7428, 2.023, 0.0517]
+  - [0.431, -1.3583, -0.3209]
+  - [6.7505, -2.565, 0.7154]
+  - [-5.1797, 2.1758, -1.2244]
+  - [0.8531, 0.1364, 0.1887]
+  - [2.2624, -0.3703, -0.2554]
+  - [6.1808, -1.4385, -0.1323]
+  - [1.7647, -0.9823, -0.1412]
+  - [3.9811, 0.5939, -0.4461]
+  - [2.6171, -1.167, 0.8602]
+  - [0.0602, -0.6024, -0.0362]
+  - [3.0914, 0.1449, 0.3962]
+- op: organ_mechanics
+  at: eye
+  C:
+  - [4.6191, -0.0448, 0.1727]
+  - [-0.0448, 5.0977, 0.0461]
+  - [0.1727, 0.0461, 5.7123]
+  K:
+  - [37.4987, 6.3437, 4.9042]
+  - [6.3437, 44.6684, 5.3534]
+  - [4.9042, 5.3534, 42.6988]
+schedule: [project, neuron_update, neuron_signal, readout, readout, muscle_pose_map, organ_mechanics]
+plotting: {renderer: none, max_frames: 0}
