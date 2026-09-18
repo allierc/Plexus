@@ -9,7 +9,7 @@ learnable:
 - {block: tau, of: neuron}
 - {block: bias, of: neuron}
 - {block: bias, of: muscle}
-io: {drive_set: retina, drive_block: signal, read_set: eye, read_block: pose, read_channel: 0}
+io: {drive_set: retina, drive_block: signal, read_set: eye, read_block: pose, read_channel: 0, unit: deg}
 training:
   epochs: 150
   n_trials: 3600

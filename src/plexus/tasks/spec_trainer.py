@@ -114,6 +114,20 @@ def _mse(y, target, ch):
     return ((y[..., :n, ch] - target[..., :n, 0]) ** 2).mean()
 
 
+def units(run):
+    """(unit, unit^2) for the read-out block, from the run spec's `io.unit:`.
+
+    THE UNIT IS DECLARED, NOT DERIVED. `eye.pose` carries `unit=None` in its schema -- the degrees
+    come from the characterisation the eye fit was made against, not from anything the engine
+    knows -- so the only honest place for it is the run that pairs a spec with a task. A run that
+    does not declare one prints bare numbers, which is the same rule `Units.describe()` applies to
+    a whole simulation: t0..t4 read a teacher output that is not an angle, and labelling their
+    error "deg^2" was a unit asserted by the printf rather than by the model.
+    """
+    u = (run.get("io") or {}).get("unit")
+    return (f" {u}", f" {u}^2") if u else ("", "")
+
+
 def train(run, root=None, device="cpu"):
     tr = run["training"]
     torch.manual_seed(int(tr.get("seed", 0)))
@@ -169,6 +183,7 @@ def train(run, root=None, device="cpu"):
     opt = torch.optim.Adam(params, lr=float(tr.get("lr", 1e-2)))
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     ch = int(io.get("read_channel", 0))
+    U1, U2 = units(run)
     hist, best, best_state, t0 = [], np.inf, None, time.time()
 
     for ep in range(epochs):
@@ -204,7 +219,8 @@ def train(run, root=None, device="cpu"):
             v = float(_mse(yv, Yv[:n_va], ch))
         tr_mse = tot / max(n_step, 1)
         hist.append({"epoch": ep, "horizon": h, "train_mse": tr_mse, "val_mse": v})
-        print(f"  ep {ep:3d}  horizon {h:4d}  train {tr_mse:10.5f}  val {v:10.5f}  deg^2")
+        print(f"  ep {ep:3d}  horizon {h:4d}  train {tr_mse:10.5f}  val {v:10.5f}{U2}"
+              f"   (|err| {np.sqrt(v):.4f}{U1} rms)")
         if v < best:
             best = v
             best_state = {k: p.detach().clone() for k, p in sim.fitted.items()}
@@ -218,7 +234,7 @@ def train(run, root=None, device="cpu"):
            "target_variance": float((Y[:n_tr] ** 2).mean()),
            "seconds": round(time.time() - t0, 1)}
     json.dump(rep, open(os.path.join(out, "results", "report.json"), "w"), indent=2)
-    print(f"[done] best val {best:.5f} deg^2 "
+    print(f"[done] best val {best:.5f}{U2} ({np.sqrt(best):.4f}{U1} rms) "
           f"({best / rep['target_variance']:.4f} of target variance) in {rep['seconds']:.0f} s")
     return out
 
@@ -291,18 +307,19 @@ def test(run, root=None, device="cpu"):
     err = (Ypred[:n, :nn_, ch] - Y[:n, :nn_, 0]).cpu().numpy()
     res = {"name": run["name"], "spec": run["spec"], "task": run["task"], "split": split,
            "n_trials": n, "mse": float(np.mean(per)), "mse_per_trial": per,
-           "mae_deg": float(np.abs(err).mean()), "rmse_deg": float(np.sqrt(np.mean(per))),
+           "mae": float(np.abs(err).mean()), "rmse": float(np.sqrt(np.mean(per))),
+           "unit": (run.get("io") or {}).get("unit"),
            "target_variance": var, "normalised_mse": float(np.mean(per)) / var,
            "fitted": {k: {"n": int(v.numel()), "mean": float(v.mean()), "sd": float(v.std())}
                       for k, v in ck["fitted"].items()}}
     p = os.path.join(out, "results", f"{run['name']}_{split}.json")
     json.dump(res, open(p, "w"), indent=2)
     np.save(os.path.join(out, "results", f"{run['name']}_{split}_traces.npy"), np.array(traces))
-    print(f"[test] {split}: mean |err| {res['mae_deg']:.4f} deg   rmse {res['rmse_deg']:.4f} deg "
-          f"  (train_eyeG reports 0.088 deg)")
-    print(f"[test] {split}: {n} trials  mse {res['mse']:.4f} deg^2  "
+    U1, U2 = units(run)
+    print(f"[test] {split}: mean |err| {res['mae']:.4f}{U1}   rmse {res['rmse']:.4f}{U1}")
+    print(f"[test] {split}: {n} trials  mse {res['mse']:.4f}{U2}  "
           f"({res['normalised_mse']:.4f} of target variance)")
-    print(f"[test] per-trial spread {min(per):.3f} .. {max(per):.3f} deg^2")
+    print(f"[test] per-trial spread {min(per):.3f} .. {max(per):.3f}{U2}")
     print(f"[test] wrote {p}")
     return res
 
@@ -408,8 +425,11 @@ def analyse(run, root=None, device="cpu"):
              f"fitted {rep['n_params']} values over {len(ck['fitted'])} block(s):"]
     for k, v in ck["fitted"].items():
         lines.append(f"   {k:16s} n={v.numel():5d}")
-    lines += ["", f"best val    {rep['best_val_mse']:9.4f} deg^2",
-              f"{split} mse     {res.get('mse', float('nan')):9.4f} deg^2",
+    U1, U2 = units(run)
+    lines += ["", f"mean |err|  {res.get('mae', float('nan')):9.4f}{U1}   <- the comparable number",
+              f"rmse        {res.get('rmse', float('nan')):9.4f}{U1}",
+              f"best val    {rep['best_val_mse']:9.4f}{U2}",
+              f"{split} mse     {res.get('mse', float('nan')):9.4f}{U2}",
               f"normalised  {res.get('normalised_mse', float('nan')):9.4f} of target variance",
               f"trained on  {rep['n_trials']} trials, {rep['epochs']} epochs",
               f"            {rep['seconds']:.0f} s"]
@@ -453,15 +473,30 @@ def _circuit_poles(sim, H, ck, slope=None):
     Returns (poles_at_operating_point, poles_at_origin), or None when no recurrent block was
     fitted -- a spec without one has no circuit poles, and inventing some would be worse.
     """
-    rec = next((k for k in ck["fitted"] if "recurrent" in k), None)
+    # THE RECURRENT EDGE SET IS FOUND STRUCTURALLY, not by its name. It is the fitted edge set
+    # whose two endpoints are the SAME set -- that is what "recurrent" means -- and matching the
+    # string instead found nothing on the zebrafish rig, whose recurrent connectome is called
+    # `synapse`. Panel d then came out empty with no complaint, which reads as "this circuit has
+    # no poles" rather than "this analyser could not find them".
+    rec = next((k for k in ck["fitted"]
+                if k.endswith(".w")
+                and (lambda e: e.is_edge_set and e.pre_name == e.post_name)(H.level(k.split(".")[0]))),
+               None)
     if rec is None:
         return None
-    W = ck["fitted"][rec].detach().cpu().numpy()
+    W = ck["fitted"][rec].detach().cpu().numpy().ravel()
     es = H.level(rec.split(".")[0])
-    n = H.level(es.post_name).n
-    M = np.zeros((n, n))
-    M[es.post.cpu().numpy(), es.pre.cpu().numpy()] = W.ravel()
     lvl = H.level(es.post_name)
+    n = lvl.n
+    # UNDER SIGN-LOCK THE EFFECTIVE WEIGHT IS |w| TIMES THE SENDER'S SIGN, so the fitted `w` is
+    # not the matrix the dynamics use. Reading `w` raw would put the poles of a circuit that does
+    # not exist on the plot -- and would do it silently, since both matrices have the same sparsity
+    # and the same magnitudes.
+    sig = dict(zip(H.operator_names, H.operators)).get("neuron_signal")
+    if sig is not None and getattr(sig, "dale", False):
+        W = np.abs(W) * sig._dale_sign(lvl, es).squeeze(-1).detach().cpu().numpy()
+    M = np.zeros((n, n))
+    M[es.post.cpu().numpy(), es.pre.cpu().numpy()] = W
     # THE LEAK AND THE COUPLING GAIN ARE SEPARATE COLUMNS OF `p`, and conflating them is right
     # only by coincidence. `neuron_update` contributes -a v and `neuron_signal` contributes
     # g W tanh(v), so the linearisation at v = 0 is
@@ -475,6 +510,15 @@ def _circuit_poles(sim, H, ck, slope=None):
          else torch.tensor([[1.0, 0.0, 1.0, 0.0, 1.0, 0.0]]).expand(n, 6))
     a = P[:, 0].detach().cpu().numpy()                  # leak, 1/s
     g = P[:, 2].detach().cpu().numpy()                  # coupling gain, dimensionless
+    # A PER-NEURON `tau:` BLOCK OVERRIDES THE TYPE TABLE'S LEAK, exactly as `neuron_update` does
+    # it -- and once tau is FITTED, the table's column 0 is the value the run started from rather
+    # than the one it ended at. On the ctRNN rig the two agreed by coincidence (p[0] = 2.0 =
+    # 1/0.5 s) and on the zebrafish pool they do not (p[0] = 10.0 against a learned tau).
+    upd = dict(zip(H.operator_names, H.operators)).get("neuron_update")
+    tb = getattr(upd, "tau_block", None)
+    if tb is not None and tb in lvl.state_schema:
+        tmin = float(getattr(upd, "tau_min", 1e-4))
+        a = 1.0 / lvl.get(tb)[:, 0].detach().cpu().numpy().clip(min=tmin)
     rho = np.ones(n) if slope is None else np.asarray(slope, float).reshape(n)
     at_op = np.linalg.eigvals(-np.diag(a) + np.diag(g) @ M @ np.diag(rho))
     at_origin = np.linalg.eigvals(-np.diag(a) + np.diag(g) @ M)
