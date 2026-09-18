@@ -310,6 +310,24 @@ def test(run, root=None, device=None):
         P = model(U)
     mse = float(((P - Y) ** 2).mean())
     var = float((Y ** 2).mean())
+    # THE SETTLED SCORE, BESIDE THE FULL ONE AND NOT INSTEAD OF IT. Every rollout starts at v = 0
+    # while the ground truth starts whereever its own law puts it, so the first fraction of a
+    # second is the circuit catching up from rest. For every teacher that is itself a filter
+    # starting from rest this costs nothing -- y(0) = 0 and there is nothing to catch up to -- but
+    # `t0_gain_unity` is an ALL-PASS law, the one law whose output must be nonzero the instant the
+    # input is, and its |y(0)| averages 0.92. There the transient is 226x the settled residual
+    # power and the full-trial score reads 0.0033 where the settled one reads 0.00023, the best in
+    # the battery. Scored in-band the identity map is reproduced to 2 parts in 10,000; the 0.0033
+    # is the scoring window, not the fit.
+    #
+    # BOTH ARE REPORTED because both are true and they answer different questions. "Can this
+    # circuit track the law from rest" is a real property of a leaky continuous-time system -- its
+    # fastest learned tau here is 70 ms -- and dropping the transient would flatter it. "Did it
+    # acquire the law" is what the battery exists to ask, and only the settled number answers it.
+    settle_s = float(run.get("training", {}).get("settle_s", 0.5))
+    k = min(int(round(settle_s / float(ck["dt"]))), Y.shape[1] - 1)
+    mse_settled = float(((P[:, k:] - Y[:, k:]) ** 2).mean())
+    var_settled = float((Y[:, k:] ** 2).mean())
     # per condition cell, because a grid exists to be read per cell
     per_cell = {}
     for c in sorted(set(cond.tolist())):
@@ -344,6 +362,8 @@ def test(run, root=None, device=None):
     res = {"name": run["name"], "task": run["task"], "split": split,
            "n_trials": int(U.shape[0]), "mse": mse, "target_variance": var,
            "normalised_mse": mse / var if var > 0 else None,
+           "settle_s": settle_s, "mse_settled": mse_settled,
+           "normalised_mse_settled": mse_settled / var_settled if var_settled > 0 else None,
            "mse_per_cell": per_cell,
            "teacher_pole_freq_hz": true_f, "n_condition_cells": len(cells),
            "circuit_slowest_pole_freq_hz": got_f,
@@ -356,6 +376,8 @@ def test(run, root=None, device=None):
     json.dump(res, open(p, "w"), indent=2, default=str)
     print(f"[test] {split}: {U.shape[0]} trials  mse {mse:.6f}  "
           f"({res['normalised_mse']:.4f} of target variance)")
+    print(f"[test] settled (after {settle_s:g} s, the start-from-rest transient dropped): "
+          f"{res['normalised_mse_settled']:.5f} of target variance")
     print(f"[test] teacher poles {np.round(true_f, 4)} Hz   "
           f"circuit slowest {np.round(got_f[:4], 4)} Hz")
     if gap is None:
@@ -495,6 +517,8 @@ def plot(run, root=None, device=None, n_show=4):
              f"best val mse   {rep['best_val_mse']:.6f}",
              f"{split} mse       {res.get('mse', float('nan')):.6f}",
              f"normalised     {res.get('normalised_mse', float('nan')):.4f}  of target variance",
+             f"  settled      {res.get('normalised_mse_settled', float('nan')):.5f}  "
+             f"(after {res.get('settle_s', 0.5):g} s from rest)",
              "",
              ] + _wrap_poles("ground-truth poles", res.get("teacher_pole_freq_hz", [])) + [
              f"circuit slowest{np.round(res.get('circuit_slowest_pole_freq_hz', [])[:4], 4).tolist()} Hz",
