@@ -64,6 +64,36 @@ def build(run, device="cpu"):
     return sim
 
 
+def write_drive(H, frame, u, drive_set, drive_block):
+    """Write frame `frame` of the stimulus into the drive set's block. THE ONE RULE, in one place.
+
+    ONE CHANNEL PER SENSORY ELEMENT, not one value broadcast over all of them. A corpus with C
+    channels -- a stimulus plus, for a teacher-varying grid, a one-hot of the condition cell --
+    has to arrive on C DIFFERENT lines or the circuit cannot tell them apart, which is the whole
+    point of sending the context at all. Element i takes channel i; a drive set wider than the
+    corpus leaves its spare lines at whatever they were seeded to, so one spec with a fixed
+    sensory bank serves tasks of several widths.
+
+    `operating_slope` used to carry its own copy of this and kept the broadcast version after
+    `rollout` moved on, so every multi-channel run trained fine and then died in `analyse`.
+    """
+    lvl = H.level(drive_set)
+    a, b = lvl.state_schema[drive_block]
+    t = min(frame, u.shape[-2] - 1)
+    st = lvl.state.clone()
+    C = u.shape[-1]
+    if C == 1:
+        st[..., a:b] = u[..., t, :].unsqueeze(-2).expand(*st.shape[:-1], b - a)
+    else:
+        if lvl.n < C:
+            raise ValueError(
+                f"the corpus has {C} input channels but `{drive_set}` has only {lvl.n} "
+                f"element(s). Give the drive set at least one element per channel -- with a "
+                f"context one-hot the channel count is 1 + the number of condition cells.")
+        st[..., :C, a:a + 1] = u[..., t, :].unsqueeze(-1)
+    lvl.state = st
+
+
 def rollout(sim, u, drive_set, drive_block, read_set, read_block, device="cpu", grad=True):
     """Write the stimulus into a block each frame, return the read-out trace.
 
@@ -78,27 +108,7 @@ def rollout(sim, u, drive_set, drive_block, read_set, read_block, device="cpu", 
     trace = []
 
     def hook(H, frame):
-        lvl = H.level(drive_set)
-        a, b = lvl.state_schema[drive_block]
-        t = min(frame, u.shape[-2] - 1)
-        st = lvl.state.clone()
-        # ONE CHANNEL PER SENSORY ELEMENT, not one value broadcast over all of them. A corpus with
-        # C channels -- a stimulus plus, for a teacher-varying grid, a one-hot of the condition
-        # cell -- has to arrive on C DIFFERENT lines or the circuit cannot tell them apart, which
-        # is the whole point of sending the context at all. Element i takes channel i; a drive set
-        # wider than the corpus leaves its spare lines at whatever they were seeded to, so one
-        # spec with a fixed sensory bank serves tasks of several widths.
-        C = u.shape[-1]
-        if C == 1:
-            st[..., a:b] = u[..., t, :].unsqueeze(-2).expand(*st.shape[:-1], b - a)
-        else:
-            if lvl.n < C:
-                raise ValueError(
-                    f"the corpus has {C} input channels but `{drive_set}` has only {lvl.n} "
-                    f"element(s). Give the drive set at least one element per channel -- with a "
-                    f"context one-hot the channel count is 1 + the number of condition cells.")
-            st[..., :C, a:a + 1] = u[..., t, :].unsqueeze(-1)
-        lvl.state = st
+        write_drive(H, frame, u, drive_set, drive_block)
         trace.append(H.level(read_set).get(read_block)[..., 0, :].clone())
 
     H, _ = engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook, batch=batch)
@@ -125,6 +135,19 @@ def _mse(y, target, ch):
     """
     n = min(y.shape[-2], target.shape[-2])
     return ((y[..., :n, ch] - target[..., :n, 0]) ** 2).mean()
+
+
+def _pole_max(tp) -> str:
+    """The ground truth's slowest pole, or "n/a" when its law has none.
+
+    A STATIC GAIN AND A PURE DELAY HAVE NO POLES. `t0_gain_unity` is y = k u and `t0_delay_100ms`
+    is y(t) = u(t - d): neither is a rational transfer function with a denominator, so
+    `teacher.pt` records an empty pole list for them and `max()` raised. `tasks.trainer` had
+    already learned this and prints "n/a"; this one had only ever been pointed at laws that have
+    poles, so the first task without any killed the whole analyse phase.
+    """
+    pr = list(tp.get("poles_real") or [])
+    return f"{max(pr):+.4f}" if pr else "     n/a"
 
 
 def units(run):
@@ -493,7 +516,7 @@ def analyse(run, root=None, device="cpu"):
         lines += ["", f"|v| at operation {v_typ:.3f}  (rho' = {float(slope.mean()):.3f})",
                   f"max Re(lam)  v=0 {float(max(p.real for p in at_origin)):+.4f}   "
                   f"op {float(max(p.real for p in at_op)):+.4f}   "
-                  f"truth {max(tp['poles_real']):+.4f}  1/s"]
+                  f"truth {_pole_max(tp)}  1/s"]
     axc.text(0.02, 0.95, "\n".join(lines), transform=axc.transAxes, va="top", ha="left",
              color=INK, fontsize=8, family="monospace")
 
@@ -589,11 +612,7 @@ def operating_slope(sim, run, U, device="cpu"):
     vs = []
 
     def hook(H, frame):
-        lvl = H.level(io["drive_set"])
-        a, b = lvl.state_schema[io["drive_block"]]
-        st = lvl.state.clone()
-        st[:, a:b] = U[min(frame, U.shape[0] - 1)].expand(lvl.n, b - a)
-        lvl.state = st
+        write_drive(H, frame, U, io["drive_set"], io["drive_block"])
         vs.append(H.level("neuron").get("voltage").squeeze(-1).clone())
 
     with torch.no_grad():
