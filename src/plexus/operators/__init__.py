@@ -72,6 +72,7 @@ from . import io_ops               # noqa: F401  load_run -- x_0 from a finished
 from . import cell_ops             # noqa: F401  compartment (entity), seed_cell_atlas,
 #                                                 aggregate_centroid, state_diffuse, and the
 #                                                 motility pair: substrate_traction, protrusion
+from . import contractile_ops     # noqa: F401  active_strain, material_from_cell -- a muscle's rest length, per cell
 from . import muscle_ops            # noqa: F401  the reduced oculomotor plant: muscle_gaze_map
 #                                                 (the measured static map g) + eye_mechanics
 #                                                 (the damped body), and the eye/muscle sets

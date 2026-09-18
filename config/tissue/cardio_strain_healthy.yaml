@@ -1,0 +1,88 @@
+general: {name: cardio_strain_healthy, seed: 0, n_frames: 50, dt: 0.002, record_cap: 200, boundary: wall,
+  dim: 2, field_record_cap: 1}
+sets:
+  tissue:
+    n: 1
+    start:
+    - [0.5, 0.5]
+    types:
+      sheet:
+        block: [0.15, 0.15, 0.85, 0.85]
+        fraction: 1.0
+        youngs: 80.0
+  cell:
+    parent: tissue
+    per_parent: 472
+    radius: 0.02
+    grow_reserve: 0
+    types:
+      myocyte: {fraction: 1.0, youngs: 80.0}
+    state:
+      pos: {width: 2, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 2, role: rate, integration: second_order_rate, boundary: free}
+      phi: {width: 1, integration: none, boundary: free, record: false}
+      g: {width: 1, integration: none, boundary: free, record: false}
+      g2: {width: 1, integration: none, boundary: free, record: false}
+      logE: {width: 1, integration: none, boundary: free, record: false}
+      delay: {width: 1, integration: none, boundary: free, record: false}
+      logtau: {width: 1, integration: none, boundary: free, record: false}
+      logtr: {width: 1, integration: none, boundary: free, record: false}
+      logdur: {width: 1, integration: none, boundary: free, record: false}
+      amode: {width: 2, integration: none, boundary: free, record: false}
+      gam_prev: {width: 1, integration: none, boundary: free}
+  mpm_particle: {density: 1.0, parent: cell, per_parent: 120, grow_reserve: 0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  cells: {frame: label_image, source: cardio/cells_2560.tif}
+operators:
+- {op: seed_from_segmentation, at: mpm_particle, from: cells, youngs_min: 80.0, youngs_max: 80.0}
+- {op: material_from_cell, at: mpm_particle, parent: cell, nu: 0.3}
+- {op: active_strain, at: mpm_particle, parent: cell, fit: cardio/healthy_allbeats.npz}
+- {op: drag, at: mpm_particle, k: 150.0, emit: mpm_acceleration}
+- {op: mpm_strain, at: mpm_particle, implementation: differentiable}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, implementation: differentiable}
+- {op: mpm_grid_update, at: mpm_grid, wall_contact: 0.06, wall_damp: 0.5, implementation: differentiable}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_contact: 0.06, wall_damp: 0.5, implementation: differentiable}
+schedule:
+- seed_from_segmentation
+- drag
+- substep_dt: 0.0002
+  compile: false
+  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+- material_from_cell
+- active_strain
+plotting: {renderer: mpl2d, color_field: speed, max_frames: 51, fps: 12}
+seed:
+- {op: seed_state_from_file, at: cell, file: cardio/healthy_allbeats.npz}
+descriptions:
+  movie_cell: {description: 'The video shows a static image of a multi-colored particle system.
+
+      There is no movement or evolution of the particles over time.
+
+      The arrangement of the colored shapes remains constant throughout the sequence.
+
+      The simulation appears to be a single frame repeated multiple times.', objects: 'The scene contains
+      a large number of small, irregularly shaped particles packed into a square area.
+
+      The particles are arranged in a dense, disordered mosaic with no clear geometric pattern.
+
+      The color palette is diverse, including shades of red, blue, green, orange, pink, and grey.
+
+      Each individual particle is roughly the same size, creating a uniform texture across the field.'}
+  movie_mpm_particle: {description: 'The simulation shows a collection of multi-colored particles distributed
+      across a 2D plane. Over time, the particles appear to move and shift slightly, though the overall
+      distribution remains relatively stable. There is no significant change in the global density or
+      the spatial arrangement of the clusters. The video captures a steady-state behavior where the stochastic
+      motion of individual points creates a flickering effect.', objects: 'The scene contains thousands
+      of small, point-like particles of various colors including red, blue, yellow, green, and pink. These
+      particles are arranged in loose, irregular clusters that are scattered throughout the square frame.
+      The particles are not connected to one another, maintaining a discrete and independent topology.
+      Each individual point is uniform in size, creating a dense, speckled texture across the entire field
+      of view.'}
+  movie_tissue: {description: The video shows a static distribution of blue dots on a white background.
+      There is no movement or change in the position of the particles across the four frames. The arrangement
+      remains perfectly consistent from the first frame to the last. The simulation appears to be in a
+      steady state or is a placeholder for a dynamic process., objects: 'The scene contains a large number
+      of small, circular blue dots. These dots are distributed in a roughly square area, appearing to
+      be randomly scattered. They are not connected to each other and maintain a uniform size throughout
+      the sequence. The dots are set against a plain, solid white background.'}
