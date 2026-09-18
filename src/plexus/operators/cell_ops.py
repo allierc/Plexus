@@ -946,6 +946,115 @@ class AggregateCentroid(Aggregate):
 # biological objects have. They exist because the alternative -- `cell_chem_diffuse` -- is welded
 # to a two-species `chem` block (`N_SPECIES = 2`) and to the cell adjacency of a vertex mesh, so
 # there was no way to diffuse ONE scalar over an ordinary `edge_index`.
+@register_operator("seed_state_from_file", family="seed", set="compartment", kind="seed")
+class SeedStateFromFile(Seed):
+    """Fill named state blocks from a `.npz`, once, at x_0 -- `seed_state_random` with a file.
+
+    set -> set: writes the blocks named in `blocks:`, reads nothing.
+
+        state[:, block]  <-  z[array]        one array per block, `[n]` or `[n, width]`
+
+    THIS IS HOW A FITTED MODEL IS RUN AGAIN. A fit writes one number per element per quantity --
+    the cardiomyocyte sheet's 472 cells carry an active strain, a fibre angle, a stiffness and an
+    excitation delay -- and re-running that model means putting those numbers back where the
+    forward pass reads them. There was no way to do it: `edges_file:` loads a RELATION (it defines
+    the set's structure, so it is a set property), `load_run` loads a whole recorded trajectory,
+    and `seed_state_random` draws values rather than reading them. A fitted per-element parameter
+    is none of those three -- it is an initial condition with a provenance.
+
+    NOT SPECIFIC TO ANY DOMAIN, and deliberately so. The values it loads are per-element numbers
+    of a set; that the set's children happen to be material points, or neurons, or nothing at all,
+    is not this operator's business. The cardiac sheet reads them from `cell` and its MPM points
+    reach them through `H.lift_index(child, ancestor)`, which is the language's Broadcast and
+    needs no help from here.
+
+        seed:
+          - op: seed_state_from_file
+            at: cell
+            file: cardio/healthy_allbeats.npz
+            blocks: {phi: phi, g: g, g2: g2, logE: logE}     # block: array in the file
+
+    `blocks:` maps a BLOCK NAME to an ARRAY NAME, because the two are allowed to differ -- a
+    checkpoint calls the fitted leaf `logE` and the spec may call the block `stiffness`. Omit it
+    and every array whose name matches a declared block is loaded, which is the common case.
+
+    A LENGTH MISMATCH IS REFUSED RATHER THAN BROADCAST. A checkpoint fitted on 472 cells loaded
+    into a set of 1,888 (which is what a default `grow_reserve` silently produces for a contained
+    set) would otherwise tile or truncate, and the run would proceed with most cells holding
+    another cell's parameters. That exact confusion cost the cardiac prototype every held-out
+    score it had, 0.83 -> 0.36, and the spec now pins `grow_reserve: 0` because of it.
+
+    Reference: none -- an initial condition, not a mechanism. Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["file"]
+    MECHANISM_TAGS = ["initial_condition", "fitted_parameters", "checkpoint"]
+    PARAM_ROLES = {"file": "npz_of_per_element_arrays", "blocks": "block_name_to_array_name"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "compartment")
+        self.file = str(params["file"])
+        self.blocks = dict(params.get("blocks") or {})
+
+    def _path(self) -> str:
+        from plexus.paths import graphs_data_path
+        if os.path.isabs(self.file) and os.path.isfile(self.file):
+            return self.file
+        p = graphs_data_path(self.file)
+        if not os.path.isfile(p):
+            raise FileNotFoundError(
+                f"seed_state_from_file: {self.file!r} -> {p} does not exist. `file:` resolves "
+                f"through graphs_data_path exactly as `edges_file:` does, or may be absolute.")
+        return p
+
+    def forward(self, H, mask=None):
+        import numpy as np
+        lvl = H.level(self.at)
+        z = np.load(self._path(), allow_pickle=False)
+        declared = {b.name for b in lvl.state_schema.blocks}
+        want = self.blocks or {k: k for k in z.files if k in declared}
+        if not want:
+            raise ValueError(
+                f"seed_state_from_file: none of {sorted(z.files)} names a state block of "
+                f"{lvl.name!r} (it has {sorted(declared)}). Give `blocks: {{<block>: <array>}}` "
+                f"if the checkpoint's names differ from the spec's.")
+        loaded = []
+        for block, array in want.items():
+            if block not in lvl.state_schema:
+                raise ValueError(
+                    f"seed_state_from_file: {lvl.name!r} has no state block {block!r} "
+                    f"(has: {sorted(declared)}). Declare it under `sets.{lvl.name}.state:`.")
+            if array not in z.files:
+                raise ValueError(
+                    f"seed_state_from_file: {self.file} holds no array {array!r} "
+                    f"(has: {sorted(z.files)}).")
+            b0, b1 = lvl.state_schema[block]
+            v = np.asarray(z[array], dtype=np.float32)
+            v = v[:, None] if v.ndim == 1 else v
+            if v.shape[0] != lvl.n:
+                raise ValueError(
+                    f"seed_state_from_file: {array!r} has {v.shape[0]} rows but {lvl.name!r} has "
+                    f"{lvl.n} elements. A fit belongs to the set it was fitted on; loading it "
+                    f"into a set of a different size would give most elements another element's "
+                    f"parameters. If the set is larger than expected, check `grow_reserve:` -- a "
+                    f"contained set is given dormant slots unless the spec pins it to 0.")
+            if v.shape[1] != b1 - b0:
+                raise ValueError(
+                    f"seed_state_from_file: {array!r} is {v.shape[1]} wide but block {block!r} is "
+                    f"{b1 - b0}. Declare `state: {{{block}: {{width: {v.shape[1]}}}}}`.")
+            lvl.state[:, b0:b1] = torch.as_tensor(v, device=lvl.state.device,
+                                                  dtype=lvl.state.dtype)
+            loaded.append(f"{block}({v.shape[1]})" if v.shape[1] > 1 else block)
+        from plexus import engine as _eng
+        if not _eng._QUIET:
+            print(f"[seed_state_from_file] {lvl.name}: {', '.join(sorted(loaded))} "
+                  f"<- {os.path.basename(self._path())} over {lvl.n:,} elements", flush=True)
+        return {}
+
+
 @register_operator("seed_state_random", family="seed", set="compartment", kind="seed")
 class SeedStateRandom(Seed):
     """Fill a named state block with independent uniform noise, once, at x_0.
