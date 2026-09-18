@@ -108,7 +108,8 @@ class ActiveStrain(Lateral):
         "parent": "the_set_carrying_the_per_cell_parameters",
         "fit": "npz_holding_the_shared_clock_and_temporal_modes",
         "clock": "four_numbers_t0_logrise_logdur_logdecay",
-        "period": "frames_between_beats_for_a_repeating_clock",
+        "period": "frames_between_beats_for_an_evenly_spaced_clock",
+        "segments": "frame_offsets_at_which_the_clock_fires_again",
     }
     REFERENCE = ("prototype/cardio_mpm/strain (Plexus, this work): per-cell active strain fitted "
                  "from motion alone on cardiomyocyte sheets.")
@@ -118,6 +119,13 @@ class ActiveStrain(Lateral):
         self.at = params.get("_at", "mpm_particle")
         self.parent = str(params["parent"])
         self.period = params.get("period")
+        # SEGMENTS: the frame offsets at which the clock fires AGAIN, so one continuous rollout
+        # spans several beats without ever being reset. `period:` is the same idea when the beats
+        # are evenly spaced; the recording's are not (50 then 51 frames), and a uniform period
+        # drifts by a frame per beat. They also keep the clock's local time inside the range the
+        # temporal modes were fitted over -- psi has one column per frame OF A BEAT, so indexing
+        # it with an absolute frame would run off the end and clamp.
+        self.segments = list(params.get("segments") or [])
         # THE SHARED CLOCK IS A PARAMETER OF THE MAP, NOT STATE OF A SET, and it is read the same
         # way `muscle_pose_map` reads its 27 quadratic coefficients: from a `fit:` file, or inline.
         # Four numbers and a K x T mode table belong to no element of any set, so there is no
@@ -173,9 +181,14 @@ class ActiveStrain(Lateral):
         tr = tr * self._block(cell, "logtr", n, dev, dt).exp()
         dur = dur * self._block(cell, "logdur", n, dev, dt).exp()
         td = td * self._block(cell, "logtau", n, dev, dt).exp()
-        # A BEAT IS ONE FIRING OF THE CLOCK. `period:` replays it, so a rollout spanning several
-        # beats is one run rather than one run per beat -- the reference's `segments`.
-        t = float(frame) % float(self.period) if self.period else float(frame)
+        # A BEAT IS ONE FIRING OF THE CLOCK, and a rollout spanning several is ONE run rather
+        # than several stitched together: the state carries over, so the drift a real tissue
+        # accumulates across beat boundaries is in the result rather than reset away.
+        t = float(frame)
+        if self.segments:
+            t = t - max([s for s in self.segments if s <= t], default=self.segments[0])
+        elif self.period:
+            t = t % float(self.period)
         t = torch.as_tensor(t, device=dev, dtype=dt)
         # gamma(0) = 0 EXACTLY, even for a delayed cell, by normalising against the cell's own
         # value at t = 0. Without it a delayed cell starts already part-way contracted and the
