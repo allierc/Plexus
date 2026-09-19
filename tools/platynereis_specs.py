@@ -323,6 +323,66 @@ def spec_r2(f: dict, scale: float = 0.55, offset=(0.22, 0.22, 0.74),
     }
 
 
+def spec_r3(f: dict) -> dict:
+    """R3: the connectome, carried as an edge set and drawn over the cells that wear it.
+
+    THE SET IS DECLARED, NOT LOADED BY AN OPERATOR. `edges_file:` on a set with `edge_set: true`
+    is a property of the set: the 4,664 edges arrive with the hierarchy and the `synapse` set's
+    `pre`/`post` legs point into the neuron set, so `neuron_signal` and `readout` can both walk
+    them without anything else being declared.
+
+    ONLY 1,009 OF THE 4,117 CELLS CARRY AN EDGE, and that is a property of the source, not a
+    defect here: the adjacency matrix joins the geometry BY CELL NAME, which only 1,196 cells
+    have. Degree zero means unjoined, not unwired. The wired classes are the interesting ones --
+    98% of motoneurons, 99% of the ciliary band, 89% of interneurons -- so the circuit this rung
+    needs is present even though most of the epidermis is not.
+
+    The cells are drawn small and dim and the synapses bright, because the subject of this rung is
+    the wiring and not the bodies.
+    """
+    um = f["side_um"]
+    return {
+        "general": {
+            "name": "plat_r3_connectome", "seed": 0, "n_frames": 0, "dt": 0.05, "dim": 3,
+            "world": [1.0, 1.0, 1.0], "boundary": "wall", "record_cap": 2,
+            "units": {"length_um": um, "time_s": 1.0},
+        },
+        "sets": {
+            "brain": {"n": 1},
+            "neuron": {"parent": "brain", "per_parent": f["n"], "type_layout": "ordered",
+                       "types": {c: {"count": f["count"][c]} for c in f["order"]}},
+            "synapse": {"parent": "brain", "edge_set": True, "entity": "connection",
+                        "pre": "neuron", "post": "neuron",
+                        "edges_file": f"neural_regions/{REGION}/connectome.npz"},
+        },
+        "seed": [{"op": "neural_seed", "at": "neuron", "region": REGION,
+                  "v0_mean": 0.0, "v0_sd": 0.0}],
+        "operators": [],
+        "schedule": [],
+        "fields": {},
+        "plotting": {
+            "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
+            "dot_shading": True, "max_frames": 1, "stills": 1, "keep_stills": True,
+            "camera_roll": 180.0,
+            "dot_radius": {c: round(0.9 / um, 6) for c in f["order"]},
+            "glyphs_only": True,
+            "colors": dict({c: COLOR[c] for c in f["order"]}, synapse="#f2f2f2"),
+            # `always: true` because a circuit's synapses ARE the picture, not its closing
+            # statement -- the default shows each relation once, over the last few frames.
+            # 0.22 and not 0.55: at 4,664 edges over a 200 um animal the lines saturate into a
+            # white sheet and the cells vanish behind their own wiring. Faint enough that density
+            # reads as density.
+            "graph_overlay": {"sets": ["synapse"], "always": True, "line_width": 1.0,
+                              "opacity": 0.22, "max_edges": 8000},
+            "static_mesh": {
+                "file": f"neural_regions/{REGION}/body_outline.obj",
+                "color": "#aeb6c2", "opacity": 0.10,
+                "to_world": {"origin": f["lo_nm"], "scale": 1.0 / f["side_nm"]},
+            },
+        },
+    }
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -343,7 +403,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -351,6 +411,19 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r3", "all"):
+        import yaml
+        sp = spec_r3(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} {F['n_edges']:,} synapses over {F['n']:,} cells")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R3 -- the connectome: 4,664 measured synapses, carried as an edge set\n"
+                         "# and drawn over the cells that wear them. Direction verified: see\n"
+                         "# tools/platynereis_fix_direction.py and tests/test_platynereis.py.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r2", "all"):
         import yaml
         sp = spec_r2(F)

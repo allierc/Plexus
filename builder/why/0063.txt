@@ -1,0 +1,4 @@
+time   2026-09-19 10:57:46
+spec   plat_r3_connectome
+camera azim=20.0 elev=8.0 zoom=1.45
+why    R3: the connectome. 4,664 measured synapses carried as an edge set --  on a set with , so the wiring arrives with the hierarchy and both neuron_signal and readout can walk it with nothing else declared. The cells are drawn small and dim and the synapses bright because the wiring is the subject here, not the bodies. Only 1,009 of the 4,117 cells carry an edge: the adjacency matrix joins the geometry BY CELL NAME and only 1,196 cells have one, so degree zero means UNJOINED, not unwired. The classes that matter are present -- 98% of motoneurons, 99% of the ciliary band, 89% of interneurons.
