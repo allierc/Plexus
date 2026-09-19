@@ -1,0 +1,4 @@
+time   2026-09-19 11:27:40
+spec   plat_r5_beat
+camera (a figure, not a render)
+why    R5 measured, take two: the stroke sized to a 6% target strain and the cells now following their own material through aggregate_centroid.

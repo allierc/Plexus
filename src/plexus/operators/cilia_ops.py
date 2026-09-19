@@ -1,0 +1,283 @@
+"""The link from a nervous system to a moving thing: a beat whose strength is a cell's own state.
+
+WHAT WAS MISSING. Plexus already had both halves of a ciliomotor animal and nothing joining them.
+On one side `neuron_update` + `neuron_signal` relax a measured connectome and leave every cell
+holding a membrane state. On the other `polar_active_stress` makes a cell's material extend and
+retract along its polarity -- the sign reverses over the cycle, so it is a stroke and not a push
+-- and `active_strain` does the same as a rest-length change. But every one of those mechanical
+operators takes its drive from a CLOCK or from a constant in the spec, never from a state block,
+so a circuit could be wired to an effector and still not move it. Auditing the whole registry and
+/workspace/connectome-gnn turned up no operator, in either, that turns neural activity into a
+mechanical quantity: every biomodel in both repos stops at membrane voltage.
+
+This is that operator, and it is deliberately the smallest thing that closes the gap:
+
+    sigma_act(x_p) = A * g(v_c) * cos(phi_c + offset) * (n_c n_c^T - I/D)
+
+for a material point p belonging to cell c, where
+
+    A          the amplitude in the run's stress units, or `amplitude_frac` of the set's own
+               (lambda + 2 mu) -- the second states a TARGET STRAIN, since the strain a stress of
+               A produces is roughly A / (lambda + 2 mu);
+    v_c        the cell's membrane state, the block named by `drive` -- the same block
+               `neuron_update` integrates and `neuron_signal` writes into;
+    g(v)       the gain, `rectify((v - v0) / v_scale)`, so a silent cell does not beat and a
+               driven one beats in proportion to how hard it is driven;
+    phi_c      the cell's phase, from `phase_clock`, which is what makes neighbouring cells beat
+               out of step instead of in lockstep;
+    n_c        the cell's unit polarity, the direction the stroke runs along;
+    I/D        subtracted when `deviatoric` (the default), making the stress traceless so the
+               cell changes shape at constant volume rather than breathing.
+
+WHY IT IS A MODEL OF `polar_active_stress` AND NOT A NEW NAME. The contract -- read a cell's
+polarity and phase, write a per-particle active stress that `mpm_scatter` adds to the elastic
+Kirchhoff stress -- is unchanged. What changes is where the amplitude comes from. Per plexus2
+that is a new implementation of an existing contract, not a new mechanism, and registering it as
+`model: driven` means a spec can swap a clocked beat for a driven one by editing one word.
+
+WHY THE GAIN IS RECTIFIED. A cilium beats or it does not; it cannot beat by a negative amount.
+Without the rectifier a cell whose membrane state went negative -- which most of this connectome's
+cells do, since it is scaled to spectral radius 0.9 and relaxes below zero -- would beat with its
+stroke reversed, and a band with half its cells stroking backwards transports nothing while
+looking perfectly busy. `rectify: abs` is offered for the case where the sign of the drive is
+meant to be a direction rather than an on/off, and it has to be asked for.
+
+Reference for the mechanics: Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101.
+Reference for the animal: Verasztó, C. et al. (2017). eLife 6:e26000, "Ciliomotor circuitry
+underlying whole-body coordination of ciliary activity in the Platynereis larva"; Verasztó, C.
+et al. (2025). eLife RP97964, the whole-body connectome.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Seed
+from plexus.models.registry import register_operator
+from plexus.operators.cell_ops import PolarActiveStress
+
+_RECTIFY = {
+    "relu": lambda x: torch.clamp(x, min=0.0),
+    "softplus": lambda x: torch.nn.functional.softplus(x),
+    "abs": torch.abs,
+    "identity": lambda x: x,
+}
+
+
+@register_operator("polar_active_stress", model="driven", family="motility", set="particle",
+                   kind="lateral")
+class PolarActiveStressDriven(PolarActiveStress):
+    """`polar_active_stress`, with its amplitude taken from a state block instead of the spec.
+
+    particle -[containment]-> particle: reads its cell's `polarity`, `phase` and `drive` block;
+    writes the per-particle active stress `mpm_scatter` consumes. Everything about the stroke --
+    deviatoric, sign-reversing over the cycle, transmitted as a divergence rather than applied
+    pointwise -- is the parent operator's and unchanged.
+
+    The one addition is `g(v) = rectify((v - v0) / v_scale)` multiplying the amplitude, with `v`
+    the cell's own membrane state. A cell below `v0` is silent. `v_scale` is the membrane state
+    at which the cell beats at the declared amplitude, so it is the number that says how hard the
+    circuit has to work to produce a full stroke, and it belongs in the spec where it can be read.
+    """
+
+    READS = ["polarity", "phase", "drive"]
+    MECHANISM_TAGS = ["active_stress", "cilia", "ciliary_beat", "neuromuscular",
+                      "excitation_contraction_coupling"]
+    PARAM_ROLES = dict(PolarActiveStress.PARAM_ROLES,
+                       drive="the_cells_membrane_state_block",
+                       drive_set="the_set_that_carries_the_membrane_state",
+                       v0="membrane_state_below_which_the_cell_is_silent",
+                       v_scale="membrane_state_giving_a_full_stroke",
+                       rectify="relu_softplus_abs_or_identity",
+                       gain_max="ceiling_on_the_gain")
+    REFERENCE = ("Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; "
+                 "Veraszto, C. et al. (2017). eLife 6:e26000.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.drive = str(params.get("drive", "voltage"))
+        # THE DRIVE MAY LIVE ON A DIFFERENT SET FROM THE POLARITY, and usually must.
+        #
+        # `voltage` IS the coordinate of a neuron -- the neuron entity declares it
+        # `role="coordinate"` and `pos` as `integration: none`, so the engine integrates the
+        # membrane state and leaves the position alone. A body's coordinate is `pos`. One set
+        # cannot have two coordinates, so a cell that is both a neuron and a lump of matter is
+        # two sets joined by containment, not one set with more blocks: declaring `voltage` by
+        # hand beside an integrated `pos` produced a voltage that stayed at exactly 0.0000 for
+        # 600 frames while every operator ran and nothing complained.
+        #
+        # `drive_set` names the set the membrane state lives on. It must be the polarity set or
+        # one of its children with exactly one child per parent -- the containment map is what
+        # says which neuron belongs to which cell.
+        self.drive_set = str(params.get("drive_set", self.cell_set))
+        self.v0 = float(params.get("v0", 0.0))
+        self.v_scale = float(params.get("v_scale", 1.0))
+        if self.v_scale == 0.0:
+            raise ValueError("polar_active_stress[driven]: `v_scale` is the membrane state that "
+                             "gives a full stroke and cannot be 0")
+        self.rectify = str(params.get("rectify", "relu")).lower()
+        if self.rectify not in _RECTIFY:
+            raise ValueError(f"polar_active_stress[driven]: `rectify` must be one of "
+                             f"{sorted(_RECTIFY)}, got {self.rectify!r}")
+        # A CEILING, because the drive is not bounded. `neuron_update`'s state is a real number,
+        # and a cell that runs away would ask for an unbounded stress -- which in MLS-MPM is not a
+        # big deformation, it is a velocity that breaks the Courant condition and a run that ends
+        # in NaN several hundred frames after the actual fault.
+        self.gain_max = float(params.get("gain_max", 4.0))
+
+    def _drive_per_cell(self, H, cl, dtype, device):
+        """The membrane state of each CELL, gathered from whichever set carries it. [n_cells]."""
+        dl = H.level(self.drive_set)
+        if self.drive not in dl.state_schema:
+            raise KeyError(
+                f"polar_active_stress[driven]: the set {dl.name!r} has no block {self.drive!r}. "
+                f"This operator's whole purpose is to read the circuit's output, so the set it "
+                f"points at must declare the block `neuron_update` integrates. Blocks present: "
+                f"{sorted(dl.state_schema)}.")
+        d0, d1 = dl.state_schema[self.drive]
+        v = dl.state[:, d0:d1][:, 0].to(device=device, dtype=dtype)
+        if dl.name == cl.name:
+            return v
+        # A CHILD SET CARRIES IT: invert the containment map. `lift_index` gives each driver its
+        # cell; scattering the drivers back by that index gives each cell its driver. With one
+        # driver per cell the scatter is a permutation and nothing is averaged away; with more
+        # than one the LAST wins, which is why the spec is required to declare `per_parent: 1`.
+        up = H.lift_index(dl.name, cl.name)
+        out = torch.zeros(cl.n, device=device, dtype=dtype)
+        out[up] = v
+        return out
+
+    def gain(self, H, cl, idx, dtype, device):
+        """g(v) per material point: its cell's membrane state, shifted, scaled, rectified, capped."""
+        v = self._drive_per_cell(H, cl, dtype, device)
+        g = _RECTIFY[self.rectify]((v - self.v0) / self.v_scale)
+        return g.clamp(max=self.gain_max)[idx]
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        D = X.shape[1]
+        cl = H.level(self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        q0, q1 = cl.state_schema[self.phase_block]
+        idx = H.lift_index(p.name, self.cell_set)
+        n = cl.state[:, b0:b1][:, :D][idx]
+        # A CELL WITH NO POLARITY HAS NO STROKE AXIS, SO IT DOES NOT STROKE.
+        #
+        # This is how a spec says WHICH cells beat, and it needs no mask on this operator: seed
+        # `polarity` on the ciliary band alone -- `at: 'cell[type=ciliary band]'` -- and every
+        # other cell keeps the zero the entity provisioned it with. Normalising that zero, which
+        # the parent operator does unconditionally, turns it into whatever
+        # `clamp_min(1e-12)` leaves behind and gives 4,000 interior cells an arbitrary stroke
+        # direction at full amplitude. Here a zero-length polarity zeroes the gain instead.
+        nrm = n.norm(dim=1, keepdim=True)
+        has_axis = (nrm[:, 0] > 1e-9).to(X.dtype)
+        n = n / nrm.clamp_min(1e-12)
+        ph = cl.state[:, q0:q1][:, 0][idx]
+        A = (torch.as_tensor(float(self.amplitude), device=X.device, dtype=X.dtype)
+             if self.amplitude is not None
+             else float(self.frac) * (p.la + 2.0 * p.mu))
+        g = A * has_axis * self.gain(H, cl, idx, X.dtype, X.device) * torch.cos(ph + self.offset)
+        if mask is not None:
+            g = g * mask.float()
+        M = n[:, :, None] * n[:, None, :]
+        if self.deviatoric:
+            M = M - torch.eye(D, device=X.device, dtype=X.dtype)[None] / float(D)
+        sig = g[:, None, None] * M
+        # ALLOCATED ONCE AND WRITTEN IN PLACE, for the parent operator's reason: the substep is
+        # captured as a CUDA graph, which bakes in the addresses it saw, so a fresh tensor per
+        # tick would leave the replay reading the one from the tick it was captured on.
+        buf = getattr(p, "act_stress", None)
+        if buf is None or buf.shape != sig.shape:
+            p.register_buffer("act_stress", torch.zeros_like(sig))
+            buf = p.act_stress
+        buf.copy_(sig)
+        return {}
+
+
+@register_operator("radial_polarity", family="seed", set="cell", kind="seed")
+class RadialPolarity(Seed):
+    """Point every cell's polarity away from the body's own axis: the direction a cilium beats in.
+
+    cell -> cell: writes `polarity`, once, at the opening of the trajectory.
+
+    A ciliary band is a GIRDLE. Its cells sit on the surface of the animal and their cilia project
+    outward, so the stroke axis of a band cell is its own outward radial direction and not a
+    single direction shared by the band -- the prototroch is a ring, and a ring of cells all
+    stroking the same way would push the animal sideways rather than drive it forward.
+
+    `axis` names the body axis the radius is measured from (2, the animal's head-to-tail z, for
+    Platynereis), so the direction written is the in-plane outward normal of the cylinder about
+    that axis:
+
+        n_i = (r_i - c_r) / |r_i - c_r|    with r_i the cell's position with the `axis`
+                                           component removed and c_r the centroid of the set,
+                                           likewise flattened
+
+    `centre` overrides that centroid when the set is not the whole animal -- a band alone has its
+    own centroid, which is on the band, not on the body's axis, and using it would point every
+    cell at its neighbours instead of outward.
+
+    A cell exactly on the axis has no radial direction; it is given `fallback` rather than a
+    normalised zero, because a zero polarity silently disables the stroke of that cell.
+    """
+
+    EMIT = None
+    INPUTS = ["cell"]
+    OUTPUTS = ["cell"]
+    READS = []
+    WRITES = ["polarity"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True          # a seed writes the state buffer
+    MECHANISM_TAGS = ["initial_condition", "polarity", "cilia", "anatomy"]
+    PARAM_ROLES = {"axis": "body_axis_the_radius_is_measured_from",
+                   "centre": "the_axis_position_in_world_units",
+                   "fallback": "direction_for_a_cell_on_the_axis"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.axis = int(params.get("axis", 2))
+        self.centre = params.get("centre")
+        self.fallback = [float(v) for v in (params.get("fallback") or [1.0, 0.0, 0.0])]
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if "polarity" not in lvl.state_schema:
+            raise KeyError(
+                f"radial_polarity: the set {lvl.name!r} has no `polarity` block to write. "
+                f"Declare `state: {{polarity: {{width: 3, integration: none, boundary: free}}}}`.")
+        X = lvl.get("pos")
+        D = X.shape[1]
+        flat = X.clone()
+        flat[:, self.axis] = 0.0
+        if self.centre is not None:
+            c = torch.as_tensor([float(v) for v in self.centre], device=X.device, dtype=X.dtype)
+            c = c.clone()
+            c[self.axis] = 0.0
+        else:
+            c = flat.mean(0)
+        r = flat - c[None, :]
+        nrm = r.norm(dim=1, keepdim=True)
+        fb = torch.as_tensor(self.fallback[:D], device=X.device, dtype=X.dtype)
+        fb = fb / fb.norm().clamp_min(1e-12)
+        n = torch.where(nrm > 1e-9, r / nrm.clamp_min(1e-12), fb[None, :].expand_as(r))
+        b0, b1 = lvl.state_schema["polarity"]
+        st = lvl.state.clone()                        # clone-and-reassign: autograd-safe
+        # THE MASK IS THE WHOLE POINT, so it is honoured rather than ignored. `at: 'cell[type=
+        # ciliary band]'` means polarise the band and NOTHING ELSE: the cells left alone keep the
+        # zero they were provisioned with, and `polar_active_stress[driven]` reads a zero-length
+        # polarity as "no stroke axis, therefore no stroke". Written the other way -- polarise
+        # everything, then mask the stress -- every interior cell would carry a stroke direction
+        # waiting for a drive, which is a different model wearing the same spec.
+        if mask is not None:
+            m = mask.to(torch.bool).to(st.device)
+            st[:, b0:b1] = torch.where(m[:, None], n[:, :b1 - b0], st[:, b0:b1])
+            k = int(m.sum())
+        else:
+            st[:, b0:b1] = n[:, :b1 - b0]
+            k = lvl.n
+        lvl.state = st
+        print(f"[radial_polarity] {lvl.name}: {k:,} of {lvl.n:,} cells pointed outward from axis "
+              f"{self.axis} at {[round(float(v), 4) for v in c.tolist()]}", flush=True)
+        return {}

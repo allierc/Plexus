@@ -308,6 +308,15 @@ def spec_r2(f: dict, scale: float = 0.55, offset=(0.22, 0.22, 0.74),
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.6, "wall_friction": 0.4},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
              "vmax": 1.0e9, "implementation": "warp"},
+            # THE CELL'S POSITION IS ITS MATERIAL'S CENTRE OF MASS, and without this the cell set
+            # never moves at all. The MPM moves the material POINTS; a parent's `pos` is only its
+            # seed position unless something aggregates it, so the first take measured the cells'
+            # radial excursion as exactly 0.0000 um for all 4,117 while their particles were
+            # travelling tens of micrometres. It also matters for the run and not only for the
+            # measurement: `radial_polarity` is a seed, but anything later that reads a cell's
+            # position -- a neighbour relation, a field sample, a second animal -- would be
+            # reading frame 0 forever.
+            {"op": "aggregate_centroid", "at": "cell", "child": "mpm_particle"},
         ],
         "schedule": ["gravity", {"substep_dt": 1.0e-3,
                                  "steps": ["mpm_strain", "mpm_scatter", "mpm_grid_update",
@@ -469,6 +478,165 @@ def spec_r4(f: dict, n_frames: int = 600, dt: float = 0.05) -> dict:
     }
 
 
+def spec_r5(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08),
+            per_cell: int = 24, soma_um: float = 1.9, n_frames: int = 600) -> dict:
+    """R5: the motor pathway -- the circuit's own output makes the ciliary band beat.
+
+    THE PATHWAY IS ALREADY IN THE DATA. The connectome carries 255 motoneuron-to-ciliary-band
+    edges, including the single MC cell contacting all 23 prototroch cells across 340 synapses,
+    so the ciliary cells' membrane state IS the motor command -- R4 measured them as the loudest
+    class in the animal at |v| 0.58, because they are the network's sink. No junction had to be
+    invented and no edge file written: `neuron_signal` already delivers it.
+
+    WHAT WAS MISSING was the last step, and it was missing from both repositories: no operator
+    anywhere turned a membrane state into a mechanical quantity. `polar_active_stress[driven]`
+    (src/plexus/operators/cilia_ops.py) is that step -- the existing beat with its amplitude read
+    from the cell's own `voltage` block instead of from a constant in the spec.
+
+    WHAT THIS RUNG DOES NOT CLAIM. A cilium is a slender appendage projecting from the cell, and
+    that is not what is modelled here: the ciliary-band CELLS themselves extend and retract along
+    their own outward radius. It is the coarsest possible reading of a ciliary stroke and it is
+    the right first one, because it makes the whole chain -- connectome, membrane law, synaptic
+    law, phase, polarity, active stress, MLS-MPM -- run end to end and be measured. The slender
+    appendage comes after the chain is known to work.
+
+    THE STROKE AXIS is each band cell's own outward radial direction about the animal's head-tail
+    axis, written once by `radial_polarity` and ONLY on the ciliary band: every other cell keeps
+    the zero polarity it was provisioned with, and a cell with no stroke axis does not stroke.
+    A ring of cells all stroking the same way would push the animal sideways; a ring stroking
+    outward is a girdle.
+    """
+    um = f["side_um"]
+    r = soma_um / um
+    pm = 1050.0 * (4.0 / 3.0) * math.pi * r ** 3 / per_cell
+    start = positions(f, scale, list(offset))
+    types = {c: {"count": f["count"][c], "shape": "ball", "material": "elastic",
+                 "youngs": MATERIAL[c][0], "density": MATERIAL[c][1],
+                 "p": P_CLASS.get(c, P_NEURON)} for c in f["order"]}
+    return {
+        "general": {
+            "name": "plat_r5_beat", "seed": 0, "n_frames": n_frames, "dt": 0.05, "dim": 3,
+            "world": [1.0, 1.0, 1.0], "boundary": "wall", "save_data": True,
+            "record_cap": n_frames + 1, "units": {"length_um": um, "time_s": 1.0},
+        },
+        "sets": {
+            # A ROOT FOR THE EDGE SET TO HANG FROM. `cell` is parentless because its 4,117
+            # positions are declared outright, and an edge set still needs a parent -- `parent:
+            # null` is refused, which is right: every set belongs somewhere in the containment map.
+            "brain": {"n": 1},
+            # THE BODY. `pos` is its coordinate and the material points hang off it.
+            "cell": {
+                "n": f["n"], "start": start, "type_layout": "ordered", "types": types,
+                "state": {
+                    "pos": {"width": 3, "role": "coordinate",
+                            "integration": "second_order_coordinate", "boundary": "world"},
+                    "vel": {"width": 3, "role": "rate", "integration": "second_order_rate",
+                            "boundary": "free"},
+                    "phase": {"width": 1, "integration": "first_order", "boundary": "free"},
+                    "polarity": {"width": 3, "integration": "none", "boundary": "free",
+                                 "record": False},
+                },
+            },
+            # THE NEURON, ONE PER CELL, AND IT IS A SEPARATE SET FOR A REASON THAT IS NOT
+            # BOOKKEEPING. `voltage` IS a neuron's coordinate -- the neuron entity declares it
+            # `role: coordinate` and `pos` as `integration: none`, so the engine integrates the
+            # membrane state and leaves the position alone. A body's coordinate is `pos`. One set
+            # cannot have two, and declaring `voltage` by hand beside an integrated `pos`
+            # produced a membrane state that sat at exactly 0.0000 for 600 frames while every
+            # operator ran and nothing complained. Containment joins them: neuron i lives in cell
+            # i, `per_parent: 1`, and `polar_active_stress[driven]` reads the drive across it.
+            # ONE TYPE, AND THAT IS A REAL LOSS, STATED. A child set's type counts are PER
+            # PARENT, so a set with `per_parent: 1` can carry exactly one type and the 18 classes
+            # cannot be spelled here. The alternative was a flat neuron set beside the cells,
+            # corresponding to them BY ROW INDEX and nothing else -- an undeclared correspondence
+            # that would break silently the first time either set was reordered. Containment is
+            # the correspondence the language has for this, so it is the one used, and the
+            # per-class parameter vectors go. They were never fitted: R4's 18 classes differed
+            # only where this file chose to make them differ, so what is lost is a guess.
+            "neuron": {"parent": "cell", "per_parent": 1, "entity": "neuron",
+                       "types": {"cell": {"fraction": 1.0, "p": P_NEURON}}},
+            "synapse": {"parent": "brain", "edge_set": True, "entity": "connection",
+                        "pre": "neuron", "post": "neuron",
+                        "edges_file": f"neural_regions/{REGION}/connectome.npz"},
+            "mpm_particle": {"parent": "cell", "per_parent": per_cell, "density": 1050.0,
+                             "radius": round(r, 6), "particle_mass": float(f"{pm:.4g}")},
+        },
+        "seed": [
+            {"op": "radial_polarity", "at": "cell[type=ciliary band]", "axis": 2,
+             "centre": [0.5, 0.5, 0.0]},
+            {"op": "seed_state_random", "at": "cell", "block": "phase", "lo": 0.0, "hi": 6.2832},
+            # v = 0 IS A FIXED POINT OF THE WHOLE SYSTEM, so a population seeded exactly there
+            # sits at it and the circuit is a picture of nothing.
+            {"op": "seed_state_random", "at": "neuron", "block": "voltage", "lo": -0.5, "hi": 0.5},
+        ],
+        "operators": [
+            {"op": "neuron_update", "at": "neuron", "model": "leaky_tanh", "noise": 0.01},
+            {"op": "neuron_signal", "at": "neuron", "model": "type_pairwise",
+             "edge_set": "synapse", "activation": "tanh"},
+            # THE BEAT'S OWN CLOCK. Each cell carries its own angle and its own rate, so the band
+            # does not beat in lockstep -- `jitter` is the spread of rates, and a girdle whose
+            # cells are all exactly in phase pumps once and then fights itself.
+            {"op": "phase_clock", "at": "cell", "block": "phase", "omega": 3.0, "jitter": 0.12,
+             "seed": 7},
+            {"op": "polar_active_stress", "at": "mpm_particle", "model": "driven",
+             "cell_set": "cell", "block": "polarity", "phase_block": "phase",
+             "drive_set": "neuron", "drive": "voltage",
+             # THE STROKE'S SIZE, AND IT IS SMALL ON PURPOSE. `amplitude_frac` states a TARGET
+             # STRAIN: the strain a stress of A produces is roughly A / (lambda + 2 mu), so 0.06
+             # is a cell reaching 6% of its own length. The first take asked for 0.30 and the
+             # gain multiplied it -- the band's measured drive of 0.95 against `v_scale` 0.45
+             # gives 1.8 -- so the real request was a strain over 50%, and band particles ended
+             # up displaced 41 um on average with one reaching 307 um, further than the animal
+             # is long. `v_scale` is raised to 0.95, the drive the band actually reaches, so a
+             # fully driven band cell asks for exactly `amplitude_frac` and not a multiple of it.
+             "v0": 0.15, "v_scale": 0.95, "rectify": "relu", "gain_max": 1.5,
+             "amplitude_frac": 0.06, "deviatoric": True},
+            # AN ANCHOR, BECAUSE THIS ANIMAL HAS NO ADHESION AND NO MATRIX. Its 4,117 cells are
+            # separate elastic balls coupled only through contact on the shared grid, and R2
+            # already measured what that costs: landing on a floor squashed the body to 55% of
+            # its height while each cell kept 97% of its own radius. With gravity off there is
+            # nothing at all holding it, and the first take of this rung dispersed the whole
+            # animal until it filled the 196 um box on every axis within 150 frames.
+            #
+            # The spring is a SCAFFOLD standing in for the cell-cell adhesion and extracellular
+            # matrix the model does not yet have, and it is named as one rather than tuned until
+            # the picture looks right. k = 400 per second squared gives a restoring time of
+            # 1/sqrt(k) = 50 ms, short against the beat's own 2 s period, so the body is held
+            # while the stroke is not.
+            {"op": "mpm_anchor", "at": "mpm_particle", "k": 400.0},
+            {"op": "mpm_strain", "at": "mpm_particle", "implementation": "warp"},
+            {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+            {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.9, "wall_friction": 0.3},
+            {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
+            # THE CELL'S POSITION IS ITS MATERIAL'S CENTRE OF MASS, and without this the cell set
+            # never moves at all. The MPM moves the material POINTS; a parent's `pos` is only its
+            # seed position unless something aggregates it, so the first take measured the cells'
+            # radial excursion as exactly 0.0000 um for all 4,117 while their particles were
+            # travelling tens of micrometres. It also matters for the run and not only for the
+            # measurement: `radial_polarity` is a seed, but anything later that reads a cell's
+            # position -- a neighbour relation, a field sample, a second animal -- would be
+            # reading frame 0 forever.
+            {"op": "aggregate_centroid", "at": "cell", "child": "mpm_particle"},
+        ],
+        # NO GRAVITY. R2 established that the animal falls; this rung is about whether the circuit
+        # moves it, and a body that is also falling makes the two impossible to tell apart.
+        "schedule": ["neuron_update", "neuron_signal", "phase_clock",
+                     {"substep_dt": 0.005,
+                      "steps": ["polar_active_stress", "mpm_anchor", "mpm_strain", "mpm_scatter",
+                                "mpm_grid_update", "mpm_gather"]},
+                     "aggregate_centroid"],
+        "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
+        "plotting": {
+            "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
+            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
+            "camera_roll": 180.0, "dot_size": 2.5,
+            "colors": {c: COLOR[c] for c in f["order"]},
+        },
+    }
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -489,7 +657,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -497,6 +665,21 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r5", "all"):
+        import yaml
+        sp = spec_r5(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} {F['count']['ciliary band']} band cells beating, "
+              f"driven through {F['n_edges']:,} synapses")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R5 -- the motor pathway: the connectome's own output makes the\n"
+                         "# ciliary band beat. The 255 motoneuron-to-ciliary-band edges are\n"
+                         "# already in the data; the missing step was an operator that turns a\n"
+                         "# membrane state into a stress, which is polar_active_stress[driven].\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r4", "all"):
         import yaml
         sp = spec_r4(F)

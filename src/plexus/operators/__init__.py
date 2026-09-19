@@ -80,6 +80,9 @@ from . import relation_ops          # noqa: F401  project -- one set's state acr
 #                                                 onto another set's block (W_in, W_out, and
 #                                                 circuit -> circuit are all this one operator)
 from . import neuron_ops            # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
+from . import cilia_ops             # noqa: F401  polar_active_stress[driven] -- a beat whose
+#                                                 amplitude is the cell's own membrane state, and
+#                                                 radial_polarity -- the direction a cilium beats
 from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
                                     #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
 #                                                 (psi: shared | type_pre | type_pairwise),
@@ -94,4 +97,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "cilia_ops", "continuous_engine"]

@@ -34,7 +34,14 @@ from plexus.models import registry
 from plexus.models.base import KINDS, EMITS
 from plexus.models.state import INTEGRATIONS
 
-_SELECTOR_RE = re.compile(r"^(?P<set>\w+)(?:\[(?P<attr>\w+)=(?P<val>\w+)\])?$")
+# THE VALUE MAY BE ANY LABEL, NOT JUST AN IDENTIFIER. `\w+` on the value meant a selector could
+# only name a type whose name happened to be a Python identifier, and a type name is a LABEL: the
+# Platynereis cell classes are `ciliary band`, `macrophage-like`, `Sensory neuron` -- the
+# compendium's own words -- and `at: 'cell[type=ciliary band]'` was rejected as a bad selector.
+# The alternative was renaming the animal's anatomy to suit a regex. Anything up to the closing
+# bracket, stripped, so `[type= ciliary band ]` also means what it looks like. The SET and the
+# ATTRIBUTE stay identifiers, because those are names in the spec's own namespace.
+_SELECTOR_RE = re.compile(r"^(?P<set>\w+)(?:\[(?P<attr>\w+)=(?P<val>[^\]]+)\])?$")
 
 
 @dataclass
@@ -49,7 +56,8 @@ class Selector:
         m = _SELECTOR_RE.match(str(s).strip())
         if not m:
             raise ValueError(f"bad selector {s!r} (expected 'set' or 'set[attr=val]')")
-        return cls(m["set"], m["attr"], m["val"])
+        v = m["val"]
+        return cls(m["set"], m["attr"], v.strip() if v is not None else None)
 
 
 @dataclass

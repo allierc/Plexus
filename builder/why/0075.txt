@@ -1,0 +1,4 @@
+time   2026-09-19 11:22:44
+spec   plat_r5_beat
+camera (a figure, not a render)
+why    R5 measured: did the ciliary band beat? The excursion is each cell's displacement projected on its OWN outward radius -- the axis the stroke acts along -- not its speed, because speed also counts being carried by neighbours. The control is every cell of every other class: same law, same noise, same material, same grid, no polarity, so no stroke axis and nothing from the operator under test.

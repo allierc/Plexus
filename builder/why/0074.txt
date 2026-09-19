@@ -1,0 +1,5 @@
+time   2026-09-19 11:21:58
+spec   plat_r5_beat
+camera azim=20.0 elev=8.0 zoom=1.3
+movie  mp4/0074.mp4  (59.3 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r5_beat/movie.mp4)
+why    R5: the motor pathway end to end, with the sets split as the language requires. The connectome already carries 255 motoneuron-to-ciliary-band edges including the MC cell onto all 23 prototroch cells, so the band's membrane state IS the motor command. polar_active_stress[driven] turns it into a stress -- the missing step in both repos. The neuron is now its own set inside each cell, because voltage IS a neuron's coordinate and pos is a body's, and one set cannot have two: declaring voltage by hand beside an integrated pos gave 0.0000 for 600 frames with no complaint. An mpm_anchor of k 400 per second squared stands in for the adhesion and matrix the model does not have; without it the animal dispersed to fill the whole box in 150 frames. (after the run)
