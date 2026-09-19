@@ -710,6 +710,126 @@ def spec_r6(f: dict, n_water: int = 140000, n_frames: int = 600) -> dict:
     return base
 
 
+def spec_r7(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08), per_cell: int = 24,
+            soma_um: float = 1.9, n_frames: int = 900, period: float = 8.0) -> dict:
+    """R7: the rhythm comes from the NEURONS, because this connectome cannot make one itself.
+
+    WHAT THE SPECTRUM SAID, measured in tools/platynereis_spectrum.py and not guessed. Every one
+    of the 4,664 weights is a synapse COUNT and therefore non-negative, and by Perron-Frobenius a
+    non-negative matrix has its spectral radius as a REAL eigenvalue. So the first mode to go
+    unstable as the gain rises is real: the network LATCHES, every cell saturating together
+    against the tanh, and no gain produces a beat. Measured: leading eigenvalue +0.900, real; the
+    leading complex pair at 0.294 +- 0.072i needs gain 3.40, reached 2.9x later. Putting Dale
+    signs back on half the interneurons does not rescue it either -- the leading mode stays real
+    and the complex pair is still reached 1.8x late.
+
+    SO THE RHYTHM IS PUT WHERE THE ANIMAL KEEPS IT. Verasztó et al. (2017), eLife 6:e26000: the
+    single cholinergic MC cell fires periodically and ARRESTS the prototroch, while serotonergic
+    Ser-h1 drives beating; the larva's ciliary closures come from cells that oscillate, not from
+    a network that does. `neuron_pacemaker` gives the motoneuron pool an intrinsic rhythm and the
+    measured connectome carries it: the question this rung answers is whether the BAND's drive
+    then oscillates at the pool's frequency, which is a claim about the wiring and not about the
+    pacemaker.
+
+    TWO TIMESCALES, AND THAT IS THE BIOLOGY. A cilium beats fast and the ciliomotor circuit gates
+    it slowly -- closures every several seconds over a beat of tens of hertz. So `phase_clock`
+    keeps the fast stroke and the circuit supplies the slow envelope, which is what
+    `polar_active_stress[driven]` reading the band's voltage already means.
+
+    THE CONNECTOME IS THE SIGNED ONE. `connectome_dale.npz`, written by the same tool: the MC
+    cell inhibitory on the paper's evidence, 30% of the other interneurons inhibitory as a STATED
+    ASSUMPTION rather than a measurement. Without any inhibition the pacemaker's rhythm arrives
+    at the band rectified into a constant.
+    """
+    um = f["side_um"]
+    r = soma_um / um
+    pm = 1050.0 * (4.0 / 3.0) * math.pi * r ** 3 / per_cell
+    start = positions(f, scale, list(offset))
+    types = {c: {"count": f["count"][c], "shape": "ball", "material": "elastic",
+                 "youngs": MATERIAL[c][0], "density": MATERIAL[c][1]} for c in f["order"]}
+    return {
+        "general": {
+            "name": "plat_r7_rhythm", "seed": 0, "n_frames": n_frames, "dt": 0.05, "dim": 3,
+            "world": [1.0, 1.0, 1.0], "boundary": "wall", "save_data": True,
+            "record_cap": n_frames + 1, "units": {"length_um": um, "time_s": 1.0},
+        },
+        "sets": {
+            "brain": {"n": 1},
+            "cell": {
+                "n": f["n"], "start": start, "type_layout": "ordered", "types": types,
+                "state": {
+                    "pos": {"width": 3, "role": "coordinate",
+                            "integration": "second_order_coordinate", "boundary": "world"},
+                    "vel": {"width": 3, "role": "rate", "integration": "second_order_rate",
+                            "boundary": "free"},
+                    "phase": {"width": 1, "integration": "first_order", "boundary": "free"},
+                    "polarity": {"width": 3, "integration": "none", "boundary": "free",
+                                 "record": False},
+                },
+            },
+            # THE NEURONS FLAT, BESIDE THE CELLS RATHER THAN INSIDE THEM, and that is forced: a
+            # child set's type counts are PER PARENT, so a `per_parent: 1` neuron set carries
+            # exactly one type and this rung has to name a class -- the pacemaker goes to the
+            # motoneurons and not to the other 3,993 cells. Flat, the 18 classes can be declared.
+            # The two sets then correspond by ROW, which is true of this dataset by construction
+            # (both are built from the same region in the same order) and is checked at run time:
+            # `polar_active_stress[driven]` refuses a `drive_set` of a different length.
+            "neuron": {"parent": "brain", "per_parent": f["n"], "type_layout": "ordered",
+                       "types": {c: {"count": f["count"][c], "p": P_CLASS.get(c, P_NEURON)}
+                                 for c in f["order"]}},
+            "synapse": {"parent": "brain", "edge_set": True, "entity": "connection",
+                        "pre": "neuron", "post": "neuron",
+                        "edges_file": f"neural_regions/{REGION}/connectome_dale.npz"},
+            "mpm_particle": {"parent": "cell", "per_parent": per_cell, "density": 1050.0,
+                             "radius": round(r, 6), "particle_mass": float(f"{pm:.4g}")},
+        },
+        "seed": [
+            {"op": "neural_seed", "at": "neuron", "region": REGION, "v0_mean": 0.0, "v0_sd": 0.3,
+             "scale": scale, "offset": list(offset)},
+            {"op": "radial_polarity", "at": "cell[type=ciliary band]", "axis": 2,
+             "centre": [0.5, 0.5, 0.0]},
+            {"op": "seed_state_random", "at": "cell", "block": "phase", "lo": 0.0, "hi": 6.2832},
+        ],
+        "operators": [
+            # THE RHYTHM, IN THE POOL THAT HAS ONE. `jitter` spreads the periods by 8%, because a
+            # pool of identical pacemakers is one pacemaker with a louder voice -- they never
+            # drift apart and nothing downstream can tell a population from a single cell.
+            {"op": "neuron_pacemaker", "at": "neuron[type=Motoneuron]", "period": period,
+             "amplitude": 1.2, "waveform": "sine", "jitter": 0.08},
+            {"op": "neuron_update", "at": "neuron", "model": "leaky_tanh", "noise": 0.01},
+            {"op": "neuron_signal", "at": "neuron", "model": "type_pairwise",
+             "edge_set": "synapse", "activation": "tanh"},
+            {"op": "phase_clock", "at": "cell", "block": "phase", "omega": 3.0, "jitter": 0.12,
+             "seed": 7},
+            {"op": "polar_active_stress", "at": "mpm_particle", "model": "driven",
+             "cell_set": "cell", "block": "polarity", "phase_block": "phase",
+             "drive_set": "neuron", "drive": "voltage",
+             "v0": 0.05, "v_scale": 0.60, "rectify": "relu", "gain_max": 2.0,
+             "amplitude_frac": 0.10, "deviatoric": True},
+            {"op": "mpm_anchor", "at": "mpm_particle", "k": 400.0},
+            {"op": "mpm_strain", "at": "mpm_particle", "implementation": "warp"},
+            {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+            {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.9, "wall_friction": 0.3},
+            {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
+            {"op": "aggregate_centroid", "at": "cell", "child": "mpm_particle"},
+        ],
+        "schedule": ["neuron_pacemaker", "neuron_update", "neuron_signal", "phase_clock",
+                     {"substep_dt": 0.005,
+                      "steps": ["polar_active_stress", "mpm_anchor", "mpm_strain", "mpm_scatter",
+                                "mpm_grid_update", "mpm_gather"]},
+                     "aggregate_centroid"],
+        "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
+        "plotting": {
+            "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
+            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
+            "camera_roll": 180.0, "dot_size": 2.5, "subject": "mpm_particle",
+            "colors": {c: COLOR[c] for c in f["order"]},
+        },
+    }
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -730,7 +850,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -738,6 +858,22 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r7", "all"):
+        import yaml
+        sp = spec_r7(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} {F['count']['Motoneuron']} pacemakers -> "
+              f"{F['count']['ciliary band']} band cells, over a signed connectome")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R7 -- the rhythm comes from the neurons. This connectome cannot make\n"
+                         "# one itself: every weight is a non-negative synapse count, so by\n"
+                         "# Perron-Frobenius its leading mode is REAL and rising gain makes it\n"
+                         "# latch, never beat. The animal keeps its rhythm in cells that have\n"
+                         "# one (Veraszto et al. 2017, eLife 6:e26000).\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r6", "all"):
         import yaml
         sp = spec_r6(F)

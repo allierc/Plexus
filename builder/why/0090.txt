@@ -1,0 +1,4 @@
+time   2026-09-19 11:57:02
+spec   plat_r7_rhythm
+camera azim=20.0 elev=8.0 zoom=1.3
+why    R7: the rhythm comes from the neurons, because this connectome cannot make one itself. Measured, not guessed: every one of the 4,664 weights is a non-negative synapse count, and by Perron-Frobenius a non-negative matrix has its spectral radius as a REAL eigenvalue -- so the first mode to destabilise as the gain rises is real and the network LATCHES, never beats. Leading eigenvalue +0.900 real; the leading complex pair at 0.294 +- 0.072i needs gain 3.40, reached 2.9x later. Dale signs on half the interneurons do not rescue it. So the rhythm is put where the animal keeps it: neuron_pacemaker gives the 124 motoneurons an intrinsic 8 s cycle with 8% period jitter, and the question is whether the measured connectome carries it to the band. (before the run)

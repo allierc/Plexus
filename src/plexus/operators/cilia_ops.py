@@ -49,9 +49,11 @@ et al. (2025). eLife RP97964, the whole-body connectome.
 """
 from __future__ import annotations
 
+import math
+
 import torch
 
-from plexus.models.base import Seed
+from plexus.models.base import Lateral, Seed
 from plexus.models.registry import register_operator
 from plexus.operators.cell_ops import PolarActiveStress
 
@@ -105,9 +107,10 @@ class PolarActiveStressDriven(PolarActiveStress):
         # hand beside an integrated `pos` produced a voltage that stayed at exactly 0.0000 for
         # 600 frames while every operator ran and nothing complained.
         #
-        # `drive_set` names the set the membrane state lives on. It must be the polarity set or
-        # one of its children with exactly one child per parent -- the containment map is what
-        # says which neuron belongs to which cell.
+        # `drive_set` names the set the membrane state lives on. Preferably the polarity set or
+        # one of its children with exactly one child per parent, so the containment map says which
+        # neuron belongs to which cell; failing that, a set of the same length in the same row
+        # order, which is checked rather than trusted (see `_drive_per_cell`).
         self.drive_set = str(params.get("drive_set", self.cell_set))
         self.v0 = float(params.get("v0", 0.0))
         self.v_scale = float(params.get("v_scale", 1.0))
@@ -141,10 +144,36 @@ class PolarActiveStressDriven(PolarActiveStress):
         # cell; scattering the drivers back by that index gives each cell its driver. With one
         # driver per cell the scatter is a permutation and nothing is averaged away; with more
         # than one the LAST wins, which is why the spec is required to declare `per_parent: 1`.
-        up = H.lift_index(dl.name, cl.name)
-        out = torch.zeros(cl.n, device=device, dtype=dtype)
-        out[up] = v
-        return out
+        try:
+            up = H.lift_index(dl.name, cl.name)
+        except Exception:                                            # noqa: BLE001
+            up = None
+        if up is not None:
+            out = torch.zeros(cl.n, device=device, dtype=dtype)
+            out[up] = v
+            return out
+        # NO CONTAINMENT: FALL BACK TO ROW ORDER, AND CHECK IT RATHER THAN TRUST IT.
+        #
+        # This is the weaker of the two bindings and is offered because the stronger one cannot
+        # always be had: a child set's type counts are PER PARENT, so a `per_parent: 1` neuron set
+        # carries exactly ONE type and a spec that needs to name cell classes -- to drive the MC
+        # cell and not the other 4,116 -- has to declare the neuron set flat, beside the cells
+        # rather than inside them. Then the only thing relating them is that row i of one is row i
+        # of the other, which is true of this dataset by construction and is exactly the kind of
+        # correspondence that breaks silently.
+        #
+        # So it is asserted. A length mismatch is refused with the reason, not broadcast or
+        # truncated: two sets of different size have no row correspondence at all, and quietly
+        # using the first `n` of the longer one would drive the wrong cells while every picture
+        # still rendered.
+        if dl.n != cl.n:
+            raise ValueError(
+                f"polar_active_stress[driven]: `drive_set` {dl.name!r} holds {dl.n:,} elements "
+                f"and `cell_set` {cl.name!r} holds {cl.n:,}, and they are not joined by "
+                f"containment -- so there is no correspondence between them. Either parent one "
+                f"to the other with `per_parent: 1`, or declare both with the same count in the "
+                f"same row order.")
+        return v
 
     def gain(self, H, cl, idx, dtype, device):
         """g(v) per material point: its cell's membrane state, shifted, scaled, rectified, capped."""
@@ -281,3 +310,100 @@ class RadialPolarity(Seed):
         print(f"[radial_polarity] {lvl.name}: {k:,} of {lvl.n:,} cells pointed outward from axis "
               f"{self.axis} at {[round(float(v), 4) for v in c.tolist()]}", flush=True)
         return {}
+
+
+@register_operator("neuron_pacemaker", family="signalling", set="neuron", kind="lateral")
+class NeuronPacemaker(Lateral):
+    """An INTRINSIC rhythm in the cells it is applied to: a current that rises and falls on its own.
+
+    neuron -> neuron: emits dx/dt += amplitude * s(t) + offset, with
+
+        s(t) = sin(2 pi t / period + phase)                  waveform: sine
+        s(t) = sin(...) clamped at 0, i.e. a half-wave       waveform: burst
+        s(t) = 1 while (t mod period) < duty * period        waveform: square
+
+    and t the run's own time, `frame * dt`.
+
+    WHY THIS EXISTS WHEN `pacemaker` AND `activation_pulse` ALREADY DO. `field_ops.pacemaker`
+    publishes ONE scalar per tick to `H.signals`, which is the right object for a tissue that
+    beats together and cannot say WHICH cells are rhythmic. `activation_pulse` paints a spatial
+    field and `neuron_drive` samples it, which works but makes the rhythm a property of a REGION
+    OF SPACE -- so two interdigitated populations cannot have different rhythms, and a pacemaker
+    that is one cell has to be addressed by where it happens to sit. Neither says the thing this
+    says: this POPULATION oscillates, and which population is the `at:` selector's business, as
+    for every operator in the library.
+
+    THE ANIMAL IT WAS WRITTEN FOR. The Platynereis ciliomotor circuit is not a network that
+    oscillates -- measured on its own connectome, its leading eigenvalue is REAL at +0.900 and
+    every one of its 4,664 weights is a non-negative synapse count, so by Perron-Frobenius the
+    first mode to destabilise as the gain rises can only latch, never beat, and putting Dale
+    signs back on half the interneurons does not change that. Its rhythm comes from cells that
+    have one: Verasztó et al. (2017), eLife 6:e26000, describe the single cholinergic MC cell
+    firing periodically to arrest the prototroch while serotonergic Ser-h1 drives beating. A
+    pacemaker is an intrinsic property of a cell, and this is how a spec says so.
+
+    The current is added to the derivative, exactly as `neuron_drive` adds an afferent one, so a
+    pacemaker cell is still subject to its own leak, its own self-coupling and everything the
+    connectome delivers to it. It is a drive, not a clamp.
+    """
+
+    EMIT = "velocity"
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = []
+    WRITES = ["voltage"]
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["period"]
+    MECHANISM_TAGS = ["pacemaker", "intrinsic_rhythm", "central_pattern_generator", "cilia"]
+    PARAM_ROLES = {"period": "seconds_per_cycle", "amplitude": "peak_injected_current",
+                   "phase": "radians_of_offset", "waveform": "sine_burst_or_square",
+                   "duty": "fraction_of_the_cycle_a_square_is_on",
+                   "jitter": "spread_of_period_across_the_population"}
+    REFERENCE = "Veraszto, C. et al. (2017). eLife 6:e26000."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        self.period = float(params["period"])
+        if self.period <= 0:
+            raise ValueError(f"neuron_pacemaker: `period` is seconds per cycle and must be > 0, "
+                             f"got {self.period}")
+        self.amplitude = float(params.get("amplitude", 1.0))
+        self.phase = float(params.get("phase", 0.0))
+        self.offset = float(params.get("offset", 0.0))
+        self.waveform = str(params.get("waveform", "sine")).lower()
+        if self.waveform not in ("sine", "burst", "square"):
+            raise ValueError(f"neuron_pacemaker: `waveform` must be sine, burst or square, "
+                             f"got {self.waveform!r}")
+        self.duty = float(params.get("duty", 0.5))
+        # A SPREAD OF PERIODS ACROSS THE POPULATION, because a pool of identical pacemakers is one
+        # pacemaker with a louder voice: they never drift apart, so the circuit downstream cannot
+        # tell a population from a single cell. Zero by default, so a spec that wants them
+        # identical says nothing and gets that.
+        self.jitter = float(params.get("jitter", 0.0))
+        self._w = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        dev = lvl.state.device
+        dt = lvl.state.dtype
+        t = float(getattr(H, "frame", 0)) * float(getattr(H, "dt", 1.0))
+        if self.jitter and self._w is None:
+            g = torch.Generator(device="cpu")
+            g.manual_seed(int(getattr(H, "seed", 0)) + 977)
+            self._w = (1.0 + self.jitter * (2.0 * torch.rand(lvl.n, generator=g) - 1.0)).to(
+                device=dev, dtype=dt)
+        per = self.period / self._w if self._w is not None else self.period
+        u = 2.0 * math.pi * t / per + self.phase
+        u = u if torch.is_tensor(u) else torch.full((lvl.n,), u, device=dev, dtype=dt)
+        if self.waveform == "sine":
+            s = torch.sin(u)
+        elif self.waveform == "burst":
+            s = torch.sin(u).clamp(min=0.0)
+        else:
+            s = ((u / (2.0 * math.pi)) % 1.0 < self.duty).to(dt)
+        dx = (self.amplitude * s + self.offset)[:, None] * lvl.occ[:, None]
+        if mask is not None:
+            dx = dx * mask[:, None].to(dx.dtype)
+        return {self.at: dx}

@@ -1,0 +1,4 @@
+time   2026-09-19 11:59:49
+spec   plat_r7_rhythm
+camera (a figure, not a render)
+why    R7 measured: did the connectome CARRY the rhythm? The pacemakers oscillating is not a result -- they were told to. The result is whether the ciliary band, 255 synapses downstream, carries the same line, and whether it beats the negative control: 3,108 cells with no edges at all, running the same membrane law with the same noise and no input, whose share of power in that line is what this measurement reads off pure noise.
