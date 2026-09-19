@@ -1,0 +1,4 @@
+time   2026-09-19 12:41:09
+spec   plat_r11_swim
+camera azim=20.0 elev=8.0 zoom=1.15
+why    R11: the free animal in water -- the first run in which swimming is even possible. Every earlier water run pinned every material point to where it started with an mpm_anchor, so the only thing that could ever have been measured was local stirring, and that is why R6 through R9 found four stroke designs indistinguishable. R10 removed the anchor by making the cells actually fill the animal at 4.0 um, and it held 100.0 percent of its extent over 600 unanchored frames. Now: does a tangential metachronal stroke, gated by a rhythm carried through the measured connectome, move the body? (before the run)

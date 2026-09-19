@@ -980,6 +980,50 @@ def spec_r10(f: dict, soma_um: float = 4.0, per_cell: int = 48, n_frames: int = 
     return base
 
 
+def spec_r11(f: dict, n_water: int = 120000, n_frames: int = 900) -> dict:
+    """R11: the free animal in water -- the first run in which swimming is even possible.
+
+    R10 took the anchor out: with its cells filling it at 4.0 um the animal holds its own shape,
+    100.0% of its extent over 600 unanchored frames. Every earlier water run pinned every
+    material point to where it started, so the only thing that could ever have been measured was
+    local stirring. This one can move.
+
+    THE MEASUREMENT CHANGES WITH IT. `tools/platynereis_flow.py` scores water by distance from
+    the band, which is the right question for a stirrer; for a swimmer the question is where the
+    ANIMAL went, and `tools/platynereis_swim.py` asks that -- the displacement of the body's own
+    centre of mass, against the three things that would fake it (the pool's initial pressure
+    equilibration, a drift shared with the water, and the walls).
+    """
+    base = spec_r10(f, n_frames=n_frames)
+    base["general"]["name"] = "plat_r11_swim"
+    base["sets"]["water"] = {"n": 1, "start": [[0.5, 0.5, 0.5]],
+                             "types": {"seawater": {"count": 1, "material": "liquid",
+                                                    "bulk_modulus": 20000.0, "density": 1025.0,
+                                                    "eta": 0.001,
+                                                    "block": [0.02, 0.02, 0.02,
+                                                              0.98, 0.98, 0.98]}}}
+    base["sets"]["water_particle"] = {"parent": "water", "per_parent": n_water,
+                                      "entity": "mpm_particle", "density": 1025.0, "radius": 0.5}
+    base["operators"] += [
+        {"op": "mpm_strain", "at": "water_particle", "implementation": "warp"},
+        {"op": "mpm_viscosity", "at": "water_particle", "eta": 0.001},
+        {"op": "mpm_scatter", "at": "water_particle", "to": "mpm_grid", "drag": 0.0,
+         "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+        {"op": "mpm_gather", "at": "water_particle", "from": "mpm_grid", "wall_damp": 0.9,
+         "vmax": 1.0e9, "implementation": "warp"},
+    ]
+    base["schedule"] = [
+        "neuron_pacemaker", "neuron_update", "neuron_signal", "phase_clock",
+        {"substep_dt": 0.005,
+         "steps": ["polar_active_stress", "mpm_strain", "mpm_strain", "mpm_viscosity",
+                   "mpm_scatter", "mpm_scatter", "mpm_grid_update", "mpm_gather", "mpm_gather"]},
+        "aggregate_centroid",
+    ]
+    base["plotting"]["colors"]["seawater"] = "#1b3f6b"
+    base["plotting"]["subject"] = "mpm_particle"
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -1000,7 +1044,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1008,6 +1052,20 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r11", "all"):
+        import yaml
+        sp = spec_r11(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} the FREE animal in water -- swimming is "
+              f"possible for the first time")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R11 -- the free animal in water. Every earlier water run pinned every\n"
+                         "# material point to where it started, so only local stirring could be\n"
+                         "# measured. R10 removed the anchor; this one can move.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r10", "all"):
         import yaml
         sp = spec_r10(F)

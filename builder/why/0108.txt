@@ -1,0 +1,4 @@
+time   2026-09-19 12:50:41
+spec   plat_r11_swim
+camera (a figure, not a render)
+why    R11 measured: did the free animal swim? Every earlier water run pinned every material point, so only local stirring was ever measurable; R10 removed the anchor by making the cells fill the body. Three controls: the pool's settling pulse is excluded by measuring from a settled frame and reported separately; the body's motion is given BOTH in the box and relative to the water's own centre of mass, because a swimmer moves relative to its fluid; and the net displacement is reported against the PATH LENGTH, because a noise-driven random walk accumulates displacement too.
