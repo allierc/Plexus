@@ -869,6 +869,68 @@ def spec_r7w(f: dict, n_water: int = 140000, n_frames: int = 900) -> dict:
     return base
 
 
+def spec_r8(f: dict, wavenumber: float = 6.0, n_water: int = 140000,
+            n_frames: int = 900) -> dict:
+    """R8: a metachronal wave, and whether a non-reciprocal band transports fluid.
+
+    THE TEST THIS RUNG IS. R6 and R7 are the two controls and they are already run: a clocked
+    band beating in random phase moved water 0.049 um at its peak, and gating that band with a
+    neural rhythm made its cells move 5.7x FURTHER while moving the water 2.3x LESS. Neither is
+    swimming, and the reason is the stroke's SHAPE: `polar_active_stress` extends and retracts
+    along one axis, which is reciprocal, and a reciprocal stroke moves no fluid at low Reynolds
+    number whatever its amplitude (Purcell 1977).
+
+    The only thing changed here is WHERE EACH CELL STARTS IN THE CYCLE. `metachronal_phase`
+    replaces the random `phase_clock` seed with a phase that winds `wavenumber` times around the
+    girdle, so at any instant one arc is extending while the arc behind it retracts and the band
+    carries a travelling deformation. The individual stroke is as reciprocal as it ever was; the
+    BAND is not. If the measured transport rises against R6 and R7, the difference is metachrony
+    and nothing else -- same animal, same pool, same drive, same amplitude, same coupling.
+
+    `phase_clock` still runs, because the wave has to travel: the seed sets the phase OFFSETS and
+    the clock advances them all together at omega.
+    """
+    base = spec_r7w(f, n_water=n_water, n_frames=n_frames)
+    base["general"]["name"] = "plat_r8_metachronal"
+    # The seed order matters: the wave is written after the random phase, so it replaces it on
+    # the band and leaves every other cell's phase alone.
+    base["seed"] = [s for s in base["seed"]] + [
+        {"op": "metachronal_phase", "at": "cell[type=ciliary band]",
+         "wavenumber": wavenumber, "axis": 2, "centre": [0.5, 0.5, 0.0]},
+    ]
+    return base
+
+
+def spec_r9(f: dict, wavenumber: float = 6.0, n_water: int = 140000,
+            n_frames: int = 900) -> dict:
+    """R9: a TANGENTIAL stroke under the metachronal wave -- the direction a cilium sweeps.
+
+    THREE CONTROLS ARE ALREADY RUN AND ALL THREE FAILED TO SWIM.
+
+      R6  random phase, clocked drive, radial stroke    peak 0.049 um, reach 31.1 um
+      R7  random phase, rhythm-gated, radial stroke     peak 0.021 um, reach 25.7 um
+      R8  METACHRONAL wave,            radial stroke    peak 0.020 um, reach 25.7 um
+
+    R8 is the informative one: adding the wave changed nothing at all. A radial stroke extends
+    and retracts along the same outward line, so every cell pushes fluid out and pulls it
+    straight back, and winding the phase around the girdle changes only WHEN each cell pushes --
+    never in which direction. Metachrony cannot rescue a stroke pointed the wrong way.
+
+    A ciliary power stroke does not point outward, it SWEEPS along the surface. `direction:
+    tangential` sets each band cell's stroke axis to the cross product of the body axis with its
+    own outward radius, which is tangent to the girdle; a travelling wave of tangential strokes
+    then carries fluid around the ring the way a peristaltic wave carries it down a tube. This is
+    the one change from R8: the same animal, the same pool, the same rhythm, the same wavenumber,
+    the same amplitude.
+    """
+    base = spec_r8(f, wavenumber=wavenumber, n_water=n_water, n_frames=n_frames)
+    base["general"]["name"] = "plat_r9_tangential"
+    for op in base["seed"]:
+        if op.get("op") == "radial_polarity":
+            op["direction"] = "tangential"
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -889,7 +951,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -897,6 +959,35 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r9", "all"):
+        import yaml
+        sp = spec_r9(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} a TANGENTIAL stroke under the same wave")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R9 -- the stroke sweeps along the surface instead of pointing out of\n"
+                         "# it. R8 showed that a metachronal wave over a RADIAL stroke changes\n"
+                         "# nothing: winding the phase changes when each cell pushes, never which\n"
+                         "# way. One change from R8, and three controls already run.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
+    if a.rung in ("r8", "all"):
+        import yaml
+        sp = spec_r8(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} a metachronal wave on the band, "
+              f"against R6 and R7 as controls")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R8 -- a metachronal wave. R6 and R7 showed that a bigger stroke moves\n"
+                         "# LESS water, because the stroke is reciprocal and a reciprocal stroke\n"
+                         "# transports nothing at low Reynolds number. The only change here is\n"
+                         "# where each band cell starts in the cycle.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r7w", "all"):
         import yaml
         sp = spec_r7w(F)

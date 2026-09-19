@@ -225,7 +225,7 @@ class PolarActiveStressDriven(PolarActiveStress):
 
 @register_operator("radial_polarity", family="seed", set="cell", kind="seed")
 class RadialPolarity(Seed):
-    """Point every cell's polarity away from the body's own axis: the direction a cilium beats in.
+    """Write each cell's stroke axis from the body's own geometry: radial, tangential or axial.
 
     cell -> cell: writes `polarity`, once, at the opening of the trajectory.
 
@@ -261,6 +261,7 @@ class RadialPolarity(Seed):
     MECHANISM_TAGS = ["initial_condition", "polarity", "cilia", "anatomy"]
     PARAM_ROLES = {"axis": "body_axis_the_radius_is_measured_from",
                    "centre": "the_axis_position_in_world_units",
+                   "direction": "radial_tangential_or_axial",
                    "fallback": "direction_for_a_cell_on_the_axis"}
 
     def __init__(self, params, device="cpu"):
@@ -268,6 +269,24 @@ class RadialPolarity(Seed):
         self.at = params.get("_at", "cell")
         self.axis = int(params.get("axis", 2))
         self.centre = params.get("centre")
+        # WHICH WAY THE STROKE RUNS, AND IT IS THE WHOLE MODEL.
+        #
+        #   radial      outward from the body axis -- the direction a cilium POINTS
+        #   tangential  around the girdle, perpendicular to both the radius and the body axis --
+        #               the direction a cilium SWEEPS
+        #   axial       along the body axis
+        #
+        # `radial` was the only option and it was the wrong default, measured: a radial stroke
+        # extends and retracts along the same outward line, so every cell pushes fluid out and
+        # pulls it straight back, and a metachronal wave over it changes only WHEN each cell
+        # pushes, never in which direction. R8 ran exactly that and moved the water 0.0198 um
+        # against R7's 0.0214 -- no difference at all. A real ciliary power stroke sweeps ALONG
+        # the surface, which is `tangential`, and a travelling wave of tangential strokes carries
+        # fluid around the girdle the way a peristaltic wave carries it down a tube.
+        self.direction = str(params.get("direction", "radial")).lower()
+        if self.direction not in ("radial", "tangential", "axial"):
+            raise ValueError(f"radial_polarity: `direction` must be radial, tangential or axial, "
+                             f"got {self.direction!r}")
         self.fallback = [float(v) for v in (params.get("fallback") or [1.0, 0.0, 0.0])]
 
     def forward(self, H, mask=None):
@@ -291,6 +310,18 @@ class RadialPolarity(Seed):
         fb = torch.as_tensor(self.fallback[:D], device=X.device, dtype=X.dtype)
         fb = fb / fb.norm().clamp_min(1e-12)
         n = torch.where(nrm > 1e-9, r / nrm.clamp_min(1e-12), fb[None, :].expand_as(r))
+        if self.direction != "radial":
+            e = torch.zeros(D, device=X.device, dtype=X.dtype)
+            e[self.axis] = 1.0
+            if self.direction == "axial":
+                n = e[None, :].expand_as(n).clone()
+            else:
+                # AROUND THE GIRDLE: the cross product of the body axis with the outward radius is
+                # tangent to the circle about that axis, and unit already since both are unit and
+                # perpendicular. A cell on the axis has no radius and so no tangent either; it
+                # keeps the fallback, which `has_axis` in the stress operator then ignores.
+                n = torch.cross(e[None, :].expand_as(n), n, dim=1)
+                n = n / n.norm(dim=1, keepdim=True).clamp_min(1e-12)
         b0, b1 = lvl.state_schema["polarity"]
         st = lvl.state.clone()                        # clone-and-reassign: autograd-safe
         # THE MASK IS THE WHOLE POINT, so it is honoured rather than ignored. `at: 'cell[type=
@@ -307,8 +338,9 @@ class RadialPolarity(Seed):
             st[:, b0:b1] = n[:, :b1 - b0]
             k = lvl.n
         lvl.state = st
-        print(f"[radial_polarity] {lvl.name}: {k:,} of {lvl.n:,} cells pointed outward from axis "
-              f"{self.axis} at {[round(float(v), 4) for v in c.tolist()]}", flush=True)
+        print(f"[radial_polarity] {lvl.name}: {k:,} of {lvl.n:,} cells pointed "
+              f"{self.direction} about axis {self.axis} at "
+              f"{[round(float(v), 4) for v in c.tolist()]}", flush=True)
         return {}
 
 
@@ -407,3 +439,94 @@ class NeuronPacemaker(Lateral):
         if mask is not None:
             dx = dx * mask[:, None].to(dx.dtype)
         return {self.at: dx}
+
+
+@register_operator("metachronal_phase", family="seed", set="cell", kind="seed")
+class MetachronalPhase(Seed):
+    """Set each band cell's phase from where it sits AROUND the band: a travelling wave, not a mob.
+
+    cell -> cell: writes `phase`, once, at the opening of the trajectory.
+
+        phi_i = k * theta_i + phi_0,     theta_i the cell's azimuth about the body axis
+
+    with `k` the wavenumber -- how many full cycles of phase fit around one turn of the girdle --
+    and the sign of `k` the direction the wave travels.
+
+    WHY A WAVE AND NOT A CLOCK. `phase_clock` gives every cell its own angle drawn at random, so
+    a band beats as a crowd: the strokes cancel and what survives is the stroke's own shape. And
+    the shape is the problem. `polar_active_stress` varies as cos(phi) along a fixed axis -- it
+    extends and then retracts along the SAME line -- which is a reciprocal stroke, and a
+    reciprocal stroke moves no fluid at low Reynolds number whatever its amplitude. That is
+    Purcell's scallop theorem, and it was measured here: gating the stroke with a neural rhythm
+    made the band's excursion 5.7x larger and the water it moved 2.3x SMALLER.
+    
+    A metachronal wave breaks the symmetry a different way. The individual stroke is still
+    reciprocal, but the BAND is not: at any instant one arc of the girdle is extending while the
+    arc behind it is retracting, so the surface carries a travelling deformation and fluid is
+    pushed along it. This is what a real prototroch does, and it is why ciliary bands beat in
+    metachrony rather than in unison.
+
+    THE AZIMUTH IS TAKEN ABOUT THE BODY AXIS, not about the band's own centroid, and `centre`
+    must name a point on that axis. A ciliary girdle is a ring around the animal; measured from
+    its own centre of mass the azimuth of a ring is still the right angle, but measured from
+    anywhere else it is not, and a band that is a partial arc -- which the metatroch and the
+    paratrochs are -- has a centroid well off the axis.
+
+    Reference for the animal: Verasztó, C. et al. (2017). eLife 6:e26000. For the physics:
+    Purcell, E. M. (1977). Am. J. Phys. 45:3-11, "Life at low Reynolds number".
+    """
+
+    EMIT = None
+    INPUTS = ["cell"]
+    OUTPUTS = ["cell"]
+    READS = []
+    WRITES = ["phase"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["wavenumber"]
+    MECHANISM_TAGS = ["initial_condition", "cilia", "metachronal_wave", "phase"]
+    PARAM_ROLES = {"wavenumber": "cycles_of_phase_per_turn_of_the_band",
+                   "axis": "body_axis_the_azimuth_is_measured_about",
+                   "centre": "a_point_on_that_axis", "phase0": "radians_of_offset",
+                   "block": "the_phase_state_block"}
+    REFERENCE = ("Veraszto, C. et al. (2017). eLife 6:e26000; "
+                 "Purcell, E. M. (1977). Am. J. Phys. 45:3-11.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.k = float(params["wavenumber"])
+        self.axis = int(params.get("axis", 2))
+        self.centre = params.get("centre")
+        self.phase0 = float(params.get("phase0", 0.0))
+        self.block = str(params.get("block", "phase"))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if self.block not in lvl.state_schema:
+            raise KeyError(f"metachronal_phase: the set {lvl.name!r} has no block "
+                           f"{self.block!r}. Blocks present: {sorted(lvl.state_schema)}.")
+        X = lvl.get("pos")
+        h = [i for i in range(X.shape[1]) if i != self.axis]
+        if self.centre is not None:
+            c = torch.as_tensor([float(v) for v in self.centre], device=X.device, dtype=X.dtype)
+            c = c[h]
+        else:
+            c = X[:, h].mean(0)
+        r = X[:, h] - c[None, :]
+        theta = torch.atan2(r[:, 1], r[:, 0])
+        ph = self.k * theta + self.phase0
+        b0, b1 = lvl.state_schema[self.block]
+        st = lvl.state.clone()
+        if mask is not None:
+            m = mask.to(torch.bool).to(st.device)
+            st[:, b0:b1] = torch.where(m[:, None], ph[:, None].to(st.dtype), st[:, b0:b1])
+            n = int(m.sum())
+        else:
+            st[:, b0:b1] = ph[:, None].to(st.dtype)
+            n = lvl.n
+        lvl.state = st
+        print(f"[metachronal_phase] {lvl.name}: {n:,} cells phased as a wave of "
+              f"{self.k:g} cycles per turn about axis {self.axis}", flush=True)
+        return {}

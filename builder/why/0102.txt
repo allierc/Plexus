@@ -1,0 +1,4 @@
+time   2026-09-19 12:34:24
+spec   plat_r9_tangential
+camera (a figure, not a render)
+why    R9 measured: a TANGENTIAL stroke under the same metachronal wave. Three controls already run and all failed to transport -- R6 radial+clocked peak 0.049 um, R7 radial+rhythm 0.021, R8 radial+wave 0.020. The one change here is the stroke AXIS: each band cell's stroke is now the cross product of the body axis with its own outward radius, which is the direction a real ciliary power stroke sweeps.
