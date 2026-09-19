@@ -1,0 +1,4 @@
+time   2026-09-19 09:43:12
+spec   platynereis_a1_body
+camera azim=35.0 elev=12.0 zoom=1.3
+why    A1: the animal's body alone. One elastic MPM body filled from the shape library's platynereis_body mesh (5,559 vertices, the larva's outline), 60,000 particles, Young's modulus 2 MPa and density 1050 kg/m3 -- seawater-ish tissue. Nothing inside it yet and nothing moving: this is the silhouette the rest of the animal gets built into.

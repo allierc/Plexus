@@ -776,9 +776,55 @@ class MorphologySeed(Seed):
         u[over], v[over] = 1.0 - u[over], 1.0 - v[over]
         return a[k] + (b[k] - a[k]) * u[:, None] + (c[k] - a[k]) * v[:, None]
 
-    def _points_for(self, path, n, rng):
+    def _pack(self, root):
+        """The region's skeletons as ONE binary file, built on first use and reused after.
+
+        WHY. `_swc` parses a text file per cell, and a region of 4,000 traced cells is 3.2 million
+        numbers in 4,000 files: 18 s per seed, measured, and paid again on every BUILD. It is not
+        the parser -- `np.fromstring` measured the same 18 s -- it is parsing text at all. The
+        `.swc` files stay, because they are the interchange format and what a person inspects;
+        this is a cache beside them, rebuilt whenever it is older than the directory.
+
+            xyz [N,3] float32, rad [N] float32, par [N] int32, off [C+1] int64
+
+        `off` is indexed by the row order of `morphology_index.json`'s keys, so cell k owns
+        rows off[k]:off[k+1]; `ids` records which body id each slot is, because a region whose
+        body ids are not 0..C-1 must still find its own.
+        """
+        import time as _t
+        cache = os.path.join(root, "skeletons_packed.npz")
+        sk = os.path.join(root, "skeletons")
+        if os.path.exists(cache) and os.path.exists(sk) and \
+                os.path.getmtime(cache) >= os.path.getmtime(sk):
+            z = np.load(cache, allow_pickle=True)
+            # MATERIALISE THE ARRAYS ONCE, then slice them. Indexing `z["xyz"][a:b]` inside the
+            # comprehension re-reads and re-decompresses the WHOLE array on every one of the 4,000
+            # cells: it turned a 28 s seed into 315 s, which is worse than the text files this
+            # cache exists to replace. Four reads, then pure views.
+            xyz, rad, par = np.asarray(z["xyz"]), np.asarray(z["rad"]), np.asarray(z["par"])
+            off, ids = np.asarray(z["off"]), np.asarray(z["ids"])
+            return {int(b): (xyz[off[i]:off[i + 1]], rad[off[i]:off[i + 1]], par[off[i]:off[i + 1]])
+                    for i, b in enumerate(ids)}
+        table = json.load(open(os.path.join(root, "morphology_index.json"))).get("skeletons") or {}
+        if not table:
+            return {}
+        t0 = _t.perf_counter()
+        ids, X, R, P, off = [], [], [], [], [0]
+        for b, f in table.items():
+            xyz, rad, par = self._swc(os.path.join(root, f))
+            ids.append(int(b)); X.append(xyz.astype(np.float32))
+            R.append(rad.astype(np.float32)); P.append(par.astype(np.int32))
+            off.append(off[-1] + len(xyz))
+        np.savez(cache, xyz=np.vstack(X), rad=np.concatenate(R), par=np.concatenate(P),
+                 off=np.asarray(off, np.int64), ids=np.asarray(ids, np.int64))
+        print(f"[morphology_seed] packed {len(ids):,} skeletons ({off[-1]:,} nodes) into "
+              f"{os.path.basename(cache)} in {_t.perf_counter() - t0:.1f}s -- built once",
+              flush=True)
+        return {int(b): (X[i], R[i], P[i]) for i, b in enumerate(ids)}
+
+    def _points_for(self, path, n, rng, swc=None):
         """`n` points along a skeleton's segments, off-centreline by the local radius."""
-        xyz, rad, par = self._swc(path)
+        xyz, rad, par = swc if swc is not None else self._swc(path)
         ok = par >= 0
         if not ok.any() or n <= 0:
             return np.tile(xyz[:1] if len(xyz) else np.zeros((1, 3)), (max(n, 0), 1))
@@ -823,6 +869,7 @@ class MorphologySeed(Seed):
         # declares `region.voxel_size_nm`; it is applied here, once.
         _vox = float((man.get("region") or {}).get("voxel_size_nm", 1.0) or 1.0)
         rng = np.random.default_rng(self.seed)
+        packed = self._pack(root) if self.kind in ("skeleton", "soma_skeleton") else {}
         st = lvl.state.clone()
         px0, px1 = lvl.state_schema["pos"]
         out = np.zeros((lvl.n, 3))
@@ -851,9 +898,10 @@ class MorphologySeed(Seed):
                       else side * 0.004) / _vox
                 u = rng.normal(size=(n_s, 3)); u /= np.linalg.norm(u, axis=1, keepdims=True).clip(1e-12)
                 soma = ctr + u * (rr * rng.random((n_s, 1)) ** (1.0 / 3.0))
-                pts = np.concatenate([soma, self._points_for(_f, len(rows) - n_s, rng)], 0)
+                pts = np.concatenate([soma, self._points_for(_f, len(rows) - n_s, rng,
+                                                             packed.get(int(bids[p])))], 0)
             else:
-                pts = self._points_for(_f, len(rows), rng)
+                pts = self._points_for(_f, len(rows), rng, packed.get(int(bids[p])))
             out[rows] = (pts * _vox - lo) / side
         st[:, px0:px1] = torch.as_tensor(out[:, :H.dim], dtype=st.dtype, device=lvl.state.device)
         # PAINTED BEFORE ANYTHING RUNS, with the parent's CELL TYPE. A morphology seeded and not

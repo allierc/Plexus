@@ -151,3 +151,9 @@ papers/morph_models/
 
 # transient specs written by tools/regression_lib.run_cut for the duration of one rerun
 config/*/_regression_*.yaml
+
+# THE BUILD RECORD: pictures, specs and reasons are tracked, MOVIES ARE NOT.
+# A step's mp4 runs 5-20 MB and there is one per run; over a long session that is
+# gigabytes of binary in a repo whose whole history is 40 MB. The png/spec/why of each
+# step is what makes the record readable, and those are text and a thumbnail.
+builder/mp4/

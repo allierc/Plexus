@@ -25,6 +25,7 @@ import numpy as np
 import posixpath
 import re
 import subprocess
+import sys
 import tempfile
 import time
 import traceback
@@ -306,6 +307,38 @@ def g_page(h, q):
 
 def g_editor(h, q):
     return h._send_file(os.path.join(STATIC, "index.html"), "text/html; charset=utf-8")
+
+
+def g_watch(h, q):
+    """`/watch` -- the read-only build history: picture, spec, why and movie, step by step.
+
+    It rides on THIS port rather than one of its own because an unforwarded port inside a
+    container is indistinguishable from a dead server, and this one already works. It reads files
+    and changes nothing; see `plexus/gui/watch.py`.
+    """
+    from plexus.gui import watch
+    return h._send_html(watch.PAGE)
+
+
+def g_watch_state(h, q):
+    from plexus.gui import watch
+    return h._send_json(watch.g_watch_state(h, q))
+
+
+def _watch_file(h, q, kind, ctype):
+    from plexus.gui import watch
+    f = watch._nth(q, kind)
+    if not f or not os.path.exists(f):
+        return h.send_error(404)
+    return h._send_file(f, ctype)
+
+
+def g_watch_shot(h, q):
+    return _watch_file(h, q, "png", "image/png")
+
+
+def g_watch_mp4(h, q):
+    return _watch_file(h, q, "mp4", "video/mp4")
 
 
 def g_state(h, q):
@@ -1080,6 +1113,44 @@ def g_regions(h, q):
         return h._send_json({"regions": [], "error": f"{type(e).__name__}: {e}"[:200]})
 
 
+def g_stacks(h, q):
+    """EVERY THREAD'S PYTHON STACK, right now.
+
+    A run that sits at frame 0 with the GPU idle is either waiting on a lock or blocked inside a
+    C call, and from outside the two look identical: the status route says `running: true` and
+    nothing else moves. `py-spy` cannot attach here (ptrace_scope is 1 and the process is not
+    ours to trace), so the process has to be able to say where it is itself. This is that.
+
+    Read-only and cheap: `sys._current_frames()` is a snapshot of frame objects already held.
+    """
+    import sys as _sys
+    import threading as _th
+    import traceback as _tb
+    names = {t.ident: t.name for t in _th.enumerate()}
+    out = {}
+    for tid, frame in _sys._current_frames().items():
+        out[f"{names.get(tid, '?')} ({tid})"] = [
+            f"{fs.filename}:{fs.lineno} in {fs.name}" for fs in _tb.extract_stack(frame)][-25:]
+    # THE TWO QUEUES THE RUN GOES THROUGH. A run that is "running" with no thread executing it is
+    # a task sitting in a queue, and which queue says which thing is wrong: `exec_queue` is work
+    # submitted to the one VTK thread and not yet picked up, `pending` is the page's camera and
+    # screenshot requests waiting for that same thread. Both zero with a live `running` flag means
+    # the task was taken and then lost, which is a different bug from a task never taken.
+    q = {}
+    try:
+        from plexus.gui import bio_view as _bv
+        q["exec_queue"] = _bv._EXEC._work_queue.qsize()
+        q["pending"] = _bv._PENDING.qsize()
+        q["vtk_thread_ident"] = _bv._VTK_THREAD.get("ident")
+        v = _bv.CURRENT.get("view")
+        q["run"] = {k: v.RUN.get(k) for k in ("running", "frame", "n_frames", "error", "stopped")} \
+            if v is not None else None
+        q["view_id"] = id(v) if v is not None else None
+    except Exception as e:                                           # noqa: BLE001
+        q["error"] = f"{type(e).__name__}: {e}"
+    return h._send_json({"threads": out, "n": len(out), "queues": q})
+
+
 def g_shot(h, q):
     """The picture AS A FILE, for an agent that can look at images but cannot hold a PNG body.
 
@@ -1105,11 +1176,12 @@ def g_shot(h, q):
     p = os.path.join(d, f"shot_{int(_t.time() * 1000)}.png")
     with open(p, "wb") as f:
         f.write(png)
-    for old in sorted(os.listdir(d))[:-40]:                      # keep the last 40
-        try:
-            os.remove(os.path.join(d, old))
-        except OSError:
-            pass
+    # NOTHING IS DELETED HERE. This used to keep only the last forty and remove the rest, which
+    # is right for a scratch preview and wrong for what this folder became: the record of every
+    # scene this session built, walked back and forth in `tools/watch.py`. A history that quietly
+    # drops its oldest forty-first entry is not a history. A shot is about a megabyte; if the
+    # folder ever needs trimming that is a decision for a person, not a side effect of taking a
+    # picture.
     return h._send_json({"path": p, "bytes": len(png), "azim": v.azim, "elev": v.elev, "zoom": v.zoom,
                          "frame": q.get("frame", [None])[0]})
 POST_ROUTES = {
@@ -1134,6 +1206,9 @@ GET_ROUTES = {
     "/api/scene/view": g_view, "/api/scene/seed": g_seed,
     "/api/catalog": g_catalog, "/api/specs": g_specs, "/media": g_media, "/api/spec": g_editor_spec,
     "/api/scene/shot": g_shot, "/api/bio/shot": g_shot, "/api/neurons/regions": g_regions,
+    "/api/debug/stacks": g_stacks,
+    "/watch": g_watch, "/api/watch/state": g_watch_state,
+    "/api/watch/shot": g_watch_shot, "/api/watch/mp4": g_watch_mp4,
 }
 for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
     GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]

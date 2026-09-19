@@ -1,0 +1,4 @@
+time   2026-09-19 09:46:13
+spec   platynereis_a1_body
+camera azim=35.0 elev=12.0 zoom=1.3
+why    A2: the same body, dropped. Gravity 9.81 m/s2 along -y, 300 frames at dt 0.002 s = 0.6 s of fall onto a wall floor with damping 0.6 and friction 0.3. The point is not the bounce but the CHECK: a mesh-filled elastic body that holds its shape through an impact is a body the rest of the animal can be built inside. (before the run)

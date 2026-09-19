@@ -1195,6 +1195,7 @@ class LiveMovie:
                     self.p.enable_eye_dome_lighting()
                 except Exception as e:                        # noqa: BLE001
                     print(f"[live-movie] edl unavailable: {e}", flush=True)
+            self._static_mesh(H)
             self._add_meshes(H)
             for _n, _l, _m in self._mesh_levels(H):
                 self._edge_actor(H, _l, _m, first=True)
@@ -2848,6 +2849,77 @@ class LiveMovie:
             return int((es * w).sum())
         es = np.asarray(es, np.int64)
         return int((es * np.arange(1, es.size + 1, dtype=np.int64)).sum())
+
+    def _static_mesh(self, H):
+        """`plotting.static_mesh` -- a fixed surface loaded from a FILE, drawn once behind the scene.
+
+        THE GAP THIS FILLS. Every other mesh the renderer draws belongs to a SET: `_mesh_levels`
+        finds the half-edge mesh a vertex model builds on `lvl.mesh`, and a point set never has
+        one. So a body outline that exists only as an `.obj` on disk -- an organism's own surface,
+        segmented once and never simulated -- had no way into the picture at all. A spec could
+        name one and nothing happened, silently, because unknown `plotting` keys are accepted.
+
+        It is deliberately STATIC: loaded at the first frame, never updated, no scalars, no
+        picking. It is scenery, and treating it as anything more would mean pretending a fixed
+        surface is part of a simulation that never touches it.
+
+        The file is resolved through the same roots as every other data path, so a spec names
+        `neural_regions/<region>/body.obj` and not an absolute path. Coordinates are taken in the
+        run's own world units; a mesh in nanometres against a unit box is invisible, so
+        `to_world` gives the affine that maps it in -- the region's `bounds_lo` and `side`.
+
+            plotting:
+              static_mesh:
+                file: neural_regions/platynereis_larva_4117/body_outline.obj
+                color: "#8a93a0"
+                opacity: 0.10
+                to_world: {origin: [x, y, z], scale: 1.0e-5}
+        """
+        cfg = (self.style or {}).get("static_mesh")
+        if not cfg:
+            return
+        cfgs = cfg if isinstance(cfg, (list, tuple)) else [cfg]
+        for c in cfgs:
+            try:
+                path = str(c.get("file") or "")
+                if not os.path.isabs(path):
+                    from plexus.paths import graphs_data_path
+                    path = os.path.join(graphs_data_path(), path)
+                if not os.path.exists(path):
+                    print(f"[live-movie] static_mesh: no file {path}", flush=True)
+                    continue
+                m = self.pv.read(path)
+                # SCALARS OFF. `add_mesh(color=...)` is IGNORED whenever the mesh carries a data
+                # array -- pyvista colours by the array instead and the surface came out in the
+                # default cyan, opaque-looking, with the requested grey silently dropped. An
+                # imported .obj often carries normals or a texture coordinate, so clear them.
+                try:
+                    m.clear_data()
+                except Exception:                                    # noqa: BLE001
+                    pass
+                tw = c.get("to_world") or {}
+                o = np.asarray(tw.get("origin", [0.0, 0.0, 0.0]), float)
+                sc = float(tw.get("scale", 1.0))
+                if sc != 1.0 or o.any():
+                    m.points = (np.asarray(m.points, float) - o) * sc
+                _op = float(c.get("opacity", 0.12))
+                if _op < 1.0:
+                    # DEPTH PEELING, or a translucent surface is not translucent. Without it VTK
+                    # blends in draw order, so whatever is drawn after the shell hides behind it
+                    # and the cells inside the body simply do not appear.
+                    try:
+                        self.p.enable_depth_peeling(number_of_peels=8)
+                    except Exception:                                # noqa: BLE001
+                        pass
+                self.p.add_mesh(m, color=str(c.get("color", "#8a93a0")),
+                                opacity=_op, scalars=None,
+                                smooth_shading=True, specular=0.15, diffuse=0.6, ambient=0.25,
+                                lighting=True, show_scalar_bar=False, name=f"static_{os.path.basename(path)}")
+                print(f"[live-movie] static_mesh: {os.path.basename(path)} "
+                      f"({m.n_points:,} points, {m.n_cells:,} faces) at opacity "
+                      f"{float(c.get('opacity', 0.12)):g}", flush=True)
+            except Exception as e:                                   # noqa: BLE001
+                print(f"[live-movie] static_mesh failed: {type(e).__name__}: {e}", flush=True)
 
     def _update_meshes(self, H):
         """POINTS ONLY, unless the CONNECTIVITY moved. Swapping the face array every frame on a

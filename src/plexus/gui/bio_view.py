@@ -23,6 +23,7 @@ import io
 import os
 import tempfile
 import threading
+import sys
 import time
 
 import numpy as np
@@ -992,7 +993,22 @@ class View:
         def _go():
             _VTK_THREAD["ident"] = threading.get_ident()
             from plexus import pipeline
+            from plexus.gui import studio
+            # THE ENGINE'S OWN OUTPUT, KEPT -- WITHOUT TOUCHING sys.stdout. The first version of
+            # this wrapped `generate` in `contextlib.redirect_stdout/stderr`, and that hung the
+            # run at frame 0 with no error and no log file: those helpers swap the PROCESS-WIDE
+            # streams, and this runs on the VTK worker while the HTTP threads are printing to the
+            # same ones. A per-thread capture is what was wanted and is not what they do.
+            #
+            # So the engine keeps printing to the terminal as it always did, and a COPY is taken
+            # afterwards from the run directory the pipeline itself writes. Less immediate, and it
+            # cannot deadlock anything.
+            log_path = ""
             try:
+                log_path = os.path.join(studio.REPO, "log", "gui_runs",
+                                        f"{os.path.splitext(os.path.basename(self.spec_path))[0]}.log")
+                os.makedirs(os.path.dirname(log_path), exist_ok=True)
+                self.RUN["log"] = log_path
                 r = pipeline.generate(self.spec_path, device=dev, force=True, describe=False, on_frame=_on_frame)
                 self.RUN["out_dir"] = r.get("data_dir")
                 self.RUN["stopped"] = bool(r.get("stopped"))
@@ -1012,10 +1028,47 @@ class View:
                     pass
                 print(f"[view] run failed: {self.RUN['error']}", flush=True)
             finally:
+                # WHAT THE RUN LEFT ON DISK, summarised into the log this session reads. The
+                # engine's console output is not captured (see above); what IS durable is the run
+                # directory, so the log records where it is and what is in it.
+                try:
+                    _d = self.RUN.get("out_dir") or ""
+                    with open(log_path or os.path.join(os.path.expanduser("~"), "plexus_run.log"),
+                              "w") as _fh:
+                        _fh.write(f"spec      {self.spec_path}\n")
+                        _fh.write(f"device    {dev}\n")
+                        _fh.write(f"frames    {self.RUN.get('frame')}/{n}\n")
+                        _fh.write(f"seconds   {round(time.time() - self.RUN['started'], 1)}\n")
+                        _fh.write(f"ms/frame  {self.RUN.get('ms_per_frame')}\n")
+                        _fh.write(f"stopped   {self.RUN.get('stopped')}\n")
+                        _fh.write(f"error     {self.RUN.get('error')}\n")
+                        _fh.write(f"out_dir   {_d}\n")
+                        if _d and os.path.isdir(_d):
+                            for nm in sorted(os.listdir(_d)):
+                                _p = os.path.join(_d, nm)
+                                _sz = os.path.getsize(_p) if os.path.isfile(_p) else 0
+                                _fh.write(f"  {nm}  {_sz:,} B\n")
+                except Exception:                                    # noqa: BLE001
+                    pass
                 self.RUN["running"] = False
                 self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
                 _drain()
-        _EXEC.submit(_go)
+        # THE FUTURE IS READ. `submit` hands back a Future, and an exception that escapes the
+        # task is stored in it and re-raised only when someone asks -- so an unread Future is a
+        # traceback thrown away. This callback asks. It costs one function call per run and it is
+        # the difference between "the run failed with X" and a scene that sits at frame 0 for
+        # three minutes with the GPU at 0% and nothing in any log.
+        def _done(fut):
+            exc = fut.exception()
+            if exc is None:
+                return
+            self.RUN["error"] = f"{type(exc).__name__}: {exc}"[:600]
+            self.RUN["running"] = False
+            import traceback
+            print(f"[view] run task died: {self.RUN['error']}", flush=True)
+            traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+        _EXEC.submit(_go).add_done_callback(_done)
         return {"started": True, "frames": n, "device": dev}
 
     def stop(self) -> dict:

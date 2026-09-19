@@ -334,6 +334,21 @@ def build_spec(form: dict) -> dict:
     substep = float(f"{dt / n_sub:.6e}")
     mp = {"parent": "cell", "per_parent": per, "density": float(bodies[0].get("density", 1000.0)),
           "radius": radius}
+    # A MESH BODY NEEDS A VOLUME TO BE SCALED TO, AND ONLY `particle_mass` GIVES IT ONE.
+    # The seeder's whole shape dispatch -- ball, cube, cylinder, `mesh:<name>`, `obj` -- sits under
+    # `if particle_mass is not None` (entities.py:549): the contract there is that
+    # `V = per_parent * particle_mass / density` fixes the body's volume and the shape only decides
+    # how that volume is arranged. With no particle_mass the seeder never reaches the dispatch and
+    # falls back to a ball of `radius` -- so this tab accepted `shape: mesh:platynereis_body`,
+    # wrote it into the spec, and drew a featureless sphere, with no warning in any log.
+    #
+    # `radius` keeps the meaning it already had here, "how big is this body": the mass is set so
+    # the mesh's volume EQUALS the volume of the ball of that radius the tab would otherwise have
+    # drawn. Swapping `ball` for `mesh:bunny` then changes the shape and nothing else.
+    if any(str(b.get("shape", "")).lower().startswith("mesh:")
+           or str(b.get("shape", "")).lower() in ("obj", "mesh") for b in bodies):
+        _rho0 = float(bodies[0].get("density", 1000.0))
+        mp["particle_mass"] = float(f"{_rho0 * (4.0 / 3.0) * math.pi * radius ** 3 / max(per, 1):.6e}")
     if launch > 0:
         mp["vel_init"] = launch
     out = {

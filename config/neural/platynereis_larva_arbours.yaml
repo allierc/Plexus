@@ -1,0 +1,3291 @@
+general:
+  name: platynereis_larva_arbours
+  seed: 0
+  n_frames: 400
+  dt: 0.05
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  record_cap: 401
+  units:
+    length_um: 195.9
+    time_s: 1.0
+sets:
+  brain:
+    n: 1
+  assembly:
+    parent: brain
+    per_parent: 1
+  neuron:
+    parent: assembly
+    per_parent: 4117
+    types:
+      Interneuron__cMNPDF-vcl1:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INdc:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INbackcross:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INbiaxLeg:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INbiaxH:
+        count: 5
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__cMNATO:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INfoot:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INW:
+        count: 5
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INmidL:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INhook:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__cMNdc:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBtype6:
+        count: 8
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBtype5:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBtype7:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcross:
+        count: 7
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INpro:
+        count: 12
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INproT2:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INpear:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INZ:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INbigloop:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INUturn:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INATOpyg:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcomm-Upstairs:
+        count: 13
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INasc-pyg:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitBronto:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INleucoPU:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INdecussfoot:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INdecusshook:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INpreLadder:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcomm-Upcross:
+        count: 9
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitVent:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcomm-DownL:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INlasso-postSN:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcommascFV:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INR1:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INmus:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INdescLuqinPDF:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcosplit:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INcommdescFVa:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsqNSasym:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INbiaxHmid:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INhorn:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBPDF:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBdescFMRF:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INDLSO:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INexsn:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__MBmouth:
+        count: 14
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INtorii:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INUturnMB:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INface:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBdesc3:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBdesc2:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INpara:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBtype9:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMBtype2:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INdecussM:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__IN1:
+        count: 10
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INiaStiff:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INmantis:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitSpin:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INlasso:
+        count: 7
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INdecussPre:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INpreMN:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INton:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INpreSer:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__MC2biax-1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INCrossbow:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INarc1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INarc2:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsn:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INrope:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INRGWa:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INCM:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INNOS:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INchaeMech:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INFVa-pyg:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitCR:
+        count: 17
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitCRATO:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INMC3:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INbiax:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitPB-RF/Ya:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitPBant:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitPB:
+        count: 16
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Interneuron__INsplitPUh:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNcommUpL:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNob-ipsi:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNpostv:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__Ser-tr1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNladder:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNacic:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNarm:
+        count: 7
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNantacic:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNpostacic:
+        count: 8
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNakro:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNchae:
+        count: 9
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNgland-head:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNheadV:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNantelope:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNsmile:
+        count: 8
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNant:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNspinning:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__Loop:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNspider-ant:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNspider-post:
+        count: 5
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNbiramous:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNcrab:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNhose:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNbow:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNwave:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MNacicX:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__Ser-h1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__cioMNcover:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MN3:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MN1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MN2:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MC3cover:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Motoneuron__MC:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__PRC:
+        count: 24
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__hCR:
+        count: 24
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__ventralpygCR:
+        count: 21
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__doCRunp:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO1.0:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS3:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS4:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS15:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNaant:
+        count: 9
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNPDF-pyg:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS22:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNnuchPDF:
+        count: 24
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS5:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS17:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-YF5cil:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS19:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS20:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS6:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS29:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS27:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS18:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-NS16:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNnuchNS:
+        count: 3
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNadNS22:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNFVa:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNblunt:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNnuchBx:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNgolden:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO1.3:
+        count: 9
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNstiff:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNbronto:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNhorn:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNpygM:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO1.1NP:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO1.1:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNhook:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNtorii:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNtrpa:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNlasso:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNMIP-vc:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNmus:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNantlerPDF:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNPDF-dc:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN0DLSO1.2-4:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO1.2-3:
+        count: 28
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO1.2-1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO2:
+        count: 12
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNMB2:
+        count: 8
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__eyespot-PRCR3:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__eyespot-PRCR1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__MS1:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__MS4:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__MS3:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__MS5:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-ASTC:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO3-PDF:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DLSO3:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-IRP2-burs:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-IRP2-FMRF:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-MIP4:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-MIP1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-WLD:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN-DSO:
+        count: 17
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__cPRC:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNbicil:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SNasym:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__SN47Ach:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__pygPBunp:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__chaeMech:
+        count: 20
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__PB:
+        count: 57
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__antPUc:
+        count: 17
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__spinPU:
+        count: 12
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__VentraltrunkPUunp:
+        count: 1
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__trochPU:
+        count: 30
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__hPUc1:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__pygCirrusPUSM:
+        count: 2
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__hCirrusPU:
+        count: 14
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__parapodPU:
+        count: 26
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__hPU:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__dsoPU:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      Sensory neuron__pygCirrusPU:
+        count: 17
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      chaetal complex__chaeta:
+        count: 106
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      chaetal complex__acicula:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      chaetal complex__acFC-noER:
+        count: 54
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      chaetal complex__chaeFC-hemi:
+        count: 187
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      chaetal complex__chaeFC-ER:
+        count: 90
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      chaetal complex__chaeFC-noER:
+        count: 102
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      chaetal complex__chaeFC-EC:
+        count: 106
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      ciliary band__akrotroch:
+        count: 8
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      ciliary band__crescentcell:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      ciliary band__prototroch:
+        count: 23
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      ciliary band__metatroch:
+        count: 8
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      ciliary band__paratroch:
+        count: 34
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      coelothelium__coelothelium:
+        count: 101
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      epidermis__EC:
+        count: 1120
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      excretory system__protonephridium:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      excretory system__nephridium:
+        count: 14
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      excretory system__nephridiumTip:
+        count: 2
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      gland__gland-pigment:
+        count: 10
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      gland cell__MVGland:
+        count: 6
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      gland cell__HeadGland:
+        count: 5
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      gland cell__InterparaGland:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      gland cell__spinMicroGland:
+        count: 19
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      gland cell__spinGland:
+        count: 4
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      gland cell__ciliatedGland:
+        count: 24
+        p:
+        - 1.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      glia cell__flat-glia:
+        count: 21
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      glia cell__ECmidline:
+        count: 46
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      glia cell__Glia-pigmented:
+        count: 5
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      macrophage-like__macrophage-like:
+        count: 13
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      mesoderm__meso 1592020:
+        count: 24
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      microvillar__microvillarCell:
+        count: 13
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      multiciliated cell__nuchalCiliaCilia:
+        count: 6
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      muscle__MUSac-notA:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-notP:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-notM:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neuAV:
+        count: 16
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neuPD:
+        count: 18
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neuPV:
+        count: 14
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neuDy:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neuDx:
+        count: 8
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neuDach:
+        count: 18
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-neure:
+        count: 8
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSac-i:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobA-re:
+        count: 39
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobA-arc:
+        count: 18
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobA-mpp:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobA-mlpp:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobA-lpp:
+        count: 10
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobA-trans:
+        count: 10
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-notD:
+        count: 28
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-neuDlong:
+        count: 9
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-neuDprox:
+        count: 18
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-neuDdist:
+        count: 19
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-neuV:
+        count: 38
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-notV:
+        count: 18
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-M:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-noty:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSobP-i:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-notDob:
+        count: 18
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-notD:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-notDn:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-notA:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-notAac:
+        count: 24
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-notAre:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-neuVob:
+        count: 16
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-neuDac:
+        count: 28
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-neuAVo:
+        count: 16
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-neuAVt:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSchae-Are:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUStrans:
+        count: 62
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSlongD:
+        count: 86
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSlongV:
+        count: 82
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSax:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSring-pyg:
+        count: 1
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSph:
+        count: 50
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSll:
+        count: 10
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSant:
+        count: 8
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSly:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSpl:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSci:
+        count: 4
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSch:
+        count: 6
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSpx:
+        count: 1
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSpr-vt:
+        count: 1
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUStri:
+        count: 2
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      muscle__MUSmed:
+        count: 2
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__eyespot-pigment-cell:
+        count: 2
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__pigment-cell:
+        count: 12
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__yolk-cover-cell cell:
+        count: 39
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__CB-pigment:
+        count: 58
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__vacuolar-cell-head:
+        count: 3
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__pygidial-pigment-cell:
+        count: 26
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      pigment cell__covercell:
+        count: 16
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+      yolk__yolk:
+        count: 5
+        p:
+        - 0.2
+        - 0.0
+        - 1.2
+        - 0.0
+        - 1.0
+        - 0.0
+    type_layout: ordered
+  synapse:
+    parent: brain
+    edge_set: true
+    entity: connection
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/platynereis_larva_4117/connectome.npz
+  morphology:
+    entity: points
+    parent: neuron
+    per_parent: 220
+fields: {}
+operators:
+- op: neuron_update
+  at: neuron
+  model: leaky_tanh
+  noise: 0.01
+- op: neuron_signal
+  at: neuron
+  model: type_pairwise
+  edge_set: synapse
+  activation: tanh
+- op: paint_children
+  at: morphology
+  parent: neuron
+  block: paint
+  parent_block: voltage
+schedule:
+- neuron_update
+- neuron_signal
+- paint_children
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  dot_size: 1.5
+  dot_shading: false
+  max_frames: 200
+  stills: 8
+  keep_stills: true
+  subject: morphology
+  color_field: paint
+  color_range:
+  - -1.5
+  - 1.5
+  dot_radius:
+    Interneuron__cMNPDF-vcl1: 0.0056151
+    Interneuron__INdc: 0.0056151
+    Interneuron__INbackcross: 0.0056151
+    Interneuron__INbiaxLeg: 0.0056151
+    Interneuron__INbiaxH: 0.0056151
+    Interneuron__cMNATO: 0.0056151
+    Interneuron__INfoot: 0.0056151
+    Interneuron__INW: 0.0056151
+    Interneuron__INmidL: 0.0056151
+    Interneuron__INhook: 0.0056151
+    Interneuron__cMNdc: 0.0056151
+    Interneuron__INMBtype6: 0.0056151
+    Interneuron__INMBtype5: 0.0056151
+    Interneuron__INMBtype7: 0.0056151
+    Interneuron__INcross: 0.0056151
+    Interneuron__INpro: 0.0056151
+    Interneuron__INproT2: 0.0056151
+    Interneuron__INpear: 0.0056151
+    Interneuron__INZ: 0.0056151
+    Interneuron__INbigloop: 0.0056151
+    Interneuron__INUturn: 0.0056151
+    Interneuron__INATOpyg: 0.0056151
+    Interneuron__INcomm-Upstairs: 0.0056151
+    Interneuron__INasc-pyg: 0.0056151
+    Interneuron__INsplitBronto: 0.0056151
+    Interneuron__INleucoPU: 0.0056151
+    Interneuron__INdecussfoot: 0.0056151
+    Interneuron__INdecusshook: 0.0056151
+    Interneuron__INpreLadder: 0.0056151
+    Interneuron__INcomm-Upcross: 0.0056151
+    Interneuron__INsplitVent: 0.0056151
+    Interneuron__INcomm-DownL: 0.0056151
+    Interneuron__INlasso-postSN: 0.0056151
+    Interneuron__INcommascFV: 0.0056151
+    Interneuron__INR1: 0.0056151
+    Interneuron__INmus: 0.0056151
+    Interneuron__INdescLuqinPDF: 0.0056151
+    Interneuron__INcosplit: 0.0056151
+    Interneuron__INcommdescFVa: 0.0056151
+    Interneuron__INsqNSasym: 0.0056151
+    Interneuron__INbiaxHmid: 0.0056151
+    Interneuron__INhorn: 0.0056151
+    Interneuron__INMBPDF: 0.0056151
+    Interneuron__INMBdescFMRF: 0.0056151
+    Interneuron__INDLSO: 0.0056151
+    Interneuron__INexsn: 0.0056151
+    Interneuron__MBmouth: 0.0056151
+    Interneuron__INtorii: 0.0056151
+    Interneuron__INUturnMB: 0.0056151
+    Interneuron__INface: 0.0056151
+    Interneuron__INMBdesc3: 0.0056151
+    Interneuron__INMBdesc2: 0.0056151
+    Interneuron__INpara: 0.0056151
+    Interneuron__INMBtype9: 0.0056151
+    Interneuron__INMBtype2: 0.0056151
+    Interneuron__INdecussM: 0.0056151
+    Interneuron__IN1: 0.0056151
+    Interneuron__INiaStiff: 0.0056151
+    Interneuron__INmantis: 0.0056151
+    Interneuron__INsplitSpin: 0.0056151
+    Interneuron__INlasso: 0.0056151
+    Interneuron__INdecussPre: 0.0056151
+    Interneuron__INpreMN: 0.0056151
+    Interneuron__INton: 0.0056151
+    Interneuron__INpreSer: 0.0056151
+    Interneuron__MC2biax-1: 0.0056151
+    Interneuron__INCrossbow: 0.0056151
+    Interneuron__INarc1: 0.0056151
+    Interneuron__INarc2: 0.0056151
+    Interneuron__INsn: 0.0056151
+    Interneuron__INrope: 0.0056151
+    Interneuron__INRGWa: 0.0056151
+    Interneuron__INCM: 0.0056151
+    Interneuron__INNOS: 0.0056151
+    Interneuron__INchaeMech: 0.0056151
+    Interneuron__INFVa-pyg: 0.0056151
+    Interneuron__INsplitCR: 0.0056151
+    Interneuron__INsplitCRATO: 0.0056151
+    Interneuron__INMC3: 0.0056151
+    Interneuron__INbiax: 0.0056151
+    Interneuron__INsplitPB-RF/Ya: 0.0056151
+    Interneuron__INsplitPBant: 0.0056151
+    Interneuron__INsplitPB: 0.0056151
+    Interneuron__INsplitPUh: 0.0056151
+    Motoneuron__MNcommUpL: 0.0061256
+    Motoneuron__MNob-ipsi: 0.0061256
+    Motoneuron__MNpostv: 0.0061256
+    Motoneuron__Ser-tr1: 0.0061256
+    Motoneuron__MNladder: 0.0061256
+    Motoneuron__MNacic: 0.0061256
+    Motoneuron__MNarm: 0.0061256
+    Motoneuron__MNantacic: 0.0061256
+    Motoneuron__MNpostacic: 0.0061256
+    Motoneuron__MNakro: 0.0061256
+    Motoneuron__MNchae: 0.0061256
+    Motoneuron__MNgland-head: 0.0061256
+    Motoneuron__MNheadV: 0.0061256
+    Motoneuron__MNantelope: 0.0061256
+    Motoneuron__MNsmile: 0.0061256
+    Motoneuron__MNant: 0.0061256
+    Motoneuron__MNspinning: 0.0061256
+    Motoneuron__Loop: 0.0061256
+    Motoneuron__MNspider-ant: 0.0061256
+    Motoneuron__MNspider-post: 0.0061256
+    Motoneuron__MNbiramous: 0.0061256
+    Motoneuron__MNcrab: 0.0061256
+    Motoneuron__MNhose: 0.0061256
+    Motoneuron__MNbow: 0.0061256
+    Motoneuron__MNwave: 0.0061256
+    Motoneuron__MNacicX: 0.0061256
+    Motoneuron__Ser-h1: 0.0061256
+    Motoneuron__cioMNcover: 0.0061256
+    Motoneuron__MN3: 0.0061256
+    Motoneuron__MN1: 0.0061256
+    Motoneuron__MN2: 0.0061256
+    Motoneuron__MC3cover: 0.0061256
+    Motoneuron__MC: 0.0061256
+    Sensory neuron__PRC: 0.0056151
+    Sensory neuron__hCR: 0.0056151
+    Sensory neuron__ventralpygCR: 0.0056151
+    Sensory neuron__doCRunp: 0.0056151
+    Sensory neuron__SN-DLSO1.0: 0.0056151
+    Sensory neuron__SN-NS1: 0.0056151
+    Sensory neuron__SN-NS3: 0.0056151
+    Sensory neuron__SN-NS4: 0.0056151
+    Sensory neuron__SN-NS15: 0.0056151
+    Sensory neuron__SNaant: 0.0056151
+    Sensory neuron__SNPDF-pyg: 0.0056151
+    Sensory neuron__SN-NS22: 0.0056151
+    Sensory neuron__SNnuchPDF: 0.0056151
+    Sensory neuron__SN-NS5: 0.0056151
+    Sensory neuron__SN-NS17: 0.0056151
+    Sensory neuron__SN-YF5cil: 0.0056151
+    Sensory neuron__SN-NS19: 0.0056151
+    Sensory neuron__SN-NS20: 0.0056151
+    Sensory neuron__SN-NS6: 0.0056151
+    Sensory neuron__SN-NS29: 0.0056151
+    Sensory neuron__SN-NS27: 0.0056151
+    Sensory neuron__SN-NS18: 0.0056151
+    Sensory neuron__SN-NS16: 0.0056151
+    Sensory neuron__SNnuchNS: 0.0056151
+    Sensory neuron__SNadNS22: 0.0056151
+    Sensory neuron__SNFVa: 0.0056151
+    Sensory neuron__SNblunt: 0.0056151
+    Sensory neuron__SNnuchBx: 0.0056151
+    Sensory neuron__SNgolden: 0.0056151
+    Sensory neuron__SN-DLSO1.3: 0.0056151
+    Sensory neuron__SNstiff: 0.0056151
+    Sensory neuron__SNbronto: 0.0056151
+    Sensory neuron__SNhorn: 0.0056151
+    Sensory neuron__SNpygM: 0.0056151
+    Sensory neuron__SN-DLSO1.1NP: 0.0056151
+    Sensory neuron__SN-DLSO1.1: 0.0056151
+    Sensory neuron__SNhook: 0.0056151
+    Sensory neuron__SNtorii: 0.0056151
+    Sensory neuron__SNtrpa: 0.0056151
+    Sensory neuron__SNlasso: 0.0056151
+    Sensory neuron__SNMIP-vc: 0.0056151
+    Sensory neuron__SNmus: 0.0056151
+    Sensory neuron__SNantlerPDF: 0.0056151
+    Sensory neuron__SNPDF-dc: 0.0056151
+    Sensory neuron__SN0DLSO1.2-4: 0.0056151
+    Sensory neuron__SN-DLSO1.2-3: 0.0056151
+    Sensory neuron__SN-DLSO1.2-1: 0.0056151
+    Sensory neuron__SN-DLSO2: 0.0056151
+    Sensory neuron__SNMB2: 0.0056151
+    Sensory neuron__eyespot-PRCR3: 0.0056151
+    Sensory neuron__eyespot-PRCR1: 0.0056151
+    Sensory neuron__MS1: 0.0056151
+    Sensory neuron__MS4: 0.0056151
+    Sensory neuron__MS3: 0.0056151
+    Sensory neuron__MS5: 0.0056151
+    Sensory neuron__SN-ASTC: 0.0056151
+    Sensory neuron__SN-DLSO3-PDF: 0.0056151
+    Sensory neuron__SN-DLSO3: 0.0056151
+    Sensory neuron__SN-IRP2-burs: 0.0056151
+    Sensory neuron__SN-IRP2-FMRF: 0.0056151
+    Sensory neuron__SN-MIP4: 0.0056151
+    Sensory neuron__SN-MIP1: 0.0056151
+    Sensory neuron__SN-WLD: 0.0056151
+    Sensory neuron__SN-DSO: 0.0056151
+    Sensory neuron__cPRC: 0.0056151
+    Sensory neuron__SNbicil: 0.0056151
+    Sensory neuron__SNasym: 0.0056151
+    Sensory neuron__SN47Ach: 0.0056151
+    Sensory neuron__pygPBunp: 0.0056151
+    Sensory neuron__chaeMech: 0.0056151
+    Sensory neuron__PB: 0.0056151
+    Sensory neuron__antPUc: 0.0056151
+    Sensory neuron__spinPU: 0.0056151
+    Sensory neuron__VentraltrunkPUunp: 0.0056151
+    Sensory neuron__trochPU: 0.0056151
+    Sensory neuron__hPUc1: 0.0056151
+    Sensory neuron__pygCirrusPUSM: 0.0056151
+    Sensory neuron__hCirrusPU: 0.0056151
+    Sensory neuron__parapodPU: 0.0056151
+    Sensory neuron__hPU: 0.0056151
+    Sensory neuron__dsoPU: 0.0056151
+    Sensory neuron__pygCirrusPU: 0.0056151
+    chaetal complex__chaeta: 0.0035733
+    chaetal complex__acicula: 0.0035733
+    chaetal complex__acFC-noER: 0.0035733
+    chaetal complex__chaeFC-hemi: 0.0035733
+    chaetal complex__chaeFC-ER: 0.0035733
+    chaetal complex__chaeFC-noER: 0.0035733
+    chaetal complex__chaeFC-EC: 0.0035733
+    ciliary band__akrotroch: 0.007657
+    ciliary band__crescentcell: 0.007657
+    ciliary band__prototroch: 0.007657
+    ciliary band__metatroch: 0.007657
+    ciliary band__paratroch: 0.007657
+    coelothelium__coelothelium: 0.0035733
+    epidermis__EC: 0.0035733
+    excretory system__protonephridium: 0.0040837
+    excretory system__nephridium: 0.0040837
+    excretory system__nephridiumTip: 0.0040837
+    gland__gland-pigment: 0.0045942
+    gland cell__MVGland: 0.0045942
+    gland cell__HeadGland: 0.0045942
+    gland cell__InterparaGland: 0.0045942
+    gland cell__spinMicroGland: 0.0045942
+    gland cell__spinGland: 0.0045942
+    gland cell__ciliatedGland: 0.0045942
+    glia cell__flat-glia: 0.0040837
+    glia cell__ECmidline: 0.0040837
+    glia cell__Glia-pigmented: 0.0040837
+    macrophage-like__macrophage-like: 0.0040837
+    mesoderm__meso 1592020: 0.0035733
+    microvillar__microvillarCell: 0.0040837
+    multiciliated cell__nuchalCiliaCilia: 0.006636
+    muscle__MUSac-notA: 0.0040837
+    muscle__MUSac-notP: 0.0040837
+    muscle__MUSac-notM: 0.0040837
+    muscle__MUSac-neuAV: 0.0040837
+    muscle__MUSac-neuPD: 0.0040837
+    muscle__MUSac-neuPV: 0.0040837
+    muscle__MUSac-neuDy: 0.0040837
+    muscle__MUSac-neuDx: 0.0040837
+    muscle__MUSac-neuDach: 0.0040837
+    muscle__MUSac-neure: 0.0040837
+    muscle__MUSac-i: 0.0040837
+    muscle__MUSobA-re: 0.0040837
+    muscle__MUSobA-arc: 0.0040837
+    muscle__MUSobA-mpp: 0.0040837
+    muscle__MUSobA-mlpp: 0.0040837
+    muscle__MUSobA-lpp: 0.0040837
+    muscle__MUSobA-trans: 0.0040837
+    muscle__MUSobP-notD: 0.0040837
+    muscle__MUSobP-neuDlong: 0.0040837
+    muscle__MUSobP-neuDprox: 0.0040837
+    muscle__MUSobP-neuDdist: 0.0040837
+    muscle__MUSobP-neuV: 0.0040837
+    muscle__MUSobP-notV: 0.0040837
+    muscle__MUSobP-M: 0.0040837
+    muscle__MUSobP-noty: 0.0040837
+    muscle__MUSobP-i: 0.0040837
+    muscle__MUSchae-notDob: 0.0040837
+    muscle__MUSchae-notD: 0.0040837
+    muscle__MUSchae-notDn: 0.0040837
+    muscle__MUSchae-notA: 0.0040837
+    muscle__MUSchae-notAac: 0.0040837
+    muscle__MUSchae-notAre: 0.0040837
+    muscle__MUSchae-neuVob: 0.0040837
+    muscle__MUSchae-neuDac: 0.0040837
+    muscle__MUSchae-neuAVo: 0.0040837
+    muscle__MUSchae-neuAVt: 0.0040837
+    muscle__MUSchae-Are: 0.0040837
+    muscle__MUStrans: 0.0040837
+    muscle__MUSlongD: 0.0040837
+    muscle__MUSlongV: 0.0040837
+    muscle__MUSax: 0.0040837
+    muscle__MUSring-pyg: 0.0040837
+    muscle__MUSph: 0.0040837
+    muscle__MUSll: 0.0040837
+    muscle__MUSant: 0.0040837
+    muscle__MUSly: 0.0040837
+    muscle__MUSpl: 0.0040837
+    muscle__MUSci: 0.0040837
+    muscle__MUSch: 0.0040837
+    muscle__MUSpx: 0.0040837
+    muscle__MUSpr-vt: 0.0040837
+    muscle__MUStri: 0.0040837
+    muscle__MUSmed: 0.0040837
+    pigment cell__eyespot-pigment-cell: 0.0045942
+    pigment cell__pigment-cell: 0.0045942
+    pigment cell__yolk-cover-cell cell: 0.0045942
+    pigment cell__CB-pigment: 0.0045942
+    pigment cell__vacuolar-cell-head: 0.0045942
+    pigment cell__pygidial-pigment-cell: 0.0045942
+    pigment cell__covercell: 0.0045942
+    yolk__yolk: 0.0081674
+  colors:
+    Interneuron__cMNPDF-vcl1: '#7e57c2'
+    Interneuron__INdc: '#7e57c2'
+    Interneuron__INbackcross: '#7e57c2'
+    Interneuron__INbiaxLeg: '#7e57c2'
+    Interneuron__INbiaxH: '#7e57c2'
+    Interneuron__cMNATO: '#7e57c2'
+    Interneuron__INfoot: '#7e57c2'
+    Interneuron__INW: '#7e57c2'
+    Interneuron__INmidL: '#7e57c2'
+    Interneuron__INhook: '#7e57c2'
+    Interneuron__cMNdc: '#7e57c2'
+    Interneuron__INMBtype6: '#7e57c2'
+    Interneuron__INMBtype5: '#7e57c2'
+    Interneuron__INMBtype7: '#7e57c2'
+    Interneuron__INcross: '#7e57c2'
+    Interneuron__INpro: '#7e57c2'
+    Interneuron__INproT2: '#7e57c2'
+    Interneuron__INpear: '#7e57c2'
+    Interneuron__INZ: '#7e57c2'
+    Interneuron__INbigloop: '#7e57c2'
+    Interneuron__INUturn: '#7e57c2'
+    Interneuron__INATOpyg: '#7e57c2'
+    Interneuron__INcomm-Upstairs: '#7e57c2'
+    Interneuron__INasc-pyg: '#7e57c2'
+    Interneuron__INsplitBronto: '#7e57c2'
+    Interneuron__INleucoPU: '#7e57c2'
+    Interneuron__INdecussfoot: '#7e57c2'
+    Interneuron__INdecusshook: '#7e57c2'
+    Interneuron__INpreLadder: '#7e57c2'
+    Interneuron__INcomm-Upcross: '#7e57c2'
+    Interneuron__INsplitVent: '#7e57c2'
+    Interneuron__INcomm-DownL: '#7e57c2'
+    Interneuron__INlasso-postSN: '#7e57c2'
+    Interneuron__INcommascFV: '#7e57c2'
+    Interneuron__INR1: '#7e57c2'
+    Interneuron__INmus: '#7e57c2'
+    Interneuron__INdescLuqinPDF: '#7e57c2'
+    Interneuron__INcosplit: '#7e57c2'
+    Interneuron__INcommdescFVa: '#7e57c2'
+    Interneuron__INsqNSasym: '#7e57c2'
+    Interneuron__INbiaxHmid: '#7e57c2'
+    Interneuron__INhorn: '#7e57c2'
+    Interneuron__INMBPDF: '#7e57c2'
+    Interneuron__INMBdescFMRF: '#7e57c2'
+    Interneuron__INDLSO: '#7e57c2'
+    Interneuron__INexsn: '#7e57c2'
+    Interneuron__MBmouth: '#7e57c2'
+    Interneuron__INtorii: '#7e57c2'
+    Interneuron__INUturnMB: '#7e57c2'
+    Interneuron__INface: '#7e57c2'
+    Interneuron__INMBdesc3: '#7e57c2'
+    Interneuron__INMBdesc2: '#7e57c2'
+    Interneuron__INpara: '#7e57c2'
+    Interneuron__INMBtype9: '#7e57c2'
+    Interneuron__INMBtype2: '#7e57c2'
+    Interneuron__INdecussM: '#7e57c2'
+    Interneuron__IN1: '#7e57c2'
+    Interneuron__INiaStiff: '#7e57c2'
+    Interneuron__INmantis: '#7e57c2'
+    Interneuron__INsplitSpin: '#7e57c2'
+    Interneuron__INlasso: '#7e57c2'
+    Interneuron__INdecussPre: '#7e57c2'
+    Interneuron__INpreMN: '#7e57c2'
+    Interneuron__INton: '#7e57c2'
+    Interneuron__INpreSer: '#7e57c2'
+    Interneuron__MC2biax-1: '#7e57c2'
+    Interneuron__INCrossbow: '#7e57c2'
+    Interneuron__INarc1: '#7e57c2'
+    Interneuron__INarc2: '#7e57c2'
+    Interneuron__INsn: '#7e57c2'
+    Interneuron__INrope: '#7e57c2'
+    Interneuron__INRGWa: '#7e57c2'
+    Interneuron__INCM: '#7e57c2'
+    Interneuron__INNOS: '#7e57c2'
+    Interneuron__INchaeMech: '#7e57c2'
+    Interneuron__INFVa-pyg: '#7e57c2'
+    Interneuron__INsplitCR: '#7e57c2'
+    Interneuron__INsplitCRATO: '#7e57c2'
+    Interneuron__INMC3: '#7e57c2'
+    Interneuron__INbiax: '#7e57c2'
+    Interneuron__INsplitPB-RF/Ya: '#7e57c2'
+    Interneuron__INsplitPBant: '#7e57c2'
+    Interneuron__INsplitPB: '#7e57c2'
+    Interneuron__INsplitPUh: '#7e57c2'
+    Motoneuron__MNcommUpL: '#ec407a'
+    Motoneuron__MNob-ipsi: '#ec407a'
+    Motoneuron__MNpostv: '#ec407a'
+    Motoneuron__Ser-tr1: '#ec407a'
+    Motoneuron__MNladder: '#ec407a'
+    Motoneuron__MNacic: '#ec407a'
+    Motoneuron__MNarm: '#ec407a'
+    Motoneuron__MNantacic: '#ec407a'
+    Motoneuron__MNpostacic: '#ec407a'
+    Motoneuron__MNakro: '#ec407a'
+    Motoneuron__MNchae: '#ec407a'
+    Motoneuron__MNgland-head: '#ec407a'
+    Motoneuron__MNheadV: '#ec407a'
+    Motoneuron__MNantelope: '#ec407a'
+    Motoneuron__MNsmile: '#ec407a'
+    Motoneuron__MNant: '#ec407a'
+    Motoneuron__MNspinning: '#ec407a'
+    Motoneuron__Loop: '#ec407a'
+    Motoneuron__MNspider-ant: '#ec407a'
+    Motoneuron__MNspider-post: '#ec407a'
+    Motoneuron__MNbiramous: '#ec407a'
+    Motoneuron__MNcrab: '#ec407a'
+    Motoneuron__MNhose: '#ec407a'
+    Motoneuron__MNbow: '#ec407a'
+    Motoneuron__MNwave: '#ec407a'
+    Motoneuron__MNacicX: '#ec407a'
+    Motoneuron__Ser-h1: '#ec407a'
+    Motoneuron__cioMNcover: '#ec407a'
+    Motoneuron__MN3: '#ec407a'
+    Motoneuron__MN1: '#ec407a'
+    Motoneuron__MN2: '#ec407a'
+    Motoneuron__MC3cover: '#ec407a'
+    Motoneuron__MC: '#ec407a'
+    Sensory neuron__PRC: '#4fc3f7'
+    Sensory neuron__hCR: '#4fc3f7'
+    Sensory neuron__ventralpygCR: '#4fc3f7'
+    Sensory neuron__doCRunp: '#4fc3f7'
+    Sensory neuron__SN-DLSO1.0: '#4fc3f7'
+    Sensory neuron__SN-NS1: '#4fc3f7'
+    Sensory neuron__SN-NS3: '#4fc3f7'
+    Sensory neuron__SN-NS4: '#4fc3f7'
+    Sensory neuron__SN-NS15: '#4fc3f7'
+    Sensory neuron__SNaant: '#4fc3f7'
+    Sensory neuron__SNPDF-pyg: '#4fc3f7'
+    Sensory neuron__SN-NS22: '#4fc3f7'
+    Sensory neuron__SNnuchPDF: '#4fc3f7'
+    Sensory neuron__SN-NS5: '#4fc3f7'
+    Sensory neuron__SN-NS17: '#4fc3f7'
+    Sensory neuron__SN-YF5cil: '#4fc3f7'
+    Sensory neuron__SN-NS19: '#4fc3f7'
+    Sensory neuron__SN-NS20: '#4fc3f7'
+    Sensory neuron__SN-NS6: '#4fc3f7'
+    Sensory neuron__SN-NS29: '#4fc3f7'
+    Sensory neuron__SN-NS27: '#4fc3f7'
+    Sensory neuron__SN-NS18: '#4fc3f7'
+    Sensory neuron__SN-NS16: '#4fc3f7'
+    Sensory neuron__SNnuchNS: '#4fc3f7'
+    Sensory neuron__SNadNS22: '#4fc3f7'
+    Sensory neuron__SNFVa: '#4fc3f7'
+    Sensory neuron__SNblunt: '#4fc3f7'
+    Sensory neuron__SNnuchBx: '#4fc3f7'
+    Sensory neuron__SNgolden: '#4fc3f7'
+    Sensory neuron__SN-DLSO1.3: '#4fc3f7'
+    Sensory neuron__SNstiff: '#4fc3f7'
+    Sensory neuron__SNbronto: '#4fc3f7'
+    Sensory neuron__SNhorn: '#4fc3f7'
+    Sensory neuron__SNpygM: '#4fc3f7'
+    Sensory neuron__SN-DLSO1.1NP: '#4fc3f7'
+    Sensory neuron__SN-DLSO1.1: '#4fc3f7'
+    Sensory neuron__SNhook: '#4fc3f7'
+    Sensory neuron__SNtorii: '#4fc3f7'
+    Sensory neuron__SNtrpa: '#4fc3f7'
+    Sensory neuron__SNlasso: '#4fc3f7'
+    Sensory neuron__SNMIP-vc: '#4fc3f7'
+    Sensory neuron__SNmus: '#4fc3f7'
+    Sensory neuron__SNantlerPDF: '#4fc3f7'
+    Sensory neuron__SNPDF-dc: '#4fc3f7'
+    Sensory neuron__SN0DLSO1.2-4: '#4fc3f7'
+    Sensory neuron__SN-DLSO1.2-3: '#4fc3f7'
+    Sensory neuron__SN-DLSO1.2-1: '#4fc3f7'
+    Sensory neuron__SN-DLSO2: '#4fc3f7'
+    Sensory neuron__SNMB2: '#4fc3f7'
+    Sensory neuron__eyespot-PRCR3: '#4fc3f7'
+    Sensory neuron__eyespot-PRCR1: '#4fc3f7'
+    Sensory neuron__MS1: '#4fc3f7'
+    Sensory neuron__MS4: '#4fc3f7'
+    Sensory neuron__MS3: '#4fc3f7'
+    Sensory neuron__MS5: '#4fc3f7'
+    Sensory neuron__SN-ASTC: '#4fc3f7'
+    Sensory neuron__SN-DLSO3-PDF: '#4fc3f7'
+    Sensory neuron__SN-DLSO3: '#4fc3f7'
+    Sensory neuron__SN-IRP2-burs: '#4fc3f7'
+    Sensory neuron__SN-IRP2-FMRF: '#4fc3f7'
+    Sensory neuron__SN-MIP4: '#4fc3f7'
+    Sensory neuron__SN-MIP1: '#4fc3f7'
+    Sensory neuron__SN-WLD: '#4fc3f7'
+    Sensory neuron__SN-DSO: '#4fc3f7'
+    Sensory neuron__cPRC: '#4fc3f7'
+    Sensory neuron__SNbicil: '#4fc3f7'
+    Sensory neuron__SNasym: '#4fc3f7'
+    Sensory neuron__SN47Ach: '#4fc3f7'
+    Sensory neuron__pygPBunp: '#4fc3f7'
+    Sensory neuron__chaeMech: '#4fc3f7'
+    Sensory neuron__PB: '#4fc3f7'
+    Sensory neuron__antPUc: '#4fc3f7'
+    Sensory neuron__spinPU: '#4fc3f7'
+    Sensory neuron__VentraltrunkPUunp: '#4fc3f7'
+    Sensory neuron__trochPU: '#4fc3f7'
+    Sensory neuron__hPUc1: '#4fc3f7'
+    Sensory neuron__pygCirrusPUSM: '#4fc3f7'
+    Sensory neuron__hCirrusPU: '#4fc3f7'
+    Sensory neuron__parapodPU: '#4fc3f7'
+    Sensory neuron__hPU: '#4fc3f7'
+    Sensory neuron__dsoPU: '#4fc3f7'
+    Sensory neuron__pygCirrusPU: '#4fc3f7'
+    chaetal complex__chaeta: '#7a7f6e'
+    chaetal complex__acicula: '#7a7f6e'
+    chaetal complex__acFC-noER: '#7a7f6e'
+    chaetal complex__chaeFC-hemi: '#7a7f6e'
+    chaetal complex__chaeFC-ER: '#7a7f6e'
+    chaetal complex__chaeFC-noER: '#7a7f6e'
+    chaetal complex__chaeFC-EC: '#7a7f6e'
+    ciliary band__akrotroch: '#ffb300'
+    ciliary band__crescentcell: '#ffb300'
+    ciliary band__prototroch: '#ffb300'
+    ciliary band__metatroch: '#ffb300'
+    ciliary band__paratroch: '#ffb300'
+    coelothelium__coelothelium: '#68756b'
+    epidermis__EC: '#6b7a5e'
+    excretory system__protonephridium: '#4db6ac'
+    excretory system__nephridium: '#4db6ac'
+    excretory system__nephridiumTip: '#4db6ac'
+    gland__gland-pigment: '#26a69a'
+    gland cell__MVGland: '#26a69a'
+    gland cell__HeadGland: '#26a69a'
+    gland cell__InterparaGland: '#26a69a'
+    gland cell__spinMicroGland: '#26a69a'
+    gland cell__spinGland: '#26a69a'
+    gland cell__ciliatedGland: '#26a69a'
+    glia cell__flat-glia: '#8d6e63'
+    glia cell__ECmidline: '#8d6e63'
+    glia cell__Glia-pigmented: '#8d6e63'
+    macrophage-like__macrophage-like: '#a1887f'
+    mesoderm__meso 1592020: '#788474'
+    microvillar__microvillarCell: '#80cbc4'
+    multiciliated cell__nuchalCiliaCilia: '#ff8f00'
+    muscle__MUSac-notA: '#8d9b6a'
+    muscle__MUSac-notP: '#8d9b6a'
+    muscle__MUSac-notM: '#8d9b6a'
+    muscle__MUSac-neuAV: '#8d9b6a'
+    muscle__MUSac-neuPD: '#8d9b6a'
+    muscle__MUSac-neuPV: '#8d9b6a'
+    muscle__MUSac-neuDy: '#8d9b6a'
+    muscle__MUSac-neuDx: '#8d9b6a'
+    muscle__MUSac-neuDach: '#8d9b6a'
+    muscle__MUSac-neure: '#8d9b6a'
+    muscle__MUSac-i: '#8d9b6a'
+    muscle__MUSobA-re: '#8d9b6a'
+    muscle__MUSobA-arc: '#8d9b6a'
+    muscle__MUSobA-mpp: '#8d9b6a'
+    muscle__MUSobA-mlpp: '#8d9b6a'
+    muscle__MUSobA-lpp: '#8d9b6a'
+    muscle__MUSobA-trans: '#8d9b6a'
+    muscle__MUSobP-notD: '#8d9b6a'
+    muscle__MUSobP-neuDlong: '#8d9b6a'
+    muscle__MUSobP-neuDprox: '#8d9b6a'
+    muscle__MUSobP-neuDdist: '#8d9b6a'
+    muscle__MUSobP-neuV: '#8d9b6a'
+    muscle__MUSobP-notV: '#8d9b6a'
+    muscle__MUSobP-M: '#8d9b6a'
+    muscle__MUSobP-noty: '#8d9b6a'
+    muscle__MUSobP-i: '#8d9b6a'
+    muscle__MUSchae-notDob: '#8d9b6a'
+    muscle__MUSchae-notD: '#8d9b6a'
+    muscle__MUSchae-notDn: '#8d9b6a'
+    muscle__MUSchae-notA: '#8d9b6a'
+    muscle__MUSchae-notAac: '#8d9b6a'
+    muscle__MUSchae-notAre: '#8d9b6a'
+    muscle__MUSchae-neuVob: '#8d9b6a'
+    muscle__MUSchae-neuDac: '#8d9b6a'
+    muscle__MUSchae-neuAVo: '#8d9b6a'
+    muscle__MUSchae-neuAVt: '#8d9b6a'
+    muscle__MUSchae-Are: '#8d9b6a'
+    muscle__MUStrans: '#8d9b6a'
+    muscle__MUSlongD: '#8d9b6a'
+    muscle__MUSlongV: '#8d9b6a'
+    muscle__MUSax: '#8d9b6a'
+    muscle__MUSring-pyg: '#8d9b6a'
+    muscle__MUSph: '#8d9b6a'
+    muscle__MUSll: '#8d9b6a'
+    muscle__MUSant: '#8d9b6a'
+    muscle__MUSly: '#8d9b6a'
+    muscle__MUSpl: '#8d9b6a'
+    muscle__MUSci: '#8d9b6a'
+    muscle__MUSch: '#8d9b6a'
+    muscle__MUSpx: '#8d9b6a'
+    muscle__MUSpr-vt: '#8d9b6a'
+    muscle__MUStri: '#8d9b6a'
+    muscle__MUSmed: '#8d9b6a'
+    pigment cell__eyespot-pigment-cell: '#5e35b1'
+    pigment cell__pigment-cell: '#5e35b1'
+    pigment cell__yolk-cover-cell cell: '#5e35b1'
+    pigment cell__CB-pigment: '#5e35b1'
+    pigment cell__vacuolar-cell-head: '#5e35b1'
+    pigment cell__pygidial-pigment-cell: '#5e35b1'
+    pigment cell__covercell: '#5e35b1'
+    yolk__yolk: '#c5b358'
+  meshes:
+  - file: neural_regions/platynereis_larva_4117/body_outline.obj
+    color: '#2a3038'
+    opacity: 0.12
+seed:
+- op: neural_seed
+  at: neuron
+  region: platynereis_larva_4117
+  v0_mean: 0.0
+  v0_sd: 0.5
+- op: morphology_seed
+  at: morphology
+  parent: neuron
+  region: platynereis_larva_4117
+  kind: skeleton
+  seed: 0
