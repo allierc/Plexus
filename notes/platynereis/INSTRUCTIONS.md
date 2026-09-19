@@ -190,6 +190,31 @@ Kept at the bottom so it is the last thing read and the easiest thing to update.
   4. The 18 per-class parameter vectors were lost at R5: a child set's type counts are per
      parent, so a `per_parent: 1` neuron set carries one type. They were never fitted.
 
-* **R7 next**: tune the neural drive until the beat is a sustained oscillation and the water
-  moves further than 31 um. The trainer exists (`tasks/spec_trainer.py`, `learnables/`) and is
-  batched and differentiable; whether to use it or to hand-tune is the first decision.
+* **2026-09-19, later** — R7, R8, R9 and the R8 claim tests done.
+
+  | rung | commit | the number it produced |
+  |---|---|---|
+  | R7 rhythm | `d53d9240` | connectome CANNOT oscillate (Perron-Frobenius); pacemakers' line reaches the band at 4.13x the unwired floor |
+  | R7 in water | `f30101d5` | moves LESS than R6: peak 0.021 vs 0.049 um. Reciprocal stroke -- scallop theorem |
+  | R8 claims | `f30101d5` | 5 of 5 structural claims hold, every threshold a chance baseline |
+  | R8/R9 strokes | `ac167bc0` | metachrony and a tangential axis change nothing; the TEST is underpowered |
+
+  **THE STATE OF THE SWIMMING QUESTION, stated plainly so it is not rediscovered.** Four stroke
+  configurations give the same transport to within the noise (0.020–0.022 um). That is not a
+  result about cilia, it is a result about the experiment, and three things have to change
+  before the question can be asked again:
+
+  1. **Un-anchor the animal.** `mpm_anchor` at k = 400 holds every material point to its rest
+     position; an anchored animal cannot swim by construction. It is there because the model has
+     no cell-cell adhesion and no extracellular matrix, and R2 measured what happens without it.
+     **The next real rung is adhesion, not a bigger stroke.**
+  2. **Raise the stroke by an order of magnitude**, or accept that 74 cells at 6-10% strain on a
+     200 um animal is below what this fluid resolution can show.
+  3. **Measure the velocity field beside the band, phase-locked to the beat**, not net
+     displacement over 45 s -- which is dominated by the pool's initial pressure equilibration.
+
+  R8's one positive geometric finding stands on its own: a metachronal wave over a RADIAL stroke
+  changes nothing, because winding the phase changes when each cell pushes and never which way.
+
+* **Next**: adhesion between cells, so the animal is a tissue rather than a heap held by a
+  scaffold. Everything downstream of swimming waits on it.
