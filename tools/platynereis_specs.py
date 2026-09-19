@@ -931,6 +931,55 @@ def spec_r9(f: dict, wavenumber: float = 6.0, n_water: int = 140000,
     return base
 
 
+def spec_r10(f: dict, soma_um: float = 4.0, per_cell: int = 48, n_frames: int = 600) -> dict:
+    """R10: cells that actually FILL the animal, and no anchor holding it up.
+
+    WHY EVERY RUNG SO FAR NEEDED A SCAFFOLD. At a soma radius of 1.9 um the 4,117 cells occupy
+    6.0% of the animal's bounding box -- measured, not estimated. That is not a tissue, it is a
+    sparse cloud of balls in the shape of a larva, and it behaves like one: R2 dropped it and the
+    body squashed to 55% of its height while every cell kept 97% of its own radius, and R5 onward
+    could only stand it up with an `mpm_anchor` pinning every material point to where it started.
+    An anchored animal cannot swim by construction, which is why R6-R9 compared four stroke
+    designs and found them indistinguishable.
+    
+    The fix is not an adhesion operator. It is that 1.9 um was a DRAWING choice, taken from a
+    `soma_radius` field that is the constant 2000 nm for all 4,117 cells -- a placeholder the
+    region builder wrote, not a measurement. At 4.0 um the same cells fill 63% of the bounding
+    box, which for a body that is not a box is most of its actual volume: they touch, the MLS-MPM
+    continuum is continuous, and the elasticity that was always there holds the animal together
+    with nothing pinning it. Platynereis cells are 3-6 um across, so this is the more defensible
+    number as well as the one that works.
+
+    48 points per cell and not 24, because the points must still resolve the grid: a 4.0 um ball
+    holding 48 points spaces them 1.8 um apart against a grid cell of 2.04 um, so every grid cell
+    that the animal covers sees at least one particle.
+
+    NO WATER HERE. This rung asks one question -- does the body hold itself up -- and a pool
+    around it would both slow the run and give the answer somewhere to hide.
+    """
+    um = f["side_um"]
+    r = soma_um / um
+    pm = 1050.0 * (4.0 / 3.0) * math.pi * r ** 3 / per_cell
+    base = spec_r7(f, per_cell=per_cell, soma_um=soma_um, n_frames=n_frames)
+    base["general"]["name"] = "plat_r10_tissue"
+    base["sets"]["mpm_particle"] = {"parent": "cell", "per_parent": per_cell, "density": 1050.0,
+                                    "radius": round(r, 6), "particle_mass": float(f"{pm:.4g}")}
+    # THE ANCHOR GOES. That is the whole experiment.
+    base["operators"] = [o for o in base["operators"] if o.get("op") != "mpm_anchor"]
+    base["schedule"] = ["neuron_pacemaker", "neuron_update", "neuron_signal", "phase_clock",
+                        {"substep_dt": 0.005,
+                         "steps": ["polar_active_stress", "mpm_strain", "mpm_scatter",
+                                   "mpm_grid_update", "mpm_gather"]},
+                        "aggregate_centroid"]
+    for op in base["seed"]:
+        if op.get("op") == "radial_polarity":
+            op["direction"] = "tangential"
+    base["seed"] = list(base["seed"]) + [
+        {"op": "metachronal_phase", "at": "cell[type=ciliary band]", "wavenumber": 6.0,
+         "axis": 2, "centre": [0.5, 0.5, 0.0]}]
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -951,7 +1000,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -959,6 +1008,21 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r10", "all"):
+        import yaml
+        sp = spec_r10(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} cells at 4.0 um fill the body; "
+              f"{F['n'] * sp['sets']['mpm_particle']['per_parent']:,} points, NO anchor")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R10 -- a tissue rather than a heap. At 1.9 um the cells filled 6.0%\n"
+                         "# of the animal's bounding box and needed an anchor to stand up; at\n"
+                         "# 4.0 um they fill 63% and touch, so the elasticity that was always\n"
+                         "# there holds the body together with nothing pinning it.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r9", "all"):
         import yaml
         sp = spec_r9(F)

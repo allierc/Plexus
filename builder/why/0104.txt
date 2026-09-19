@@ -1,0 +1,5 @@
+time   2026-09-19 12:39:00
+spec   plat_r10_tissue
+camera azim=20.0 elev=8.0 zoom=1.3
+movie  mp4/0104.mp4  (70.5 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r10_tissue/movie.mp4)
+why    R10: a tissue rather than a heap, and no anchor. Measured: at a soma radius of 1.9 um the 4,117 cells occupy 6.0% of the animal's bounding box -- that is not a tissue, it is a sparse cloud of balls in the shape of a larva, and it behaved like one. R2 dropped it and the body squashed to 55% of its height while every cell kept 97% of its own radius; R5 onward could only stand it up with an mpm_anchor pinning every point to where it started, and an anchored animal cannot swim by construction, which is why R6-R9 found four stroke designs indistinguishable. 1.9 um was a DRAWING choice taken from a soma_radius field that is the constant 2000 nm for all 4,117 cells -- a placeholder, not a measurement. At 4.0 um the same cells fill 63% of the bounding box and touch, so the elasticity that was always there should hold the animal together with nothing pinning it. Platynereis cells are 3-6 um across. (after the run)

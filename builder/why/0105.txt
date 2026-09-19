@@ -1,0 +1,4 @@
+time   2026-09-19 12:40:19
+spec   plat_r10_tissue
+camera (a figure, not a render)
+why    R10: with the cells filling the animal at 4.0 um and NO anchor, does the body still hold and does the band still beat? The extent measured 100.0/101.2/100.0 percent of its start over 600 frames and each cell kept 100% of its own radius -- the elasticity holds it, nothing pins it.
