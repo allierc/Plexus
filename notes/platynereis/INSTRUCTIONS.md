@@ -216,5 +216,33 @@ Kept at the bottom so it is the last thing read and the easiest thing to update.
   R8's one positive geometric finding stands on its own: a metachronal wave over a RADIAL stroke
   changes nothing, because winding the phase changes when each cell pushes and never which way.
 
-* **Next**: adhesion between cells, so the animal is a tissue rather than a heap held by a
-  scaffold. Everything downstream of swimming waits on it.
+* **2026-09-19, R10 and R11 — the block cleared.**
+
+  | rung | commit | the number |
+  |---|---|---|
+  | R10 tissue | `f16be308` | cells at 4.0 um FILL the body; it holds 100.0% of its extent over 600 UNANCHORED frames |
+  | R11 swim | `e6bd88cc` | free animal moves 0.239 um, straightness 0.858; the zero-amplitude control moves 0.000 |
+
+  **What was wrong the whole time, and it was never the physics.** At a soma radius of 1.9 um the
+  4,117 cells occupy **6.0%** of the animal's bounding box. That is a sparse cloud of balls in the
+  shape of a larva, and it needed an `mpm_anchor` to stand up — which pinned every material point
+  and made swimming impossible by construction. And 1.9 um was never a measurement: `soma_radius`
+  in the region is the constant 2000 nm for all 4,117 cells, a placeholder, which R1 turned into a
+  drawing choice and later rungs let become a physical one. At 4.0 um (Platynereis cells are 3–6 um)
+  they fill 63%, they touch, and the elasticity that was always there holds the animal together.
+
+  **The swim result, stated exactly.** 0.239 um of directed displacement caused by the beat —
+  the control with `amplitude_frac: 0.0` moves 0.000 um and its water drifts 0.000 um. It is also
+  0.0066 um/s on a 165 um animal, about 4e-5 body lengths per second against the ~5 a real
+  nectochaete swims: five orders of magnitude short. The sign and the cause are right; the
+  magnitude is not.
+
+* **Open questions, in the order they matter:**
+  1. **Why is the displacement along the box diagonal** ([0.575, 0.577, 0.580])? The control rules
+     out a numerical drift, so this is a property of the beat and is unexplained.
+  2. **Five orders of magnitude.** Candidates: the stroke is 10% strain on 74 of 4,117 cells; the
+     cilia are cells rather than slender appendages, so the lever arm is missing; the fluid is a
+     compressible MPM continuum rather than Stokes flow.
+  3. Re-run R8 and R9 (metachrony, tangential stroke) now that the animal is FREE — they were
+     compared under the anchor, where nothing could have distinguished them.
+  4. A cilium as a slender appendage, which is the honest version of the whole motor rung.
