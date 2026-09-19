@@ -525,7 +525,8 @@ def g_picture(h, q, route):
             bio.STATE["pick"] = pk
             return h._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
         if q.get("azim") or q.get("elev") or q.get("zoom"):
-            v.set_camera(*(float((q.get(k) or [str(getattr(v, k))])[0]) for k in ("azim", "elev", "zoom")))
+            v.set_camera(*(float((q.get(k) or [str(getattr(v, k, 0.0) or 0.0)])[0])
+                           for k in ("azim", "elev", "zoom", "roll")))
         if q.get("frame"):                                       # a kept frame of the last run, at this camera
             v.show_frame(int(q["frame"][0]))
         if q.get("pick"):
@@ -1165,7 +1166,8 @@ def g_shot(h, q):
         return h._send_json({"error": "no scene is open; seed one first"}, 400)
     try:
         if q.get("azim") or q.get("elev") or q.get("zoom"):
-            v.set_camera(*(float((q.get(k) or [str(getattr(v, k))])[0]) for k in ("azim", "elev", "zoom")))
+            v.set_camera(*(float((q.get(k) or [str(getattr(v, k, 0.0) or 0.0)])[0])
+                           for k in ("azim", "elev", "zoom", "roll")))
         if q.get("frame"):
             v.show_frame(int(q["frame"][0]))
         png = v.png()

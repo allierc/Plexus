@@ -1182,8 +1182,21 @@ class LiveMovie:
                 if not self._contour_build(H, lvl, pos):
                     self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                     point_size=self._dot_px(pos))
-            elif (self.style or {}).get("dot_radius") and self._glyph_build(H, lvl):
-                pass                                          # spheres of world radius per type, below
+            elif (self.style or {}).get("dot_radius") is not None and (
+                    self._glyph_build(H, lvl)
+                    or bool((self.style or {}).get("glyphs_only", False))):
+                # SPHERES OF WORLD RADIUS PER TYPE (below), and with `glyphs_only` NOTHING ELSE.
+                #
+                # `dot_radius` names the types to draw and `_glyph_types` skips any type without
+                # an entry, which is what makes a layered build possible: a class absent from the
+                # mapping is not drawn small or drawn dark, it is not drawn. But the fall-through
+                # undid it -- an EMPTY mapping is falsy, so `dot_radius: {}` (draw no cells at
+                # all, the rung that shows only the body's outline) skipped this branch entirely
+                # and the plain cloud drew all 4,117 somata in the default blue. `is not None`
+                # distinguishes "no mapping declared" from "a mapping that selects nothing", and
+                # `glyphs_only` says the fall-back is unwanted even when the mapping selects
+                # nothing, which is exactly the empty case.
+                pass
             elif _r3d != "surface" or not self._skin_build(H, lvl, pos):
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))

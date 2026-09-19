@@ -1,0 +1,108 @@
+# R1.06 -- the musculature: longitudinal, transverse, oblique, pharyngeal
+# Written by tools/platynereis_specs.py; the ladder is the video's own order.
+general:
+  name: plat_r1_06_muscle
+  seed: 0
+  n_frames: 0
+  dt: 0.01
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: wall
+  record_cap: 2
+  units:
+    length_um: 195.9
+    time_s: 1.0
+sets:
+  brain:
+    n: 1
+  neuron:
+    parent: brain
+    per_parent: 4117
+    type_layout: ordered
+    types:
+      Interneuron:
+        count: 317
+      Motoneuron:
+        count: 124
+      Sensory neuron:
+        count: 503
+      chaetal complex:
+        count: 657
+      ciliary band:
+        count: 74
+      coelothelium:
+        count: 101
+      epidermis:
+        count: 1120
+      excretory system:
+        count: 20
+      gland:
+        count: 10
+      gland cell:
+        count: 62
+      glia cell:
+        count: 72
+      macrophage-like:
+        count: 13
+      mesoderm:
+        count: 24
+      microvillar:
+        count: 13
+      multiciliated cell:
+        count: 6
+      muscle:
+        count: 840
+      pigment cell:
+        count: 156
+      yolk:
+        count: 5
+seed:
+- op: neural_seed
+  at: neuron
+  region: platynereis_larva_4117
+  v0_mean: 0.0
+  v0_sd: 0.0
+operators: []
+schedule: []
+fields: {}
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: false
+  up_axis: 2
+  dot_shading: true
+  max_frames: 1
+  stills: 1
+  keep_stills: true
+  dot_radius:
+    yolk: 0.045942
+    chaetal complex: 0.010209
+    coelothelium: 0.013272
+    mesoderm: 0.013272
+    ciliary band: 0.012251
+    multiciliated cell: 0.012251
+    glia cell: 0.010209
+    muscle: 0.009188
+  glyphs_only: true
+  colors:
+    yolk: '#d8d2c4'
+    chaetal complex: '#2b2b30'
+    coelothelium: '#d98a3d'
+    mesoderm: '#b06a2c'
+    ciliary band: '#e24a6a'
+    multiciliated cell: '#f07a94'
+    glia cell: '#1f9e8f'
+    muscle: '#c94040'
+  static_mesh:
+    file: neural_regions/platynereis_larva_4117/body_outline.obj
+    color: '#aeb6c2'
+    opacity: 0.16
+    to_world:
+      origin:
+      - 6929.0
+      - 4209.0
+      - -2760.0
+      scale: 5.104645227156713e-06

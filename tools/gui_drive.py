@@ -65,8 +65,11 @@ def note(msg: str) -> None:
         f.write(f"{time.strftime('%H:%M:%S')}  {msg}\n")
 
 
-def _get(path, **q):
-    url = f"{BASE}{path}" + ("?" + urllib.parse.urlencode(q) if q else "")
+def _get(_route, **q):
+    # `_route` and not `path`: the open route takes a query parameter CALLED `path`, and a plain
+    # `path` here collided with it -- `_get("/api/scene/open", path=p)` raised "got multiple
+    # values for argument 'path'". A leading underscore keeps the whole query namespace free.
+    url = f"{BASE}{_route}" + ("?" + urllib.parse.urlencode(q) if q else "")
     with urllib.request.urlopen(url, timeout=1800) as r:
         body = r.read()
     try:
@@ -103,6 +106,35 @@ def build(tab: str, form: dict, seed: bool = True) -> dict:
             note(f"  seed FAILED: {str(s['error'])[:120]}")
         else:
             out["sets"] = {k: v.get("n_live") for k, v in (s.get("sets") or {}).items()}
+            note(f"  seeded in {out['seed_s']}s: "
+                 + ", ".join(f"{k} {v:,}" for k, v in out["sets"].items() if v))
+    return out
+
+
+def open_spec(path: str, seed: bool = True) -> dict:
+    """Open a spec WRITTEN BY HAND and seed it -- the path for anything a tab's form cannot say.
+
+    The tabs are form-writers; a form that knows a ball and a block cannot express 4,117 somata at
+    their measured positions, and it should not be bent until it can. `/api/scene/open` imports
+    the file and opens it exactly as written, which is also what `Plexus_Main.py -o generate` runs.
+    """
+    p = path if os.path.isabs(path) else os.path.join(REPO, path)
+    note(f"open   {os.path.relpath(p, REPO)}")
+    t0 = time.perf_counter()
+    r = _get("/api/scene/open", path=p)
+    if "error" in r:
+        note(f"  open FAILED: {str(r['error'])[:160]}")
+        return {"step": "open", **r}
+    out = {"opened": r.get("name"), "open_s": round(time.perf_counter() - t0, 2)}
+    if seed:
+        t1 = time.perf_counter()
+        sres = _get("/api/scene/seed", name=r.get("name"))
+        out["seed_s"] = round(time.perf_counter() - t1, 2)
+        if "error" in sres:
+            out["error"] = sres["error"]
+            note(f"  seed FAILED: {str(sres['error'])[:160]}")
+        else:
+            out["sets"] = {k: v.get("n_live") for k, v in (sres.get("sets") or {}).items()}
             note(f"  seeded in {out['seed_s']}s: "
                  + ", ".join(f"{k} {v:,}" for k, v in out["sets"].items() if v))
     return out
@@ -230,8 +262,9 @@ def caption(mp4: str, frames: int = 8) -> dict:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["build", "shot", "run", "status", "wait", "artefacts",
-                                    "log", "caption", "cycle"])
+    ap.add_argument("cmd", choices=["build", "open", "shot", "run", "status", "wait", "artefacts",
+                                    "log", "caption", "cycle", "opencycle"])
+    ap.add_argument("--spec", default=None, help="path of a hand-written spec, for open/opencycle")
     ap.add_argument("--tab", default="platynereis")
     ap.add_argument("--form", default="{}")
     # A FORM IS OFTEN TOO BIG FOR A COMMAND LINE. The material tab's form carries one entry per
@@ -246,6 +279,10 @@ def main():
     ap.add_argument("--azim", type=float, default=35.0)
     ap.add_argument("--elev", type=float, default=12.0)
     ap.add_argument("--zoom", type=float, default=1.3)
+    # WHICH END OF THE ANIMAL IS UP, in degrees of camera roll. The Platynereis region runs
+    # head (low z) to tail (high z), so a z-up camera draws it upside down against its own paper;
+    # `--roll 180` turns the picture over without touching the data or the lighting.
+    ap.add_argument("--roll", type=float, default=0.0)
     ap.add_argument("--no-caption", action="store_true")
     # WHY THIS STEP EXISTS, in the session's own words. It is the third file of the record and the
     # only one that cannot be reconstructed from the others.
@@ -255,8 +292,10 @@ def main():
 
     if a.cmd == "build":
         print(json.dumps(build(a.tab, form), indent=1))
+    elif a.cmd == "open":
+        print(json.dumps(open_spec(a.spec), indent=1))
     elif a.cmd == "shot":
-        print(json.dumps(shot(a.why, a.mp4, azim=a.azim, elev=a.elev, zoom=a.zoom), indent=1))
+        print(json.dumps(shot(a.why, a.mp4, azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll), indent=1))
     elif a.cmd == "status":
         print(json.dumps(status(), indent=1))
     elif a.cmd == "wait":
@@ -270,6 +309,25 @@ def main():
     elif a.cmd == "run":
         note(f"run  device={a.device}")
         print(json.dumps(_post("/api/scene/run", {"device": a.device}), indent=1))
+    elif a.cmd == "opencycle":
+        # THE SAME LOOP AS `cycle`, STARTING FROM A FILE instead of from a tab's form.
+        rep = {"open": open_spec(a.spec)}
+        if rep["open"].get("error"):
+            print(json.dumps(rep, indent=1)); return
+        rep["shot_before"] = shot(f"{a.why} (before the run)".strip(),
+                                  azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        note(f"run  device={a.device}")
+        rep["started"] = _post("/api/scene/run", {"device": a.device})
+        rep["final"] = wait()
+        nm = rep["open"]["opened"]
+        rep["artefacts"] = artefacts(nm)
+        rep["engine_log"] = engine_log(nm, a.tail)
+        rep["mp4"] = mp4 = _mp4_path(rep["artefacts"])
+        rep["shot_after"] = shot(f"{a.why} (after the run)".strip(), mp4,
+                                 azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        if mp4 and not a.no_caption and os.path.exists(mp4):
+            rep["caption"] = caption(mp4)
+        print(json.dumps(rep, indent=1))
     elif a.cmd == "cycle":
         # THE WHOLE LOOP, which is the reason this file exists: build, look, run, wait, collect,
         # read the engine's own words, and ask the VLLM what the movie shows.
@@ -277,7 +335,7 @@ def main():
         if rep["build"].get("error"):
             print(json.dumps(rep, indent=1)); return
         rep["shot_before"] = shot(f"{a.why} (before the run)".strip(),
-                                  azim=a.azim, elev=a.elev, zoom=a.zoom)
+                                  azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
         note(f"run  device={a.device}")
         rep["started"] = _post("/api/scene/run", {"device": a.device})
         rep["final"] = wait()
@@ -286,7 +344,7 @@ def main():
         rep["engine_log"] = engine_log(nm, a.tail)
         rep["mp4"] = mp4 = _mp4_path(rep["artefacts"])
         rep["shot_after"] = shot(f"{a.why} (after the run)".strip(), mp4,
-                                 azim=a.azim, elev=a.elev, zoom=a.zoom)
+                                 azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
         if mp4 and not a.no_caption and os.path.exists(mp4):
             rep["caption"] = caption(mp4)
         print(json.dumps(rep, indent=1))

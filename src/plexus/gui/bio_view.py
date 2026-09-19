@@ -209,16 +209,27 @@ class View:
             self.lm.p.render()
 
     # ------------------------------------------------------------------ camera and picture
-    def set_camera(self, azim=None, elev=None, zoom=None):
-        return _vtk(self._set_camera, azim, elev, zoom)
+    def set_camera(self, azim=None, elev=None, zoom=None, roll=None):
+        return _vtk(self._set_camera, azim, elev, zoom, roll)
 
-    def _set_camera(self, azim=None, elev=None, zoom=None):
+    def _set_camera(self, azim=None, elev=None, zoom=None, roll=None):
         if self.panel is not None:
             return
         with LOCK:
             if azim is not None: self.azim = float(azim)
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
             if zoom is not None: self.zoom = max(0.05, min(60.0, float(zoom)))
+            # ROLL, BECAUSE WHICH END IS UP IS A VIEW CHOICE AND NOTHING ELSE.
+            #
+            # The orbit is built around `up_axis` with the up vector +axis, and `elev` is clamped
+            # to +-89 deg, so there is no way to get from it to a picture of an animal whose long
+            # axis runs the other way -- the Platynereis region has its head at LOW z and its tail
+            # at high z, so z-up draws the larva upside down against every figure in its own
+            # paper. Rolling 180 deg turns the picture over. It is deliberately NOT a flipped
+            # `up_axis`: the up axis also decides where the floor is drawn and which way the scale
+            # bar is lifted, and a scene lit and floored for one up vector and photographed from
+            # the other is a worse picture than an upside-down one.
+            if roll is not None: self.roll = float(roll)
             a, e = np.radians(self.azim), np.radians(self.elev)
             # the orbit is about the spec's `up_axis`: elevation climbs along it, azimuth turns around it
             up = self.up_axis
@@ -232,6 +243,11 @@ class View:
             par = bool(cam.parallel_projection)
             cam.position = tuple(self.focal + d * (self.dist0 if par else self.dist0 / self.zoom))
             cam.up = tuple(U)
+            _roll = float(getattr(self, "roll", 0.0) or 0.0)
+            if _roll:
+                # `camera.roll` is a pyvista PROPERTY, not VTK's `Roll()` method -- calling it
+                # raises TypeError, which the shot route swallowed into a reply with no `path`.
+                cam.roll = cam.roll + _roll
             # THE MOVIE'S CAMERA IS ORTHOGRAPHIC (`parallel_projection`, live_movie.py:547), so
             # zoom is the parallel scale (half the view height in world units), not the distance.
             if bool(cam.parallel_projection):

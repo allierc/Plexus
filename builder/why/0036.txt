@@ -1,0 +1,4 @@
+time   2026-09-19 10:21:14
+spec   plat_r1_09_epidermis
+camera azim=20.0 elev=8.0 zoom=1.45
+why    R1.09 adds the epidermis, 1,120 cells, which closes the animal: 1,120 cells of 'epidermis', bringing the animal to 3,173 of 4,117 drawn. The order is the source video's own (elife-97964-video1.mp4), so the two can be compared frame for frame. No gravity and no clock: R1 is an assembly, and a falling animal would hide a misplaced layer under the motion.

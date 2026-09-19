@@ -1,0 +1,4 @@
+time   2026-09-19 10:16:34
+spec   plat_r1_08_glands
+camera azim=20.0 elev=8.0 zoom=1.45
+why    R1.08 adds glands, nephridia and the odds and ends: 118 cells of 'gland', 'gland cell', 'excretory system', 'microvillar', 'macrophage-like', bringing the animal to 2,053 of 4,117 drawn. The order is the source video's own (elife-97964-video1.mp4), so the two can be compared frame for frame. No gravity and no clock: R1 is an assembly, and a falling animal would hide a misplaced layer under the motion.
