@@ -1,0 +1,5 @@
+time   2026-09-19 10:34:19
+spec   plat_r2_fall
+camera azim=20.0 elev=8.0 zoom=1.15
+movie  mp4/0050.mp4  (4.8 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r2_fall/movie.mp4)
+why    R2 after the drop: 240 frames at dt 20 us = 4.8 ms of fall under 9.81 m/s2 along -z, onto a wall floor with damping 0.6 and friction 0.4. The question this rung answers is whether the measured anatomy is MECHANICALLY coherent -- whether the episphere stays a head and the parapodia stay parapodia through an impact. If it flew apart, a layer is misplaced and the rest of the ladder would be built on sand.

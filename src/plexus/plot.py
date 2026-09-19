@@ -117,7 +117,15 @@ def _typed_palette(sim, sname: str, style: dict):
     cmap_colors = style.get("colors")
     pal = None
     if cmap_colors:
-        pal = np.array([to_rgb(tuple(cmap_colors[nm])) if nm in cmap_colors else (1.0, 1.0, 1.0)
+        # A COLOUR MAY BE A TRIPLE OR A NAME, and `tuple()` destroys the second kind.
+        # `tuple("#2f6fb5")` is a seven-character tuple, which `to_rgb` rejects with "RGBA
+        # sequence should have length 3 or 4" -- and the caller catches that, prints "palette
+        # unavailable" and colours by HEIGHT instead. So every spec that wrote its palette as hex
+        # strings, which is how a person writes one, silently lost it. `to_rgb` already
+        # understands "#2f6fb5", "tab:blue" and "red"; only a list needs converting.
+        def _rgb(v):
+            return to_rgb(tuple(v)) if isinstance(v, (list, tuple, np.ndarray)) else to_rgb(v)
+        pal = np.array([_rgb(cmap_colors[nm]) if nm in cmap_colors else (1.0, 1.0, 1.0)
                         for nm in names], np.float32)
     size_by = style.get("size_by")
     sf = None

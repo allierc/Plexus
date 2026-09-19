@@ -1,0 +1,5 @@
+time   2026-09-19 10:55:23
+spec   plat_r2_fall
+camera azim=20.0 elev=8.0 zoom=0.72
+movie  mp4/0062.mp4  (13.4 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r2_fall/movie.mp4)
+why    R2 RESULT, measured not asserted. The animal fell 95 um -- a third of its own length -- in 1.17 s and landed. Each cell kept 97.3% of its own mean point-to-centre distance, so the cells themselves held together. The ANIMAL did not: its height went 105.8 -> 59.1 um (55%) and its width 70.5 -> 84.3 um (120%). It pancaked. That is the honest reading of a body whose 4,117 cells are coupled ONLY through contact on the shared MPM grid -- there is no cell-cell adhesion and no extracellular matrix in this spec, so the anatomy is a heap of soft balls in the shape of a larva rather than a tissue. Worth knowing before R5 hangs cilia off it.

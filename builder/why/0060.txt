@@ -1,0 +1,4 @@
+time   2026-09-19 10:51:45
+spec   plat_r2_fall
+camera azim=20.0 elev=8.0 zoom=1.1
+why    R2: the assembled anatomy, dropped -- and the movie now rolled with the stills. 4,117 cells, each a soft ball of 1.90 um radius made of 24 MPM material points (98,808 in all) on one shared grid. It falls 67 um, a third of its own length, landing after 1.17 s of the 1.5 s run. Gravity acts along +z so that a head-up view also shows it falling downward. The rung asks whether the measured anatomy is mechanically coherent. (before the run)

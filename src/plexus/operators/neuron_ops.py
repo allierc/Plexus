@@ -540,7 +540,8 @@ class NeuralSeed(Seed):
     neuron -> neuron: reads a file, writes pos, voltage and neurite_dir, once, at the opening
     of the trajectory.
 
-        x_i = (xyz_i - bounds_lo) / side          the cube becomes the unit box
+        x_i = offset + scale * (xyz_i - bounds_lo) / side     the cube becomes the unit box,
+                                                              placed where the spec asks
         v_i = v0_mean + v0_sd z_i,  z_i ~ N(0, 1)
 
     xyz_i is the soma position in NANOMETRES and side the cube's edge in the same units; the
@@ -583,7 +584,8 @@ class NeuralSeed(Seed):
     REQUIRES_PARAMS = ["region"]
     MECHANISM_TAGS = ["connectome", "anatomy", "initial_condition", "neuprint"]
     PARAM_ROLES = {"region": "frozen_region_manifest_dir", "v0_sd": "initial_voltage_spread",
-                   "v0_mean": "initial_voltage_mean"}
+                   "v0_mean": "initial_voltage_mean", "offset": "region_origin_in_world_units",
+                   "scale": "fraction_of_the_world_the_region_cube_fills"}
     REFERENCE = ("Region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain "
                  "connectome from Scheffer, L. K. et al. (2020). A connectome and analysis of "
                  "the adult Drosophila central brain. eLife 9:e57443.")
@@ -594,6 +596,8 @@ class NeuralSeed(Seed):
         self.region = params["region"]
         self.v0_mean = float(params.get("v0_mean", 0.0))
         self.v0_sd = float(params.get("v0_sd", 0.5))   # a spread, so v = 0 is not a fixed point
+        self.offset = params.get("offset")             # where the region sits, in world units
+        self.scale = float(params.get("scale", 1.0))   # how much of the world the cube fills
 
     def _load(self):
         # `region_path` owns the convention -- a bare name resolves to
@@ -626,6 +630,23 @@ class NeuralSeed(Seed):
                 f"a different circuit than the one the manifest and the connectome describe.")
         D = H.dim
         unit = (xyz - lo) / side                                   # the cube -> the unit box
+        # WHERE THE REGION SITS IN THE WORLD, in world units, added after the affine.
+        #
+        # The mapping above fills the unit box by construction, which is right when the world IS
+        # the region and wrong the moment the region has to share the world with anything else --
+        # a floor to fall onto, a volume of water to swim through, a second animal. Those need a
+        # world larger than the cube and the region placed somewhere in it, and there was no way
+        # to say so: an animal seeded into a 1 x 1 x 3 box still spanned z = 0 to 0.95 and was
+        # already resting on the floor.
+        #
+        # It is a TRANSLATION and nothing else. No scale, no rotation: every distance ratio the
+        # affine preserved is still preserved, and `length_um` still means what it meant, so the
+        # units check below is untouched. `scale` is offered for the same reason and defaults to
+        # 1, so a spec that declares neither gets exactly the old behaviour.
+        if self.scale != 1.0:
+            unit = unit * self.scale
+        if self.offset is not None:
+            unit = unit + np.asarray(self.offset, np.float64)[None, :unit.shape[1]]
         dev = lvl.state.device
         st = lvl.state.clone()                                     # clone-and-reassign: autograd-safe
         px0, px1 = lvl.state_schema["pos"]

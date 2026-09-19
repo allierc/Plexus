@@ -33,6 +33,8 @@ import json
 import os
 import sys
 
+import math
+
 import numpy as np
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -180,6 +182,7 @@ def spec(rung: int, f: dict) -> dict:
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
             "dot_shading": True, "max_frames": 1, "stills": 1, "keep_stills": True,
+            "camera_roll": 180.0,
             # THE LAYER SWITCH. Only the classes this rung has reached carry a radius, and a class
             # with no radius is not drawn (`live_movie._glyph_types`). See the module docstring.
             "dot_radius": {c: round(RADIUS_UM[c] / um, 6) for c in shown},
@@ -195,6 +198,127 @@ def spec(rung: int, f: dict) -> dict:
                 "color": "#aeb6c2", "opacity": 0.16,
                 "to_world": {"origin": f["lo_nm"], "scale": 1.0 / f["side_nm"]},
             },
+        },
+    }
+
+
+# THE MATERIAL OF EACH CLASS, a first guess and stated as such: nothing here has been fitted.
+# Young's modulus in pascals, density in kg/m3. The chaetae are stiff because they are chitin
+# rods; the yolk is soft and the densest thing in the animal because it is stored lipid and
+# protein; muscle and epidermis sit between.
+MATERIAL = {
+    "Interneuron": (1500.0, 1050.0), "Motoneuron": (1500.0, 1050.0),
+    "Sensory neuron": (1500.0, 1050.0), "chaetal complex": (8000.0, 1200.0),
+    "ciliary band": (1200.0, 1050.0), "coelothelium": (1200.0, 1040.0),
+    "epidermis": (2500.0, 1060.0), "excretory system": (1200.0, 1040.0),
+    "gland": (1000.0, 1040.0), "gland cell": (1000.0, 1040.0),
+    "glia cell": (1200.0, 1040.0), "macrophage-like": (900.0, 1030.0),
+    "mesoderm": (1500.0, 1050.0), "microvillar": (1200.0, 1040.0),
+    "multiciliated cell": (1200.0, 1050.0), "muscle": (3000.0, 1060.0),
+    "pigment cell": (1800.0, 1060.0), "yolk": (400.0, 1150.0),
+}
+
+
+def positions(f: dict, scale: float, offset: list) -> list:
+    """The 4,117 measured soma positions, mapped into the world exactly as `neural_seed` maps them.
+
+    WHY THEY ARE WRITTEN INTO THE SPEC AND NOT SEEDED. `neural_seed` runs in the `seed:` block,
+    which is AFTER the hierarchy is built -- and an `mpm_particle` set is filled around its
+    parent's position at BUILD time. So a spec that seeds neurons from the region and hangs
+    material points off them gets its cells moved to their measured positions and their matter
+    left behind at the origin: the whole animal renders as one small blob, which is exactly what
+    happened the first time. Writing the positions as the set's own `start:` puts the cells where
+    they belong before any particle is placed.
+
+    The affine is `neural_seed`'s, to the digit: `offset + scale * (xyz - bounds_lo) / side`. The
+    provenance it would have recorded is written into the spec's header comment instead.
+    """
+    import numpy as _np
+    z = _np.load(os.path.join(region_dir(), "neurons.npz"), allow_pickle=True)
+    xyz = _np.asarray(z["xyz"], _np.float64)
+    unit = (xyz - _np.asarray(f["lo_nm"])) / f["side_nm"]
+    w = _np.asarray(offset)[None, :] + scale * unit
+    return [[round(float(v), 6) for v in row] for row in w]
+
+
+def spec_r2(f: dict, scale: float = 0.55, offset=(0.22, 0.22, 0.74),
+            per_cell: int = 24, soma_um: float = 1.9) -> dict:
+    """R2: the assembled anatomy as matter, dropped.
+
+    Every cell becomes a parent of `per_cell` MPM material points, so the animal is a heap of
+    4,117 soft balls sharing one background grid -- which is what lets them push on each other.
+    The particle mass fixes each cell's VOLUME (`V = per_parent * particle_mass / density`), and
+    it is chosen so a cell of density 1050 is a ball of `soma_um` radius. It is in WORLD units,
+    not kilogrammes: `p_vol` is read as a world-cube volume.
+    """
+    um = f["side_um"]
+    r = soma_um / um                                       # the soma radius, in world units
+    pm = 1050.0 * (4.0 / 3.0) * math.pi * r ** 3 / per_cell
+    start = positions(f, scale, list(offset))
+    types = {c: {"count": f["count"][c], "shape": "ball", "material": "elastic",
+                 "youngs": MATERIAL[c][0], "density": MATERIAL[c][1]} for c in f["order"]}
+    return {
+        "general": {
+            "name": "plat_r2_fall", "seed": 0, "n_frames": 300, "dt": 0.005, "dim": 3,
+            "world": [1.0, 1.0, 1.6], "boundary": "wall", "save_data": True, "record_cap": 301,
+            # `length_um` IS HERE BECAUSE `neural_seed` CHECKS IT, not because the dynamics are
+            # in SI. The engine reads `gz`, `youngs` and `density` as RAW numbers in world units
+            # per time unit -- it does not rescale them by this block -- and the first version of
+            # this rung proved it the hard way: `gz: -9.81` with a 195.9 um world unit is 9.81
+            # WORLD units per second squared, so in 4.8 ms the animal fell 21 NANOMETRES, which
+            # is what the trajectory measured. See the note above the operators.
+            "units": {"length_um": um, "time_s": 1.0},
+        },
+        "sets": {
+            "cell": {"n": f["n"], "start": start, "type_layout": "ordered", "types": types},
+            "mpm_particle": {"parent": "cell", "per_parent": per_cell, "density": 1050.0,
+                             "radius": round(r, 6), "particle_mass": float(f"{pm:.4g}")},
+        },
+        "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
+        "operators": [
+            # GRAVITY, IN WORLD UNITS PER TIME UNIT SQUARED, and the whole scene with it.
+            #
+            # 0.5 is not 0.5 m/s2 and is not meant to be. The scene is stated consistently in the
+            # engine's own units and reads as follows: the animal starts 0.34 of a world unit (67
+            # um, a third of its own length) clear of the face it will land on and reaches it
+            # after 1.17 s of scene time, arriving at 0.58 world units per second -- inside the
+            # 1.5 s the run lasts, with time left to watch it settle.
+            #
+            # IT FALLS ALONG +z, AND THAT IS A STATEMENT ABOUT THE PICTURE, NOT THE PHYSICS. The
+            # region's z runs HEAD to TAIL, so every view of this animal is rolled 180 degrees to
+            # put its head up, which also puts LOW z at the top of the screen. Gravity along -z
+            # would then read as the animal falling upwards out of frame, which is what the first
+            # landing looked like. Along +z it falls toward the bottom of the screen and lands on
+            # the z = 1.6 face, which `boundary: wall` treats like any other wall. Head up, falling
+            # down; nothing about the mechanics differs. The stiffest tissue here has a sound speed sqrt(E/rho) = sqrt(8000/1200)
+            # = 2.6 world units per second, so the impact is Mach 0.23 -- an elastic body landing,
+            # not a hypersonic one shattering.
+            #
+            # The alternative, real SI throughout, needs Young's moduli near 1e10 to keep the same
+            # Mach number once a world unit is 196 um, and the substep that then satisfies the
+            # Courant condition makes the run hours long for no extra truth.
+            #
+            # ALONG -z, NAMED AXIS BY AXIS: a bare `g:` pulls along -y, which is right for a scene
+            # whose up axis is y and wrong here, where the animal's long axis runs head to tail
+            # along z -- a bare `g` would drag it sideways through its own body.
+            {"op": "gravity", "at": "cell", "gx": 0.0, "gy": 0.0, "gz": 0.5},
+            {"op": "mpm_strain", "at": "mpm_particle", "implementation": "warp"},
+            {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+            {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.6, "wall_friction": 0.4},
+            {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
+        ],
+        "schedule": ["gravity", {"substep_dt": 1.0e-3,
+                                 "steps": ["mpm_strain", "mpm_scatter", "mpm_grid_update",
+                                           "mpm_gather"]}],
+        "plotting": {
+            "renderer": "vtk_points", "background": "black", "box_frame": True, "up_axis": 2,
+            "dot_shading": True, "max_frames": 300, "stills": 4, "keep_stills": True,
+            # The movie is rolled with the stills, so the two pictures of one run agree. Without
+            # it the film showed the larva tail-up and falling toward the top of the frame.
+            "camera_roll": 180.0,
+            "dot_size": 3.0, "colors": {c: COLOR[c] for c in f["order"]},
         },
     }
 
@@ -219,10 +343,36 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="r1")
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
     print(f"{REGION}: {F['n']:,} cells, {len(F['order'])} classes, {F['n_edges']:,} edges, "
           f"cube {F['side_um']:g} um\n")
-    write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r1", "all"):
+        write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r2", "all"):
+        import yaml
+        sp = spec_r2(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        n_p = F["n"] * sp["sets"]["mpm_particle"]["per_parent"]
+        print(f"  {os.path.relpath(p, REPO):48s} {F['n']:,} cells x "
+              f"{sp['sets']['mpm_particle']['per_parent']} points = {n_p:,} material points")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write(
+                    "# R2 -- the assembled anatomy, dropped.\n#\n"
+                    "# Every one of the 4,117 cells is a parent of MPM material points, so the\n"
+                    "# animal is a heap of soft balls sharing one background grid. Then gravity is\n"
+                    "# turned on for the first time. What it tests is whether the measured anatomy\n"
+                    "# is MECHANICALLY coherent: a cloud of dots falls the same way whatever the\n"
+                    "# dots mean, a body does not.\n#\n"
+                    "# The soma positions in `start:` are the region's own, mapped by exactly the\n"
+                    "# affine `neural_seed` uses -- offset + scale * (xyz - bounds_lo) / side, with\n"
+                    "# bounds_lo " + str(F["lo_nm"]) + " nm and side " + f"{F['side_nm']:.0f}"
+                    + " nm.\n"
+                    "# Source: Veraszto et al. 2025, eLife RP97964, whole-body connectome of a\n"
+                    "# 3-day Platynereis dumerilii nectochaete larva.\n"
+                    "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)

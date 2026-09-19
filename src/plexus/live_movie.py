@@ -753,6 +753,21 @@ class LiveMovie:
             self._view_dir = d.copy()
             u = np.zeros(3); u[self.up] = 1.0
             self.p.camera.up = tuple(u)
+            # `plotting.camera_roll`, IN DEGREES: WHICH END OF THE SUBJECT IS UP.
+            #
+            # The up vector is +`up_axis` and there is no way to ask for the other end, which
+            # matters for any dataset whose long axis is anatomical rather than vertical: the
+            # Platynereis region runs head (low z) to tail (high z), so a z-up movie shows the
+            # larva upside down against every figure in its own paper. The GUI's own camera grew
+            # the same knob for the same reason, and without it here the stills and the movie of
+            # ONE run disagreed -- the local VLM watched the rolled stills and the unrolled movie
+            # and reported the animal "slowly migrating upward" as it fell.
+            #
+            # A roll and not a flipped `up_axis`: the up axis also decides where the floor is
+            # drawn and which way the scale bar is lifted.
+            _roll = float((self.style or {}).get("camera_roll", 0.0) or 0.0)
+            if _roll:
+                self.p.camera.roll = self.p.camera.roll + _roll
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = radius * 1.45
             # AND SHIFTED OUT FROM UNDER THE PANELS. Widening the frame alone does not clear the

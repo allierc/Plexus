@@ -1,0 +1,5 @@
+time   2026-09-19 10:47:58
+spec   plat_r2_fall
+camera azim=20.0 elev=8.0 zoom=1.1
+movie  mp4/0059.mp4  (13.4 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r2_fall/movie.mp4)
+why    R2: the assembled anatomy, dropped. 4,117 cells, each a soft ball of 1.90 um radius made of 24 MPM material points -- 98,808 in all -- on one shared grid so they push on each other. It falls 67 um, a third of its own length, and lands after 1.17 s of the 1.5 s run. Gravity acts along +z because every view of this animal is rolled 180 degrees to put its head up, which puts low z at the top of the screen: along -z the animal fell upwards out of frame. The rung asks whether the measured anatomy is mechanically coherent. (after the run)

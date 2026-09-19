@@ -1,0 +1,5 @@
+time   2026-09-19 10:43:32
+spec   plat_r2_fall
+camera azim=20.0 elev=8.0 zoom=1.1
+movie  mp4/0055.mp4  (13.7 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r2_fall/movie.mp4)
+why    R2: the assembled anatomy, dropped -- take three, with the scene stated in world units. 4,117 cells, each a soft ball of 1.90 um radius made of 24 MPM points (98,808 in all) sharing one grid. Gravity 0.5 world units per second squared, so the animal falls 69 um -- a third of its own length -- in 1.18 s, landing at Mach 0.23 against the stiffest tissue's sound speed. The first two attempts fell 21 NANOMETRES because the engine reads gz as world units and the spec asked for 9.81 of them. (after the run)
