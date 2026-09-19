@@ -167,6 +167,29 @@ These are settled. Do not relitigate them mid-run.
 
 Kept at the bottom so it is the last thing read and the easiest thing to update.
 
-* **2026-09-19** — R0 started. Branch cut, record committed at `5547dd51`. Three warm-up steps
-  already in `builder/` (0008 body, 0010 drop, 0013 grains) from before the brief; the grains go
-  away now, per the user. Audit running.
+* **2026-09-19** — R0–R6 done and committed on `feat/platynereis-animal`. Every rung measured,
+  not asserted; every measurement in `builder/`.
+
+  | rung | commit | the number it produced |
+  |---|---|---|
+  | R0 audit | `5547dd51` | `AUDIT.md`: the whole chain exists as separate operators, nothing chains them |
+  | R1 anatomy | `3c08fe21` | 11 rungs, 4,117 cells, the video's own order |
+  | — | `ec09edc7` | **the connectome pointed backwards**; 4,664 edges reversed, direction locked by tests |
+  | R2 fall | `e606787a` | falls 95 um; cells keep 97.3% of their radius, the ANIMAL squashes to 55% |
+  | R3 connectome | `ddcd1dbc` | 4,664 synapses drawn; 1,009 of 4,117 cells wired |
+  | R4 activity | `4d241af9` | wired cells 7.6x the unwired noise floor; band and motoneurons loudest |
+  | R5 beat | `51ddd6e5` | band excursion 4.4x control, **0.488 Hz** against a clock at 0.477 Hz |
+  | R6 water | `09b8ee13` | disturbance reaches **31 um**; 56,290 of 140,000 particles moved |
+
+  **Open, and each one is a decision rather than a bug:**
+  1. The animal has no cell-cell adhesion and no extracellular matrix. R2 measured the cost (it
+     pancakes); R5 and R6 stand it up with an `mpm_anchor` scaffold at k = 400 per second
+     squared, which is named as a stand-in and not tuned until the picture looked right.
+  2. A cilium is still the ciliary-band CELL extending and retracting, not a slender appendage.
+  3. The circuit settles to a fixed point with noise on it; nothing oscillates it. That is R7.
+  4. The 18 per-class parameter vectors were lost at R5: a child set's type counts are per
+     parent, so a `per_parent: 1` neuron set carries one type. They were never fitted.
+
+* **R7 next**: tune the neural drive until the beat is a sustained oscillation and the water
+  moves further than 31 um. The trainer exists (`tasks/spec_trainer.py`, `learnables/`) and is
+  batched and differentiable; whether to use it or to hand-tune is the first decision.
