@@ -1,0 +1,4 @@
+time   2026-09-19 11:02:39
+spec   plat_r4_activity
+camera (a figure, not a render)
+why    R4 viz: the activity of the whole circuit, measured. Panel b is the one that matters -- the 1,009 wired cells against the 3,108 unwired ones, which run the SAME membrane law with the SAME noise and no input, so the gap between the curves is what the connectome did and nothing else. Panel a orders every class by how loud it gets: motoneurons and the ciliary band come out on top because they are the network's sinks, which is the pathway R5 needs. The sd-over-time column says the circuit settles to a fixed point rather than oscillating; that is R7's problem, not a failure of this rung.

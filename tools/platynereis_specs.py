@@ -383,6 +383,92 @@ def spec_r3(f: dict) -> dict:
     }
 
 
+# THE PER-CLASS DYNAMICS, as the parameter vector `neuron_ops` reads:
+#
+#     p = [a, b, g, s, w, h]   leak, offset, gain, self-coupling, width, threshold
+#
+# and the law those six sit in (neuron_ops.py:8) is
+#
+#     dx_i/dt = -a_i x_i + b_i + s_i tanh(x_i) + g_i * sum_j W_ij psi_ij(x_j) + eta_i
+#
+# with x_i the cell's membrane state (dimensionless -- these are NOT millivolts), a_i = 1/tau_i
+# its leak rate per time unit, b_i a constant offset, s_i a self-coupling, g_i the gain on the
+# synaptic sum, W_ij the measured connectome weight, psi the synaptic transfer function and eta
+# noise of the declared standard deviation per step.
+#
+# NOTHING HERE IS FITTED, and the existing 291-type spec is no better off -- every one of its
+# types carries the same placeholder. What IS said deliberately: the neurons are given the
+# self-coupling s = 0.5 that makes a cell more than a leak, and the ciliary band is given twice
+# the leak (a = 2.0) and half the width (w = 0.5), so an effector follows its drive rather than
+# integrating it. Everything else takes the neuron values.
+P_NEURON = [1.0, 0.0, 1.2, 0.5, 1.0, 0.0]
+P_EFFECTOR = [2.0, 0.0, 1.2, 0.5, 0.5, 0.0]
+P_CLASS = {"ciliary band": P_EFFECTOR, "multiciliated cell": P_EFFECTOR, "muscle": P_EFFECTOR}
+
+
+def spec_r4(f: dict, n_frames: int = 600, dt: float = 0.05) -> dict:
+    """R4: the connectome doing something -- the membrane law and the synaptic law, and a viz.
+
+    `neuron_update` is the local half (phi) and `neuron_signal` the synaptic half (psi); both are
+    already registered, so this rung declares rather than writes. `model: type_pairwise` lets the
+    RECEIVER set the width and the sender the threshold, which is the richest of the three
+    without introducing a parameter the data cannot constrain.
+
+    WHAT MAKES IT MOVE. Nothing is driving this circuit yet: the activity is noise of standard
+    deviation 0.01 per step, relaxed through a connectome scaled to spectral radius 0.9. A
+    contracting network fed noise is the honest first picture -- it shows the wiring transporting
+    something, without a stimulus whose shape would be the thing you were really watching. The
+    drive arrives at R7, when there is a ciliary beat to tune.
+    """
+    um = f["side_um"]
+    return {
+        "general": {
+            "name": "plat_r4_activity", "seed": 0, "n_frames": n_frames, "dt": dt, "dim": 3,
+            "world": [1.0, 1.0, 1.0], "boundary": "wall", "save_data": True,
+            "record_cap": n_frames + 1, "units": {"length_um": um, "time_s": 1.0},
+        },
+        "sets": {
+            "brain": {"n": 1},
+            "neuron": {"parent": "brain", "per_parent": f["n"], "type_layout": "ordered",
+                       "types": {c: {"count": f["count"][c],
+                                     "p": P_CLASS.get(c, P_NEURON)} for c in f["order"]}},
+            "synapse": {"parent": "brain", "edge_set": True, "entity": "connection",
+                        "pre": "neuron", "post": "neuron",
+                        "edges_file": f"neural_regions/{REGION}/connectome.npz"},
+        },
+        # v0_sd 0.5 and not 0: v = 0 is a fixed point of the whole system, so a population seeded
+        # exactly there sits at it and the run is a picture of nothing.
+        "seed": [{"op": "neural_seed", "at": "neuron", "region": REGION,
+                  "v0_mean": 0.0, "v0_sd": 0.5}],
+        "operators": [
+            {"op": "neuron_update", "at": "neuron", "model": "leaky_tanh", "noise": 0.01},
+            {"op": "neuron_signal", "at": "neuron", "model": "type_pairwise",
+             "edge_set": "synapse", "activation": "tanh"},
+        ],
+        "schedule": ["neuron_update", "neuron_signal"],
+        "fields": {},
+        "plotting": {
+            "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
+            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
+            "camera_roll": 180.0, "dot_size": 7.0,
+            # THE VIZ. Every soma coloured by its own membrane state, on a fixed range so two
+            # frames of the run can be compared -- an autoscaled range makes a quiet moment look
+            # exactly like a loud one.
+            # THE RANGE IS THE ONE THE RUN ACTUALLY OCCUPIES. +-1.5 is the range the membrane
+            # law could reach and not the one it does: measured over the last sixth of a run, the
+            # wired population sits at |v| 0.25 and the loudest class, the ciliary band, at 0.58,
+            # so +-1.5 renders the whole animal as almost-white and the activity is invisible.
+            # Fixed and not autoscaled, so two frames stay comparable.
+            "color_field": "voltage", "field_cmap": "coolwarm", "color_range": [-0.8, 0.8],
+            "static_mesh": {
+                "file": f"neural_regions/{REGION}/body_outline.obj",
+                "color": "#aeb6c2", "opacity": 0.08,
+                "to_world": {"origin": f["lo_nm"], "scale": 1.0 / f["side_nm"]},
+            },
+        },
+    }
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -403,7 +489,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -411,6 +497,19 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r4", "all"):
+        import yaml
+        sp = spec_r4(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} {sp['general']['n_frames']} frames of "
+              f"{F['n']:,} cells over {F['n_edges']:,} synapses")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R4 -- the connectome doing something: the membrane law, the synaptic\n"
+                         "# law, and every soma coloured by its own membrane state.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r3", "all"):
         import yaml
         sp = spec_r3(F)

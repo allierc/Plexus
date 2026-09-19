@@ -1,0 +1,5 @@
+time   2026-09-19 11:03:43
+spec   plat_r4_activity
+camera azim=20.0 elev=8.0 zoom=1.45
+movie  mp4/0069.mp4  (43.5 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r4_activity/movie.mp4)
+why    R4: the connectome doing something, with the colour range set to what the run actually occupies. neuron_update (the membrane half) and neuron_signal type_pairwise over the synapse edge set (the synaptic half), both already registered. Measured over the last sixth: the 1,009 wired cells sit at |v| 0.248 against 0.033 for the 3,108 unwired ones, which run the same law with the same noise and no input -- the wiring lifts the population 7.6x above that floor. The loudest classes are the ciliary band (0.58) and the motoneurons (0.51), the network's sinks, which is exactly the pathway R5 needs. (after the run)
