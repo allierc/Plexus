@@ -98,6 +98,13 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # the browser, and thrown away -- and mixing them into a curated family would make the family
     # untrustworthy.
     ("studio",      ("studio",)),
+    # THE PLATYNEREIS LADDER. A whole-animal family: the anatomy of a three-day nectochaete larva
+    # from Veraszto et al. (2025) eLife RP97964, its measured connectome, the activity that
+    # connectome supports, and the ciliary beat that activity drives. Registered here for the same
+    # reason the promotion's folders were -- `validate_pre_folder` admits only a known simulation
+    # TYPE, so an unregistered folder cannot be run by `Plexus_Main.py` at all, and the alternative
+    # is a private runner that makes the core's own path untested on this work.
+    ("platynereis", ("platynereis", "plat")),
     ("active_matter", ("active_matter", "vicsek", "flock_am")),
     ("mpm",         ("mpm", "tissue", "elastic", "soft")),
     ("divide",      ("divide", "grow", "mitosis", "morula")),

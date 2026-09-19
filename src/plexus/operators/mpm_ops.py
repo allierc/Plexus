@@ -627,6 +627,8 @@ class MPMScatter(MPMWrites, Exchange):
         # existing 2D field-driven operator is untouched.
         act = getattr(p, "act_stress", None)
         _gact = getattr(H, "active_stress", None)
+        if _gact is not None and _gact.shape[0] != p.n:
+            _gact = None                        # the global slot is another set's; see below
         if _gact is not None:
             act = _gact if act is None else act + _gact
         if act is not None:
@@ -635,7 +637,12 @@ class MPMScatter(MPMWrites, Exchange):
         # stress written by an operator upstream in the substep -- today the Newtonian viscous
         # stress from `mpm_viscosity`. Kept separate from `active_stress` so the two compose
         # rather than clobber, and so a spec that reads `active_stress` back means what it says.
-        xtr = getattr(H, "extra_stress", None)
+        xtr = getattr(p, "extra_stress", None)
+        if xtr is None:
+            _gx = getattr(H, "extra_stress", None)
+            # A GLOBAL SLOT IS ONLY MEANINGFUL FOR THE SET WHOSE SHAPE IT HAS. With two particle
+            # sets on one grid it belongs to whichever ran last, so it is taken only when it fits.
+            xtr = _gx if (_gx is not None and _gx.shape[0] == p.n) else None
         if xtr is not None:
             stress = stress + xtr
         # TURGOR / OSMOTIC PRESSURE (optional, default OFF): an isotropic OUTWARD pressure carried
@@ -1782,7 +1789,7 @@ class MPMViscosity(Lateral):
     Reference: the Navier-Stokes viscous term; Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
     """
 
-    EMIT = None                 # writes H.extra_stress, consumed by mpm_scatter in the same substep
+    EMIT = None                 # writes `p.extra_stress`, consumed by mpm_scatter in the substep
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["eta"]
     MECHANISM_TAGS = ["viscous_stress", "momentum_diffusion", "dissipation"]
@@ -1823,11 +1830,24 @@ class MPMViscosity(Lateral):
             tau = tau * (occ > 0).to(tau.dtype)[:, None, None]
         if mask is not None:
             tau = tau * mask.to(tau.dtype)[:, None, None]
-        prev = getattr(H, "extra_stress", None)
+        # ON THE SET, NOT ON THE HIERARCHY. `H.extra_stress` is one slot shared by every particle
+        # set in the model, which is right while there is one cloud and wrong the moment there are
+        # two: an animal of 98,808 points and a pool of 140,000 both scatter into one grid, and the
+        # water's viscous stress was added to the ANIMAL's -- "the size of tensor a (98808) must
+        # match the size of tensor b (140000)". The same flaw `active_stress` carries, and
+        # `polar_active_stress` already avoids by writing `p.act_stress`.
+        #
+        # The global is still written when this is the only set using it, because specs and
+        # prototypes read it back, and a reader of `H.extra_stress` on a one-cloud model must keep
+        # meaning what it meant. `mpm_scatter` prefers the per-set buffer and falls back.
+        prev = getattr(p, "extra_stress", None)
         if prev is None or prev.shape != tau.shape:
-            H.extra_stress = tau
+            p.register_buffer("extra_stress", tau.detach().clone())
         else:
             prev.copy_(tau)                     # persistent buffer -> safe inside a captured graph
+        _g = getattr(H, "extra_stress", None)
+        if _g is None or _g.shape == tau.shape:
+            H.extra_stress = p.extra_stress
         return {}
 
 
@@ -2754,6 +2774,10 @@ class MPMScatterWarp(MPMScatter):
         _has_turg = _turg is not None
         _turg = _turg.contiguous() if _has_turg else _z
         _act = getattr(H, "active_stress", None)
+        # SAME GUARD AS `extra_stress` BELOW: the global slot belongs to whichever set wrote it
+        # last, so it is taken only when its shape is this set's.
+        if _act is not None and _act.shape[0] != p.n:
+            _act = None
         _lact = getattr(p, "act_stress", None)          # per-set active stress; see the torch path
         if _lact is not None:
             _act = _lact if _act is None else (_act + _lact)
@@ -2762,7 +2786,10 @@ class MPMScatterWarp(MPMScatter):
         # given separate inputs -- they enter the momentum identically and the kernel cannot tell
         # them apart. Summing in torch also keeps the kernel signature (and its cached compile)
         # unchanged, which is why `mpm_viscosity` needs no warp kernel of its own.
-        _xtr = getattr(H, "extra_stress", None)
+        _xtr = getattr(p, "extra_stress", None)
+        if _xtr is None:
+            _gx = getattr(H, "extra_stress", None)
+            _xtr = _gx if (_gx is not None and _gx.shape[0] == p.n) else None
         if _xtr is not None:
             _act = _xtr if _act is None else (_act + _xtr)
         _has_act = _act is not None

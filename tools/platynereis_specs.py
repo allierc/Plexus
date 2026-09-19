@@ -637,6 +637,79 @@ def spec_r5(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08),
     }
 
 
+def spec_r6(f: dict, n_water: int = 140000, n_frames: int = 600) -> dict:
+    """R6: water, and whether the beat moves it.
+
+    R5's beat is real and periodic but it happens in a vacuum. This puts the animal in a fluid and
+    asks the only question that matters for a swimmer: does the stroke move anything that is not
+    the animal.
+
+    HOW THE TWO SETS TALK, and it needs no new operator. `mpm_scatter` zeroes the grid only on the
+    substep's FIRST scatter (mpm_ops.py:717, tagged `shared_grid_accumulate`); every later one
+    accumulates. So two particle sets that each scatter into `mpm_grid`, are solved together by
+    one `mpm_grid_update`, and each gather back, exert forces on each other through the grid's
+    momentum -- which is exactly how the eye prototype's six muscles move a globe, and how
+    config/cell/adh_base.yaml runs fifteen sets at once. The animal pushes the water because they
+    share a grid, not because anything applies a force `to the water`.
+
+    THE WATER IS A LIQUID AND SAYS SO: `material: liquid` with a `bulk_modulus` instead of a
+    Young's modulus, and `mpm_viscosity` on it. Without the viscosity a "liquid" here is a
+    pressure-only gas that transmits a stroke instantly and shears not at all, and the wake the
+    rung exists to see is a shear wake.
+
+    ITS PARTICLES ARE SMALLER THAN THE ANIMAL'S. `particle_mass` is per set, so the water can be
+    resolved finely without the cells being cut up: 140,000 points over the box against 98,808
+    over the animal.
+    """
+    base = spec_r5(f, n_frames=n_frames)
+    base["general"]["name"] = "plat_r6_water"
+    sets = base["sets"]
+    # THE POOL, as a block filling the box around the animal. The cells occupy 1.6% of the world
+    # volume, so the overlap at frame 0 is small and the first substep resolves it as pressure.
+    sets["water"] = {"n": 1, "start": [[0.5, 0.5, 0.5]],
+                     "types": {"seawater": {"count": 1, "material": "liquid",
+                                            "bulk_modulus": 20000.0, "density": 1025.0,
+                                            "eta": 0.001,
+                                            "block": [0.02, 0.02, 0.02, 0.98, 0.98, 0.98]}}}
+    # `entity: mpm_particle` IS WHAT MAKES A SET MATERIAL POINTS. Without it the set is provided
+    # with positions and nothing else -- no deformation gradient, no affine velocity -- and the
+    # run dies on the first strain step with `'Level' object has no attribute 'F'`. The NAME
+    # `mpm_particle` is not the trigger and was never meant to be; the entity is, which is what
+    # lets one model carry fifteen material-point sets under fifteen different names.
+    sets["water_particle"] = {"parent": "water", "per_parent": n_water, "entity": "mpm_particle",
+                              "density": 1025.0, "radius": 0.5}
+    ops = base["operators"]
+    # The water's own four steps, into the SAME grid. `mpm_anchor` is deliberately not among them:
+    # the animal is held to its rest shape, the water is free.
+    ops += [
+        {"op": "mpm_strain", "at": "water_particle", "implementation": "warp"},
+        {"op": "mpm_viscosity", "at": "water_particle", "eta": 0.001},
+        {"op": "mpm_scatter", "at": "water_particle", "to": "mpm_grid", "drag": 0.0,
+         "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+        {"op": "mpm_gather", "at": "water_particle", "from": "mpm_grid", "wall_damp": 0.9,
+         "vmax": 1.0e9, "implementation": "warp"},
+    ]
+    base["schedule"] = [
+        "neuron_update", "neuron_signal", "phase_clock",
+        # ONE SUBSTEP BLOCK FOR BOTH SETS. Both scatters must land between the same grid zero and
+        # the same grid solve, or the second set would be solved against a grid the first had
+        # already consumed -- which is a scene where the water feels the animal and the animal
+        # does not feel the water.
+        {"substep_dt": 0.005,
+         "steps": ["polar_active_stress", "mpm_anchor", "mpm_strain", "mpm_strain",
+                   "mpm_viscosity", "mpm_scatter", "mpm_scatter", "mpm_grid_update",
+                   "mpm_gather", "mpm_gather"]},
+        "aggregate_centroid",
+    ]
+    base["plotting"]["colors"]["seawater"] = "#1b3f6b"
+    base["plotting"]["dot_size"] = 2.0
+    # THE ANIMAL IS THE SUBJECT, SAID OUT LOUD. The renderer draws the BIGGEST particle set unless
+    # told otherwise, and the pool is larger than the animal, so the first take rendered 140,000
+    # water points in one hue and no larva at all.
+    base["plotting"]["subject"] = "mpm_particle"
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -657,7 +730,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -665,6 +738,21 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r6", "all"):
+        import yaml
+        sp = spec_r6(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} "
+              f"{F['n'] * sp['sets']['mpm_particle']['per_parent']:,} animal points + "
+              f"{sp['sets']['water_particle']['per_parent']:,} water points, one grid")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R6 -- water. Two MPM particle sets sharing one grid, which is how\n"
+                         "# the beat reaches the fluid: mpm_scatter zeroes the grid only on the\n"
+                         "# substep's first scatter and accumulates thereafter.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r5", "all"):
         import yaml
         sp = spec_r5(F)
