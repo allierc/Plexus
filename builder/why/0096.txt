@@ -1,0 +1,4 @@
+time   2026-09-19 12:10:45
+spec   plat_r7_water
+camera (a figure, not a render)
+why    R7 in water, measured against R6. Same animal, same pool, same shared-grid coupling; the only change is that the stroke is now gated by the pacemakers' rhythm carried through 255 motoneuron-to-band synapses, and is six times larger for it. R6's clocked beat reached 31 um with a peak displacement of 0.049 um.

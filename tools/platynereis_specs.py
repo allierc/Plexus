@@ -830,6 +830,45 @@ def spec_r7(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08), per_cell: i
     }
 
 
+def spec_r7w(f: dict, n_water: int = 140000, n_frames: int = 900) -> dict:
+    """R7 in water: the rhythm-driven stroke, and how far it now reaches.
+
+    R6 measured a clocked beat's reach into the fluid at 31 um. This is the same pool around the
+    same animal with the same coupling -- one shared `mpm_grid` -- and the only thing changed is
+    that the stroke is now gated by the pacemakers' rhythm carried through the connectome, and is
+    six times larger for it. The comparison is therefore a clean one: two runs differing in the
+    drive and in nothing else.
+    """
+    base = spec_r7(f, n_frames=n_frames)
+    base["general"]["name"] = "plat_r7_water"
+    sets = base["sets"]
+    sets["water"] = {"n": 1, "start": [[0.5, 0.5, 0.5]],
+                     "types": {"seawater": {"count": 1, "material": "liquid",
+                                            "bulk_modulus": 20000.0, "density": 1025.0,
+                                            "eta": 0.001,
+                                            "block": [0.02, 0.02, 0.02, 0.98, 0.98, 0.98]}}}
+    sets["water_particle"] = {"parent": "water", "per_parent": n_water, "entity": "mpm_particle",
+                              "density": 1025.0, "radius": 0.5}
+    base["operators"] += [
+        {"op": "mpm_strain", "at": "water_particle", "implementation": "warp"},
+        {"op": "mpm_viscosity", "at": "water_particle", "eta": 0.001},
+        {"op": "mpm_scatter", "at": "water_particle", "to": "mpm_grid", "drag": 0.0,
+         "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+        {"op": "mpm_gather", "at": "water_particle", "from": "mpm_grid", "wall_damp": 0.9,
+         "vmax": 1.0e9, "implementation": "warp"},
+    ]
+    base["schedule"] = [
+        "neuron_pacemaker", "neuron_update", "neuron_signal", "phase_clock",
+        {"substep_dt": 0.005,
+         "steps": ["polar_active_stress", "mpm_anchor", "mpm_strain", "mpm_strain",
+                   "mpm_viscosity", "mpm_scatter", "mpm_scatter", "mpm_grid_update",
+                   "mpm_gather", "mpm_gather"]},
+        "aggregate_centroid",
+    ]
+    base["plotting"]["colors"]["seawater"] = "#1b3f6b"
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -850,7 +889,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -858,6 +897,19 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r7w", "all"):
+        import yaml
+        sp = spec_r7w(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} the rhythm-driven stroke, in the R6 pool")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R7w -- R7's rhythm-driven stroke in R6's pool. The same animal, the\n"
+                         "# same water, the same shared grid; only the drive differs, so the\n"
+                         "# reach can be compared against R6's 31 um directly.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r7", "all"):
         import yaml
         sp = spec_r7(F)

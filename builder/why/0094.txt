@@ -1,0 +1,4 @@
+time   2026-09-19 12:01:12
+spec   plat_r7_water
+camera azim=20.0 elev=8.0 zoom=1.15
+why    R7 in water: the rhythm-driven stroke, and how far it now reaches. R6 measured a clocked beat's reach into the fluid at 31 um with a stroke of 0.05 um; this is the same pool around the same animal with the same shared-grid coupling, and the only thing changed is that the stroke is gated by the pacemakers' rhythm carried through 255 motoneuron-to-band synapses, and is six times larger for it. Two runs differing in the drive and in nothing else. (before the run)
