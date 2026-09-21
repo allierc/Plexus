@@ -1317,6 +1317,70 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 400, per_cilium: in
     }
 
 
+def spec_r13(f: dict, n_frames: int = 400, torque: float = 3.0e-4, omega: float = 2.5) -> dict:
+    """R13: the cilium feels the fluid. An elastic shaft driven by a TORQUE, momentum conserved.
+
+    R12 drove each shaft kinematically -- `cilium_kinematics` overwrote its position AND velocity
+    every substep -- and that is not a model of an actuator, it is momentum appearing from
+    nowhere. Measured on the trajectory: the scene's total momentum ran 0.58 -> 45.9 -> 2.4 from
+    a standing start, the body's momentum sat 9 degrees from the water's at frame 100 instead of
+    180, the body inflated to 168% of its own radius rather than being propelled, and stiffening
+    it six-fold changed the blow-up by 4% because stiffness cannot absorb a source.
+
+    HERE THE SHAFT IS ORDINARY ELASTIC MATTER. It has `mpm_strain`, it scatters, it gathers, the
+    fluid pushes back on it and its root is held by the same grid that holds the body. The only
+    thing added is a PURE COUPLE at the root -- forces that sum to zero by construction, so a
+    driven shaft cannot accelerate its own centre of mass however hard it is driven -- and the
+    equal and opposite couple on the body points nearest that root, so the reaction goes where a
+    basal body's reaction goes. Both are exact to the last bit of float64 and tested
+    (tests/test_platynereis.py).
+
+    WHAT THIS COSTS, and it is worth stating before the run rather than after. A real cilium is
+    0.25 um thick and the grid cell here is 2.04 um: MLS-MPM cannot hold a body thinner than its
+    own cell, so the shaft is widened to 1.2 um radius -- 2.4 um across, a little over one cell.
+    That is a fatter cilium than the animal's, and the alternative is a finer grid at eight times
+    the cost per halving. The shaft is also SOFT (2 kPa) so that a torque can actually bend it;
+    a stiff rod would rotate rigidly and the stroke's shape would be the command's, not the
+    fluid's.
+
+    `organ_mechanics` is gone. The plant IS the shaft's own dynamics now -- its inertia, its
+    elasticity and the water's drag -- so there is no second-order model of a body travelling to
+    a commanded angle, because the body is there.
+    """
+    base = spec_r12(f, n_frames=n_frames, omega=omega)
+    base["general"]["name"] = "plat_r13_torque"
+    sets = base["sets"]
+    # WIDE ENOUGH FOR THE GRID TO HOLD IT, and soft enough for a torque to bend it.
+    sets["cilium_point"]["radius"] = round(1.2 / f["side_um"], 6)
+    sets["cilium_point"]["types"]["cilium_shaft"]["youngs"] = 2000.0
+    sets["cilium_point"].pop("particle_mass", None)
+
+    ops = [o for o in base["operators"]
+           if o.get("op") not in ("cilium_kinematics", "organ_mechanics")]
+    # the shaft is matter: it strains, and it takes the grid's answer back
+    ops = ([{"op": "cilium_pose_map", "at": "cilium", "sweep_deg": torque, "omega": omega,
+             "waveform": "stroke", "duty": 0.3, "d0": 0.0, "d_scale": 1.0}]
+           + [o for o in ops if o.get("op") != "cilium_pose_map"])
+    ops += [
+        {"op": "cilium_torque", "at": "cilium_point", "cilium_set": "cilium",
+         "body_set": "body_point", "n_react": 24, "check": True},
+        {"op": "mpm_strain", "at": "cilium_point", "implementation": "warp"},
+        {"op": "mpm_gather", "at": "cilium_point", "from": "mpm_grid", "wall_damp": 0.9,
+         "vmax": 1.0e9, "implementation": "warp"},
+    ]
+    base["operators"] = ops
+    base["schedule"] = [
+        "cilium_pose_map",
+        {"substep_dt": 0.005,
+         "steps": ["cilium_torque", "mpm_strain", "mpm_strain", "mpm_strain", "mpm_viscosity",
+                   "mpm_scatter", "mpm_scatter", "mpm_scatter", "mpm_grid_update",
+                   "mpm_gather", "mpm_gather", "mpm_gather"]},
+        "aggregate_centroid",
+    ]
+    base["plotting"]["dot_radius"]["cilium_shaft"] = round(1.2 / f["side_um"], 6)
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -1337,7 +1401,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1345,6 +1409,21 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r13", "all"):
+        import yaml
+        sp = spec_r13(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} the shaft as ELASTIC matter, driven by a pure "
+              f"couple -- momentum conserved by construction")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R13 -- the cilium feels the fluid. An elastic shaft driven by a\n"
+                         "# TORQUE at its root, with the equal and opposite couple on the body.\n"
+                         "# Forces sum to zero by construction, so a driven shaft cannot\n"
+                         "# accelerate its own centre of mass -- the invariant R12 broke.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r12", "all"):
         import yaml
         sp = spec_r12(F)

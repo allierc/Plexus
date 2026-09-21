@@ -150,3 +150,65 @@ def test_the_ciliary_band_is_wired(data):
     np.add.at(deg, ei[1], 1)
     wired = int((deg[m] > 0).sum())
     assert wired >= 70, f"only {wired} of {int(m.sum())} ciliary-band cells carry an edge"
+
+
+# ------------------------------------------------------------------ the cilium's active torque
+
+def test_the_active_couple_creates_no_net_force():
+    """`cilium_torque` drives a shaft with a PURE COUPLE: sum(f) is identically zero.
+
+    This is the invariant the kinematic operator broke, and it broke it silently -- every picture
+    still rendered while the scene's total momentum ran from 0.58 to 45.9 from a standing start,
+    the body's momentum sat 9 degrees from the water's instead of 180, and the animal inflated to
+    168% of its own radius instead of being propelled.
+
+    The construction subtracts a term proportional to each point's OWN mass, which leaves a set
+    of forces whose weighted sum vanishes identically rather than approximately. In float64 that
+    is a ratio at the last bit of the representation, so the test asks for 1e-12 and gets 1e-16.
+    """
+    import torch
+    from plexus.operators.cilia_ops import CiliumTorque
+    torch.manual_seed(0)
+    for n_pts in (5, 20, 200):
+        r = torch.randn(n_pts, 3, dtype=torch.float64)
+        r = r - r[0]                                   # a shaft rooted at its first point
+        m = torch.rand(n_pts, dtype=torch.float64) + 0.1
+        ax = torch.randn(3, dtype=torch.float64)
+        ax = (ax / ax.norm())[None, :].expand(n_pts, 3)
+        tau = torch.tensor([0.37], dtype=torch.float64)
+        f = CiliumTorque._couple(r, m, ax, tau)
+
+        net = float(f.sum(0).norm())
+        scale = float(f.abs().sum())
+        assert net / scale < 1e-12, (
+            f"{n_pts} points: |sum f| / total |f| = {net / scale:.3e}. A driven shaft whose "
+            f"forces do not sum to zero accelerates its own centre of mass out of nothing.")
+
+        got = float((torch.cross(r, f, dim=1) * ax).sum())
+        assert abs(got - 0.37) < 1e-9 * 0.37, (
+            f"{n_pts} points: delivered torque {got:.6g} against the commanded 0.37")
+
+
+def test_the_reaction_torque_is_equal_and_opposite():
+    """The couple put on the body is the shaft's, negated -- so angular momentum is conserved too.
+
+    A cilium's basal body is embedded in its cell: the torque it applies to the axoneme is felt
+    by the cell as an equal and opposite one. Without the reaction the shaft would gain angular
+    momentum from nowhere -- a weaker violation than the kinematic operator's and still one that
+    would spin the animal.
+    """
+    import torch
+    from plexus.operators.cilia_ops import CiliumTorque
+    torch.manual_seed(1)
+    r = torch.randn(30, 3, dtype=torch.float64); r = r - r.mean(0)
+    m = torch.rand(30, dtype=torch.float64) + 0.1
+    ax = torch.randn(3, dtype=torch.float64)
+    ax = (ax / ax.norm())[None, :].expand(30, 3)
+    tau = torch.tensor([0.8], dtype=torch.float64)
+    f_on = CiliumTorque._couple(r, m, ax, tau)
+    f_re = CiliumTorque._couple(r, m, ax, -tau)
+    t_on = float((torch.cross(r, f_on, dim=1) * ax).sum())
+    t_re = float((torch.cross(r, f_re, dim=1) * ax).sum())
+    assert abs(t_on + t_re) < 1e-9 * abs(t_on), f"{t_on:.6g} and {t_re:.6g} do not cancel"
+    for f in (f_on, f_re):
+        assert float(f.sum(0).norm()) / float(f.abs().sum()) < 1e-12

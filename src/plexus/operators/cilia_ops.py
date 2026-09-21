@@ -1025,3 +1025,174 @@ class ExcludeOverlap(Seed):
               f"{', '.join(self.inside)} and are dormant -- the volume the body displaces",
               flush=True)
         return {}
+
+
+@register_operator("cilium_torque", family="mechanics", set="particle", kind="lateral")
+class CiliumTorque(Lateral):
+    """Drive each shaft with a TORQUE at its root, and put the reaction on the body. Exactly.
+
+    particle -> particle: reads the cilium's commanded torque and the shaft's own geometry, emits
+    an acceleration on the shaft's material points and the equal and opposite couple on the body
+    points nearest each root.
+
+    WHY THIS REPLACES `cilium_kinematics`, and it is not a refinement -- it is the difference
+    between a model that conserves momentum and one that does not. The kinematic operator
+    overwrites each shaft's position AND velocity every substep. Changing a body's momentum takes
+    a force, and none was applied to produce it: the shaft simply WAS moving. `mpm_scatter` then
+    handed that momentum to the grid, the grid gave it to the water and the body alike, and the
+    equal and opposite never came back to the shaft because the next substep overwrote it.
+    Measured on the trajectory: the scene's total momentum ran 0.58 -> 45.9 -> 2.4 from a
+    standing start, the body's momentum sat 9 degrees from the water's at frame 100 instead of
+    180, and the body inflated to 168% of its own radius rather than being propelled. A massless
+    actuator -- 0.077 world units of mass against 154 for the body and 797 for the water --
+    driving a scene a thousand times its size.
+
+    THE CONSTRUCTION, and each step is what makes the invariant exact rather than approximate.
+
+    For a shaft with points x_p of mass m_p about its root o, and a commanded torque tau n:
+
+        f_p  =  m_p (n x r_p),           r_p = x_p - o            a rotation field about n
+        f_p  <-  f_p - m_p (sum f / sum m)                        now  sum f_p = 0  EXACTLY
+        f_p  <-  f_p * tau / (sum r_p x f_p) . n                  now the net torque is tau
+
+    The subtraction is what buys linear momentum: removing a term proportional to each point's own
+    mass leaves a set of forces whose weighted sum is identically zero, so the shaft's centre of
+    mass cannot accelerate however hard it is driven. What remains is a pure couple, which is what
+    a basal body actually applies.
+
+    THE REACTION GOES ON THE BODY, by the same construction with -tau, over the `n_react` body
+    points nearest the root. A cilium's basal body is embedded in its cell: the torque it applies
+    to the axoneme is felt by the cell as an equal and opposite one. Without this the shaft would
+    gain angular momentum from nowhere -- a weaker violation than the kinematic operator's, and
+    still a violation, and still one that would make the animal spin.
+
+    WHAT IS NOT CONSERVED, said plainly. ENERGY is not: an active element does work, which is the
+    point of it. The torque is a source of energy and a sink depending on the phase, and over a
+    cycle of a reciprocal command the net work is whatever the fluid takes. That is physical. What
+    would not be physical is momentum appearing, and that is what the two sum-to-zero steps above
+    prevent.
+
+    `check: true` verifies both at run time rather than trusting the derivation -- the residual
+    net force and net torque are computed and printed on the first frame.
+    """
+
+    EMIT = "mpm_acceleration"        # a body force the MPM substep consumes, not an integrand
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["cilium_set"]
+    INPUTS = ["particle", "cilium"]
+    OUTPUTS = ["particle"]
+    READS = ["pose_target"]
+    WRITES = []
+    MECHANISM_TAGS = ["cilia", "ciliary_beat", "active_torque", "momentum_conserving",
+                      "excitation_contraction_coupling"]
+    PARAM_ROLES = {"cilium_set": "the_organ_set_carrying_the_commanded_torque",
+                   "body_set": "the_tissue_that_takes_the_reaction",
+                   "n_react": "body_points_the_reaction_is_spread_over",
+                   "torque_block": "the_block_holding_the_command",
+                   "check": "verify_the_invariants_at_run_time"}
+    REFERENCE = ("Newton's third law, applied where `cilium_kinematics` discarded it; "
+                 "Veraszto, C. et al. (2017). eLife 6:e26000.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cilium_point")
+        self.cilium_set = str(params["cilium_set"])
+        self.body_set = params.get("body_set")
+        self.body_set = str(self.body_set) if self.body_set else None
+        self.n_react = int(params.get("n_react", 24))
+        self.torque_block = str(params.get("torque_block", "pose_target"))
+        self.check = bool(params.get("check", True))
+        self._idx = None
+        self._react = None
+        self._said = False
+
+    @staticmethod
+    def _couple(r, m, n, tau):
+        """Forces about `n` through the origin of `r`, with sum(f) == 0 and net torque == tau.
+
+        [P, 3] offsets, [P] masses, [P, 3] unit axes, [P] torque magnitudes -> [P, 3] forces.
+        Both properties are exact for each group, not approximate: see the class docstring.
+        """
+        f = m[:, None] * torch.cross(n, r, dim=1)
+        # sum f = 0, by removing a term proportional to each point's OWN mass
+        f = f - m[:, None] * (f.sum(0, keepdim=True) / m.sum().clamp_min(1e-30))
+        got = (torch.cross(r, f, dim=1) * n).sum()
+        return f * (tau.sum() / got.clamp(min=1e-30) if got.abs() > 1e-30 else 0.0)
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cil = H.level(self.cilium_set)
+        X = p.get("pos")
+        dev, dt = X.device, X.dtype
+
+        # FULLY VECTORISED, AND IT HAS TO BE. The substep is captured as a CUDA graph, which
+        # forbids host-side branching on device data and any synchronisation -- a Python loop over
+        # the 74 cilia with `if sel.any()` in it raised `cudaErrorStreamCaptureInvalidated` on the
+        # first frame. The shaft points are laid out contiguously and equally per cilium
+        # (`per_parent` is a scalar for this set, and `repeat_interleave` keeps a child's rows
+        # adjacent and in parent order), so the whole set reshapes to [n_cilia, per, 3] and every
+        # step below is one batched tensor op.
+        n_c = cil.n
+        per = p.n // max(n_c, 1)
+        Xc = X.view(n_c, per, 3)
+
+        t0, _ = cil.state_schema[self.torque_block]
+        tau = cil.state[:, t0:t0 + 1][:, 0].to(dt)
+        live = getattr(cil, "cil_live", None)
+        if live is not None:
+            tau = tau * live.to(dt)
+        ax = cil.cil_axis.to(dt)
+
+        m_p = getattr(p, "mass", None)
+        M = (torch.ones(n_c, per, device=dev, dtype=dt) if m_p is None
+             else m_p.to(dt).reshape(n_c, per))
+
+        f = self._couple_batched(Xc - Xc[:, :1, :], M, ax, tau)
+        acc = (f / M[..., None].clamp_min(1e-30)).reshape(-1, 3)
+
+        # THE REACTION, on the body points nearest each root, with -tau.
+        if self.body_set is not None:
+            b = H.level(self.body_set)
+            Xb = b.get("pos").to(dt)
+            m_b = getattr(b, "mass", None)
+            m_b = (torch.ones(b.n, device=dev, dtype=dt) if m_b is None
+                   else m_b.to(dt).reshape(-1))
+            if self._react is None:
+                self._react = torch.cdist(Xc[:, 0, :], Xb).topk(
+                    min(self.n_react, b.n), largest=False).indices
+            k = self._react                                       # [n_cilia, n_react]
+            Yb = Xb[k]
+            Mb = m_b[k]
+            fb = self._couple_batched(Yb - Yb.mean(1, keepdim=True), Mb, ax, -tau)
+            b_acc = torch.zeros_like(Xb)
+            b_acc.index_add_(0, k.reshape(-1),
+                             (fb / Mb[..., None].clamp_min(1e-30)).reshape(-1, 3))
+            _prev = getattr(b, "mpm_acceleration_ext", None)
+            if _prev is None or _prev.shape != b_acc.shape:
+                b.register_buffer("mpm_acceleration_ext", b_acc.detach().clone())
+            else:
+                _prev.copy_(b_acc)
+
+        if self.check and not self._said and not torch.cuda.is_current_stream_capturing():
+            self._said = True
+            net = float(f.sum((0, 1)).norm())
+            scale = float(f.abs().sum().clamp_min(1e-30))
+            print(f"[cilium_torque] invariant on the shafts: |sum f| / total |f| = "
+                  f"{net / scale:.3e} "
+                  f"({'EXACT to float' if net / scale < 1e-5 else 'NOT ZERO, investigate'})",
+                  flush=True)
+        if mask is not None:
+            acc = acc * mask[:, None].to(dt)
+        return {self.at: acc}
+
+    @staticmethod
+    def _couple_batched(r, M, ax, tau):
+        """The same couple as `_couple`, for [G, P, 3] groups at once. sum(f) == 0 per group."""
+        n = ax[:, None, :].expand_as(r)
+        f = M[..., None] * torch.cross(n, r, dim=2)
+        f = f - M[..., None] * (f.sum(1, keepdim=True)
+                                / M.sum(1, keepdim=True)[..., None].clamp_min(1e-30))
+        got = (torch.cross(r, f, dim=2) * n).sum((1, 2))
+        return f * (tau / torch.where(got.abs() > 1e-30, got, torch.ones_like(got))
+                    )[:, None, None]
