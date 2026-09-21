@@ -12825,8 +12825,8 @@ plotting:
   dot_size: 1.1
   dot_radius:
     cilium_shaft: 0.004594
-    yolk_mass: 0.015314
-    body: 0.004084
+    yolk_mass: 0.013272
+    body: 0.006636
   colors:
     Interneuron: '#2f6fb5'
     Motoneuron: '#d45fa8'

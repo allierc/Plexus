@@ -294,6 +294,18 @@ class View:
         up = np.zeros(3); up[self.up_axis] = 1.0
         right = np.cross(up, view_dir); right /= max(np.linalg.norm(right), 1e-12)
         vup = np.cross(view_dir, right); vup /= max(np.linalg.norm(vup), 1e-12)
+        # THE ROLL TURNS THE SCREEN, SO IT HAS TO TURN THIS BASIS TOO.
+        #
+        # The bar is a line in WORLD space placed at the bottom-right of the view; its label is a
+        # viewport annotation pinned to the bottom-right of the WINDOW. Those agree only while the
+        # screen basis derived from `up_axis` is the screen's actual basis -- and a rolled camera
+        # breaks that. At the 180 degrees this animal is drawn with (its z runs head to tail, so
+        # z-up shows it upside down) the bar went to the TOP-LEFT and its label stayed at the
+        # bottom-right: a scale bar in one corner and the number it refers to in the other.
+        _roll = float(getattr(self, "roll", 0.0) or 0.0)
+        if _roll:
+            _c, _s = np.cos(np.radians(_roll)), np.sin(np.radians(_roll))
+            right, vup = _c * right + _s * vup, -_s * right + _c * vup
         half_h = float(cam.parallel_scale) if cam.parallel_projection else float(self.dist0 / self.zoom) * np.tan(np.radians(float(cam.view_angle) / 2))
         W, Hh = self.p.window_size
         half_w = half_h * float(W) / float(Hh)

@@ -1,0 +1,4 @@
+time   2026-09-21 15:03:01
+spec   plat_r12_cilia
+camera azim=20.0 elev=8.0 zoom=1.3
+why    R12 anatomy: the body white, the yolk yellow inside it, the cilia white on its surface, the water blue. The body is drawn at 0.8 um rather than its physical 4.0 um so the yolk shows through -- dot_radius is a drawing key and the set's own radius, which the simulation uses, is untouched.

@@ -306,6 +306,8 @@ def spec_r2(f: dict, scale: float = 0.55, offset=(0.22, 0.22, 0.74),
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
              "a_max": 200.0, "implementation": "warp", "polar": "higham"},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.6, "wall_friction": 0.4},
+            {"op": "mpm_gather", "at": "body_point", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
              "vmax": 1.0e9, "implementation": "warp"},
             # THE CELL'S POSITION IS ITS MATERIAL'S CENTRE OF MASS, and without this the cell set
@@ -608,6 +610,8 @@ def spec_r5(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08),
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
              "a_max": 200.0, "implementation": "warp", "polar": "higham"},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.9, "wall_friction": 0.3},
+            {"op": "mpm_gather", "at": "body_point", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
              "vmax": 1.0e9, "implementation": "warp"},
             # THE CELL'S POSITION IS ITS MATERIAL'S CENTRE OF MASS, and without this the cell set
@@ -811,6 +815,8 @@ def spec_r7(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08), per_cell: i
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
              "a_max": 200.0, "implementation": "warp", "polar": "higham"},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.9, "wall_friction": 0.3},
+            {"op": "mpm_gather", "at": "body_point", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
              "vmax": 1.0e9, "implementation": "warp"},
             {"op": "aggregate_centroid", "at": "cell", "child": "mpm_particle"},
@@ -1038,11 +1044,13 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
     surface, on a 4 um cell, so the appendage is five times the body that bears it and the lever
     arm the cell-only model could not express finally exists.
 
-    WHAT IS MADE OF MATTER, AND WHAT IS NOT. The yolk, the cilia and the water, and nothing
-    else. Giving all 4,117 cells material points costs 197,616 of them and does not help answer
-    whether a cilium moves water; the cells keep their measured positions and their polarity,
-    because that is where the shafts are rooted, but they are not integrated. The yolk is the
-    larva's one large internal mass and stands in for the body the water flows around.
+    WHAT IS MADE OF MATTER. The body, the yolk, the cilia and the water. The body is the 4,112
+    non-yolk cells at eight points each -- the size R10 measured as the one at which cells touch
+    and the animal holds its own shape -- because a cilium rooted at a band cell needs a SURFACE
+    under it. The first take made only the yolk out of matter and the picture showed why that
+    fails: the five yolk cells span 15 x 12 x 19 um in the middle of the animal while the band
+    spans 97 x 115 x 128 um at its surface, a median 54.5 um apart, so the shafts floated in
+    open water with nothing beneath them.
 
     THE DRIVE IS PRESCRIBED, NOT WIRED, AND THAT IS THE POINT OF THIS RUNG. The circuit is left
     out entirely and every cilium is given `drive = 1`. If the water does not move with the
@@ -1089,38 +1097,33 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
                                  "record": False},
                 },
             },
-            # ONLY THE YOLK IS MATTER, and that is the whole economy of this rung. Giving all
-            # 4,117 cells material points costs 197,616 of them and tests nothing: the question
-            # is whether a CILIUM moves WATER, and 4,000 elastic balls in between are a slow way
-            # of not answering it. `per_parent` as a mapping from the parent's TYPE puts points
-            # only where they are wanted -- the yolk is the larva's one large internal mass, so
-            # it is the body the water has to flow around -- and every other class gets zero,
-            # which `repeat_interleave` turns into no rows at all.
+            # THE BODY, AND THE YOLK INSIDE IT, AS TWO SETS.
             #
-            # The cells themselves keep their measured positions and their polarity. They are
-            # where the cilia are rooted and what the picture draws; they are simply not made of
-            # anything this rung has to integrate.
-            # NO `particle_mass` HERE, and it is refused rather than ignored: a per-type
-            # `per_parent` gives each body a different point count, so one point mass would make
-            # the two disagree about every body's volume (entities.py:498). The radius sizes the
-            # yolk balls instead -- 12 um, which is what the five yolk cells look like in the
-            # source video.
-            # A TYPE OF ITS OWN, so the renderer can draw it. `dot_radius` is keyed by TYPE
-            # NAME and reads the SET'S OWN types, not its parent's -- a particle set that
-            # declares none can only ever be the subject cloud, coloured by whatever its parent
-            # is. One type named for what the set is makes it addressable.
-            "mpm_particle": {"parent": "cell", "density": 1050.0,
+            # The first take made only the yolk out of matter, and the picture showed why that
+            # cannot work: the five yolk cells span 15 x 12 x 19 um and sit in the middle of the
+            # animal, while the ciliary band spans 97 x 115 x 128 um at its SURFACE. The median
+            # band cell is 54.5 um from the nearest yolk cell, so a 12 um yolk ball leaves a 43 um
+            # gap and the cilia float in open water with nothing under them. The yolk is an
+            # internal mass; it is not the body.
+            #
+            # So the body is the CELLS -- all 4,112 of the non-yolk ones, eight material points
+            # each at a 4.0 um radius, which R10 measured as the size at which they touch and the
+            # animal holds its own shape. 32,896 points for a body, against the 197,616 a
+            # 48-point version cost, because this rung needs the cilia to have a surface to sit
+            # on and not a finite-element study of the tissue.
+            "body_point": {"parent": "cell", "entity": "mpm_particle", "density": 1050.0,
+                           "radius": round(4.0 / um, 6),
+                           "types": {"body": {"fraction": 1.0, "material": "elastic",
+                                              "youngs": 2000.0, "density": 1050.0}},
+                           "per_parent": {c: (0 if c == "yolk" else 8) for c in f["order"]}},
+            # The yolk keeps its own set because it is a different thing: five big cells, 400
+            # points each at 12 um, dense and soft. Its own set is also what lets it keep its own
+            # colour while the rest of the animal is white.
+            "mpm_particle": {"parent": "cell", "entity": "mpm_particle", "density": 1150.0,
                              "radius": round(12.0 / um, 6),
-                             # THE MATERIAL COMES WITH THE TYPE. A particle set that declares
-                             # its own types must give them their own `youngs` and `density`:
-                             # with no types it inherited the parent cell's, and `mpm_scatter`
-                             # refuses a type with neither rather than guessing one.
                              "types": {"yolk_mass": {"fraction": 1.0, "material": "elastic",
                                                      "youngs": 400.0, "density": 1150.0}},
                              "per_parent": {c: (400 if c == "yolk" else 0) for c in f["order"]}},
-            # ONE CILIUM PER CELL, and only the ones with a polarity grow a shaft -- the band is
-            # polarised by `radial_polarity` and nothing else is, so that is how the spec says
-            # which cells bear one without needing a mask on every operator downstream.
             # A CILIUM EXISTS ONLY WHERE A CELL BEARS ONE. With `per_parent: 1` the set held
             # 4,117 cilia of which 74 were real, and their 48,516 dead shaft points still
             # scattered into the MPM grid as lumps of matter at every cell in the animal --
@@ -1196,7 +1199,10 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
              "K": [[1600.0, 0, 0], [0, 1600.0, 0], [0, 0, 1600.0]],
              "C": [[60.0, 0, 0], [0, 60.0, 0], [0, 0, 60.0]]},
             {"op": "cilium_kinematics", "at": "cilium_point", "cilium_set": "cilium"},
+            {"op": "mpm_strain", "at": "body_point", "implementation": "warp"},
             {"op": "mpm_strain", "at": "mpm_particle", "implementation": "warp"},
+            {"op": "mpm_scatter", "at": "body_point", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
              "a_max": 200.0, "implementation": "warp", "polar": "higham"},
             {"op": "mpm_scatter", "at": "cilium_point", "to": "mpm_grid", "drag": 0.0,
@@ -1206,6 +1212,8 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             {"op": "mpm_scatter", "at": "water_particle", "to": "mpm_grid", "drag": 0.0,
              "a_max": 200.0, "implementation": "warp", "polar": "higham"},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.9, "wall_friction": 0.3},
+            {"op": "mpm_gather", "at": "body_point", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
              "vmax": 1.0e9, "implementation": "warp"},
             {"op": "mpm_gather", "at": "water_particle", "from": "mpm_grid", "wall_damp": 0.9,
@@ -1216,9 +1224,10 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
         # around -- a different model, and one this rung is not testing.
         "schedule": ["phase_clock", "cilium_pose_map", "organ_mechanics",
                      {"substep_dt": 0.005,
-                      "steps": ["cilium_kinematics", "mpm_strain", "mpm_strain", "mpm_viscosity",
-                                "mpm_scatter", "mpm_scatter", "mpm_scatter", "mpm_grid_update",
-                                "mpm_gather", "mpm_gather"]}],
+                      "steps": ["cilium_kinematics", "mpm_strain", "mpm_strain", "mpm_strain",
+                                "mpm_viscosity", "mpm_scatter", "mpm_scatter", "mpm_scatter",
+                                "mpm_scatter", "mpm_grid_update", "mpm_gather", "mpm_gather",
+                                "mpm_gather"]}],
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": True, "up_axis": 2,
@@ -1232,11 +1241,20 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             # subject's cloud whether or not the subject was among the glyphs.
             "subject": "water_particle", "dot_size": 1.1,
             "dot_radius": {"cilium_shaft": round(0.9 / um, 6),
-                           "yolk_mass": round(2.2 / um, 6)},
+                           "yolk_mass": round(3.0 / um, 6),
+                           # THE BODY IS DRAWN SMALLER THAN IT IS, on purpose. At its physical
+                           # 4 um the 32,896 points close into an opaque white solid and the
+                           # yolk -- which is INSIDE it, and is the thing being looked for --
+                           # cannot be seen at all. 0.8 um leaves the body reading as its own
+                           # surface while the yellow mass shows through. It changes the picture
+                           # and not the physics: `dot_radius` is a drawing key and the
+                           # simulation's radius is the set's `radius`, which is untouched.
+                           "body": round(0.8 / um, 6)},
             # WHITE FOR BOTH BODIES, as asked: the yolk and the cilia are the animal here and the
             # water is the medium, so the picture says so with two colours and not four.
             "colors": dict({c: COLOR[c] for c in f["order"]},
-                           seawater="#3d6ea8", cilium_shaft="#ffffff", yolk_mass="#ffffff"),
+                           seawater="#3d6ea8", cilium_shaft="#ffffff", body="#ffffff",
+                           yolk_mass="#e8c33a"),
         },
     }
 
