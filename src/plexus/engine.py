@@ -2157,6 +2157,45 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         _by_token_all.setdefault(_nm, []).append(_i)
     _by_token = _tokens_live(0)
 
+    # AN OPERATOR THE SCHEDULE NEVER NAMES ENOUGH TIMES IS A SET LEFT OUT OF THE PHYSICS.
+    #
+    # The binding above is positional: the i-th OCCURRENCE of a token takes the i-th INSTANCE. So
+    # a model with four material sets declares four `mpm_scatter`, and a schedule naming the token
+    # three times runs three of them -- the fourth set never scatters into the grid, never gathers
+    # from it, and simply has no dynamics. Nothing raises: three scatters is a legal schedule, and
+    # a set that does not move is a legal set.
+    #
+    # It cost a full debugging session on the Platynereis cilia. The shafts had exactly 0.00000
+    # momentum at every frame; the torque driving them was correct, its invariant was verified to
+    # 1e-8 in the running process, the command reaching them was a clean +-0.05 -- and they were
+    # not in the schedule. Widening them from 1.2 um to 6 um changed nothing, because the width
+    # was never the problem.
+    #
+    # A warning and not an error: naming a token fewer times than it is declared is legitimate
+    # when the extra instances are gated off by a window (the `_n < len(_all)` case below), and
+    # refusing it would break those specs. But it should never be SILENT.
+    try:
+        from collections import Counter as _C
+        _named = _C()
+        for _st in (sim.schedule or []):
+            if isinstance(_st, dict):
+                for _t in (_st.get("steps") or []):
+                    _named[_t] += 1
+            else:
+                _named[str(_st)] += 1
+        for _tok, _all_i in _by_token_all.items():
+            _n_named = _named.get(_tok, 0)
+            if _n_named < len(_all_i):
+                _sets = ", ".join(str(inst[_j][0]) if not isinstance(inst[_j][0], str)
+                                  else str(getattr(inst[_j][1], "at", "?"))
+                                  for _j in _all_i[_n_named:])
+                warn(f"[warn] schedule names {_tok!r} {_n_named} time(s) but {len(_all_i)} are "
+                      f"declared: {len(_all_i) - _n_named} instance(s) will never run"
+                      + (f" (at: {_sets})" if _sets else "")
+                      + ". If those are not gated by a window, that set is out of the physics.")
+    except Exception:                                                # noqa: BLE001
+        pass
+
     # STATIC STORAGE FOR THE SUBSTEP'S DELTA SNAPSHOT.
     #
     # The delta accumulator is rebound constantly: `zero_delta` builds fresh zeros every TICK

@@ -1369,15 +1369,68 @@ def spec_r13(f: dict, n_frames: int = 400, torque: float = 3.0e-4, omega: float 
          "vmax": 1.0e9, "implementation": "warp"},
     ]
     base["operators"] = ops
+    # EVERY INSTANCE MUST APPEAR, AND THE COUNT IS THE WHOLE POINT.
+    #
+    # The engine binds the i-th occurrence of a token in the schedule to the i-th instance of
+    # that operator in the list. There are now FOUR material sets -- body, yolk, water and the
+    # shafts -- so there are four `mpm_strain`, four `mpm_scatter` and four `mpm_gather`, and a
+    # schedule naming three of each silently drops one set out of the physics entirely. That is
+    # what happened: the shafts never scattered into the grid and never gathered from it, so they
+    # had no dynamics at all, their momentum was 0.00000 at every frame, and widening them from
+    # 1.2 um to 6 um changed nothing because the width was never the problem.
+    #
+    # Counted from the sets rather than written out, so adding a fifth material set cannot
+    # reintroduce it.
+    n_mat = sum(1 for k, v in base["sets"].items() if str(v.get("entity", "")) == "mpm_particle"
+                or k in ("body_point", "mpm_particle", "water_particle", "cilium_point"))
     base["schedule"] = [
         "cilium_pose_map",
         {"substep_dt": 0.005,
-         "steps": ["cilium_torque", "mpm_strain", "mpm_strain", "mpm_strain", "mpm_viscosity",
-                   "mpm_scatter", "mpm_scatter", "mpm_scatter", "mpm_grid_update",
-                   "mpm_gather", "mpm_gather", "mpm_gather"]},
+         "steps": (["cilium_torque"] + ["mpm_strain"] * n_mat + ["mpm_viscosity"]
+                   + ["mpm_scatter"] * n_mat + ["mpm_grid_update"] + ["mpm_gather"] * n_mat)},
         "aggregate_centroid",
     ]
     base["plotting"]["dot_radius"]["cilium_shaft"] = round(1.2 / f["side_um"], 6)
+    return base
+
+
+def spec_r14(f: dict, n_frames: int = 400, torque: float = 0.05, omega: float = 2.5,
+             paddle_um: float = 6.0, omega_vis: float = 60.0) -> dict:
+    """R14: an actuator the GRID CAN MOVE, and water coloured by what it is doing.
+
+    R13 conserved momentum to 118 times better than R12 and kept the body at 101% of its own
+    radius -- and its shafts had exactly 0.00000 momentum at every frame. MLS-MPM carries ONE
+    velocity per grid node, so a body narrower than a cell shares every node it touches with the
+    fluid and cannot move relative to it. The cell is 2.04 um; R13's shaft was 1.18 cells across
+    and was simply advected. A real cilium at 0.25 um is a quarter of a cell and would need a
+    2000-cube grid on this domain.
+
+    SO THE ACTUATOR IS WIDENED UNTIL THE GRID CAN HOLD IT: 6 um radius, 5.9 cells across. That is
+    not a cilium and is not called one -- it is a PADDLE, and it stands for the collective action
+    of the tuft of cilia a band cell actually carries, which is the thing that moves water at this
+    scale anyway. Naming it honestly is the difference between a coarse model and a wrong one.
+
+    AND THE WATER IS COLOURED BY ITS SPEED. 125,000 blue dots are a fog whatever is happening
+    behind them; on a dark colour map still water is BLACK and only moving water is visible, so
+    the picture stops being a box of dots and becomes the flow itself. `color_range` is fixed so
+    two frames can be compared -- an autoscaled range makes a quiet moment look like a loud one.
+    """
+    base = spec_r13(f, n_frames=n_frames, torque=torque, omega=omega)
+    base["general"]["name"] = "plat_r14_paddle"
+    um = f["side_um"]
+    cp = base["sets"]["cilium_point"]
+    cp["radius"] = round(paddle_um / um, 6)
+    # A PADDLE HAS TO BE STIFF ENOUGH TO PUSH. At 2 kPa a 6 um shaft folds under its own drag
+    # instead of sweeping; 30 kPa is still soft against chitin and holds its shape over a stroke.
+    cp["types"]["cilium_shaft"]["youngs"] = 30000.0
+    base["plotting"]["dot_radius"]["cilium_shaft"] = round(paddle_um / um, 6)
+    # THE WATER IS THE PICTURE NOW: black where it is still, bright where it moves.
+    base["plotting"]["color_field"] = "speed"
+    base["plotting"]["field_cmap"] = "inferno"
+    base["plotting"]["color_range"] = [0.0, 0.35]
+    base["plotting"]["dot_size"] = 2.2
+    base["plotting"]["colors"]["body"] = "#4a5a70"
+    base["plotting"]["dot_opacity"] = {"body": 0.10, "cilium_shaft": 1.0}
     return base
 
 
@@ -1401,7 +1454,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1409,6 +1462,22 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r14", "all"):
+        import yaml
+        sp = spec_r14(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} a 6 um PADDLE the grid can move (5.9 cells), "
+              f"water coloured by speed")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R14 -- an actuator the grid can move. R13's 1.2 um shaft was 1.18\n"
+                         "# cells across and had exactly zero momentum: MPM carries one velocity\n"
+                         "# per node, so a sub-cell body is advected by the fluid it shares nodes\n"
+                         "# with. 6 um is 5.9 cells. It is a PADDLE, not a cilium, and is named\n"
+                         "# as one. Water is coloured by speed so still fluid is black.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r13", "all"):
         import yaml
         sp = spec_r13(F)
