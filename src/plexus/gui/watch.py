@@ -88,7 +88,7 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
  .why{background:#12171d;border-left:3px solid #7fb069;border-radius:0 5px 5px 0;padding:8px 12px;
       margin-bottom:10px;white-space:pre-wrap;font-size:12px;color:#c8d2dc;max-width:min(62vw,820px)}
  .col{display:flex;flex-direction:column}
- video{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px);margin-top:10px}
+ video{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px)}
  .tabs button{font-size:12px;padding:3px 10px}
  img{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px)}
  pre{background:#0f1319;border:1px solid #222a33;border-radius:5px;padding:10px 12px;
@@ -112,7 +112,7 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
  <div class=col>
   <div class=why id=why></div>
   <img id=shot>
-  <video id=mov controls loop muted style="display:none"></video>
+  <video id=mov controls loop muted autoplay playsinline style="display:none"></video>
  </div>
  <div class=col style="flex:1;min-width:300px">
   <div class="row tabs" style="margin-bottom:6px">
@@ -149,17 +149,28 @@ async function tick(){
  document.getElementById('pos').textContent =
    total ? (idx < 0 ? `live — ${total} of ${total}` : `${j.index + 1} of ${total}`) : '';
  document.getElementById('meta').innerHTML =
-   j.shot ? `${j.shot_name} &nbsp;&middot;&nbsp; ${j.shot_age}s ago` : 'no picture yet';
- if(j.shot) document.getElementById('shot').src = '/api/watch/shot?i=' + j.index + '&t=' + j.shot_mtime;
+   j.shot ? `${j.shot_name} &nbsp;&middot;&nbsp; ${j.shot_age}s ago`
+          + (j.mp4 ? ' &nbsp;&middot;&nbsp; showing the movie' : '') : 'no picture yet';
+ const im = document.getElementById('shot');
  document.getElementById('journal').innerHTML = j.journal;
  if(idx < 0) document.getElementById('journal').scrollTop = 1e9;
  // THE OTHER THREE FILES OF THE STEP. The why is always in view because it is the one thing a
  // picture cannot show; the spec sits behind a tab because it is 250 lines.
  document.getElementById('why').textContent = j.why || '(no why recorded for this step)';
  document.getElementById('spec').textContent = j.spec || '(no spec recorded for this step)';
+ // THE MOVIE REPLACES THE PICTURE WHEN THERE IS ONE, rather than sitting under it. A step that
+ // ran has a still of its LAST frame and a film of the whole run, and showing both makes the
+ // reader compare a frame against the thing it was taken from; the film is strictly the better
+ // record. A step that only built something has no film, and then the still is all there is.
  const mv = document.getElementById('mov');
- if(j.mp4){ if(!mv.src.includes('i=' + j.index)){ mv.src = '/api/watch/mp4?i=' + j.index; } mv.style.display = ''; }
- else { mv.removeAttribute('src'); mv.style.display = 'none'; }
+ if(j.mp4){
+  if(!mv.dataset.i || mv.dataset.i != j.index){ mv.src = '/api/watch/mp4?i=' + j.index; mv.dataset.i = j.index; }
+  mv.style.display = ''; im.style.display = 'none';
+ } else {
+  mv.removeAttribute('src'); mv.removeAttribute('data-i'); mv.style.display = 'none';
+  im.style.display = '';
+  if(j.shot) im.src = '/api/watch/shot?i=' + j.index + '&t=' + j.shot_mtime;
+ }
 }
 document.addEventListener('keydown', e => {
  if(e.key === 'ArrowLeft') step(-1);
