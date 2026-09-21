@@ -1030,8 +1030,8 @@ def spec_r11(f: dict, n_water: int = 120000, n_frames: int = 900) -> dict:
     return base
 
 
-def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: int = 12,
-             cilium_um: float = 20.0, soma_um: float = 4.0, per_cell: int = 48,
+def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: int = 20,
+             cilium_um: float = 38.0, soma_um: float = 4.0, per_cell: int = 48,
              sweep_deg: float = 55.0, omega: float = 12.0) -> dict:
     """R12: TRUE CILIA, driven open-loop, in water. Does a real appendage move the fluid?
 
@@ -1040,9 +1040,12 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
     beats by SWINGING -- which is why the source video's chaetae look like bristles and nothing
     in these specs did.
 
-    Here each band cell grows a real one: a 20 um shaft of 12 material points rooted at the cell's
-    surface, on a 4 um cell, so the appendage is five times the body that bears it and the lever
-    arm the cell-only model could not express finally exists.
+    Here each band cell grows a real one: a 38 um shaft of 20 material points rooted at the cell's
+    surface, on a 4 um cell. A Platynereis prototroch cilium is some 20-40 um long, so the
+    appendage is nearly TEN TIMES the cell that bears it -- and that ratio is the whole point,
+    because the tip's speed is the angular rate times the length and it is the tip that does the
+    work on the fluid. The points are spaced 1.9 um apart against a grid cell of 2.04 um, so the
+    shaft is resolved along its whole length rather than being a line of isolated lumps.
 
     WHAT IS MADE OF MATTER. The body, the yolk, the cilia and the water. The body is the 4,112
     non-yolk cells at eight points each -- the size R10 measured as the one at which cells touch
@@ -1148,7 +1151,11 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
                                     "boundary": "free"},
                     "drive": {"width": 1, "role": "readout", "integration": "none",
                               "boundary": "free"},
-                    "phase": {"width": 1, "integration": "first_order", "boundary": "free"},
+                    # AN OFFSET, NOT A STATE. `organ_mechanics` integrates `pose` at second
+                    # order and a set carries one integrator, so a first-order `phase_clock`
+                    # beside it is refused. The offset is written once by `metachronal_phase` and
+                    # `cilium_pose_map` advances the cycle from the run's own clock.
+                    "phase": {"width": 1, "integration": "none", "boundary": "free"},
                 },
             },
             "cilium_point": {"parent": "cilium", "per_parent": per_cilium,
@@ -1185,11 +1192,15 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             {"op": "seed_state_random", "at": "cilium", "block": "drive", "lo": 1.0, "hi": 1.0},
             {"op": "metachronal_phase", "at": "cilium", "wavenumber": 6.0, "axis": 2,
              "centre": [0.5, 0.5, 0.0], "block": "phase"},
+            # THE WATER THE ANIMAL DISPLACES. A block of water does not know a body is standing
+            # in it, so a uniform seed puts thousands of particles inside the tissue -- and
+            # MLS-MPM resolves that as a first-frame pressure explosion that every later
+            # measurement of "how far the water moved" would be reading instead of the beat.
+            {"op": "exclude_overlap", "at": "water_particle",
+             "inside": ["body_point", "mpm_particle", "cilium_point"], "res": 96, "dilate": 1},
         ],
         "operators": [
-            {"op": "phase_clock", "at": "cilium", "block": "phase", "omega": omega,
-             "jitter": 0.0, "seed": 7},
-            {"op": "cilium_pose_map", "at": "cilium", "sweep_deg": sweep_deg,
+            {"op": "cilium_pose_map", "at": "cilium", "sweep_deg": sweep_deg, "omega": omega,
              "waveform": "stroke", "duty": 0.3, "d0": 0.0, "d_scale": 1.0},
             # STAGE TWO IS THE EYE'S OWN PLANT, unchanged. K and C are per second squared and per
             # second: sqrt(eig K) = 40 rad/s is a corner well above the beat's own 12 rad/s, so
@@ -1222,7 +1233,7 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
         # NO GRAVITY. And no `mpm_gather` on the shaft: it is kinematic, its motion is its
         # circuit's, and reading the grid back into it would be the fluid pushing the cilium
         # around -- a different model, and one this rung is not testing.
-        "schedule": ["phase_clock", "cilium_pose_map", "organ_mechanics",
+        "schedule": ["cilium_pose_map", "organ_mechanics",
                      {"substep_dt": 0.005,
                       "steps": ["cilium_kinematics", "mpm_strain", "mpm_strain", "mpm_strain",
                                 "mpm_viscosity", "mpm_scatter", "mpm_scatter", "mpm_scatter",
@@ -1240,6 +1251,11 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             # until `_glyph_cover_subject`: naming a radius for one set used to delete the
             # subject's cloud whether or not the subject was among the glyphs.
             "subject": "water_particle", "dot_size": 1.1,
+            # HOW SOLID EACH BODY LOOKS. A set of 33,000 spheres is a wall: an animal drawn
+            # opaque hides the water it is supposed to be moving, and what the water does is the
+            # entire subject of the run. The body is nearly a ghost, the yolk half-there inside
+            # it, the cilia solid because they are the thing to watch.
+            "dot_opacity": {"body": 0.10, "yolk_mass": 0.45, "cilium_shaft": 1.0},
             "dot_radius": {"cilium_shaft": round(0.9 / um, 6),
                            "yolk_mass": round(3.0 / um, 6),
                            # THE BODY IS DRAWN SMALLER THAN IT IS, on purpose. At its physical

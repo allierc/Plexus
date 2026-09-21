@@ -139,7 +139,10 @@ function live(){ idx = -1; tick(); }
 function step(d){
  if(total === 0) return;
  if(idx < 0) idx = total - 1;           // stepping back from live starts at the newest
- idx = Math.max(0, Math.min(total - 1, idx + d));
+ // WRAPS, rather than stopping dead at either end. The record is a loop to walk, not a list with
+ // walls: next past the last step returns to the first and prev before the first goes to the
+ // last, so flipping through it never needs a decision about which button has stopped working.
+ idx = (idx + d + total) % total;
  tick();
 }
 async function tick(){

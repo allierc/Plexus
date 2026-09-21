@@ -12615,7 +12615,7 @@ sets:
         boundary: free
       phase:
         width: 1
-        integration: none
+        integration: first_order
         boundary: free
   cilium_point:
     parent: cilium
@@ -12687,19 +12687,16 @@ seed:
   - 0.5
   - 0.0
   block: phase
-- op: exclude_overlap
-  at: water_particle
-  inside:
-  - body_point
-  - mpm_particle
-  - cilium_point
-  res: 96
-  dilate: 1
 operators:
+- op: phase_clock
+  at: cilium
+  block: phase
+  omega: 12.0
+  jitter: 0.0
+  seed: 7
 - op: cilium_pose_map
   at: cilium
   sweep_deg: 55.0
-  omega: 12.0
   waveform: stroke
   duty: 0.3
   d0: 0.0
@@ -12792,6 +12789,7 @@ operators:
   vmax: 1000000000.0
   implementation: warp
 schedule:
+- phase_clock
 - cilium_pose_map
 - organ_mechanics
 - substep_dt: 0.005

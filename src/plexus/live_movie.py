@@ -3733,6 +3733,27 @@ class LiveMovie:
             out.append((tid, nm, float(r), col))
         return out or None
 
+    def _glyph_opacity(self, key):
+        """`plotting.dot_opacity: {body: 0.12, yolk_mass: 0.5}` -- per TYPE, 1 when unstated.
+
+        A SET OF 33,000 SPHERES IS A WALL, and that is the problem this solves. The bodies in a
+        swimming scene are drawn as glyphs precisely so they read as objects rather than dust,
+        and the consequence is that they also hide everything behind them: an animal drawn solid
+        occludes the water it is supposed to be moving, and the run's whole subject is what the
+        water does. Opacity is the knob that lets a body be present without being a screen.
+
+        Keyed by type, like `dot_radius` and `colors`, so a scene can make its animal a ghost and
+        leave its yolk legible inside it. `key` is `<set>_<type>`, which is how `_glyphs` names
+        its actors, so the type is what follows the set's name.
+        """
+        opa = (self.style or {}).get("dot_opacity") or {}
+        if not opa:
+            return 1.0
+        for nm, v in opa.items():
+            if key.endswith("_" + str(nm)):
+                return float(v)
+        return 1.0
+
     def _glyph_points(self, lv, tid, subject):
         """Live positions of one type: the drawn subset for the subject, every live row otherwise."""
         import torch
@@ -3920,11 +3941,13 @@ class LiveMovie:
                 ps = float(self.p.camera.parallel_scale) if self.p.camera.parallel_projection else None
                 px = max(1.0, r / ps * self.p.window_size[1] / 2.0) if ps else 3.0
                 actor = self.p.add_mesh(self.pv.PolyData(pts), color=col, render_points_as_spheres=True,
-                                        point_size=px, name=f"glyph_{key}")
+                                        point_size=px, opacity=self._glyph_opacity(key),
+                                        name=f"glyph_{key}")
             elif len(pts):
                 pd = self.pv.PolyData(pts).glyph(geom=self._glyph_geom[key], scale=False, orient=False)
                 actor = self.p.add_mesh(pd, color=col, smooth_shading=True, lighting=True, ambient=0.35,
-                                        diffuse=0.7, specular=0.2, name=f"glyph_{key}")
+                                        diffuse=0.7, specular=0.2,
+                                        opacity=self._glyph_opacity(key), name=f"glyph_{key}")
             g[key] = (lname, tid, col, actor)
 
     def _dot_px(self, pos):

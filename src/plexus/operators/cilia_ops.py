@@ -769,6 +769,19 @@ class CiliumPoseMap(Lateral):
         self.d_scale = float(params.get("d_scale", 1.0))
         self.gain_max = float(params.get("gain_max", 2.0))
         self.offset = float(params.get("offset", 0.0))
+        # THE CLOCK LIVES HERE RATHER THAN IN `phase_clock`, AND IT HAS TO.
+        #
+        # `phase_clock` emits a first-order rate into `phase` while `organ_mechanics` emits an
+        # ACCELERATION into `pose`, and the engine refuses one set carrying operators of two
+        # integration orders -- "conflicting integration order" -- which is correct: a set has one
+        # integrator. So the cilium's `phase` block holds only its OFFSET, written once by
+        # `metachronal_phase`, and the cycle is advanced here from the run's own clock:
+        #
+        #     phi_c(t) = phase_c + omega t
+        #
+        # Nothing is integrated, so nothing conflicts, and the wave still travels: the offsets are
+        # fixed around the girdle and the whole pattern rotates at `omega`.
+        self.omega = float(params.get("omega", 0.0))
 
     def forward(self, H, mask=None):
         cil = H.level(self.at)
@@ -780,7 +793,8 @@ class CiliumPoseMap(Lateral):
 
         drive = st[:, d0:d1][:, 0]
         g = ((drive - self.d0) / self.d_scale).clamp(min=0.0, max=self.gain_max)
-        ph = st[:, q0:q1][:, 0] + self.offset
+        t = float(getattr(H, "frame", 0)) * float(getattr(H, "dt", 1.0))
+        ph = st[:, q0:q1][:, 0] + self.offset + self.omega * t
         u = (ph / (2.0 * math.pi)) % 1.0                     # where in the cycle, in [0, 1)
 
         if self.waveform == "sine":
@@ -890,4 +904,96 @@ class CiliumKinematics(Lateral):
         new[:, pa:pb] = torch.where(keep, pos, new[:, pa:pb])
         new[:, va:vb] = torch.where(keep, vel, new[:, va:vb])
         p.state = new
+        return {}
+
+
+@register_operator("exclude_overlap", family="seed", set="particle", kind="seed")
+class ExcludeOverlap(Seed):
+    """No particle of this set may START inside another one: the fluid a body displaces.
+
+    particle -> particle: reads both sets' positions, writes this set's `occ`, once, before the
+    first frame.
+
+    WHY A POOL NEEDS THIS. Water is declared as a BLOCK filling the tank, and a block does not
+    know an animal is standing in it -- so a uniform seed puts thousands of water particles inside
+    the body. In this scene the animal occupies about an eighth of the pool, which is some 17,000
+    of 140,000 particles starting in the same place as the tissue. MLS-MPM resolves that as an
+    enormous first-frame pressure spike, and every measurement of "how far the water moved"
+    afterwards is reading that explosion rather than the beat. Displacement is what a body in a
+    fluid DOES; it has to be true at frame zero as well as after it.
+
+    HOW: the occupied volume is rasterised onto a grid at `res`, dilated by one cell, and any
+    particle of this set landing in an occupied cell is made dormant -- `occ = 0`, which
+    `mpm_scatter` masks its weights by, so the particle contributes no mass and no momentum and
+    is drawn nowhere. A grid and not a neighbour search because the two sets here are 140,000 and
+    33,000 points: the pairwise distance matrix is four and a half billion entries, and the
+    voxel test is linear in each.
+
+    Dormant rather than deleted, because the sets' row counts are part of the containment map and
+    a hierarchy that renumbers itself mid-seed is a different object from the one the spec
+    declared.
+    """
+
+    EMIT = None
+    INPUTS = ["particle"]
+    OUTPUTS = ["particle"]
+    READS = ["pos"]
+    WRITES = []
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["inside"]
+    MECHANISM_TAGS = ["initial_condition", "boundary_condition", "displacement", "fluid"]
+    PARAM_ROLES = {"inside": "the_sets_whose_volume_is_excluded", "res": "rasterisation_grid",
+                   "dilate": "cells_of_clearance_around_the_body"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "water_particle")
+        ins = params["inside"]
+        self.inside = [str(v) for v in (ins if isinstance(ins, (list, tuple)) else [ins])]
+        self.res = int(params.get("res", 96))
+        self.dilate = int(params.get("dilate", 1))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        dev = X.device
+        n = self.res
+        lo = torch.zeros(3, device=dev, dtype=X.dtype)
+        # `world_size`, which is what the Hierarchy actually calls it -- `H.world` does not exist.
+        # `or` ON A TENSOR ASKS FOR ITS TRUTH VALUE, which for more than one element raises.
+        _w = getattr(H, "world_size", None)
+        if _w is None:
+            _w = [1.0, 1.0, 1.0]
+        elif torch.is_tensor(_w):
+            _w = [float(v) for v in _w.flatten().tolist()]
+        elif hasattr(_w, "__len__"):
+            _w = [float(v) for v in _w]
+        else:
+            _w = [float(_w)] * 3
+        hi = torch.as_tensor((list(_w) * 3)[:3], device=dev, dtype=X.dtype)
+        span = (hi - lo).clamp_min(1e-12)
+
+        occupied = torch.zeros(n * n * n, dtype=torch.bool, device=dev)
+        for nm in self.inside:
+            lv = H.level(nm)
+            Y = lv.get("pos")
+            g = ((Y - lo) / span * n).long().clamp(0, n - 1)
+            occupied[(g[:, 0] * n + g[:, 1]) * n + g[:, 2]] = True
+        vol = occupied.view(n, n, n)
+        for _ in range(max(self.dilate, 0)):
+            v = vol.clone()
+            for d in range(3):
+                v |= torch.roll(vol, 1, dims=d) | torch.roll(vol, -1, dims=d)
+            vol = v
+
+        g = ((X - lo) / span * n).long().clamp(0, n - 1)
+        hit = vol[g[:, 0], g[:, 1], g[:, 2]]
+        occ = p.occ.clone()
+        occ[hit] = 0
+        p.occ = occ
+        print(f"[exclude_overlap] {p.name}: {int(hit.sum()):,} of {p.n:,} particles start inside "
+              f"{', '.join(self.inside)} and are dormant -- the volume the body displaces",
+              flush=True)
         return {}
