@@ -1252,21 +1252,20 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             "renderer": "vtk_points", "background": "black", "box_frame": True, "up_axis": 2,
             "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
             "camera_roll": 180.0,
-            # THE BODY IS THE CLOUD AND THE CILIA ARE SPHERES -- the 0009 look, which is the one
-            # that reads as an animal: a dense cloud of small gold points showing the whole
-            # silhouette, rather than a wall of white spheres that hides its own shape. The
-            # cilia stay as spheres because they are the thing being watched and a 0.9 um shaft
-            # drawn as dots would vanish into the body behind it.
+            # THE WATER IS THE CLOUD, AT A DOT SIZE YOU CAN ACTUALLY SEE. Only one set can be
+            # the subject and the subject is what gets drawn as points, so the water takes it --
+            # it is the thing whose motion this rung is about, and at 1.1 px it read as a faint
+            # haze. The body and the cilia are glyphs over it: the body gold and nearly
+            # transparent so it shows its silhouette without hiding the water behind it, the
+            # cilia white and solid because they are what is being watched.
             #
-            # THE WATER IS NOT DRAWN AT ALL HERE. 125,866 blue dots over the animal is a fog that
-            # makes the one question this picture answers -- are the shafts attached to the body
-            # -- harder to see, and the water has its own figure.
-            "subject": "body_point", "dot_size": 1.6,
-            # AND THE YOLK IS NOT DRAWN EITHER. It is still MATTER -- it scatters into the grid
-            # and displaces water like everything else -- but a type with no `dot_radius` is not
-            # drawn, so the picture is the body and its cilia and nothing else.
-            "dot_opacity": {"cilium_shaft": 1.0},
-            "dot_radius": {"cilium_shaft": round(0.9 / um, 6)},
+            # THE YOLK IS NOT DRAWN. It is still MATTER -- it scatters into the grid and
+            # displaces water like everything else -- but a type with no `dot_radius` is not
+            # drawn at all.
+            "subject": "water_particle", "dot_size": 2.8,
+            "dot_opacity": {"cilium_shaft": 1.0, "body": 0.14},
+            "dot_radius": {"cilium_shaft": round(0.9 / um, 6),
+                           "body": round(0.9 / um, 6)},
             "colors": dict({c: COLOR[c] for c in f["order"]},
                            seawater="#3d6ea8", cilium_shaft="#ffffff",
                            body="#d8b45c", yolk_mass="#e8c33a"),

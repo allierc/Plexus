@@ -341,6 +341,18 @@ def g_watch_mp4(h, q):
     return _watch_file(h, q, "mp4", "video/mp4")
 
 
+def _journal(msg: str) -> None:
+    """One line into the record's own journal, which the watcher's panel is already polling."""
+    import time as _t
+    try:
+        from plexus.gui import watch
+        os.makedirs(os.path.dirname(watch.JOURNAL), exist_ok=True)
+        with open(watch.JOURNAL, "a") as f:
+            f.write(f"{_t.strftime('%H:%M:%S')}  {msg}\n")
+    except Exception:                                            # noqa: BLE001
+        pass
+
+
 def g_watch_open3d(h, q):
     """`/api/watch/open3d?i=N` -- open THAT step's own saved spec here and seed it.
 
@@ -355,12 +367,23 @@ def g_watch_open3d(h, q):
     f = watch._nth(q, "spec")
     if not f or not os.path.exists(f):
         return h._send_json({"error": "that step saved no spec"}, 404)
+    import time as _time
     try:
         spec = yaml.safe_load(open(f))
         name = str(((spec.get("general") or {}).get("name")) or "opened").strip()
         dst = _spec_path(name)
         os.makedirs(studio.CONFIG_DIR, exist_ok=True)
         shutil.copyfile(f, dst)
+        # SAY WHAT IS HAPPENING, BOTH PLACES. Seeding a few hundred thousand particles takes
+        # seconds on the one VTK thread, and a button that does nothing visible for six seconds
+        # is indistinguishable from a broken one. The terminal gets it, and so does the journal
+        # -- which the watcher's own panel is already polling, so the message appears in the page
+        # beside the button that caused it.
+        _sets = ", ".join(f"{k}" for k in (spec.get("sets") or {}))
+        _say = f"3D: VTK is building the scene for {name!r} -- sets: {_sets}"
+        print(f"[watch] {_say}", flush=True)
+        _journal(_say)
+        _t0 = _time.perf_counter()
         # AND SEEDED HERE, not left for the first render to pay for. `g_open` only imports the
         # file; the scene is built by `open_view`, which for a few hundred thousand particles
         # takes seconds. Leaving that to the render meant the browser's first frame hung, and a
@@ -369,7 +392,11 @@ def g_watch_open3d(h, q):
         bio_view.open_view(dst)
         bio.STATE["name"] = name
         bio.bump(name, f"opened {f} for the 3-D view")
-        return h._send_json({"name": name, "spec": dst})
+        _el = _time.perf_counter() - _t0
+        _done = f"3D: {name!r} is ready after {_el:.1f}s -- drag to turn, wheel to zoom"
+        print(f"[watch] {_done}", flush=True)
+        _journal(_done)
+        return h._send_json({"name": name, "spec": dst, "seconds": round(_el, 1)})
     except Exception as e:                                       # noqa: BLE001
         return h._send_json({"error": f"{type(e).__name__}: {e}"[:300]}, 400)
 

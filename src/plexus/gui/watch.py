@@ -144,15 +144,23 @@ function open3d(){
  const i = (idx < 0) ? total - 1 : idx;
  if(d3 && d3.i === i){ close3d(); return; }
  d3 = {i: i, azim: 20, elev: 8, zoom: 1.3, roll: 180, drag: null, name: null};
- document.getElementById('d3note').textContent = ' — opening and seeding, a few seconds…';
+ // A COUNTER WHILE VTK BUILDS, because a button that does nothing visible for six seconds is
+ // indistinguishable from a broken one. The server prints the same thing to the journal panel.
+ const t0 = Date.now();
+ const note = document.getElementById('d3note');
+ const tim = setInterval(() => {
+  if(d3) note.textContent = ' — VTK is building the scene… ' + ((Date.now()-t0)/1000).toFixed(1) + ' s';
+ }, 200);
+ note.textContent = ' — VTK is building the scene… 0.0 s';
  fetch('/api/watch/open3d?i=' + i).then(r => r.json()).then(j => {
-  if(j.error){ document.getElementById('d3note').textContent = ' — ' + j.error; d3 = null; return; }
+  clearInterval(tim);
+  if(j.error){ note.textContent = ' — ' + j.error; d3 = null; return; }
   // THE NAME IS CARRIED ON EVERY RENDER, because opening a spec is not seeding it: the render
   // route builds the scene itself when it is told which one, and without that it answers "no
   // scene is open; seed one first".
   d3.name = j.name;
-  document.getElementById('d3note').textContent =
-    ' — ' + j.name + ': drag to turn, wheel to zoom, 3D again to close';
+  note.textContent = ' — ' + j.name + ' ready in ' + (j.seconds || '?')
+    + ' s: drag to turn, wheel to zoom, 3D again to close';
   document.getElementById('shot').style.display = 'none';
   document.getElementById('mov').style.display = 'none';
   document.getElementById('live3d').style.display = '';

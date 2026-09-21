@@ -1,11 +1,14 @@
-# R12 -- true cilia. A slender shaft rooted in each band cell, with an
-# ANGLE driven through the eye's own two-stage plant. The drive is
-# PRESCRIBED here, not wired: if the water does not move with the
-# effector flat out, wiring a connectome to it would only be adding an
-# explanation for a thing that is not happening.
-# Written by tools/platynereis_specs.py.
+# R12-null -- THE CONTROL, and it decides whether the water result means anything.
+# Byte-identical to plat_r12_cilia except the sweep is ZERO degrees: the shafts exist, the
+# plant runs, the phases wind around the girdle, and nothing swings.
+#
+# WHY IT IS NEEDED. `exclude_overlap` makes 14,134 water particles dormant where the animal
+# stands, which leaves a HOLE in a pool that is otherwise at uniform density -- and water at
+# rest beside a hole flows into it. That transient has nothing to do with the beat, and the
+# measured 27.2 um of median displacement is large enough that it could be entirely that.
+# If this control moves the water as far, the beat is not what moved it.
 general:
-  name: plat_r12_cilia
+  name: plat_r12_null
   seed: 0
   n_frames: 600
   dt: 0.05
@@ -12698,7 +12701,7 @@ seed:
 operators:
 - op: cilium_pose_map
   at: cilium
-  sweep_deg: 85.0
+  sweep_deg: 0.0
   omega: 10.0
   waveform: stroke
   duty: 0.3
@@ -12729,7 +12732,6 @@ operators:
 - op: cilium_kinematics
   at: cilium_point
   cilium_set: cilium
-  cell_set: cell
 - op: mpm_strain
   at: body_point
   implementation: warp
@@ -12792,13 +12794,10 @@ operators:
   wall_damp: 0.9
   vmax: 1000000000.0
   implementation: warp
-- op: aggregate_centroid
-  at: cell
-  child: body_point
 schedule:
 - cilium_pose_map
 - organ_mechanics
-- substep_dt: 0.005
+- substep_dt: 9.259259e-04
   steps:
   - cilium_kinematics
   - mpm_strain
@@ -12813,7 +12812,6 @@ schedule:
   - mpm_gather
   - mpm_gather
   - mpm_gather
-- aggregate_centroid
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -12829,13 +12827,15 @@ plotting:
   keep_stills: true
   camera_roll: 180.0
   subject: water_particle
-  dot_size: 2.8
+  dot_size: 1.1
   dot_opacity:
+    body: 0.1
+    yolk_mass: 0.45
     cilium_shaft: 1.0
-    body: 0.14
   dot_radius:
     cilium_shaft: 0.004594
-    body: 0.004594
+    yolk_mass: 0.015314
+    body: 0.004084
   colors:
     Interneuron: '#2f6fb5'
     Motoneuron: '#d45fa8'
@@ -12857,5 +12857,5 @@ plotting:
     yolk: '#d8d2c4'
     seawater: '#3d6ea8'
     cilium_shaft: '#ffffff'
-    body: '#d8b45c'
+    body: '#ffffff'
     yolk_mass: '#e8c33a'
