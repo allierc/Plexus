@@ -1032,7 +1032,7 @@ def spec_r11(f: dict, n_water: int = 120000, n_frames: int = 900) -> dict:
 
 def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: int = 20,
              cilium_um: float = 38.0, soma_um: float = 4.0, per_cell: int = 48,
-             sweep_deg: float = 55.0, omega: float = 12.0) -> dict:
+             sweep_deg: float = 85.0, omega: float = 10.0) -> dict:
     """R12: TRUE CILIA, driven open-loop, in water. Does a real appendage move the fluid?
 
     Every rung up to here made a ciliary-band CELL swell and shrink. That is not a cilium. A
@@ -1202,10 +1202,12 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
         "operators": [
             {"op": "cilium_pose_map", "at": "cilium", "sweep_deg": sweep_deg, "omega": omega,
              "waveform": "stroke", "duty": 0.3, "d0": 0.0, "d_scale": 1.0},
-            # STAGE TWO IS THE EYE'S OWN PLANT, unchanged. K and C are per second squared and per
-            # second: sqrt(eig K) = 40 rad/s is a corner well above the beat's own 12 rad/s, so
-            # the shaft follows its command rather than being low-passed out of existence, and
-            # the damping ratio C / (2 sqrt K) = 0.75 keeps it from ringing.
+            # STAGE TWO IS THE EYE'S OWN PLANT, unchanged. K and C are per second squared and
+            # per second: sqrt(eig K) = 40 rad/s is a corner four times the beat's own 10 rad/s,
+            # so the shaft FOLLOWS its command rather than being low-passed out of existence --
+            # which is the thing to get right before asking whether the water moved, because a
+            # plant that cannot track its input makes every amplitude in the spec a fiction. The
+            # damping ratio C / (2 sqrt K) = 0.75 keeps it from ringing on the stroke's corner.
             {"op": "organ_mechanics", "at": "cilium",
              "K": [[1600.0, 0, 0], [0, 1600.0, 0], [0, 0, 1600.0]],
              "C": [[60.0, 0, 0], [0, 60.0, 0], [0, 0, 60.0]]},

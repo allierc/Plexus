@@ -1,0 +1,4 @@
+time   2026-09-21 15:26:32
+spec   plat_r12_null
+camera azim=20.0 elev=8.0 zoom=1.3
+why    R12-null, THE CONTROL: identical to the beat run with the sweep set to ZERO degrees. The shafts exist, the plant runs, the phases wind around the girdle, and nothing swings. It is needed because exclude_overlap makes 14,134 water particles dormant where the animal stands, leaving a HOLE in a pool that is otherwise at uniform density -- and water at rest beside a hole flows into it. That transient has nothing to do with the beat, and the measured 27.2 um of median displacement is large enough that it could be entirely that. (before the run)

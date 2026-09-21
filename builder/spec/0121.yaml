@@ -12794,7 +12794,7 @@ operators:
 schedule:
 - cilium_pose_map
 - organ_mechanics
-- substep_dt: 0.005
+- substep_dt: 9.259259e-04
   steps:
   - cilium_kinematics
   - mpm_strain

@@ -1,0 +1,4 @@
+time   2026-09-21 15:25:04
+spec   plat_r12_cilia
+camera (a figure, not a render)
+why    R12 MEASURED: the cilia move. Tip excursion 87.4 um peak-to-peak against 4.4 um at the root -- the root is pinned to its cell and is the free control -- so the tip swings 20x its own base. The beat is 1.6047 Hz measured against 1.5915 commanded (omega 10 rad/s), and the tip runs at 360 um/s with peaks near 774. The chord the command asks for is 2 L sin(sweep), not 2 L sin(sweep/2): the waveform swings +-85 degrees rather than across 85, so the extremes are 170 degrees apart.
