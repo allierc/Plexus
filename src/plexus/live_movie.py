@@ -1198,7 +1198,7 @@ class LiveMovie:
                     self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                     point_size=self._dot_px(pos))
             elif (self.style or {}).get("dot_radius") is not None and (
-                    self._glyph_build(H, lvl)
+                    self._glyph_cover_subject(H, lvl)
                     or bool((self.style or {}).get("glyphs_only", False))):
                 # SPHERES OF WORLD RADIUS PER TYPE (below), and with `glyphs_only` NOTHING ELSE.
                 #
@@ -3757,6 +3757,20 @@ class LiveMovie:
         if P.shape[1] == 2:
             P = np.concatenate([P, np.zeros((P.shape[0], 1), np.float32)], 1)
         return P
+
+    def _glyph_cover_subject(self, H, lvl):
+        """Build every set's glyphs, and say whether THE SUBJECT is among them.
+
+        WHY THE TWO QUESTIONS ARE DIFFERENT. `_glyph_build` draws glyphs for every typed set that
+        carries a `dot_radius`, not only the subject, and returns whether it drew ANY -- and the
+        caller used that to decide whether to draw the subject's point CLOUD. So naming a radius
+        for one small set silently deleted the cloud of a different, larger one: a scene of 74
+        cilia and 2,000 yolk points over 140,000 water particles rendered the first two as spheres
+        and the water not at all, because the water had no radius of its own and something else
+        did. A set is drawn as glyphs or as a cloud; which of the two is a property of THAT set.
+        """
+        built = self._glyph_build(H, lvl)
+        return built and bool(self._glyph_types(lvl))
 
     def _glyph_build(self, H, lvl):
         """EVERY typed point set with a `dot_radius`, not only the subject. A tissue holds its

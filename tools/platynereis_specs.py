@@ -1105,8 +1105,18 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             # the two disagree about every body's volume (entities.py:498). The radius sizes the
             # yolk balls instead -- 12 um, which is what the five yolk cells look like in the
             # source video.
+            # A TYPE OF ITS OWN, so the renderer can draw it. `dot_radius` is keyed by TYPE
+            # NAME and reads the SET'S OWN types, not its parent's -- a particle set that
+            # declares none can only ever be the subject cloud, coloured by whatever its parent
+            # is. One type named for what the set is makes it addressable.
             "mpm_particle": {"parent": "cell", "density": 1050.0,
                              "radius": round(12.0 / um, 6),
+                             # THE MATERIAL COMES WITH THE TYPE. A particle set that declares
+                             # its own types must give them their own `youngs` and `density`:
+                             # with no types it inherited the parent cell's, and `mpm_scatter`
+                             # refuses a type with neither rather than guessing one.
+                             "types": {"yolk_mass": {"fraction": 1.0, "material": "elastic",
+                                                     "youngs": 400.0, "density": 1150.0}},
                              "per_parent": {c: (400 if c == "yolk" else 0) for c in f["order"]}},
             # ONE CILIUM PER CELL, and only the ones with a polarity grow a shaft -- the band is
             # polarised by `radial_polarity` and nothing else is, so that is how the spec says
@@ -1140,6 +1150,14 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             },
             "cilium_point": {"parent": "cilium", "per_parent": per_cilium,
                              "entity": "mpm_particle", "density": 1050.0,
+                             # The shaft is driven KINEMATICALLY, so its own elasticity never
+                             # enters its motion -- `cilium_kinematics` overwrites pos and vel
+                             # every substep and its deformation gradient stays a rotation, which
+                             # carries no stress. The modulus is here because `mpm_scatter`
+                             # requires one, and it is the tissue's so the number is not a
+                             # stranger to the scene.
+                             "types": {"cilium_shaft": {"fraction": 1.0, "material": "elastic",
+                                                        "youngs": 2000.0, "density": 1050.0}},
                              "radius": round(0.25 / um, 6),
                              "particle_mass": float(f"{cil_pm:.4g}")},
             "water": {"n": 1, "start": [[0.5, 0.5, 0.5]],
@@ -1203,10 +1221,22 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
                                 "mpm_gather", "mpm_gather"]}],
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
         "plotting": {
-            "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
+            "renderer": "vtk_points", "background": "black", "box_frame": True, "up_axis": 2,
             "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
-            "camera_roll": 180.0, "dot_size": 2.5, "subject": "mpm_particle",
-            "colors": dict({c: COLOR[c] for c in f["order"]}, seawater="#1b3f6b"),
+            "camera_roll": 180.0,
+            # THE WATER IS THE CLOUD AND THE BODIES ARE SPHERES. The subject set is drawn as
+            # points -- 140,000 of them, which as glyph spheres would be 14 million triangles a
+            # frame -- while the two sets that have to be SEEN as objects carry a `dot_radius`
+            # and are drawn at their real size. Both at once, which the renderer could not do
+            # until `_glyph_cover_subject`: naming a radius for one set used to delete the
+            # subject's cloud whether or not the subject was among the glyphs.
+            "subject": "water_particle", "dot_size": 1.1,
+            "dot_radius": {"cilium_shaft": round(0.9 / um, 6),
+                           "yolk_mass": round(2.2 / um, 6)},
+            # WHITE FOR BOTH BODIES, as asked: the yolk and the cilia are the animal here and the
+            # water is the medium, so the picture says so with two colours and not four.
+            "colors": dict({c: COLOR[c] for c in f["order"]},
+                           seawater="#3d6ea8", cilium_shaft="#ffffff", yolk_mass="#ffffff"),
         },
     }
 

@@ -1,0 +1,4 @@
+time   2026-09-21 14:58:03
+spec   plat_r12_cilia
+camera azim=20.0 elev=8.0 zoom=1.15
+why    R12 anatomy, the whole scene: the yolk and the cilia in WHITE, the water in blue. 2,000 yolk points drawn as 2.2 um spheres, 74 cilia as 20 um shafts of twelve 0.9 um spheres each, and 140,000 seawater particles as the cloud they sit in. The 4,117 cells are positions only -- not matter and not drawn. The renderer could not do this until now: naming a dot_radius for ONE set deleted the SUBJECT's point cloud whether or not the subject was among the glyphs, so a scene of 74 cilia over 140,000 water particles drew the cilia and no water at all.
