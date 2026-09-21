@@ -1024,6 +1024,193 @@ def spec_r11(f: dict, n_water: int = 120000, n_frames: int = 900) -> dict:
     return base
 
 
+def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: int = 12,
+             cilium_um: float = 20.0, soma_um: float = 4.0, per_cell: int = 48,
+             sweep_deg: float = 55.0, omega: float = 12.0) -> dict:
+    """R12: TRUE CILIA, driven open-loop, in water. Does a real appendage move the fluid?
+
+    Every rung up to here made a ciliary-band CELL swell and shrink. That is not a cilium. A
+    cilium is a slender shaft rooted in a cell, several times longer than the cell itself, and it
+    beats by SWINGING -- which is why the source video's chaetae look like bristles and nothing
+    in these specs did.
+
+    Here each band cell grows a real one: a 20 um shaft of 12 material points rooted at the cell's
+    surface, on a 4 um cell, so the appendage is five times the body that bears it and the lever
+    arm the cell-only model could not express finally exists.
+
+    WHAT IS MADE OF MATTER, AND WHAT IS NOT. The yolk, the cilia and the water, and nothing
+    else. Giving all 4,117 cells material points costs 197,616 of them and does not help answer
+    whether a cilium moves water; the cells keep their measured positions and their polarity,
+    because that is where the shafts are rooted, but they are not integrated. The yolk is the
+    larva's one large internal mass and stands in for the body the water flows around.
+
+    THE DRIVE IS PRESCRIBED, NOT WIRED, AND THAT IS THE POINT OF THIS RUNG. The circuit is left
+    out entirely and every cilium is given `drive = 1`. If the water does not move with the
+    effector commanded flat out and nothing else in the way, then wiring a connectome to it would
+    only be adding an explanation for a thing that is not happening. The connectome goes back in
+    at the next rung, and then the comparison is against THIS.
+
+    NO GRAVITY, for the reason R5 had none: a body that is also falling makes it impossible to
+    say whether the beat moved anything.
+
+    The two stages are the eye's, per cilium:
+        cilium.drive + cilium.phase --(cilium_pose_map)--> pose_target      a commanded angle
+        pose_target                 --(organ_mechanics)--> pose             a damped plant
+        pose                        --(cilium_kinematics)--> the shaft's pos AND vel
+    and the shaft shares the water's `mpm_grid`, which is what carries the momentum across.
+    """
+    um = f["side_um"]
+    r = soma_um / um
+    pm = 1050.0 * (4.0 / 3.0) * math.pi * r ** 3 / per_cell
+    start = positions(f, 0.85, [0.08, 0.08, 0.08])
+    types = {c: {"count": f["count"][c], "shape": "ball", "material": "elastic",
+                 "youngs": MATERIAL[c][0], "density": MATERIAL[c][1]} for c in f["order"]}
+    # A CILIUM POINT'S MASS. The shaft is prescribed kinematically, so its mass never enters its
+    # own motion -- but it is exactly what it hands the grid, and therefore the water. A shaft of
+    # 20 um and 0.25 um radius at the tissue's own density is the honest number.
+    cil_vol = math.pi * (0.25 / um) ** 2 * (cilium_um / um)
+    cil_pm = 1050.0 * cil_vol / per_cilium
+    return {
+        "general": {
+            "name": "plat_r12_cilia", "seed": 0, "n_frames": n_frames, "dt": 0.05, "dim": 3,
+            "world": [1.0, 1.0, 1.0], "boundary": "wall", "save_data": True,
+            "record_cap": n_frames + 1, "units": {"length_um": um, "time_s": 1.0},
+        },
+        "sets": {
+            "cell": {
+                "n": f["n"], "start": start, "type_layout": "ordered", "types": types,
+                "state": {
+                    "pos": {"width": 3, "role": "coordinate",
+                            "integration": "second_order_coordinate", "boundary": "world"},
+                    "vel": {"width": 3, "role": "rate", "integration": "second_order_rate",
+                            "boundary": "free"},
+                    "phase": {"width": 1, "integration": "first_order", "boundary": "free"},
+                    "polarity": {"width": 3, "integration": "none", "boundary": "free",
+                                 "record": False},
+                },
+            },
+            # ONLY THE YOLK IS MATTER, and that is the whole economy of this rung. Giving all
+            # 4,117 cells material points costs 197,616 of them and tests nothing: the question
+            # is whether a CILIUM moves WATER, and 4,000 elastic balls in between are a slow way
+            # of not answering it. `per_parent` as a mapping from the parent's TYPE puts points
+            # only where they are wanted -- the yolk is the larva's one large internal mass, so
+            # it is the body the water has to flow around -- and every other class gets zero,
+            # which `repeat_interleave` turns into no rows at all.
+            #
+            # The cells themselves keep their measured positions and their polarity. They are
+            # where the cilia are rooted and what the picture draws; they are simply not made of
+            # anything this rung has to integrate.
+            # NO `particle_mass` HERE, and it is refused rather than ignored: a per-type
+            # `per_parent` gives each body a different point count, so one point mass would make
+            # the two disagree about every body's volume (entities.py:498). The radius sizes the
+            # yolk balls instead -- 12 um, which is what the five yolk cells look like in the
+            # source video.
+            "mpm_particle": {"parent": "cell", "density": 1050.0,
+                             "radius": round(12.0 / um, 6),
+                             "per_parent": {c: (400 if c == "yolk" else 0) for c in f["order"]}},
+            # ONE CILIUM PER CELL, and only the ones with a polarity grow a shaft -- the band is
+            # polarised by `radial_polarity` and nothing else is, so that is how the spec says
+            # which cells bear one without needing a mask on every operator downstream.
+            # A CILIUM EXISTS ONLY WHERE A CELL BEARS ONE. With `per_parent: 1` the set held
+            # 4,117 cilia of which 74 were real, and their 48,516 dead shaft points still
+            # scattered into the MPM grid as lumps of matter at every cell in the animal --
+            # invisible in the picture and pushing the water all the same. The per-type mapping
+            # makes them not exist.
+            "cilium": {
+                "parent": "cell", "entity": "organ",
+                "per_parent": {c: (1 if c == "ciliary band" else 0) for c in f["order"]},
+                "state": {
+                    # A PLACE AS WELL AS AN ANGLE. The `organ` entity carries `pose` and nothing
+                    # spatial -- an eye's coordinate is where it LOOKS, not where it is -- but a
+                    # cilium's shaft has to hang off something, and the child set is scattered
+                    # about its parent's `pos` at build. Integrated by nothing: the cilium sits
+                    # where its cell is, and `cilium_seed` writes it there.
+                    "pos": {"width": 3, "role": "coordinate", "integration": "none",
+                            "boundary": "free"},
+                    "pose": {"width": 3, "role": "coordinate",
+                             "integration": "second_order_coordinate", "boundary": "free"},
+                    "pose_rate": {"width": 3, "role": "rate", "integration": "second_order_rate",
+                                  "boundary": "free"},
+                    "pose_target": {"width": 3, "role": "readout", "integration": "none",
+                                    "boundary": "free"},
+                    "drive": {"width": 1, "role": "readout", "integration": "none",
+                              "boundary": "free"},
+                    "phase": {"width": 1, "integration": "first_order", "boundary": "free"},
+                },
+            },
+            "cilium_point": {"parent": "cilium", "per_parent": per_cilium,
+                             "entity": "mpm_particle", "density": 1050.0,
+                             "radius": round(0.25 / um, 6),
+                             "particle_mass": float(f"{cil_pm:.4g}")},
+            "water": {"n": 1, "start": [[0.5, 0.5, 0.5]],
+                      "types": {"seawater": {"count": 1, "material": "liquid",
+                                             "bulk_modulus": 20000.0, "density": 1025.0,
+                                             "eta": 0.001,
+                                             "block": [0.02, 0.02, 0.02, 0.98, 0.98, 0.98]}}},
+            "water_particle": {"parent": "water", "per_parent": n_water,
+                               "entity": "mpm_particle", "density": 1025.0, "radius": 0.5},
+        },
+        "seed": [
+            # RADIAL, because this is the direction the cilium POINTS, not the direction it
+            # sweeps. The sweep is a rotation ABOUT an axis perpendicular to the shaft, and
+            # `cilium_seed` computes that axis itself from the body's geometry.
+            {"op": "radial_polarity", "at": "cell[type=ciliary band]", "axis": 2,
+             "centre": [0.5, 0.5, 0.0], "direction": "radial"},
+            {"op": "cilium_seed", "at": "cilium_point", "cilium_set": "cilium",
+             "cell_set": "cell", "length_um": cilium_um, "soma_um": soma_um,
+             "beat": "tangential", "axis": 2},
+            # THE PRESCRIBED DRIVE. Every cilium flat out, so this rung tests the mechanism and
+            # not a circuit's ability to reach it.
+            {"op": "seed_state_random", "at": "cilium", "block": "drive", "lo": 1.0, "hi": 1.0},
+            {"op": "metachronal_phase", "at": "cilium", "wavenumber": 6.0, "axis": 2,
+             "centre": [0.5, 0.5, 0.0], "block": "phase"},
+        ],
+        "operators": [
+            {"op": "phase_clock", "at": "cilium", "block": "phase", "omega": omega,
+             "jitter": 0.0, "seed": 7},
+            {"op": "cilium_pose_map", "at": "cilium", "sweep_deg": sweep_deg,
+             "waveform": "stroke", "duty": 0.3, "d0": 0.0, "d_scale": 1.0},
+            # STAGE TWO IS THE EYE'S OWN PLANT, unchanged. K and C are per second squared and per
+            # second: sqrt(eig K) = 40 rad/s is a corner well above the beat's own 12 rad/s, so
+            # the shaft follows its command rather than being low-passed out of existence, and
+            # the damping ratio C / (2 sqrt K) = 0.75 keeps it from ringing.
+            {"op": "organ_mechanics", "at": "cilium",
+             "K": [[1600.0, 0, 0], [0, 1600.0, 0], [0, 0, 1600.0]],
+             "C": [[60.0, 0, 0], [0, 60.0, 0], [0, 0, 60.0]]},
+            {"op": "cilium_kinematics", "at": "cilium_point", "cilium_set": "cilium"},
+            {"op": "mpm_strain", "at": "mpm_particle", "implementation": "warp"},
+            {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+            {"op": "mpm_scatter", "at": "cilium_point", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+            {"op": "mpm_strain", "at": "water_particle", "implementation": "warp"},
+            {"op": "mpm_viscosity", "at": "water_particle", "eta": 0.001},
+            {"op": "mpm_scatter", "at": "water_particle", "to": "mpm_grid", "drag": 0.0,
+             "a_max": 200.0, "implementation": "warp", "polar": "higham"},
+            {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.9, "wall_friction": 0.3},
+            {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
+             "vmax": 1.0e9, "implementation": "warp"},
+            {"op": "mpm_gather", "at": "water_particle", "from": "mpm_grid", "wall_damp": 0.9,
+             "vmax": 1.0e9, "implementation": "warp"},
+        ],
+        # NO GRAVITY. And no `mpm_gather` on the shaft: it is kinematic, its motion is its
+        # circuit's, and reading the grid back into it would be the fluid pushing the cilium
+        # around -- a different model, and one this rung is not testing.
+        "schedule": ["phase_clock", "cilium_pose_map", "organ_mechanics",
+                     {"substep_dt": 0.005,
+                      "steps": ["cilium_kinematics", "mpm_strain", "mpm_strain", "mpm_viscosity",
+                                "mpm_scatter", "mpm_scatter", "mpm_scatter", "mpm_grid_update",
+                                "mpm_gather", "mpm_gather"]}],
+        "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
+        "plotting": {
+            "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
+            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
+            "camera_roll": 180.0, "dot_size": 2.5, "subject": "mpm_particle",
+            "colors": dict({c: COLOR[c] for c in f["order"]}, seawater="#1b3f6b"),
+        },
+    }
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -1044,7 +1231,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1052,6 +1239,22 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r12", "all"):
+        import yaml
+        sp = spec_r12(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} TRUE CILIA: {F['count']['ciliary band']} shafts "
+              f"of 20 um, driven open-loop, in water, no gravity")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R12 -- true cilia. A slender shaft rooted in each band cell, with an\n"
+                         "# ANGLE driven through the eye's own two-stage plant. The drive is\n"
+                         "# PRESCRIBED here, not wired: if the water does not move with the\n"
+                         "# effector flat out, wiring a connectome to it would only be adding an\n"
+                         "# explanation for a thing that is not happening.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r11", "all"):
         import yaml
         sp = spec_r11(F)

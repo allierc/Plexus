@@ -530,3 +530,364 @@ class MetachronalPhase(Seed):
         print(f"[metachronal_phase] {lvl.name}: {n:,} cells phased as a wave of "
               f"{self.k:g} cycles per turn about axis {self.axis}", flush=True)
         return {}
+
+
+# ===========================================================================================
+# A CILIUM AS A THING, not as a cell that swells.
+#
+# Everything above treats a ciliary-band CELL as the effector: `polar_active_stress[driven]`
+# makes its material extend and retract along an axis. That was the coarsest reading of a
+# ciliary stroke and it was the right first one, but it is not a cilium. A cilium is a slender
+# shaft rooted in a cell, it has a LENGTH and an ANGLE, and it beats by swinging -- which is why
+# the source video draws the chaetae as bristles emerging from their follicle cells and nothing
+# in these specs looked like that.
+#
+# THE ARCHITECTURE IS THE EYE'S, PER APPENDAGE, and deliberately so: the oculomotor rig already
+# solved "a circuit commands an angle and a body travels to it" and its two stages are
+# registered and fitted. Applied here,
+#
+#     motoneurons --(readout)--> cilium.drive        the circuit reaches the effector
+#     cilium.drive --(cilium_pose_map)--> pose_target    STAGE ONE: drives -> a commanded angle
+#     pose_target --(organ_mechanics)--> pose            STAGE TWO: a damped second-order plant
+#     pose --(cilium_kinematics)--> the shaft's pos, vel  the angle becomes geometry
+#     the shaft ---(shared mpm_grid)---> the water        and geometry becomes flow
+#
+# Stage two is `organ_mechanics` VERBATIM -- the same operator the eye uses, pointed at a set
+# declared `entity: organ`. Its law is `u_ddot = K(u_inf - u) - C u_dot` on a three-vector of
+# angles, which is what a cilium bending at its base needs; nothing about it is ocular.
+#
+# The shaft's points are written KINEMATICALLY, position and velocity together in closed form,
+# which is `prototype/eye/forced_gaze_ops.py`'s contract: MLS-MPM's P2G carries each particle's
+# CURRENT velocity every substep, so a body whose position is prescribed without its velocity
+# transmits nothing to the fluid. The cilium is authoritative over its own points and the grid
+# carries the momentum to the water.
+# ===========================================================================================
+
+
+def _rodrigues(axis, theta):
+    """Rotate about `axis` by `theta`. [N, 3] axes and [N] angles -> [N, 3, 3]."""
+    a = axis / axis.norm(dim=1, keepdim=True).clamp_min(1e-12)
+    c, s = torch.cos(theta)[:, None, None], torch.sin(theta)[:, None, None]
+    K = torch.zeros(a.shape[0], 3, 3, device=a.device, dtype=a.dtype)
+    K[:, 0, 1], K[:, 0, 2] = -a[:, 2], a[:, 1]
+    K[:, 1, 0], K[:, 1, 2] = a[:, 2], -a[:, 0]
+    K[:, 2, 0], K[:, 2, 1] = -a[:, 1], a[:, 0]
+    I = torch.eye(3, device=a.device, dtype=a.dtype)[None]
+    return I + s * K + (1.0 - c) * torch.bmm(K, K)
+
+
+@register_operator("cilium_seed", family="seed", set="particle", kind="seed")
+class CiliumSeed(Seed):
+    """Grow a slender shaft out of every cell that bears one, and remember its rest geometry.
+
+    particle -[containment]-> cilium -[containment]-> cell: places each cilium's material points
+    evenly along a shaft rooted at its cell's surface and pointing out of the body, and stores
+    what `cilium_kinematics` needs to swing it -- the base, the points' offsets from that base in
+    the REST frame, and the axis the beat rotates about.
+
+        x_p = base_c + (k + 1)/N * L * u_c ,        k = 0 .. N-1 along the shaft
+        base_c = x_cell + r_soma * u_c ,            the shaft starts at the cell's surface
+        u_c    = the cell's `polarity`, normalised   the direction the cilium POINTS
+
+    `length_um` is the shaft's own length and the one number that says what kind of appendage
+    this is: a Platynereis prototroch cilium is some 20 um on a cell of 4 um, so the shaft is
+    several times the cell it grows from -- which is exactly the lever arm the cell-only model
+    had no way to express.
+
+    THE BEAT AXIS IS PERPENDICULAR TO THE SHAFT, and which perpendicular is the modelling
+    choice. `beat: tangential` rotates the shaft within the plane containing the body axis, so
+    the tip sweeps front-to-back along the animal -- the power stroke of a band that drives the
+    larva forward. `beat: azimuthal` sweeps it around the girdle instead, which is what makes a
+    larva spin. Either way the axis is stored per cilium and the stroke plane follows the
+    animal's own geometry rather than a direction written once in the spec.
+
+    `taper` thins the shaft toward the tip by putting fewer points there; it changes only where
+    the mass sits, not the length. A cilium is not a rod of uniform density and the fluid it
+    pushes cares.
+    """
+
+    EMIT = None
+    INPUTS = ["particle", "cilium", "cell"]
+    OUTPUTS = ["particle"]
+    READS = []
+    WRITES = ["pos"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["cilium_set", "cell_set", "length_um"]
+    MECHANISM_TAGS = ["initial_condition", "cilia", "appendage", "anatomy"]
+    PARAM_ROLES = {"cilium_set": "the_organ_set_carrying_the_angle",
+                   "cell_set": "the_cells_the_shafts_are_rooted_in",
+                   "length_um": "shaft_length_in_micrometres",
+                   "beat": "tangential_or_azimuthal",
+                   "axis": "the_body_axis", "soma_um": "where_on_the_cell_the_shaft_starts"}
+    REFERENCE = ("Veraszto, C. et al. (2017). eLife 6:e26000; shaft kinematics after "
+                 "prototype/eye/forced_gaze_ops.py.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cilium_point")
+        self.cilium_set = str(params["cilium_set"])
+        self.cell_set = str(params["cell_set"])
+        self.length_um = float(params["length_um"])
+        self.beat = str(params.get("beat", "tangential")).lower()
+        if self.beat not in ("tangential", "azimuthal"):
+            raise ValueError(f"cilium_seed: `beat` must be tangential or azimuthal, "
+                             f"got {self.beat!r}")
+        self.axis = int(params.get("axis", 2))
+        self.soma_um = float(params.get("soma_um", 4.0))
+        self.block = str(params.get("block", "polarity"))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cil = H.level(self.cilium_set)
+        cl = H.level(self.cell_set)
+        dev, dt = p.state.device, p.state.dtype
+        um = float((getattr(H, "region", None) or {}).get("side_um", 195.9))
+
+        # each cilium's cell, and each point's cilium
+        c_of_cil = H.lift_index(cil.name, cl.name)
+        cil_of_pt = H.lift_index(p.name, cil.name)
+
+        b0, b1 = cl.state_schema[self.block]
+        u = cl.state[:, b0:b1][:, :3][c_of_cil].to(dtype=dt)
+        nrm = u.norm(dim=1, keepdim=True)
+        # A CELL WITH NO POLARITY BEARS NO CILIUM. The band is polarised by `radial_polarity` and
+        # nothing else is, so this is how the spec says which cells have one without a mask.
+        live = (nrm[:, 0] > 1e-9)
+        u = u / nrm.clamp_min(1e-12)
+
+        e = torch.zeros(3, device=dev, dtype=dt)
+        e[self.axis] = 1.0
+        if self.beat == "tangential":
+            # sweeping front-to-back: rotate about the axis perpendicular to BOTH the shaft and
+            # the body axis, which is the girdle's own tangent
+            ax = torch.cross(e[None, :].expand_as(u), u, dim=1)
+        else:
+            # sweeping around the girdle: rotate about the shaft's own radial plane normal
+            ax = torch.cross(u, torch.cross(e[None, :].expand_as(u), u, dim=1), dim=1)
+        ax = ax / ax.norm(dim=1, keepdim=True).clamp_min(1e-12)
+
+        base = cl.get("pos")[c_of_cil].to(dtype=dt) + (self.soma_um / um) * u
+        # THE CILIUM SITS WHERE ITS CELL DOES, written here because the build scattered it about
+        # a `pos` that was still zero.
+        if "pos" in cil.state_schema:
+            k0, k1 = cil.state_schema["pos"]
+            cst = cil.state.clone()
+            cst[:, k0:k1] = cl.get("pos")[c_of_cil].to(dtype=cst.dtype)
+            cil.state = cst
+        n_per = int(p.n // max(cil.n, 1))
+        k = (torch.arange(p.n, device=dev, dtype=dt) % n_per + 1.0) / float(n_per)
+        L = self.length_um / um
+        rest = (k[:, None] * L) * u[cil_of_pt]                    # offset from the base, rest frame
+        pos = base[cil_of_pt] + rest
+
+        # kept for `cilium_kinematics`, which swings the shaft about `base` every frame
+        p.register_buffer("cil_rest", rest.detach().clone())
+        p.register_buffer("cil_base", base[cil_of_pt].detach().clone())
+        p.register_buffer("cil_axis", ax[cil_of_pt].detach().clone())
+        p.register_buffer("cil_live", live[cil_of_pt].detach().clone())
+        cil.register_buffer("cil_axis", ax.detach().clone())
+        cil.register_buffer("cil_live", live.detach().clone())
+
+        st = p.state.clone()
+        pa, pb = p.state_schema["pos"]
+        st[:, pa:pb] = torch.where(live[cil_of_pt][:, None], pos, st[:, pa:pb])
+        p.state = st
+        print(f"[cilium_seed] {int(live.sum()):,} of {cil.n:,} cilia grown, {n_per} points each, "
+              f"{self.length_um:g} um long, beating {self.beat}", flush=True)
+        return {}
+
+
+@register_operator("cilium_pose_map", family="mechanics", set="organ", kind="lateral")
+class CiliumPoseMap(Lateral):
+    """STAGE ONE: the drive a circuit delivers becomes the angle the cilium is COMMANDED to.
+
+    cilium -> cilium: reads the cilium's own `drive` and its `phase`, writes `pose_target` --
+    the equilibrium `organ_mechanics` then pulls the shaft toward.
+
+        theta_inf(t) = sweep * g(drive) * s(phi + offset)        degrees, about the beat axis
+        g(drive)     = clamp((drive - d0) / d_scale, 0, gain_max)
+        s(phi)       = sin(phi)                     waveform: sine   -- a symmetric sweep
+                     = asymmetric sawtooth          waveform: stroke -- fast one way, slow back
+
+    WHAT EACH HALF IS FOR, and the split is the whole point of a two-stage plant. The DRIVE sets
+    the amplitude -- how far the cilium swings, or whether it swings at all -- and is what the
+    connectome delivers, on the slow timescale a ciliomotor circuit works on. The PHASE sets
+    where in the stroke it is, on the fast timescale a cilium beats at. A cell cannot express
+    that separation; an angle with an amplitude and a phase can, and it is the separation
+    Verasztó et al. (2017) describe: the larva's ciliary closures are the circuit gating a beat
+    that runs far faster than the gating.
+
+    `waveform: stroke` IS THE ONE THAT CAN TRANSPORT. A sine sweep is time-symmetric -- the shaft
+    retraces its own path, which at low Reynolds number moves no net fluid however hard it is
+    driven (Purcell's scallop theorem, and measured on this animal: a sine-driven band moved the
+    water 0.02 um and adding a metachronal wave to it changed nothing). A real cilium beats
+    ASYMMETRICALLY: a fast straight power stroke and a slow bent recovery. `stroke` makes the
+    sweep spend `duty` of its cycle going one way and the rest coming back, which breaks the
+    time symmetry the theorem needs.
+
+    Written as the eye's `muscle_pose_map` is written -- drives in, a commanded pose out, no
+    dynamics -- so that everything with dynamics lives in one place, downstream.
+    """
+
+    EMIT = None
+    INTEGRAND = None
+    INPUTS = ["cilium"]
+    OUTPUTS = ["cilium"]
+    READS = ["drive", "phase"]
+    WRITES = ["pose_target"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    MAY_MUTATE_INTEGRATED_STATE = True      # writes a `readout` block in place
+    REQUIRES_PARAMS = ["sweep_deg"]
+    MECHANISM_TAGS = ["cilia", "ciliary_beat", "excitation_contraction_coupling", "pose_command"]
+    PARAM_ROLES = {"sweep_deg": "peak_sweep_in_degrees", "drive_block": "the_drive_state_block",
+                   "phase_block": "the_phase_state_block", "waveform": "sine_or_stroke",
+                   "duty": "fraction_of_the_cycle_in_the_power_stroke",
+                   "d0": "drive_below_which_the_cilium_is_still",
+                   "d_scale": "drive_giving_a_full_sweep", "gain_max": "ceiling_on_the_gain",
+                   "offset": "radians_of_phase_offset"}
+    REFERENCE = ("Veraszto, C. et al. (2017). eLife 6:e26000; "
+                 "Purcell, E. M. (1977). Am. J. Phys. 45:3-11.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cilium")
+        self.sweep = float(params["sweep_deg"])
+        self.drive_block = str(params.get("drive_block", "drive"))
+        self.phase_block = str(params.get("phase_block", "phase"))
+        self.waveform = str(params.get("waveform", "stroke")).lower()
+        if self.waveform not in ("sine", "stroke"):
+            raise ValueError(f"cilium_pose_map: `waveform` must be sine or stroke, "
+                             f"got {self.waveform!r}")
+        self.duty = float(params.get("duty", 0.3))
+        if not 0.0 < self.duty < 1.0:
+            raise ValueError(f"cilium_pose_map: `duty` is the fraction of the cycle spent in the "
+                             f"power stroke and must lie strictly between 0 and 1, got {self.duty}")
+        self.d0 = float(params.get("d0", 0.0))
+        self.d_scale = float(params.get("d_scale", 1.0))
+        self.gain_max = float(params.get("gain_max", 2.0))
+        self.offset = float(params.get("offset", 0.0))
+
+    def forward(self, H, mask=None):
+        cil = H.level(self.at)
+        st = cil.state
+        dev, dt = st.device, st.dtype
+        d0, d1 = cil.state_schema[self.drive_block]
+        q0, q1 = cil.state_schema[self.phase_block]
+        t0, t1 = cil.state_schema["pose_target"]
+
+        drive = st[:, d0:d1][:, 0]
+        g = ((drive - self.d0) / self.d_scale).clamp(min=0.0, max=self.gain_max)
+        ph = st[:, q0:q1][:, 0] + self.offset
+        u = (ph / (2.0 * math.pi)) % 1.0                     # where in the cycle, in [0, 1)
+
+        if self.waveform == "sine":
+            s = torch.sin(2.0 * math.pi * u)
+        else:
+            # THE ASYMMETRIC BEAT. Up through +1 over the first `duty` of the cycle (the fast
+            # power stroke), back down to -1 over the remaining 1 - duty (the slow recovery).
+            # Triangular rather than sinusoidal because what matters is that the two halves take
+            # DIFFERENT TIMES, which is the time asymmetry the scallop theorem turns on, and a
+            # shape with a corner states that more plainly than one tuned to look smooth.
+            up = u / self.duty
+            down = 1.0 - (u - self.duty) / (1.0 - self.duty)
+            s = torch.where(u < self.duty, 2.0 * up - 1.0, 2.0 * down - 1.0)
+
+        theta = self.sweep * g * s
+        live = getattr(cil, "cil_live", None)
+        if live is not None:
+            theta = theta * live.to(dt)
+        if mask is not None:
+            theta = theta * mask.to(dt)
+        new = st.clone()
+        # pose is three angles; a cilium hinges about ONE axis, its own, so the command goes in
+        # the first component and `cilium_kinematics` reads it against the stored axis.
+        new[:, t0:t0 + 1] = theta[:, None]
+        new[:, t0 + 1:t1] = 0.0
+        cil.state = new
+        return {}
+
+
+@register_operator("cilium_kinematics", family="mechanics", set="particle", kind="lateral")
+class CiliumKinematics(Lateral):
+    """The angle becomes geometry: swing each shaft to its cilium's pose, position AND velocity.
+
+    particle -[containment]-> cilium: reads the cilium's `pose`, writes the shaft's `pos` and
+    `vel` directly.
+
+        x_p(t) = base_p + R(a_c, theta_c) r_p          r_p the rest offset, a_c the beat axis
+        v_p(t) = theta_dot_c  a_c x (x_p - base_p)     the rigid-body velocity, in closed form
+
+    BOTH, AND THE SECOND IS NOT OPTIONAL. MLS-MPM's particle-to-grid carries each particle's
+    CURRENT velocity every substep, so a body whose position is prescribed and whose velocity is
+    left alone transmits NOTHING to the fluid around it -- it teleports through the grid and the
+    water never learns it moved. `prototype/eye/forced_gaze_ops.py` says the same thing about a
+    prescribed globe. The velocity here is the exact rigid rotation, not a finite difference of
+    positions, so it is right on the first frame and does not lag by one.
+
+    KINEMATIC, HENCE AUTHORITATIVE. Whatever any force operator computes for these points is
+    overwritten the next tick. That is the contract, and a spec should leave such operators OUT
+    of the shaft's schedule rather than let them be silently outvoted: the shaft is driven by its
+    circuit through the plant, and the only thing it owes the fluid is honest momentum.
+
+    THE CILIUM IS RIGID ABOUT ITS BASE, which a real one is not -- a cilium bends along its
+    length, and the bend is where the recovery stroke gets its asymmetry from. What is modelled
+    here is a straight shaft hinging at the root, so the asymmetry has to come from the TIMING
+    (`cilium_pose_map[waveform: stroke]`) instead of from the shape. That is a real
+    simplification and is the next thing to lift.
+    """
+
+    EMIT = None
+    INPUTS = ["particle", "cilium"]
+    OUTPUTS = ["particle"]
+    READS = ["pose", "pose_rate"]
+    WRITES = ["pos", "vel"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True      # a kinematic constraint writes the state directly
+    REQUIRES_PARAMS = ["cilium_set"]
+    MECHANISM_TAGS = ["cilia", "kinematic_constraint", "boundary_condition", "ciliary_beat"]
+    PARAM_ROLES = {"cilium_set": "the_organ_set_carrying_the_angle"}
+    REFERENCE = "prototype/eye/forced_gaze_ops.py (prescribed kinematics into a shared MPM grid)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cilium_point")
+        self.cilium_set = str(params["cilium_set"])
+        self._idx = None
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cil = H.level(self.cilium_set)
+        if not hasattr(p, "cil_rest"):
+            raise RuntimeError(
+                f"cilium_kinematics: the set {p.name!r} carries no rest geometry. "
+                f"`cilium_seed` must run in the spec's `seed:` block -- it is what stores the "
+                f"base, the rest offsets and the beat axis this operator swings.")
+        if self._idx is None:
+            self._idx = H.lift_index(p.name, cil.name)
+        idx = self._idx
+        dt = p.state.dtype
+
+        a0, a1 = cil.state_schema["pose"]
+        r0, r1 = cil.state_schema["pose_rate"]
+        theta = torch.deg2rad(cil.state[:, a0:a0 + 1][:, 0]).to(dt)[idx]
+        omega = torch.deg2rad(cil.state[:, r0:r0 + 1][:, 0]).to(dt)[idx]
+
+        ax = p.cil_axis.to(dt)
+        R = _rodrigues(ax, theta)
+        rel = torch.bmm(R, p.cil_rest.to(dt)[:, :, None])[:, :, 0]
+        pos = p.cil_base.to(dt) + rel
+        vel = omega[:, None] * torch.cross(ax, rel, dim=1)
+
+        live = p.cil_live
+        pa, pb = p.state_schema["pos"]
+        va, vb = p.state_schema["vel"]
+        keep = live[:, None] if mask is None else (live & mask.to(torch.bool))[:, None]
+        new = p.state.clone()
+        new[:, pa:pb] = torch.where(keep, pos, new[:, pa:pb])
+        new[:, va:vb] = torch.where(keep, vel, new[:, va:vb])
+        p.state = new
+        return {}
