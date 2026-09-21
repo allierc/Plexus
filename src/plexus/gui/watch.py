@@ -91,6 +91,7 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
  video{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px)}
  .tabs button{font-size:12px;padding:3px 10px}
  img{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px)}
+ #live3d{border-color:#4a6b8a}
  pre{background:#0f1319;border:1px solid #222a33;border-radius:5px;padding:10px 12px;
      max-height:74vh;overflow:auto;font-size:11.5px;color:#b9c3cd;flex:1;min-width:300px;margin:0}
  .t{color:#6f7a86}
@@ -106,12 +107,15 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
  <button onclick="step(-1)">&larr; prev</button>
  <button onclick="step(1)">next &rarr;</button>
  <button onclick="live()" id=livebtn>live</button>
+ <button onclick="open3d()" id=d3btn>3D</button>
  <span id=pos class=t></span>
+ <span id=d3note class=t></span>
 </div>
 <div class=wrap>
  <div class=col>
   <div class=why id=why></div>
   <img id=shot>
+  <img id=live3d style="display:none;cursor:grab">
   <video id=mov controls loop muted autoplay playsinline style="display:none"></video>
  </div>
  <div class=col style="flex:1;min-width:300px">
@@ -127,6 +131,65 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
 // `idx` is which picture is shown; -1 means FOLLOW THE NEWEST, which is what a watcher wants by
 // default. Pressing prev/next pins it to one shot so the view stops jumping while it is read.
 let idx = -1, total = 0, shown = 'journal';
+// THE 3-D VIEW. A step's picture is one camera; this re-opens that step's own SPEC on this
+// server, seeds it, and serves the live render so it can be turned and zoomed. Server-side VTK
+// streamed as a PNG, which is what the page itself does -- there is no WebGL here and a point
+// cloud of 100,000 particles is not something to ship to a browser frame by frame.
+//
+// IT IS THE ONLY THING IN THIS PAGE THAT CHANGES ANYTHING, and it says so: seeding a scene takes
+// over this server's one VTK thread. That is why it is a button and not the default.
+let d3 = null;   // {i, azim, elev, zoom, drag}
+function open3d(){
+ if(total === 0) return;
+ const i = (idx < 0) ? total - 1 : idx;
+ if(d3 && d3.i === i){ close3d(); return; }
+ d3 = {i: i, azim: 20, elev: 8, zoom: 1.3, roll: 180, drag: null, name: null};
+ document.getElementById('d3note').textContent = ' — opening the spec and seeding…';
+ fetch('/api/watch/open3d?i=' + i).then(r => r.json()).then(j => {
+  if(j.error){ document.getElementById('d3note').textContent = ' — ' + j.error; d3 = null; return; }
+  // THE NAME IS CARRIED ON EVERY RENDER, because opening a spec is not seeding it: the render
+  // route builds the scene itself when it is told which one, and without that it answers "no
+  // scene is open; seed one first".
+  d3.name = j.name;
+  document.getElementById('d3note').textContent =
+    ' — drag to turn, wheel to zoom, 3D again to close';
+  document.getElementById('shot').style.display = 'none';
+  document.getElementById('mov').style.display = 'none';
+  document.getElementById('live3d').style.display = '';
+  render3d();
+ });
+}
+function close3d(){
+ d3 = null;
+ document.getElementById('live3d').style.display = 'none';
+ document.getElementById('d3note').textContent = '';
+ tick();
+}
+function render3d(){
+ if(!d3) return;
+ document.getElementById('live3d').src =
+   '/api/watch/render?name=' + encodeURIComponent(d3.name || '')
+   + '&azim=' + d3.azim.toFixed(1) + '&elev=' + d3.elev.toFixed(1)
+   + '&zoom=' + d3.zoom.toFixed(3) + '&roll=' + d3.roll + '&t=' + Date.now();
+}
+(function(){
+ const im = document.getElementById('live3d');
+ im.addEventListener('mousedown', e => { if(d3){ d3.drag = {x: e.clientX, y: e.clientY}; im.style.cursor='grabbing'; e.preventDefault(); }});
+ window.addEventListener('mouseup', () => { if(d3){ d3.drag = null; document.getElementById('live3d').style.cursor='grab'; }});
+ window.addEventListener('mousemove', e => {
+  if(!d3 || !d3.drag) return;
+  d3.azim += (e.clientX - d3.drag.x) * 0.5;
+  d3.elev = Math.max(-89, Math.min(89, d3.elev + (e.clientY - d3.drag.y) * 0.5));
+  d3.drag = {x: e.clientX, y: e.clientY};
+  render3d();
+ });
+ im.addEventListener('wheel', e => {
+  if(!d3) return;
+  e.preventDefault();
+  d3.zoom = Math.max(0.2, Math.min(12, d3.zoom * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+  render3d();
+ }, {passive: false});
+})();
 function pane(w){
  shown = w;
  for(const k of ['journal','spec']){
@@ -166,6 +229,7 @@ async function tick(){
  // reader compare a frame against the thing it was taken from; the film is strictly the better
  // record. A step that only built something has no film, and then the still is all there is.
  const mv = document.getElementById('mov');
+ if(d3) return;                       // the 3-D view owns the panel while it is open
  if(j.mp4){
   if(!mv.dataset.i || mv.dataset.i != j.index){ mv.src = '/api/watch/mp4?i=' + j.index; mv.dataset.i = j.index; }
   mv.style.display = ''; im.style.display = 'none';

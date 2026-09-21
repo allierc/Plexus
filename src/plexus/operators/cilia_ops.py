@@ -682,8 +682,13 @@ class CiliumSeed(Seed):
         rest = (k[:, None] * L) * u[cil_of_pt]                    # offset from the base, rest frame
         pos = base[cil_of_pt] + rest
 
-        # kept for `cilium_kinematics`, which swings the shaft about `base` every frame
+        # KEPT AS AN OFFSET FROM THE CELL, NOT AS A POSITION. A frozen base is a shaft nailed to
+        # where its cell was at frame 0, and the cell does not stay there: the body is MPM and
+        # free, so it drifts, deforms and is pushed by the water -- and the cilia stayed behind.
+        # Rooted means rooted in the CELL, so the offset is stored and the position is read live.
         p.register_buffer("cil_rest", rest.detach().clone())
+        p.register_buffer("cil_base_off", ((self.soma_um / um) * u)[cil_of_pt].detach().clone())
+        p.register_buffer("cil_cell", c_of_cil[cil_of_pt].detach().clone())
         p.register_buffer("cil_base", base[cil_of_pt].detach().clone())
         p.register_buffer("cil_axis", ax[cil_of_pt].detach().clone())
         p.register_buffer("cil_live", live[cil_of_pt].detach().clone())
@@ -863,14 +868,18 @@ class CiliumKinematics(Lateral):
     MAY_MUTATE_INTEGRATED_STATE = True      # a kinematic constraint writes the state directly
     REQUIRES_PARAMS = ["cilium_set"]
     MECHANISM_TAGS = ["cilia", "kinematic_constraint", "boundary_condition", "ciliary_beat"]
-    PARAM_ROLES = {"cilium_set": "the_organ_set_carrying_the_angle"}
+    PARAM_ROLES = {"cilium_set": "the_organ_set_carrying_the_angle",
+                   "cell_set": "the_cells_the_shafts_are_rooted_in"}
     REFERENCE = "prototype/eye/forced_gaze_ops.py (prescribed kinematics into a shared MPM grid)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cilium_point")
         self.cilium_set = str(params["cilium_set"])
+        self.cell_set = params.get("cell_set")
+        self.cell_set = str(self.cell_set) if self.cell_set else None
         self._idx = None
+        self._prev_base = None
 
     def forward(self, H, mask=None):
         p = H.level(self.at)
@@ -893,8 +902,27 @@ class CiliumKinematics(Lateral):
         ax = p.cil_axis.to(dt)
         R = _rodrigues(ax, theta)
         rel = torch.bmm(R, p.cil_rest.to(dt)[:, :, None])[:, :, 0]
-        pos = p.cil_base.to(dt) + rel
+        # THE BASE IS READ LIVE FROM THE CELL, EVERY FRAME. Using the seeded base instead nails
+        # each shaft to where its cell was at frame 0 -- and the cell does not stay there, because
+        # the body is MPM and free. Measured on the first run of this rung: by frame 426 the
+        # shafts had visibly left the animal, crossing each other in open water while the body
+        # drifted out from under them. A cilium is rooted in a cell, so its root is wherever that
+        # cell is now.
+        if self.cell_set is not None and hasattr(p, "cil_cell"):
+            base = H.level(self.cell_set).get("pos")[p.cil_cell].to(dt) + p.cil_base_off.to(dt)
+        else:
+            base = p.cil_base.to(dt)
+        pos = base + rel
+        # AND THE ROOT'S OWN VELOCITY RIDES ALONG. The shaft is rigid about a base that is itself
+        # moving, so a point's velocity is the rotation PLUS the base's -- otherwise a drifting
+        # animal hands the water a velocity field its own body does not share, and the grid reads
+        # the difference as a shear that nothing physical produced.
         vel = omega[:, None] * torch.cross(ax, rel, dim=1)
+        if self._prev_base is not None and self._prev_base.shape == base.shape:
+            _dt = float(getattr(H, "dt", 0.0) or 0.0)
+            if _dt > 0:
+                vel = vel + (base - self._prev_base) / _dt
+        self._prev_base = base.detach().clone()
 
         live = p.cil_live
         pa, pb = p.state_schema["pos"]

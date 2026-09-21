@@ -1211,7 +1211,8 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
             {"op": "organ_mechanics", "at": "cilium",
              "K": [[1600.0, 0, 0], [0, 1600.0, 0], [0, 0, 1600.0]],
              "C": [[60.0, 0, 0], [0, 60.0, 0], [0, 0, 60.0]]},
-            {"op": "cilium_kinematics", "at": "cilium_point", "cilium_set": "cilium"},
+            {"op": "cilium_kinematics", "at": "cilium_point", "cilium_set": "cilium",
+             "cell_set": "cell"},
             {"op": "mpm_strain", "at": "body_point", "implementation": "warp"},
             {"op": "mpm_strain", "at": "mpm_particle", "implementation": "warp"},
             {"op": "mpm_scatter", "at": "body_point", "to": "mpm_grid", "drag": 0.0,
@@ -1231,6 +1232,10 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
              "vmax": 1.0e9, "implementation": "warp"},
             {"op": "mpm_gather", "at": "water_particle", "from": "mpm_grid", "wall_damp": 0.9,
              "vmax": 1.0e9, "implementation": "warp"},
+            # THE CELL FOLLOWS ITS OWN MATTER, without which the anchor above is anchored to a
+            # frame-0 ghost: the MPM moves the body's POINTS and a parent keeps its seed position
+            # unless something aggregates it.
+            {"op": "aggregate_centroid", "at": "cell", "child": "body_point"},
         ],
         # NO GRAVITY. And no `mpm_gather` on the shaft: it is kinematic, its motion is its
         # circuit's, and reading the grid back into it would be the fluid pushing the cilium
@@ -1240,39 +1245,31 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
                       "steps": ["cilium_kinematics", "mpm_strain", "mpm_strain", "mpm_strain",
                                 "mpm_viscosity", "mpm_scatter", "mpm_scatter", "mpm_scatter",
                                 "mpm_scatter", "mpm_grid_update", "mpm_gather", "mpm_gather",
-                                "mpm_gather"]}],
+                                "mpm_gather"]},
+                     "aggregate_centroid"],
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": True, "up_axis": 2,
             "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
             "camera_roll": 180.0,
-            # THE WATER IS THE CLOUD AND THE BODIES ARE SPHERES. The subject set is drawn as
-            # points -- 140,000 of them, which as glyph spheres would be 14 million triangles a
-            # frame -- while the two sets that have to be SEEN as objects carry a `dot_radius`
-            # and are drawn at their real size. Both at once, which the renderer could not do
-            # until `_glyph_cover_subject`: naming a radius for one set used to delete the
-            # subject's cloud whether or not the subject was among the glyphs.
-            "subject": "water_particle", "dot_size": 1.1,
-            # HOW SOLID EACH BODY LOOKS. A set of 33,000 spheres is a wall: an animal drawn
-            # opaque hides the water it is supposed to be moving, and what the water does is the
-            # entire subject of the run. The body is nearly a ghost, the yolk half-there inside
-            # it, the cilia solid because they are the thing to watch.
-            "dot_opacity": {"body": 0.10, "yolk_mass": 0.45, "cilium_shaft": 1.0},
-            "dot_radius": {"cilium_shaft": round(0.9 / um, 6),
-                           "yolk_mass": round(3.0 / um, 6),
-                           # THE BODY IS DRAWN SMALLER THAN IT IS, on purpose. At its physical
-                           # 4 um the 32,896 points close into an opaque white solid and the
-                           # yolk -- which is INSIDE it, and is the thing being looked for --
-                           # cannot be seen at all. 0.8 um leaves the body reading as its own
-                           # surface while the yellow mass shows through. It changes the picture
-                           # and not the physics: `dot_radius` is a drawing key and the
-                           # simulation's radius is the set's `radius`, which is untouched.
-                           "body": round(0.8 / um, 6)},
-            # WHITE FOR BOTH BODIES, as asked: the yolk and the cilia are the animal here and the
-            # water is the medium, so the picture says so with two colours and not four.
+            # THE BODY IS THE CLOUD AND THE CILIA ARE SPHERES -- the 0009 look, which is the one
+            # that reads as an animal: a dense cloud of small gold points showing the whole
+            # silhouette, rather than a wall of white spheres that hides its own shape. The
+            # cilia stay as spheres because they are the thing being watched and a 0.9 um shaft
+            # drawn as dots would vanish into the body behind it.
+            #
+            # THE WATER IS NOT DRAWN AT ALL HERE. 125,866 blue dots over the animal is a fog that
+            # makes the one question this picture answers -- are the shafts attached to the body
+            # -- harder to see, and the water has its own figure.
+            "subject": "body_point", "dot_size": 1.6,
+            # AND THE YOLK IS NOT DRAWN EITHER. It is still MATTER -- it scatters into the grid
+            # and displaces water like everything else -- but a type with no `dot_radius` is not
+            # drawn, so the picture is the body and its cilia and nothing else.
+            "dot_opacity": {"cilium_shaft": 1.0},
+            "dot_radius": {"cilium_shaft": round(0.9 / um, 6)},
             "colors": dict({c: COLOR[c] for c in f["order"]},
-                           seawater="#3d6ea8", cilium_shaft="#ffffff", body="#ffffff",
-                           yolk_mass="#e8c33a"),
+                           seawater="#3d6ea8", cilium_shaft="#ffffff",
+                           body="#d8b45c", yolk_mass="#e8c33a"),
         },
     }
 

@@ -341,6 +341,27 @@ def g_watch_mp4(h, q):
     return _watch_file(h, q, "mp4", "video/mp4")
 
 
+def g_watch_open3d(h, q):
+    """`/api/watch/open3d?i=N` -- open THAT step's own saved spec here and seed it.
+
+    The record keeps every step's spec beside its picture, so a step can be re-opened and turned
+    rather than only looked at from the one camera it was shot with. This is the only route in
+    the watcher that changes anything, which is why the page puts it behind a button: seeding a
+    scene takes this server's single VTK thread, and a scene of a few hundred thousand particles
+    takes seconds to build.
+    """
+    from plexus.gui import watch
+    f = watch._nth(q, "spec")
+    if not f or not os.path.exists(f):
+        return h._send_json({"error": "that step saved no spec"}, 404)
+    g_open(h, {"path": [f]})
+
+
+def g_watch_render(h, q):
+    """The live scene as a picture, at the camera the 3-D view is asking for."""
+    return g_picture(h, q, "/api/scene/render")
+
+
 def g_state(h, q):
     from plexus.gui import bio
     return h._send_json(dict(bio.STATE))
@@ -1211,12 +1232,15 @@ GET_ROUTES = {
     "/api/debug/stacks": g_stacks,
     "/watch": g_watch, "/api/watch/state": g_watch_state,
     "/api/watch/shot": g_watch_shot, "/api/watch/mp4": g_watch_mp4,
+    "/api/watch/open3d": g_watch_open3d,
 }
 for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
     GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]
 GET_ROUTES["/api/studio/spec"] = g_spec
 GET_ROUTES["/api/material/run"] = g_artefacts
 PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", "pick", "info", "snapshot")}
+# The watcher's 3-D view streams the same picture the page's own view does.
+PICTURE_ROUTES.add("/api/watch/render")
 
 
 class Handler(BaseHTTPRequestHandler):

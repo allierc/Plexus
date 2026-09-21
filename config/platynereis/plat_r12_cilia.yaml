@@ -12729,6 +12729,7 @@ operators:
 - op: cilium_kinematics
   at: cilium_point
   cilium_set: cilium
+  cell_set: cell
 - op: mpm_strain
   at: body_point
   implementation: warp
@@ -12791,6 +12792,9 @@ operators:
   wall_damp: 0.9
   vmax: 1000000000.0
   implementation: warp
+- op: aggregate_centroid
+  at: cell
+  child: body_point
 schedule:
 - cilium_pose_map
 - organ_mechanics
@@ -12809,6 +12813,7 @@ schedule:
   - mpm_gather
   - mpm_gather
   - mpm_gather
+- aggregate_centroid
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -12823,16 +12828,12 @@ plotting:
   stills: 6
   keep_stills: true
   camera_roll: 180.0
-  subject: water_particle
-  dot_size: 1.1
+  subject: body_point
+  dot_size: 1.6
   dot_opacity:
-    body: 0.1
-    yolk_mass: 0.45
     cilium_shaft: 1.0
   dot_radius:
     cilium_shaft: 0.004594
-    yolk_mass: 0.015314
-    body: 0.004084
   colors:
     Interneuron: '#2f6fb5'
     Motoneuron: '#d45fa8'
@@ -12854,5 +12855,5 @@ plotting:
     yolk: '#d8d2c4'
     seawater: '#3d6ea8'
     cilium_shaft: '#ffffff'
-    body: '#ffffff'
+    body: '#d8b45c'
     yolk_mass: '#e8c33a'
