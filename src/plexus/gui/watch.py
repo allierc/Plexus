@@ -91,7 +91,7 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
  video{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px)}
  .tabs button{font-size:12px;padding:3px 10px}
  img{border:1px solid #2a3139;background:#000;max-width:min(62vw,820px)}
- #live3d{border-color:#4a6b8a}
+ #live3d{border-color:#4a6b8a;min-height:320px;min-width:320px;user-select:none;-webkit-user-drag:none}
  pre{background:#0f1319;border:1px solid #222a33;border-radius:5px;padding:10px 12px;
      max-height:74vh;overflow:auto;font-size:11.5px;color:#b9c3cd;flex:1;min-width:300px;margin:0}
  .t{color:#6f7a86}
@@ -144,7 +144,7 @@ function open3d(){
  const i = (idx < 0) ? total - 1 : idx;
  if(d3 && d3.i === i){ close3d(); return; }
  d3 = {i: i, azim: 20, elev: 8, zoom: 1.3, roll: 180, drag: null, name: null};
- document.getElementById('d3note').textContent = ' — opening the spec and seeding…';
+ document.getElementById('d3note').textContent = ' — opening and seeding, a few seconds…';
  fetch('/api/watch/open3d?i=' + i).then(r => r.json()).then(j => {
   if(j.error){ document.getElementById('d3note').textContent = ' — ' + j.error; d3 = null; return; }
   // THE NAME IS CARRIED ON EVERY RENDER, because opening a spec is not seeding it: the render
@@ -152,7 +152,7 @@ function open3d(){
   // scene is open; seed one first".
   d3.name = j.name;
   document.getElementById('d3note').textContent =
-    ' — drag to turn, wheel to zoom, 3D again to close';
+    ' — ' + j.name + ': drag to turn, wheel to zoom, 3D again to close';
   document.getElementById('shot').style.display = 'none';
   document.getElementById('mov').style.display = 'none';
   document.getElementById('live3d').style.display = '';
@@ -165,15 +165,40 @@ function close3d(){
  document.getElementById('d3note').textContent = '';
  tick();
 }
+// ONE RENDER IN FLIGHT AT A TIME, AND THE LAST GOOD FRAME STAYS UP.
+//
+// A render of a few hundred thousand particles takes seconds on the server's one VTK thread. A
+// drag fires a mousemove every few milliseconds, so setting `img.src` on each one starts dozens
+// of overlapping requests that each cancel the last image load -- and an <img> whose load was
+// cancelled shows NOTHING. That is the black panel: not a failed render, a hundred successful
+// ones none of which was ever allowed to finish.
+//
+// So: at most one request in flight, the newest camera queued behind it, and the picture decoded
+// into an offscreen Image that is swapped in only once it is complete. The view then lags the
+// mouse by one render instead of blanking.
+let busy = false, pending = false;
 function render3d(){
  if(!d3) return;
- document.getElementById('live3d').src =
-   '/api/watch/render?name=' + encodeURIComponent(d3.name || '')
+ if(busy){ pending = true; return; }
+ busy = true;
+ const url = '/api/watch/render?name=' + encodeURIComponent(d3.name || '')
    + '&azim=' + d3.azim.toFixed(1) + '&elev=' + d3.elev.toFixed(1)
    + '&zoom=' + d3.zoom.toFixed(3) + '&roll=' + d3.roll + '&t=' + Date.now();
+ const pre = new Image();
+ pre.onload = () => {
+  if(d3) document.getElementById('live3d').src = pre.src;
+  busy = false;
+  if(pending){ pending = false; render3d(); }
+ };
+ pre.onerror = () => {
+  busy = false; pending = false;
+  document.getElementById('d3note').textContent = ' — the render failed; see the journal';
+ };
+ pre.src = url;
 }
 (function(){
  const im = document.getElementById('live3d');
+ im.addEventListener('dragstart', e => e.preventDefault());   // or the browser drags the IMAGE
  im.addEventListener('mousedown', e => { if(d3){ d3.drag = {x: e.clientX, y: e.clientY}; im.style.cursor='grabbing'; e.preventDefault(); }});
  window.addEventListener('mouseup', () => { if(d3){ d3.drag = null; document.getElementById('live3d').style.cursor='grab'; }});
  window.addEventListener('mousemove', e => {

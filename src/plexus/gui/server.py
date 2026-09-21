@@ -350,11 +350,28 @@ def g_watch_open3d(h, q):
     scene takes this server's single VTK thread, and a scene of a few hundred thousand particles
     takes seconds to build.
     """
-    from plexus.gui import watch
+    import shutil
+    from plexus.gui import bio, bio_view, studio, watch
     f = watch._nth(q, "spec")
     if not f or not os.path.exists(f):
         return h._send_json({"error": "that step saved no spec"}, 404)
-    g_open(h, {"path": [f]})
+    try:
+        spec = yaml.safe_load(open(f))
+        name = str(((spec.get("general") or {}).get("name")) or "opened").strip()
+        dst = _spec_path(name)
+        os.makedirs(studio.CONFIG_DIR, exist_ok=True)
+        shutil.copyfile(f, dst)
+        # AND SEEDED HERE, not left for the first render to pay for. `g_open` only imports the
+        # file; the scene is built by `open_view`, which for a few hundred thousand particles
+        # takes seconds. Leaving that to the render meant the browser's first frame hung, and a
+        # drag begun while it hung fired more renders behind it -- which is what a black panel
+        # looks like from the outside.
+        bio_view.open_view(dst)
+        bio.STATE["name"] = name
+        bio.bump(name, f"opened {f} for the 3-D view")
+        return h._send_json({"name": name, "spec": dst})
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"{type(e).__name__}: {e}"[:300]}, 400)
 
 
 def g_watch_render(h, q):
