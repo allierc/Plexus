@@ -460,8 +460,15 @@ def spec_r4(f: dict, n_frames: int = 600, dt: float = 0.05) -> dict:
         "fields": {},
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
-            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
-            "camera_roll": 180.0, "dot_size": 7.0,
+            # EVERY FRAME KEPT, AND A BEAT THE FILM CAN RESOLVE. At omega 10 rad/s one cycle is
+            # 12.6 frames and the movie's stride of 2 sampled it 6.3 times -- barely above
+            # Nyquist, so a stroke that is perfectly smooth in the data reads on screen as a
+            # jitter, and what you are watching is the sampling rather than the cilium. At 2.5
+            # rad/s (0.40 Hz) a cycle is 50 frames, `max_frames` equals `n_frames` so the stride
+            # is 1, and every one of those 50 is in the film: 8 beats over the run at 20 fps,
+            # two and a half seconds of screen time each.
+            "dot_shading": True, "max_frames": n_frames, "stills": 6, "keep_stills": True,
+            "fps": 20.0, "camera_roll": 180.0, "dot_size": 7.0,
             # THE VIZ. Every soma coloured by its own membrane state, on a fixed range so two
             # frames of the run can be compared -- an autoscaled range makes a quiet moment look
             # exactly like a loud one.
@@ -634,8 +641,15 @@ def spec_r5(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08),
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
-            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
-            "camera_roll": 180.0, "dot_size": 2.5,
+            # EVERY FRAME KEPT, AND A BEAT THE FILM CAN RESOLVE. At omega 10 rad/s one cycle is
+            # 12.6 frames and the movie's stride of 2 sampled it 6.3 times -- barely above
+            # Nyquist, so a stroke that is perfectly smooth in the data reads on screen as a
+            # jitter, and what you are watching is the sampling rather than the cilium. At 2.5
+            # rad/s (0.40 Hz) a cycle is 50 frames, `max_frames` equals `n_frames` so the stride
+            # is 1, and every one of those 50 is in the film: 8 beats over the run at 20 fps,
+            # two and a half seconds of screen time each.
+            "dot_shading": True, "max_frames": n_frames, "stills": 6, "keep_stills": True,
+            "fps": 20.0, "camera_roll": 180.0, "dot_size": 2.5,
             "colors": {c: COLOR[c] for c in f["order"]},
         },
     }
@@ -829,8 +843,15 @@ def spec_r7(f: dict, scale: float = 0.85, offset=(0.08, 0.08, 0.08), per_cell: i
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": False, "up_axis": 2,
-            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
-            "camera_roll": 180.0, "dot_size": 2.5, "subject": "mpm_particle",
+            # EVERY FRAME KEPT, AND A BEAT THE FILM CAN RESOLVE. At omega 10 rad/s one cycle is
+            # 12.6 frames and the movie's stride of 2 sampled it 6.3 times -- barely above
+            # Nyquist, so a stroke that is perfectly smooth in the data reads on screen as a
+            # jitter, and what you are watching is the sampling rather than the cilium. At 2.5
+            # rad/s (0.40 Hz) a cycle is 50 frames, `max_frames` equals `n_frames` so the stride
+            # is 1, and every one of those 50 is in the film: 8 beats over the run at 20 fps,
+            # two and a half seconds of screen time each.
+            "dot_shading": True, "max_frames": n_frames, "stills": 6, "keep_stills": True,
+            "fps": 20.0, "camera_roll": 180.0, "dot_size": 2.5, "subject": "mpm_particle",
             "colors": {c: COLOR[c] for c in f["order"]},
         },
     }
@@ -1030,9 +1051,9 @@ def spec_r11(f: dict, n_water: int = 120000, n_frames: int = 900) -> dict:
     return base
 
 
-def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: int = 20,
+def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 400, per_cilium: int = 20,
              cilium_um: float = 38.0, soma_um: float = 4.0, per_cell: int = 48,
-             sweep_deg: float = 85.0, omega: float = 10.0) -> dict:
+             sweep_deg: float = 85.0, omega: float = 2.5) -> dict:
     """R12: TRUE CILIA, driven open-loop, in water. Does a real appendage move the fluid?
 
     Every rung up to here made a ciliary-band CELL swell and shrink. That is not a cilium. A
@@ -1250,8 +1271,15 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 600, per_cilium: in
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": 96}},
         "plotting": {
             "renderer": "vtk_points", "background": "black", "box_frame": True, "up_axis": 2,
-            "dot_shading": True, "max_frames": 300, "stills": 6, "keep_stills": True,
-            "camera_roll": 180.0,
+            # EVERY FRAME KEPT, AND A BEAT THE FILM CAN RESOLVE. At omega 10 rad/s one cycle is
+            # 12.6 frames and the movie's stride of 2 sampled it 6.3 times -- barely above
+            # Nyquist, so a stroke that is perfectly smooth in the data reads on screen as a
+            # jitter, and what you are watching is the sampling rather than the cilium. At 2.5
+            # rad/s (0.40 Hz) a cycle is 50 frames, `max_frames` equals `n_frames` so the stride
+            # is 1, and every one of those 50 is in the film: 8 beats over the run at 20 fps,
+            # two and a half seconds of screen time each.
+            "dot_shading": True, "max_frames": n_frames, "stills": 6, "keep_stills": True,
+            "fps": 20.0, "camera_roll": 180.0,
             # THE WATER IS THE CLOUD, AT A DOT SIZE YOU CAN ACTUALLY SEE. Only one set can be
             # the subject and the subject is what gets drawn as points, so the water takes it --
             # it is the thing whose motion this rung is about, and at 1.1 px it read as a faint
