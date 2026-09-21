@@ -1,0 +1,4 @@
+time   2026-09-21 18:35:56
+spec   plat_r12_cilia
+camera azim=20.0 elev=8.0 zoom=1.3
+why    R12, all three of your readings acted on. (1) THE PHASE WAS ALIASED, not random: a metachronal wave needs neighbouring cilia close in phase, and at wavenumber 6 the metatroch's 8 cells stepped 160 degrees between neighbours and the prototroch's 23 stepped 59 -- past antiphase, which on screen is indistinguishable from noise. At wavenumber 1 every girdle steps 5 to 27 degrees and the wave is a wave. (2) THE BODY WAS NOT STIFF ENOUGH: at 2 kPa its bounding volume grew 2.94x while the zero-sweep control held at exactly 1.00, so the cilia were tearing it. 12 kPa raises the sound speed from 1.4 to 3.4 world units per second. (3) And the sweep drops from 85 to 45 degrees, which is the momentum the shafts inject. The water moving was the one good sign and is what this has to keep. (before the run)

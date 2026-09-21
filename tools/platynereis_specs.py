@@ -1053,7 +1053,8 @@ def spec_r11(f: dict, n_water: int = 120000, n_frames: int = 900) -> dict:
 
 def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 400, per_cilium: int = 20,
              cilium_um: float = 38.0, soma_um: float = 4.0, per_cell: int = 48,
-             sweep_deg: float = 85.0, omega: float = 2.5) -> dict:
+             sweep_deg: float = 45.0, omega: float = 2.5,
+             wavenumber: float = 1.0, body_youngs: float = 12000.0) -> dict:
     """R12: TRUE CILIA, driven open-loop, in water. Does a real appendage move the fluid?
 
     Every rung up to here made a ciliary-band CELL swell and shrink. That is not a cilium. A
@@ -1137,8 +1138,15 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 400, per_cilium: in
             # on and not a finite-element study of the tissue.
             "body_point": {"parent": "cell", "entity": "mpm_particle", "density": 1050.0,
                            "radius": round(4.0 / um, 6),
+                           # STIFFER THAN THE TISSUE'S NOMINAL 2 kPa, and the reason is the
+                           # cilia. 74 shafts stirring at hundreds of micrometres per second
+                           # deliver real momentum into the shared grid, and a body at 2 kPa
+                           # cannot take it: measured, its bounding volume grew 2.94x over 400
+                           # frames while the zero-sweep control held at exactly 1.00. 12 kPa
+                           # raises the sound speed sqrt(E/rho) from 1.4 to 3.4 world units per
+                           # second, so the body transmits the load instead of being torn by it.
                            "types": {"body": {"fraction": 1.0, "material": "elastic",
-                                              "youngs": 2000.0, "density": 1050.0}},
+                                              "youngs": body_youngs, "density": 1050.0}},
                            "per_parent": {c: (0 if c == "yolk" else 8) for c in f["order"]}},
             # The yolk keeps its own set because it is a different thing: five big cells, 400
             # points each at 12 um, dense and soft. Its own set is also what lets it keep its own
@@ -1211,7 +1219,15 @@ def spec_r12(f: dict, n_water: int = 140000, n_frames: int = 400, per_cilium: in
             # THE PRESCRIBED DRIVE. Every cilium flat out, so this rung tests the mechanism and
             # not a circuit's ability to reach it.
             {"op": "seed_state_random", "at": "cilium", "block": "drive", "lo": 1.0, "hi": 1.0},
-            {"op": "metachronal_phase", "at": "cilium", "wavenumber": 6.0, "axis": 2,
+            # WAVENUMBER 1, NOT 6, AND THAT IS A SAMPLING LIMIT RATHER THAN A TASTE.
+            #
+            # A metachronal wave needs NEIGHBOURING cilia close in phase; past about 90 degrees
+            # per step the ring is aliased and adjacent shafts sit in antiphase, which on screen
+            # is indistinguishable from random. The girdles are small: the metatroch has 8 cells
+            # and the akrotroch 8, so at k = 6 the metatroch steps 160 degrees between
+            # neighbours and the prototroch 59. At k = 1 the steps are 5 to 27 degrees across
+            # every girdle and the wave is a wave.
+            {"op": "metachronal_phase", "at": "cilium", "wavenumber": wavenumber, "axis": 2,
              "centre": [0.5, 0.5, 0.0], "block": "phase"},
             # THE WATER THE ANIMAL DISPLACES. A block of water does not know a body is standing
             # in it, so a uniform seed puts thousands of particles inside the tissue -- and
