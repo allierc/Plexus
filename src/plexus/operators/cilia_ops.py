@@ -1289,3 +1289,186 @@ class CiliumTorque(Lateral):
         got = (torch.cross(r, f, dim=2) * n).sum((1, 2))
         return f * (tau / torch.where(got.abs() > 1e-30, got, torch.ones_like(got))
                     )[:, None, None]
+
+
+@register_operator("cilium_anchor", family="mechanics", set="particle", kind="lateral")
+class CiliumAnchor(Lateral):
+    """Hold each blade's root to the CELL it grows from, with the reaction on that cell.
+
+    particle -> particle: a critically-damped spring between the blade's root row and its parent
+    cell's live position, and the equal and opposite force spread over that cell's own material
+    points.
+
+    WHY THIS IS NEEDED AT ALL, and it is a consequence of the thing R13 got right. Up to R12 the
+    shaft was driven kinematically, so it was welded to its cell by definition -- its position was
+    written every substep from the cell's. R13 made it ORDINARY ELASTIC MATTER so that the fluid
+    could push back on it, which is what conserves momentum, and in doing so removed the only
+    thing that had ever held it on. What was left was the hope that the root would share enough
+    MLS-MPM grid nodes with the body to be dragged along.
+
+    It did not. Measured on plat_r16_girdle: the MEDIAN root stayed 3.3 um from the body point it
+    started nearest -- so most blades held -- while 18 of 74 ended more than 25 um away and the
+    worst finished 232 um off, across the whole box. Most of them broke free within the first 30
+    frames. A blade held by node-sharing alone is held by an accident of where its root landed,
+    and the ones whose roots landed in a cell with little body mass in it were never attached.
+
+    THE ANCHOR FOLLOWS THE CELL, WHICH IS THE WHOLE DIFFERENCE FROM `mpm_anchor`. That operator
+    springs a particle back to the position it was SEEDED at -- a fixed point in the world -- which
+    is right for tissue on a dish and catastrophic here: the animal swims, so a root pinned to its
+    frame-0 position would drag the larva back to where it started and tear it in half on the way.
+    This is the same mistake `cilium_seed` made once already with a frozen base, and the fix is the
+    same: store the OFFSET, read the cell live.
+
+        target_c = x_cell[c] + off_c            where the root belongs, now
+        f_c      = M_c [ k (target_c - root_c) - c_d (v_root,c - v_cell,c) ]
+        a_root   = f_c / M_c   on each of the `n_root` root points
+        a_cell   = -f_c / M_body,c  on each of that cell's body points
+
+    with k = omega_n^2 and c_d = 2 zeta omega_n, so the attachment is stated as a CORNER FREQUENCY
+    in radians per second rather than as a stiffness whose units nobody carries in their head.
+    `omega_n` must sit well above the beat or the anchor low-passes the stroke it is supposed to
+    be a fulcrum for: at a beat of 1.25 rad/s, 40 rad/s is 32 times faster and the root is a hinge.
+
+    MOMENTUM IS EXACT, NOT APPROXIMATE. The same force f_c is added to the root and subtracted
+    from the cell, each spread so that the mass-weighted sum is f_c exactly, so sum(m a) over both
+    is identically zero however stiff the spring or however far the root has strayed. That matters
+    here more than usual: this whole rung exists because an operator that looked momentum-exact
+    was silently posting its reaction to a buffer nobody read.
+
+    WHAT IS NOT CONSTRAINED, deliberately. Only the root's POSITION is held. The blade's
+    orientation is left entirely to `cilium_torque` and the fluid, so the anchor is a hinge and
+    not a clamp -- it says where the basal body is, not which way the cilium is pointing.
+    """
+
+    EMIT = "mpm_acceleration"        # a body force the MPM substep consumes, as gravity is
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["cilium_set", "cell_set"]
+    INPUTS = ["particle", "cilium", "cell"]
+    OUTPUTS = ["particle"]
+    READS = []
+    WRITES = []
+    MECHANISM_TAGS = ["cilia", "anchor", "attachment", "momentum_conserving"]
+    PARAM_ROLES = {"cilium_set": "the_organ_set_the_blades_belong_to",
+                   "cell_set": "the_cells_the_blades_are_rooted_in",
+                   "body_set": "the_tissue_that_takes_the_reaction",
+                   "omega_n": "attachment_corner_frequency_rad_per_s",
+                   "zeta": "damping_ratio_of_the_attachment",
+                   "n_root": "points_in_the_blade_s_root_row",
+                   "check": "verify_the_pairing_at_run_time"}
+    REFERENCE = ("The basal body is embedded in its cell: Veraszto, C. et al. (2017). "
+                 "eLife 6:e26000.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cilium_point")
+        self.cilium_set = str(params["cilium_set"])
+        self.cell_set = str(params["cell_set"])
+        self.body_set = params.get("body_set")
+        self.body_set = str(self.body_set) if self.body_set else None
+        self.omega_n = float(params.get("omega_n", 40.0))
+        self.zeta = float(params.get("zeta", 1.0))
+        self.n_root = int(params.get("n_root", 1))
+        self.check = bool(params.get("check", True))
+        self._said = False
+        self._cell_of = None            # [n_cilia]        which cell each blade grows from
+        self._off = None                # [n_cilia, 3]     root offset from that cell, at rest
+        self._body_of = None            # [n_cilia, P]     that cell's own material points
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cil = H.level(self.cilium_set)
+        cl = H.level(self.cell_set)
+        X = p.get("pos")
+        dev, dt = X.device, X.dtype
+        n_c = cil.n
+        per = p.n // max(n_c, 1)
+        n_r = max(min(self.n_root, per), 1)
+        Xc = X.view(n_c, per, 3)
+        Vc = p.get("vel").view(n_c, per, 3).to(dt)
+
+        if self._cell_of is None:
+            # RESOLVED ONCE, FROM THE SEED'S OWN BOOKKEEPING. `cilium_seed` stores `cil_cell` and
+            # `cil_base_off` PER POINT; the blade's value is its first point's, so the reshape
+            # takes column 0 rather than a mean that would be identical but slower.
+            cc = getattr(p, "cil_cell", None)
+            if cc is None:
+                raise RuntimeError(
+                    "cilium_anchor: the set has no `cil_cell` buffer. It is written by "
+                    "`cilium_seed`, so this operator must come after it in the schedule.")
+            self._cell_of = cc.view(n_c, per)[:, 0].long()
+            if self.body_set is not None:
+                b = H.level(self.body_set)
+                par = H.lift_index(b.name, cl.name).long()
+                # THE CELL'S OWN POINTS, AS A RECTANGLE. `per_parent` is uniform over the cells
+                # that bear a blade, so every one of them has the same number of material points
+                # and the membership table is a fixed [n_cilia, P] -- which keeps this a batched
+                # gather inside a captured CUDA graph instead of a ragged Python loop.
+                order = torch.argsort(par, stable=True)
+                cnt = torch.bincount(par, minlength=cl.n)
+                start = torch.cumsum(cnt, 0) - cnt
+                P = int(cnt[self._cell_of].min().item())
+                if P < 1:
+                    raise RuntimeError(
+                        f"cilium_anchor: a cell bearing a blade has no points in {b.name!r}, so "
+                        f"there is nothing for the reaction to act on.")
+                self._body_of = order[start[self._cell_of][:, None]
+                                      + torch.arange(P, device=dev)[None, :]]
+                # THE OFFSET IS MEASURED AGAINST THE CELL'S OWN MATTER, NOT AGAINST `cell.pos`,
+                # and the difference is a whole frame of lag. `cell.pos` is only refreshed by
+                # `aggregate_centroid`, which runs at FRAME level after the substep block, so a
+                # target built from it is 0.05 s stale -- two full time constants of a 40 rad/s
+                # anchor, which would make the root chase a ghost and ring while doing it. The
+                # centroid of the cell's material points is live at every substep, so that is what
+                # the root is held against, and the offset is taken from it once, here.
+                self._off = (Xc[:, :n_r, :].mean(1)
+                             - b.get("pos")[self._body_of].to(dt).mean(1)).detach().clone()
+
+        if self._off is None:
+            raise RuntimeError("cilium_anchor: `body_set` is required -- the root is held against "
+                               "the cell's own material points, and the reaction goes on them.")
+        b = H.level(self.body_set)
+        k = self._body_of
+        Xb = b.get("pos")[k].to(dt)
+        target = Xb.mean(1) + self._off
+        m_p = getattr(p, "mass", None)
+        M = (torch.ones(n_c, per, device=dev, dtype=dt) if m_p is None
+             else m_p.to(dt).reshape(n_c, per))[:, :n_r]
+        root = Xc[:, :n_r, :].mean(1)
+        v_root = Vc[:, :n_r, :].mean(1)
+        m_b = getattr(b, "mass", None)
+        Mb = (torch.ones_like(k, dtype=dt) if m_b is None else m_b.to(dt)[k])
+        v_cell = b.get("vel")[k].to(dt).mean(1)
+
+        live = getattr(cil, "cil_live", None)
+        gate = torch.ones(n_c, device=dev, dtype=dt) if live is None else live.to(dt)
+        kk, cd = self.omega_n ** 2, 2.0 * self.zeta * self.omega_n
+        a_root = (kk * (target - root) - cd * (v_root - v_cell)) * gate[:, None]   # [n_c, 3]
+
+        acc = torch.zeros(n_c, per, 3, device=dev, dtype=dt)
+        acc[:, :n_r, :] = a_root[:, None, :]
+
+        # THE REACTION, AS A FORCE AND NOT AS AN ACCELERATION. The root row and the cell's points
+        # have different masses, so copying the acceleration across would conserve nothing; what
+        # has to match is sum(m a) on each side, which is f_c. Spread uniformly over the cell's
+        # points, that is a_b = -f_c / (total mass of those points).
+        f = M.sum(1)[:, None] * a_root                                  # [n_c, 3]
+        a_b = (-f / Mb.sum(1)[:, None].clamp_min(1e-30))[:, None, :].expand(-1, k.shape[1], -1)
+        b_acc = torch.zeros_like(b.get("pos"))
+        b_acc.index_add_(0, k.reshape(-1), a_b.reshape(-1, 3).to(b_acc.dtype))
+
+        if self.check and not self._said and not torch.cuda.is_current_stream_capturing():
+            self._said = True
+            net = float(((M.sum(1)[:, None] * a_root)
+                         + (Mb.sum(1)[:, None] * a_b[:, 0, :])).sum(0).norm())
+            scale = float((M.sum(1)[:, None] * a_root).abs().sum().clamp_min(1e-30))
+            print(f"[cilium_anchor] blade pull and cell reaction cancel to {net / scale:.3e} of "
+                  f"the pull ({'PAIRED' if net / scale < 1e-4 else 'NOT PAIRED'}); "
+                  f"median root offset {float((target - root).norm(dim=1).median()) * 195.9:.2f} "
+                  f"um", flush=True)
+
+        out = {self.body_set: b_acc}
+        if mask is not None:
+            acc = acc * mask.view(n_c, per)[..., None].to(dt)
+        out[self.at] = acc.reshape(-1, 3)
+        return out

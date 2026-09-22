@@ -138,6 +138,41 @@ def main():
     print(f"\n  WATER SPEED  median {np.median(sp_um.mean(0)):.3f} um/s   "
           f"95th {np.percentile(sp_um.mean(0), 95):.3f}   max {sp_um.max():.1f}")
 
+    # ------------------------------------------------------------------ is the box big enough?
+    #
+    # THE QUESTION IS NOT HOW CLOSE THE WALLS ARE, IT IS WHETHER THE FLOW HAS DECAYED BEFORE IT
+    # REACHES THEM. A swimmer in a box is in trouble when the fluid it pushed arrives at a wall
+    # still moving, because the wall then pushes back and the animal is partly swimming against
+    # its own reflection. The honest test is the speed profile against distance from the nearest
+    # wall, compared with the speed in the shell around the animal that the cilia are stirring.
+    #
+    # Stokes flow from a finite swimmer decays like 1/r or faster, so a box that is comfortable
+    # shows the wall shell at a few percent of the near shell. Anything approaching parity means
+    # the run is measuring its container.
+    B = np.asarray(tr["body_point__pos"])
+    com = B.mean(1)[0]
+    W0 = W[0][occ]
+    r_animal = np.linalg.norm(B[0] - com, axis=1).mean()
+    d_wall = np.minimum(W0, 1.0 - W0).min(1)                 # distance to the NEAREST wall
+    d_body = np.linalg.norm(W0 - com, axis=1)
+    speed = sp_um.mean(0)                                     # per particle, averaged over time
+    print(f"\n  IS THE BOX BIG ENOUGH? the animal's mean radius is {r_animal * UM:.0f} um and the "
+          f"nearest wall is {d_wall.min() * UM:.0f} um from the nearest water")
+    print(f"    {'shell':>22s} {'n':>9s} {'speed um/s':>11s}")
+    near = speed[d_body < 1.5 * r_animal]
+    for lo, hi in ((0.0, 0.10), (0.10, 0.20), (0.20, 0.35)):
+        m = (d_wall >= lo) & (d_wall < hi)
+        if m.sum():
+            print(f"    {lo * UM:6.0f} - {hi * UM:3.0f} um from wall {int(m.sum()):9,d} "
+                  f"{np.median(speed[m]):11.3f}")
+    if near.size:
+        print(f"    {'within 1.5 body radii':>22s} {near.size:9,d} {np.median(near):11.3f}")
+        m = d_wall < 0.10
+        if m.sum():
+            print(f"    the wall shell runs at {100 * np.median(speed[m]) / max(np.median(near), 1e-12):.0f}% "
+                  f"of the shell the cilia are stirring -- a comfortable box shows a few percent, "
+                  f"and parity means the run is measuring its container")
+
 
 if __name__ == "__main__":
     main()

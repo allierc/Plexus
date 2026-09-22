@@ -1545,6 +1545,120 @@ def spec_r15(f: dict, n_frames: int = 400, torque: float = 0.2, omega: float = 1
     return base
 
 
+def spec_r16(f: dict, n_frames: int = 400, torque: float = 0.2, omega: float = 1.25,
+             blade_um: float = 25.0, width_um: float = 10.0,
+             n_along: int = 16, n_across: int = 7, v_max: float = 0.06) -> dict:
+    """R16: the girdle points the right way, the blade is the size of the band it stands for.
+
+    R15 made the scene a continuum and the numbers came right -- body and water opposing at 161
+    degrees, the body holding 101% of its own radius -- and the PICTURE was still a thicket. Two
+    reasons, both anatomy rather than physics, and both measurable.
+
+    THE GIRDLE WAS POLARISED ABOUT THE WRONG AXIS. `radial_polarity` and `metachronal_phase` were
+    both given `centre: [0.5, 0.5, 0.0]`, the middle of the world box -- but the animal does not
+    sit in the middle of its box. Its centroid is at (0.353, 0.475, 0.487) and it spans x from
+    0.100 to 0.633, so x = 0.5 is near its +x EDGE, 28.8 um off the axis it was meant to name.
+    The consequence is measurable without running anything: the mean of the 74 blades' unit
+    directions has magnitude 0.399 about the spec's centre and 0.010 about the animal's own. A
+    girdle radiates evenly; 0.399 is most of a band pointing one way.
+
+    Both operators already default to the level's own centroid when `centre` is absent. So the
+    fix is to DELETE the parameter, not to compute a better triple and write it down -- a hard
+    coded centre is a number that stops being true the moment `positions()` changes its scale or
+    its margin, and nothing would say so.
+
+    THE BLADE WAS BIGGER THAN THE BAND. It was 38 x 12 um, 74 of them, on an animal whose cells
+    lie a mean 61.4 um from its centroid: 135,000 um^3 of paddle against roughly 589,000 um^3 of
+    animal, 23% of the larva made of cilia. Measured on the region instead of guessed, the band's
+    cells sit a median 9.9 um apart (10th percentile 6.7, 90th 16.3), and per girdle the spacing
+    along the ring is 9.7 um for the paratroch, 16.0 for the prototroch, 24.4 for the metatroch
+    and 31.9 for the akrotroch. So a 10 um blade TILES the band one per cell, which is what a
+    ciliary band is, and 12 um was already overlapping its neighbours.
+
+    The length comes down from 38 um to 25 um for the same reason: Platynereis prototroch cilia
+    run some 20-25 um, and a 38 um blade rooted 4 um out from a cell at radius 58 um reached 96
+    um on a body whose own outer radius is 70 to 93 -- a fringe half again as long as the animal
+    is wide.
+
+    AND THE COLOUR RANGE WAS FIFTEEN TIMES TOO WIDE, which is most of why the flow was invisible.
+    `color_range: [0, 0.35]` is in world units per second; the water's measured median speed is
+    4.487 um/s = 0.0229 world/s, so the median pixel sat at 6.5% of an inferno map, which is
+    black. It is set from the measurement now: 0.06 puts the median at 38% and the 95th
+    percentile (9.7 um/s) near the top.
+
+    `cutaway` OPENS THE FLUID INSTEAD OF DRAWING ALL OF IT. 307,000 water dots are an opaque fog
+    whatever colour they carry. Cutting along the view direction discards the half nearest the
+    camera, so what is drawn is the flow BEHIND and AROUND the animal, seen square on, by the
+    same renderer and the same palette. The animal itself is a glyph set and is not cut.
+    """
+    base = spec_r15(f, n_frames=n_frames, torque=torque, omega=omega,
+                    blade_um=blade_um, width_um=width_um,
+                    n_along=n_along, n_across=n_across)
+    base["general"]["name"] = "plat_r16_girdle"
+
+    # ---------------------------------------------------------------- the axis the girdle is on
+    # DELETED, NOT CORRECTED. Both operators fall back to the level's own centroid, which follows
+    # the animal wherever `positions()` puts it; a triple written here would not.
+    for o in base["seed"]:
+        if o.get("op") in ("radial_polarity", "metachronal_phase"):
+            o.pop("centre", None)
+
+    # ---------------------------------------------------------------- what can actually be seen
+    p = base["plotting"]
+    p["color_range"] = [0.0, v_max]
+    p["cutaway"] = {"axis": "view", "at": 0.5}
+    p["dot_opacity"] = {"body": 0.18, "cilium_shaft": 1.0}
+    p["dot_size"] = 2.6
+    return base
+
+
+def spec_r17(f: dict, n_frames: int = 400, omega_n: float = 40.0, zeta: float = 1.0,
+             n_across: int = 7, **kw) -> dict:
+    """R17: the blade is attached to the animal. Eighteen of seventy-four had been flying off.
+
+    R13 made the shaft ordinary elastic matter so the fluid could push back on it, which is what
+    conserves momentum -- and in doing so it deleted `cilium_kinematics`, which had been the only
+    thing holding the shaft to its cell. What was left was the hope that a root would share enough
+    MLS-MPM grid nodes with the body to be dragged along by it.
+
+    MEASURED ON plat_r16_girdle, that hope holds for most blades and fails for a fifth of them.
+    The MEDIAN root stayed 3.3 um from the body point it began nearest, so the majority were fine;
+    but 25 of 74 ended more than 10 um away, 18 more than 25 um, and the worst finished 232 um
+    off -- clear across a 196 um box. Most broke free inside the first 30 frames. On R15 it was 11
+    of 74. A blade held by node-sharing alone is held by an accident of where its root landed.
+
+    `cilium_anchor` IS A HINGE, NOT A CLAMP. It springs the blade's root ROW to the live centroid
+    of its own cell's material points, and puts the equal and opposite force on those same points,
+    so sum(m a) over the pair is identically zero. Only the root's POSITION is held: the blade's
+    orientation is left entirely to `cilium_torque` and the water, which is what a basal body
+    does -- it says where the cilium is attached, not which way it points.
+
+    NOT `mpm_anchor`, AND THE DIFFERENCE WOULD HAVE BEEN CATASTROPHIC. That operator springs a
+    particle back to the position it was SEEDED at, a fixed point in the world. The animal swims
+    44.5 um over this run, so a root pinned to its frame-0 position would drag the larva back to
+    where it started and tear it apart on the way. This is the frozen-base mistake `cilium_seed`
+    already made once; the fix is the same one -- store the offset, read the body live.
+
+    `omega_n` IS WHERE THE MODELLING IS. It is the attachment's corner frequency in radians per
+    second, and it has to sit well above the beat or the anchor low-passes the stroke it is meant
+    to be the fulcrum of. At a beat of 1.25 rad/s, 40 rad/s is 32 times faster: over one time
+    constant of the anchor the blade has swept 1.8 degrees, so the root is a hinge on the stroke's
+    own timescale. Critically damped (zeta = 1) so it does not ring on the stroke's corner.
+    """
+    base = spec_r16(f, n_frames=n_frames, n_across=n_across, **kw)
+    base["general"]["name"] = "plat_r17_anchored"
+    ops = base["operators"]
+    i = next(i for i, o in enumerate(ops) if o.get("op") == "cilium_torque")
+    ops.insert(i + 1, {"op": "cilium_anchor", "at": "cilium_point", "cilium_set": "cilium",
+                       "cell_set": "cell", "body_set": "body_point",
+                       "omega_n": omega_n, "zeta": zeta, "n_root": n_across, "check": True})
+    for st in base["schedule"]:
+        if isinstance(st, dict) and "steps" in st:
+            j = st["steps"].index("cilium_torque")
+            st["steps"].insert(j + 1, "cilium_anchor")
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -1565,7 +1679,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "r16", "r17", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1573,6 +1687,43 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r17", "all"):
+        import yaml
+        sp = spec_r17(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} the blades are ATTACHED: a momentum-exact hinge "
+              f"to the cell's own matter")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R17 -- cilium_anchor. R13 made the shaft ordinary matter so the fluid\n"
+                         "# could push back on it, and thereby deleted cilium_kinematics, which\n"
+                         "# was the only thing holding it to its cell. On R16 that cost 18 of 74\n"
+                         "# blades, the worst ending 232 um away in a 196 um box, most gone\n"
+                         "# inside 30 frames. The anchor is a momentum-exact hinge to the live\n"
+                         "# centroid of the cell's own material points -- NOT mpm_anchor, which\n"
+                         "# springs to a frame-0 position and would drag the swimming larva back.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
+    if a.rung in ("r16", "all"):
+        import yaml
+        sp = spec_r16(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} the girdle polarised about the ANIMAL's axis, "
+              f"a blade the size of the band, a colour range you can see")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R16 -- anatomy, after R15 fixed the physics. radial_polarity and\n"
+                         "# metachronal_phase were centred on [0.5, 0.5], the middle of the BOX,\n"
+                         "# while the animal's centroid is at (0.353, 0.475): the mean of the 74\n"
+                         "# blade directions had magnitude 0.399 where a girdle radiating evenly\n"
+                         "# gives 0.010. The blade comes down to 25 x 10 um -- the band's own\n"
+                         "# median cell spacing is 9.9 um, so 10 um tiles it one per cell -- and\n"
+                         "# color_range drops 0.35 -> 0.06 world/s against a measured median water\n"
+                         "# speed of 0.0229, which is why the flow rendered black.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r15", "all"):
         import yaml
         sp = spec_r15(F)

@@ -246,3 +246,67 @@ Kept at the bottom so it is the last thing read and the easiest thing to update.
   3. Re-run R8 and R9 (metachrony, tangential stroke) now that the animal is FREE — they were
      compared under the anchor, where nothing could have distinguished them.
   4. A cilium as a slender appendage, which is the honest version of the whole motor rung.
+
+* **2026-09-21, R15 to R17 — the scene was never a continuum, and everything downstream of that
+  was noise wearing the name of a result.**
+
+  The overnight objectives were to lower the body's strain, check the water, consider a bigger
+  box, raise the motion-per-energy ratio, and make the thing observable. Four faults turned up,
+  none of them visible in any rendered frame, and all four were found by a measurement.
+
+  | what was wrong | how it was found | the number |
+  |---|---|---|
+  | the reaction couple was never delivered | a new check summing torque on BOTH sides | shafts +0.837, body 0.000 |
+  | the substep was 6.76x over Courant | `plexus.generators.mpm_cfl` | 5.0e-03 against a 7.4e-04 limit |
+  | every body was a dust | `plexus.generators.mpm_cfl.particles_per_cell` | 0.18 to 0.47 per cell, wants ~8 |
+  | the shaft had no cross-section | tip vs root excursion | tip moved 0.8x its own root |
+  | the girdle was polarised about the box, not the animal | mean of the 74 blade directions | 0.399, where even radiation is 0.010 |
+  | 18 of 74 blades flew off | root-to-body separation per blade | worst ended 232 um away in a 196 um box |
+
+  **THE ONE TO REMEMBER: the body was not breaking for want of stiffness.** Every rung since R12
+  treated the blow-up as a modulus to be raised, and raising it six-fold moved the blow-up by 4%.
+  A solid sampled at a quarter of a particle per grid cell has almost no cell in which MLS-MPM can
+  assemble a stress at all, so it has no stiffness to lose. `particles_per_cell` says so in one
+  line and has said so all along. **Run the repository's own checkers on a spec before believing
+  anything it produces** -- both of these live in `src/plexus/generators/mpm_cfl.py` and neither
+  had ever been pointed at this model.
+
+  **Measured, R14 (reaction fixed, unresolved) -> R15 (resolved) -> R16 (anatomy + viz):**
+
+  | | R14 | R15 | R16 |
+  |---|---|---|---|
+  | body vs water angle (180 is the law) | 36 / 91 deg | 161 / 172 | 156 / 160 |
+  | total \|p\| as a fraction of the parts | 0.96 | 0.20 | 0.36 |
+  | body radius (100% = still one body) | 161% | 101% | 101% |
+  | tip / root excursion | 0.8x | 1.30x | 1.11x |
+  | beat, with the body's ride projected out | -- | 73% of blade | 90% of blade |
+  | water speed, median | 2.00 um/s | 4.49 | 6.24 |
+  | swim speed | -- | 2.22 um/s | 2.45 |
+  | water cells occupied | 14.8% | 78.3% | 78.3% |
+
+  **The blade is a blade and is named one.** A real Platynereis cilium is 0.25 um thick against a
+  grid cell of 4.08 um and no grid this model can afford will hold one. The blade stands for the
+  tuft a band cell carries plus the layer it entrains. Its size is not a guess: the band's cells
+  sit a median 9.9 um apart (measured on the region), so a 10 um blade tiles the band one per
+  cell, and 25 um of length is the low end of the 20-40 um the literature gives the prototroch.
+
+  **The box: 19% contaminated, and periodic is not the escape.** The wall shell (within 20 um of a
+  wall) runs at 1.39 um/s against 7.46 um/s in the shell the cilia stir. Real but not dominant.
+  `boundary: periodic` is NOT the fix: `_resolve_default_impl` (engine.py:986) refuses the warp
+  path for a periodic world -- 973.8 ms a frame against 31.8 -- and these specs name
+  `implementation: warp` explicitly, so a periodic world would keep the fast kernel and silently
+  CLAMP at the wall instead of wrapping. A wrong answer at full speed. The box has to grow, and
+  `save_data: true` must come OUT of the spec first: it overrides `record_cap` (engine.py:1736),
+  which is why R15 wrote a 2.9 GB trajectory when it was asked for every fourth frame.
+
+* **What is still open, in the order it matters:**
+  1. **The bigger box** (R18). Drop `save_data`, set `record_cap`, double `length_um` and
+     `n_grid` together so the cell stays 4.08 um. Re-measure the 19%.
+  2. **Motion per unit drive** is 6.9e-03 and has barely moved between rungs. The knobs not yet
+     swept: torque, `duty` (the power/recovery asymmetry that Purcell's theorem turns on),
+     `omega`, and blade aspect ratio. `tools/platynereis_sweep.py` runs one knob across several
+     specs and reports tip/root, water speed, momentum and body radius for each.
+  3. **The swim is 2.45 um/s** on a 165 um animal, 0.015 body lengths a second against the ~5 a
+     real nectochaete does. The mechanism is now right and the magnitude is not.
+  4. **The connectome still is not driving anything** -- every blade is given `drive = 1`. That
+     was R12's deliberate choice and it has not been revisited since the motor actually works.
