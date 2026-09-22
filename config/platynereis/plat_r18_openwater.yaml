@@ -12863,3 +12863,15 @@ plotting:
   cutaway:
     axis: view
     at: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a large-scale cosmic structure evolving over a period of time. Small
+      blue particles cluster together to form dense filaments and large-scale web-like structures. Over
+      time, these clusters grow larger and more defined as they move and merge. The overall distribution
+      of matter becomes increasingly organized into a complex cosmic web.
+    objects: The scene contains thousands of tiny blue particles that represent matter in the universe.
+      These particles are arranged in a vast, three-dimensional web of filaments and dense nodes. Some
+      particles are concentrated into bright white clusters, indicating regions of high density. The entire
+      system is contained within a large, transparent cubic bounding box.

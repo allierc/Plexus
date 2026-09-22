@@ -83,6 +83,13 @@ from . import neuron_ops            # noqa: F401  neural_seed, neuron_update (ph
 from . import cilia_ops             # noqa: F401  polar_active_stress[driven] -- a beat whose
 #                                                 amplitude is the cell's own membrane state, and
 #                                                 radial_polarity -- the direction a cilium beats
+from . import rod_ops               # noqa: F401  a cilium as a DISCRETE ELASTIC ROD: rod_seed,
+#                                                 rod_stretch/_bend (internal, momentum-exact),
+#                                                 rod_base_moment (driven at the anchored base),
+#                                                 rod_pin (to a wall or to a cell) and rod_drag.
+#                                                 MPM cannot hold a body thinner than a grid cell;
+#                                                 a rod has no such floor, so this is how the model
+#                                                 gets a cilium that is 0.25 um thick.
 from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
                                     #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
 #                                                 (psi: shared | type_pre | type_pairwise),
@@ -97,4 +104,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "cilia_ops", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "cilia_ops", "rod_ops", "continuous_engine"]

@@ -310,3 +310,67 @@ Kept at the bottom so it is the last thing read and the easiest thing to update.
      real nectochaete does. The mechanism is now right and the magnitude is not.
   4. **The connectome still is not driving anything** -- every blade is given `drive = 1`. That
      was R12's deliberate choice and it has not been revisited since the motor actually works.
+
+## 2026-09-22 — THE REBUILD: a cilium as a ROD, not as MPM material
+
+Cedric stopped the animal-scale work after looking at builder 134-140 and named the bottleneck
+exactly: *"I need first to find an operator that allows torque on anchor point."* The agreed
+scheme, in order, and NOTHING may be skipped:
+
+  1. ONE cilium on a FIXED base, driven by a moment at that base. Does it oscillate?     <- DONE
+  2. Add water particles and watch them move, as in `prototype/microswimmer`.
+  3. Understand how a back-and-forth cilium can move the cell it is attached to.
+  4. Unfix the cell and see how it moves.
+  5. An ELASTIC cilium rather than a stiff one.
+
+**What builder 134-140 actually showed, since each observation was right and each has a cause.**
+134 is R13: the cilia are not moving because four material sets declared `mpm_scatter` and the
+schedule named three, so the shafts were never in the physics at all -- 0.00000 momentum for two
+whole rungs. 135-140 is R14: the huge white dots are `dot_radius` set to the 6 um paddle width,
+the vanished water is `color_range: [0, 0.35]` world/s against a median water speed of 0.0229 (the
+median pixel at 6.5% of an inferno map, which is black), and the breaking into independent balls
+is real -- 18 of 74 blades tore off, because R13 deleted `cilium_kinematics` and nothing else ever
+held a shaft to its cell.
+
+**Why a rod and not MPM.** MLS-MPM carries one velocity per grid node, so a body thinner than a
+cell cannot move relative to the fluid it shares nodes with. A real cilium is 0.25 um against a
+4.08 um cell, so the model kept widening it: 1.2 um, then a 6 um "paddle", then a 25 x 10 um
+"blade". A rod has no such floor -- its nodes are points on a curve and its thickness is a DRAG
+COEFFICIENT, not a volume -- and it is how cilia are actually modelled.
+
+**`prototype/microswimmer` has no cilium object at all.** Its cilia are a boundary condition: a
+tangential slip velocity on a sphere driving an ANALYTIC Stokes flow (the squirmer multipole
+series), with tracer particles to make the flow visible. So it supplies the flow-visualisation
+pattern for step 2 and nothing for step 1.
+
+**Step 1 result (`config/platynereis/cil_s1_onerod.yaml`, runs in 4 s).** A 24-node rod, 0.4
+long, pinned at node 0, driven by a 1 Hz moment across the base joint:
+
+  * base joint swings 60.3 deg, tip swings 31.8 deg, tip/base 0.53
+  * period 0.953 s against a commanded 1.000
+  * the beat is CENTRED at -1.7 deg and sustained over ten cycles
+  * sperm number Sp = 1.49, inside the 1-4 real cilia live at
+  * the tip LAGS the base, so the stroke is curved -- an elastic cilium, not a stick
+
+**Six new operators, `src/plexus/operators/rod_ops.py`.** `rod_seed`, `rod_stretch`, `rod_bend`
+(all internal and momentum-exact), `rod_base_moment` -- THE operator that was missing, a moment
+across the base joint whose reaction lands on the anchored node -- `rod_pin` (to a wall now, to a
+cell at step 4) and `rod_drag` (resistive-force theory, and an honest external momentum sink).
+
+**Every constant was measured, not chosen** (`tools/rod_sweep.py`, and each is in the spec's
+header): k_bend 5e5 returns NaN because the bending operator needs dt < 0.5/sqrt(k); drag 5.0 gave
+a DEAD TIP at Sp 4.3 and 0.07 puts Sp at 1.49; the stretch and bend springs each need their own
+dashpot because drag is too low to damp anything, and both have their own stability ceilings
+(stretch zeta 1.0 -> NaN, bend zeta 0.15 -> NaN); and `clamp` had to be added at all, because
+`rod_bend` penalises curvature and a RIGID ROTATION about the pin has none -- so an unclamped rod
+beats perfectly well about a rest direction that is itself windmilling, +32 deg over ten seconds.
+
+**What is still open from the overnight list, and is not abandoned:**
+  * THE BOX. R18 doubled it and the answer was unusable: the wall shell reads 117% of the near
+    shell and the whole fluid moves uniformly at 9.3 um/s. Doubling `length_um` while the world
+    stays a unit cube HALVES the animal in world units, so its dynamics changed too -- a different
+    scene, not a controlled twin. R17's 17% stands as the only honest measurement of the walls.
+  * THE REGIME. Re = rho U L / eta is about 14,000 against a larva's 0.16. The viscosity probe
+    that was meant to test it varied the wrong knob: `mpm_viscosity` prefers a PER-PARTICLE eta
+    built from the type table, and the `seawater` TYPE declares `eta: 0.001`, so the operator's
+    own `eta` is shadowed and a 10,000x sweep changed the stress by nothing at all.

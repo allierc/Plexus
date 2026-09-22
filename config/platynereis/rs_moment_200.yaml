@@ -1,0 +1,93 @@
+# rod sweep: moment = 200 on cil_s1_onerod. Written by tools/rod_sweep.py
+general:
+  name: rs_moment_200
+  seed: 0
+  n_frames: 3000
+  dt: 0.001
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: free
+  save_data: true
+  units:
+    length_um: 50.0
+    time_s: 1.0
+sets:
+  rod_node:
+    n: 24
+    start:
+    - - 0.5
+      - 0.5
+      - 0.25
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        boundary: free
+seed:
+- op: rod_seed
+  at: rod_node
+  length: 0.4
+  base:
+  - 0.5
+  - 0.5
+  - 0.25
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  n_rod: 1
+operators:
+- op: rod_stretch
+  at: rod_node
+  k: 100000.0
+- op: rod_bend
+  at: rod_node
+  k: 50000.0
+- op: rod_base_moment
+  at: rod_node
+  moment: 200.0
+  omega: 6.283185
+  waveform: sine
+- op: rod_pin
+  at: rod_node
+  anchor: fixed
+  omega_n: 600.0
+  zeta: 1.0
+- op: rod_drag
+  at: rod_node
+  zeta_par: 5.0
+  ratio: 2.0
+fields: {}
+schedule:
+- rod_stretch
+- rod_bend
+- rod_base_moment
+- rod_pin
+- rod_drag
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  subject: rod_node
+  dot_size: 10.0
+  dot_shading: true
+  max_frames: 300
+  stills: 6
+  keep_stills: true
+  fps: 20.0
+  colors:
+    rod_node: '#ffffff'
