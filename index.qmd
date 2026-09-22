@@ -6,6 +6,8 @@ resources:
 
 > *Il semble que la perfection soit atteinte non quand il n'y a plus rien à ajouter,
 > mais quand il n'y a plus rien à retrancher.*
+> (*It seems that perfection is attained not when there is nothing more to add,
+> but when there is nothing more to take away.*)
 >
 > — Antoine de Saint-Exupéry, *Terre des hommes* (1939), ch. III
 
