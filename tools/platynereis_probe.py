@@ -128,9 +128,11 @@ def main():
             yaml.safe_dump(variant(base, a.knob, v, nm, a.frames), fh,
                            sort_keys=False, width=110)
         print(f"  running {a.knob} = {v} ...", flush=True)
-        r = subprocess.run([sys.executable, os.path.join(REPO, "Plexus_Main.py"),
-                            "-o", "generate", f"platynereis/{nm}",
-                            "--device", a.device, "--no-describe", "--no-viz"],
+        # THROUGH THE WATCHER, like every other run -- see tools/rod_sweep.py for why.
+        r = subprocess.run([sys.executable, os.path.join(REPO, "tools", "gui_drive.py"),
+                            "opencycle", "--spec", os.path.join(OUT, nm + ".yaml"),
+                            "--device", a.device,
+                            "--why", f"probe on {a.base}: {a.knob} = {v:g}, {a.frames} frames"],
                            capture_output=True, text=True, cwd=REPO, timeout=7200)
         try:
             rows.append((v, score(nm, a.n_across, a.dt)))

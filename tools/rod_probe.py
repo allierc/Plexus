@@ -187,15 +187,36 @@ def main():
     # mode has eigenvalue about 16k, so dt < 2/sqrt(16k) = 0.5/sqrt(k). Measured: k = 5e5 at
     # dt = 1e-3 needs 7.1e-4 and returns NaN, while 5e4 is stable.
     if kb:
-        print(f"    rod_elastic k_bend = {kb:g}: dt / (0.5/sqrt(k)) = {dt / (0.5 / math.sqrt(kb)):.3f}  "
-              f"({'OK' if dt < 0.5 / math.sqrt(kb) else 'OVER -- this will return NaN'})")
-    print(f"\n  IS IT STABLE? an explicit spring needs dt < 2/sqrt(k)")
+        pass
+    # THE SPRINGS INTEGRATE AT THE SUBSTEP, NOT THE FRAME. Checking against general.dt on a spec
+    # with a substep block reports every stiff spec as unstable -- it said 958 against a limit of
+    # 2 on a run that was perfectly stable, because the real step was 600x smaller.
+    _sub = next((st["substep_dt"] for st in d.get("schedule", [])
+                 if isinstance(st, dict) and "substep_dt" in st), dt)
+    print(f"\n  IS IT STABLE? an explicit spring needs dt < 2/sqrt(k), at the SUBSTEP "
+          f"({_sub:.2e}, {dt / _sub:.0f} a frame)")
     if k_s:
-        print(f"    rod_elastic k_stretch = {k_s:g}: dt * sqrt(k) = {dt * math.sqrt(k_s):.3f}  "
-              f"({'OK' if dt * math.sqrt(k_s) < 2 else 'OVER -- this will blow up'})")
+        print(f"    rod_elastic k_stretch = {k_s:g}: dt*sqrt(k) = {_sub * math.sqrt(k_s):.3f}  "
+              f"({'OK' if _sub * math.sqrt(k_s) < 2 else 'OVER -- this will blow up'})")
     if w_p:
-        print(f"    rod_base omega_n = {w_p:g}: dt * omega_n = {dt * w_p:.3f}  "
-              f"({'OK' if dt * w_p < 2 else 'OVER -- this will blow up'})")
+        print(f"    rod_base omega_n = {w_p:g}: dt*omega_n = {_sub * w_p:.3f}  "
+              f"({'OK' if _sub * w_p < 2 else 'OVER -- this will blow up'})")
+    # DEFORMATION, AND END-TO-END LENGTH IS NOT ENOUGH ON ITS OWN. A rod can hold its overall
+    # length while one segment near the drive is stretched to several times its rest length and
+    # another is compressed to nothing -- which is what pulling a filament apart at its base looks
+    # like before it becomes visible as an L. So the worst SEGMENT is reported beside the whole.
+    seg = np.linalg.norm(np.diff(P, axis=1), axis=2)          # [T, N-1]
+    rest = L0 / (N - 1)
+    strain = (seg - rest) / rest
+    print(f"\n  IS THE ROD DEFORMED? a cilium is inextensible, so these want to be near zero.")
+    print(f"    worst segment strain {100 * np.abs(strain[s]).max():8.2f}%   "
+          f"median {100 * np.median(np.abs(strain[s])):.2f}%")
+    # curvature as the turn angle between consecutive segments, which is what `k_bend` resists
+    e = np.diff(P, axis=1)
+    e = e / np.maximum(np.linalg.norm(e, axis=2, keepdims=True), 1e-12)
+    cosang = np.clip((e[:, :-1] * e[:, 1:]).sum(2), -1, 1)
+    print(f"    worst joint bend {np.degrees(np.arccos(cosang[s])).max():8.2f} deg   "
+          f"median {np.degrees(np.arccos(cosang[s])).median() if False else np.median(np.degrees(np.arccos(cosang[s]))):.2f} deg")
     print(f"    rod end-to-end length {L0:.4f} -> {L[-1]:.4f} "
           f"({100 * L[-1] / L0:.1f}% of its rest length; far from 100 means it is stretching or "
           f"curling)")

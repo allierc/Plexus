@@ -1,0 +1,139 @@
+# THE SHEAR-WAVE BENCH: what viscosity does this fluid ACTUALLY have?
+#
+# A box of water, a shear wave, nothing else. u = U0 sin(2 pi z) x_hat decays as exp(-nu k^2 t),
+# so fitting the decay of the amplitude returns the EFFECTIVE kinematic viscosity: the physical
+# one PLUS whatever the discretisation adds.
+#
+# WHY THIS IS WORTH ITS OWN BENCH. Every Reynolds number in this model so far came from the spec's
+# eta, and in MLS-MPM the particle-to-grid-to-particle transfer smooths the velocity field every
+# substep. That numerical viscosity is about dx^2/(2 dt) or U dx / 2 -- on the cilium runs, 0.244
+# against a physical 1e-6. If the estimate holds, the GRID set the dissipation, the spec's eta did
+# nothing, and those runs sat near Re 4 rather than the 9e5 I claimed. Estimates are not
+# measurements.
+#
+# THE DESIGN IS A 2x2 IN (dx, dt), PLUS ONE. The two candidate laws differ in whether dt matters:
+# dx^2/(2 dt) does, U dx / 2 does not. So the grid and the substep are varied INDEPENDENTLY, which
+# is the only way to tell them apart, and the fifth run raises eta to 1.0 -- far above either
+# estimate -- to check that the physical viscosity takes control once it is no longer buried.
+#
+# PARTICLES PER CELL IS HELD AT 8 THROUGHOUT. Vary the grid at a fixed particle COUNT and the
+# sampling changes with it, and the measurement would be of that instead.
+#
+# THE WAVE VARIES IN z AND POINTS IN x, which makes it pure SHEAR -- the fluid slides over itself.
+# Pointed along the axis it varies in, it is a sound wave, decaying through the bulk modulus and
+# measuring nothing about viscosity. The walls are frictionless and perfectly elastic
+# (wall_damp 1, wall_friction 0); a damping wall removes energy of its own and would be counted
+# as viscosity.
+#
+# THIS ONE (eta 1.0, far above the numerical floor): grid 32^3, 262,144 particles = 8.00 a cell, substep 1.4286e-04, eta 1.
+general:
+  name: nu_E_g32_eta1
+  seed: 0
+  n_frames: 400
+  dt: 0.002
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: wall
+  save_data: null
+  record_cap: 201
+  units:
+    length_um: 50.0
+    time_s: 1.0
+sets:
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        count: 1
+        material: liquid
+        bulk_modulus: 100000.0
+        density: 1000.0
+        eta: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+  water_particle:
+    parent: water
+    per_parent: 262144
+    entity: mpm_particle
+    density: 1000.0
+    radius: 0.5
+seed:
+- op: seed_state
+  at: water_particle
+  block: vel
+  pattern: wave
+  amplitude: 0.5
+  k: 1.0
+  axis: 2
+  direction:
+  - 1.0
+  - 0.0
+  - 0.0
+operators:
+- op: mpm_strain
+  at: water_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: water_particle
+  eta: 1.0
+- op: mpm_scatter
+  at: water_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  wall_friction: 0.0
+- op: mpm_gather
+  at: water_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+  implementation: warp
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+schedule:
+- substep_dt: 0.00014286
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  subject: water_particle
+  dot_size: 1.6
+  dot_shading: true
+  max_frames: 200
+  stills: 6
+  keep_stills: true
+  fps: 20.0
+  color_field: speed
+  field_cmap: inferno
+  color_range:
+  - 0.0
+  - 0.5
+  cutaway:
+    axis: view
+    at: 0.5

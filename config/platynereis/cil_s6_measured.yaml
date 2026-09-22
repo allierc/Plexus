@@ -1,0 +1,231 @@
+# 152's ROD IN WATER, WITH THE PARAMETERS SET AGAINST THE MEASURED nu_eff.
+#
+# The shear-wave bench (builder 0193-0202) measured this MPM's effective kinematic viscosity at
+# nu_eff ~ 0.016 at grid 32 -- about 10,000x the 1e-6 the spec's eta was asking for. Runs A and E
+# of that bench differ ONLY in eta, by a factor of 1000, and their nu_eff differ by 8%: the
+# physical viscosity was invisible, and the GRID set the dissipation. Every Reynolds number
+# quoted for the cilium before that bench was therefore fiction, this one included until now.
+#
+# SO THE VISCOSITY IS CHOSEN TO DOMINATE THE GRID'S, not to hit a number on paper. nu = 1.6 is
+# 100x the measured numerical floor of 0.016, so nu_eff is nu_physical to within a percent and
+# the Reynolds number is ours to set rather than the discretisation's. At the tip speed 152's
+# stroke implies (U = A L omega = 0.70 world/s) that is Re = U L / nu = 0.17 -- a Platynereis
+# larva's regime, which is 0.16.
+#
+# THE SUBSTEP FOLLOWS FROM THAT AND NOT FROM THE ELASTIC WAVE. Explicit viscous diffusion needs
+# dt < dx^2/(6 nu), which at nu 1.6 and grid 32 is 1.0e-4; the elastic limit is 1.25e-3, twelve
+# times looser, so the CFL checker will call this run over-resolved and it is not.
+#
+# k_stretch GOES TO 1e8, AND THE FIRST LADDER IS WHY. A cilium is inextensible, and the moment
+# drives the first node at M/|e| while only the stretch spring resists it: the segment strain is
+# M / (|e|^2 k_stretch). At the inherited k_stretch of 1e5 that is 3.3% at moment 1, 330% at
+# moment 100 and 33,000% at moment 1e5 -- so the ladder's upper rungs were not beating, they were
+# pulling the rod apart into an L. Cedric saw it in the picture before I checked the length
+# column. 1e8 is under the explicit limit (2/dt)^2 = 5.9e8 and holds moment 1000 at 3.3% strain.
+#
+# THE MOMENT IS THE ONE UNKNOWN and it is what the ladder above this spec is for: 152 in air beat
+# 31.8 deg at the tip with a moment of 1.0, and the drag here is orders larger, so the moment
+# that reproduces that stroke has to be found rather than derived.
+general:
+  name: cil_s6_measured
+  seed: 0
+  n_frames: 800
+  dt: 0.005
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: wall
+  save_data: null
+  record_cap: 161
+  units:
+    length_um: 50.0
+    time_s: 1.0
+sets:
+  rod_node:
+    n: 24
+    start:
+    - - 0.5
+      - 0.5
+      - 0.3
+    entity: mpm_particle
+    density: 1100.0
+    radius: 0.01
+    types:
+      cilium:
+        fraction: 1.0
+        material: elastic
+        youngs: 1.0
+        density: 1100.0
+        block:
+        - 0.49
+        - 0.49
+        - 0.3
+        - 0.51
+        - 0.51
+        - 0.7
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        boundary: free
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        count: 1
+        material: liquid
+        bulk_modulus: 100000.0
+        density: 1000.0
+        eta: 1600.0
+        block:
+        - 0.08
+        - 0.08
+        - 0.08
+        - 0.92
+        - 0.92
+        - 0.92
+  water_particle:
+    parent: water
+    per_parent: 155374
+    entity: mpm_particle
+    density: 1000.0
+    radius: 0.5
+seed:
+- op: rod_seed
+  at: rod_node
+  length: 0.4
+  base:
+  - 0.5
+  - 0.5
+  - 0.3
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  n_rod: 1
+operators:
+- op: rod_elastic
+  at: rod_node
+  k_stretch: 100000000.0
+  k_bend: 50000.0
+  zeta_stretch: 0.3
+  zeta_bend: 0.05
+  emit: mpm_acceleration
+- op: rod_base
+  at: rod_node
+  moment: 10000.0
+  omega: 6.283185
+  waveform: sine
+  omega_n: 600.0
+  zeta: 1.0
+  clamp: 40.0
+  clamp_zeta: 1.0
+  anchor: fixed
+  emit: mpm_acceleration
+- op: mpm_strain
+  at: rod_node
+  implementation: warp
+- op: mpm_strain
+  at: water_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: water_particle
+  eta: 1600.0
+- op: mpm_scatter
+  at: rod_node
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: water_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  wall_friction: 0.3
+- op: mpm_gather
+  at: rod_node
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+- op: mpm_gather
+  at: water_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+schedule:
+- substep_dt: 8.1967e-05
+  steps:
+  - rod_elastic
+  - rod_base
+  - mpm_strain
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  subject: water_particle
+  dot_size: 1.6
+  dot_shading: true
+  max_frames: 160
+  stills: 6
+  keep_stills: true
+  fps: 20.0
+  color_field: speed
+  field_cmap: inferno
+  color_range:
+  - 0.0
+  - 0.004
+  cutaway:
+    axis: view
+    at: 0.5
+  chain:
+    set: rod_node
+    per: 24
+    width: 7
+    color: '#ffffff'
+descriptions:
+  movie:
+    description: A thin vertical line of particles is positioned in the center of a large cubic domain.
+      Over time, the particles remain stationary and do not exhibit any significant movement or dispersion.
+      The simulation progresses through several time steps while the central structure maintains its integrity.
+      The visual representation shows a stable state where the velocity field remains near zero.
+    objects: The scene contains a single vertical line composed of many small, white particles. This line
+      is located in the center of a large, black cubic volume. A scale bar in the bottom right corner
+      indicates a length of 10 micrometers. The cubic domain is defined by a wireframe boundary and represents
+      a 50 micrometer box.

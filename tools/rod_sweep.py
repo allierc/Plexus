@@ -1,15 +1,28 @@
 #!/usr/bin/env python
 """Vary one number of the rod rig across several runs, and report what each did.
 
-    python tools/rod_sweep.py cil_s1_onerod bend 500 5e3 5e4 5e5
-    python tools/rod_sweep.py cil_s1_onerod moment 0.02 0.1 0.5
+    python tools/rod_sweep.py cil_s1_onerod bend=500,5e3,5e4,5e5
+    python tools/rod_sweep.py cil_s3_onlywater moment=10,50,200,800 bend=5e4,2e5,5e5
+
+ANY NUMBER OF KNOBS, as `name=v1,v2,...` -- the runs are their cartesian product. One knob is the
+special case, so there is no separate one-knob tool and no separate two-knob tool. The question
+that forced it was a two-parameter one: is there a regime where the beat is big enough to see and
+the fluid's inertia does NOT tip the rod over, and does stiffening the rod open it?
 
 THE RIG RUNS IN FOUR SECONDS, which is the point of it. The MPM larva takes twenty minutes a run
 and every question about the cilium had to be asked through four hundred thousand water particles
 and an animal; here one filament on a bench answers the same question before lunch, and the
 answers transfer because the filament is the same object.
 
-THE COLUMN THAT MATTERS IS `tip/base`. A rod whose tip angle equals its base angle is a rigid
+THE COLUMN THAT MATTERS DEPENDS ON THE QUESTION, so both are here. `tip/base` says whether the
+rod is beating or being carried. `tip mean` says whether it is beating ABOUT THE RIGHT PLACE -- a
+rod can sweep 50 degrees perfectly well about a rest direction that has drifted 70 degrees off
+vertical, starting upright and finishing lying down, and amplitude alone calls that a beat. When
+the scene has water, `flow` is the time-averaged fluid velocity along the sweep direction: it is
+zero for a symmetric stroke in a Stokes fluid, and non-zero means inertial streaming, which is
+what tips the rod.
+
+THE OLD COLUMN NOTE, still true: `tip/base`. A rod whose tip angle equals its base angle is a rigid
 stick pivoting at the anchor; one whose tip is dead is a floppy string being wiggled at one end,
 and the wiggle dies within a segment or two. A cilium is neither: the tip follows most of the way
 and arrives LATE, because drag curls the rod as it sweeps. So the pair to read is `tip/base`
@@ -68,27 +81,64 @@ def variant(base, knob, v, name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base")
-    ap.add_argument("knob", choices=sorted(KNOBS))
-    ap.add_argument("values", nargs="+", type=float)
+    ap.add_argument("knobs", nargs="+", help="name=v1,v2,... ; several make a cartesian product")
     ap.add_argument("--device", default="cuda:1")
+    ap.add_argument("--frames", type=int, default=None)
     a = ap.parse_args()
+
+    import itertools
+    axes = []
+    for spec_ in a.knobs:
+        if "=" not in spec_:
+            raise SystemExit(f"knobs are `name=v1,v2,...`; got {spec_!r}. "
+                             f"Known names: {', '.join(sorted(KNOBS))}")
+        k, vs = spec_.split("=", 1)
+        if k not in KNOBS:
+            raise SystemExit(f"unknown knob {k!r}; known: {', '.join(sorted(KNOBS))}")
+        axes.append((k, [float(v) for v in vs.split(",")]))
 
     from rod_probe import load, angles
     import numpy as np
     import math
 
     base = yaml.safe_load(open(os.path.join(OUT, a.base + ".yaml")))
+    if a.frames:
+        base["general"]["n_frames"] = a.frames
+        base["general"]["record_cap"] = min(base["general"].get("record_cap", 10 ** 9),
+                                            a.frames // 4 + 1)
+        base["plotting"]["max_frames"] = a.frames // 4
     rows = []
-    for v in a.values:
-        nm = f"rs_{a.knob}_{('%g' % v).replace('.', 'p').replace('-', 'm').replace('+', '')}"
+    for combo in itertools.product(*[vs for _, vs in axes]):
+        tag = "_".join(f"{k}{('%g' % v).replace('.', 'p').replace('-', 'm').replace('+', '')}"
+                       for (k, _), v in zip(axes, combo))
+        nm = f"rs_{tag}"
+        d_ = base
+        for (k, _), v in zip(axes, combo):
+            d_ = variant(d_, k, v, nm)
         with open(os.path.join(OUT, nm + ".yaml"), "w") as fh:
-            fh.write(f"# rod sweep: {a.knob} = {v:g} on {a.base}. "
-                     f"Written by tools/rod_sweep.py\n")
-            yaml.safe_dump(variant(base, a.knob, v, nm), fh, sort_keys=False, width=100)
-        r = subprocess.run([sys.executable, os.path.join(REPO, "Plexus_Main.py"),
-                            "-o", "generate", f"platynereis/{nm}",
-                            "--device", a.device, "--no-describe", "--no-viz"],
-                           capture_output=True, text=True, cwd=REPO, timeout=3600)
+            fh.write(f"# rod sweep on {a.base}: "
+                     + ", ".join(f"{k} = {v:g}" for (k, _), v in zip(axes, combo))
+                     + ". Written by tools/rod_sweep.py\n")
+            yaml.safe_dump(d_, fh, sort_keys=False, width=100)
+        v = combo
+        # EVERY RUN GOES THROUGH THE WATCHER. This used Plexus_Main directly, on the argument
+        # that a sweep variant produces only a row of numbers. That argument is wrong: a sweep is
+        # twelve SCENES, and twelve scenes that never reach the record are twelve things Cedric
+        # cannot see while they run. `gui_drive opencycle` writes builder/{spec,png,why,mp4}/NNNN
+        # and captions the movie, so a sweep is in the record BY CONSTRUCTION rather than by my
+        # remembering to put it there.
+        why = (f"rod sweep on {a.base}: "
+               + ", ".join(f"{k} = {v:g}" for (k, _), v in zip(axes, combo))
+               + ". Is there a regime where the beat is big enough to see AND the fluid's inertia "
+                 "does not tip the rod over? `tip mean` is the angle the beat is centred on, 0 "
+                 "being upright, and `flow` is the time-averaged fluid velocity along the sweep "
+                 "-- zero for a symmetric stroke in a Stokes fluid, non-zero only from inertial "
+                 "streaming, which is what tips it.")
+        r = subprocess.run([sys.executable, os.path.join(REPO, "tools", "gui_drive.py"),
+                            "opencycle", "--spec", os.path.join(OUT, nm + ".yaml"),
+                            "--device", a.device, "--azim", "35", "--elev", "12", "--zoom", "1.3",
+                            "--why", why],
+                           capture_output=True, text=True, cwd=REPO, timeout=7200)
         try:
             tr, sp = load(nm)
             d = yaml.safe_load(open(sp))
@@ -115,17 +165,31 @@ def main():
                 c = np.correlate(y2, y1, "full")
                 lag = 360.0 * ((np.argmax(c) - (y1.size - 1)) * dt) / per
             L = np.linalg.norm(P[:, -1, :] - P[:, 0, :], axis=1)
-            rows.append((v, ab, at, mean_t, at / max(ab, 1e-12), lag,
-                         100 * float(L[-1]) / float(rs["length"]),
-                         float(np.linalg.norm(P[:, 0, :] - P[0, 0, :], axis=1).max())))
+            # THE TIME-AVERAGED FLOW ALONG THE SWEEP, when there is water. Zero for a symmetric
+            # stroke in a Stokes fluid; non-zero IS inertial streaming, and it is what tips the
+            # rod, so it belongs beside the drift rather than in a separate tool.
+            flow = float("nan")
+            if "water_particle__pos" in tr.files:
+                W = np.asarray(tr["water_particle__pos"])
+                oc = np.asarray(tr["water_particle__occ"])[0].astype(bool)
+                stride = max(1, d["general"]["n_frames"] // max(T - 1, 1))
+                c0 = P[0].mean(0)
+                near = np.linalg.norm(W[0][oc] - c0, axis=1) < float(rs["length"])
+                mv = (np.diff(W[:, oc][:, near], axis=0) / (dt * stride)).mean((0, 1))
+                flow = float(mv @ np.cross(nn, d0)) * float(
+                    (d["general"].get("units") or {}).get("length_um", 1.0))
+            rows.append((combo, ab, at, mean_t, at / max(ab, 1e-12), flow,
+                         100 * float(L[-1]) / float(rs["length"])))
         except Exception as e:                                       # noqa: BLE001
-            print(f"  {a.knob}={v:g} FAILED {type(e).__name__}: {str(e)[:120]}")
+            print(f"  {tag} FAILED {type(e).__name__}: {str(e)[:120]}")
             print(f"    {(r.stderr or r.stdout)[-300:]}")
 
-    print(f"\n  {a.knob:>10s} {'base deg':>9s} {'tip deg':>9s} {'tip mean':>9s} "
-          f"{'tip/base':>9s} {'lag deg':>8s} {'length %':>9s} {'base drift':>11s}")
-    for v, ab, at, mt, r_, lg, ln, bd in rows:
-        print(f"  {v:10g} {ab:9.2f} {at:9.2f} {mt:9.2f} {r_:9.3f} {lg:8.1f} {ln:9.1f} {bd:11.2e}")
+    hdr = "  " + " ".join(f"{k:>9s}" for k, _ in axes)
+    print(f"\n{hdr} {'base deg':>9s} {'tip deg':>9s} {'tip mean':>9s} "
+          f"{'tip/base':>9s} {'flow um/s':>10s} {'length %':>9s}")
+    for combo, ab, at, mt, r_, fl, ln in rows:
+        print("  " + " ".join(f"{v:9g}" for v in combo)
+              + f" {ab:9.2f} {at:9.2f} {mt:9.2f} {r_:9.3f} {fl:10.4f} {ln:9.1f}")
     print(f"\n  tip/base: 1 is a rigid stick pivoting at the anchor, 0 a floppy string whose "
           f"wiggle dies in a\n  segment or two. A cilium is in between, WITH a lag -- drag curls "
           f"the rod as it sweeps, so the tip\n  arrives late, and that lag is the time asymmetry "

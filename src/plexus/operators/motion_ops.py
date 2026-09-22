@@ -36,6 +36,36 @@ class Drag(Lateral):
     Drag alone is dissipative; drag plus noise is a thermal bath whose equilibrium temperature
     is set by the ratio eta^2 / k, which is the fluctuation-dissipation relation.
 
+    `field: <grid>` DRAGS AGAINST A MOVING FLUID INSTEAD OF A STILL ONE, and for an immersed
+    filament it is the difference between a model and nothing.
+
+        a = -k [ (v - u) resolved into tangential and transverse parts as below ]
+
+    with u the fluid velocity INTERPOLATED AT THE PARTICLE from the named grid, by the same
+    quadratic B-spline weights the MPM transfer uses. With no `field` the fluid is taken to be at
+    rest and this is the plain law above.
+
+    WHY IT HAD TO EXIST. The obvious way to immerse a rod in MLS-MPM water is to declare its nodes
+    `entity: mpm_particle` and let `mpm_scatter` and `mpm_gather` carry the momentum. That fails
+    for a SLENDER body, and the measurement is stark: a rod node weighs 7.3e-03 while the 3x3x3
+    stencil it scatters over holds 1.39 of water, so the node is 0.53% of the mass its own velocity
+    is averaged with -- and `mpm_gather` REPLACES a particle's velocity with that average. Over
+    99% of whatever the drive did in a substep is discarded before it comes back. Measured on the
+    cilium: the base swing fell from 60.3 degrees in air to 1.0 in water, and no moment or clamp
+    recovered it (40 rad/s of clamp let the base flop to +107 degrees, 8e4 gave exactly 0.00, and
+    the operator's own arithmetic is fine -- a unit test returns the quasi-static angle it should).
+    Making the rod 100x denser moved the tip from 0.00 to 4.79 degrees, which identified the cause,
+    and 1000x diverged.
+
+    `react: true` PUTS THE EQUAL AND OPPOSITE BACK INTO THE FLUID, which is what makes this a
+    coupling rather than a one-way sink. The force taken from the particle is scattered onto the
+    same grid nodes, with the same weights, as a velocity increment -w m_p a dt / m_i. Without it
+    the rod would feel the water and the water would never feel the rod, and a swimmer built that
+    way would move with nothing pushed the other way.
+
+    IT REPLACES `mpm_scatter`/`mpm_gather` ON THAT SET, it does not join them: a set that both
+    gathers and drags is told its velocity twice.
+
     `along: chain` MAKES IT ANISOTROPIC, which is what a slender body in a fluid actually feels
     and is the whole mechanism by which a filament waving back and forth produces net thrust.
 
@@ -73,7 +103,9 @@ class Drag(Lateral):
     MECHANISM_TAGS = ["viscous_drag", "friction", "damping", "resistive_force_theory"]
     PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise",
                    "along": "chain_to_make_the_drag_anisotropic_about_the_local_tangent",
-                   "ratio": "transverse_over_tangential_drag_about_2_for_a_slender_filament"}
+                   "ratio": "transverse_over_tangential_drag_about_2_for_a_slender_filament",
+                   "field": "grid_whose_velocity_the_drag_is_measured_against",
+                   "react": "put_the_equal_and_opposite_back_into_that_fluid"}
     REFERENCE = ("Stokes, G. G. (1851). On the effect of the internal friction of fluids on "
                  "the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.")
 
@@ -86,11 +118,31 @@ class Drag(Lateral):
         if self.along not in ("", "chain"):
             raise ValueError(f"drag: `along` is `chain` or nothing, got {self.along!r}")
         self.ratio = float(params.get("ratio", 2.0))
+        self.field = params.get("field")
+        self.field = str(self.field) if self.field else None
+        self.react = bool(params.get("react", False))
+        if self.react and not self.field:
+            raise ValueError("drag: `react` needs a `field` to react against -- there is nothing "
+                             "to push back on otherwise.")
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         occ = lvl.occ
         V = lvl.get("vel")
+        # THE FLUID'S OWN VELOCITY AT THIS PARTICLE, by the same B-spline the MPM transfer uses,
+        # so the rod feels the flow it is actually sitting in rather than a still medium.
+        _u = None
+        if self.field is not None:
+            from plexus.operators.mpm_ops import bspline, stencil_offsets
+            g = H.fields[self.field]
+            D = V.shape[1]
+            off = stencil_offsets(D, V.device)
+            inv_dx = 1.0 / float(g.dx)
+            _, w, flat = bspline(lvl.get("pos"), inv_dx, off, g.shape,
+                                 bool(getattr(H, "periodic", False)))
+            _u = (w[..., None] * g.v[flat].view(lvl.n, off.shape[0], D)).sum(1)
+            _u = torch.nan_to_num(_u)
+            V = V - _u
         if self.along == "chain":
             n_rod = int(getattr(lvl, "n_rod", 1))
             per = lvl.n // max(n_rod, 1)
@@ -110,6 +162,18 @@ class Drag(Lateral):
                                                  device=acc.device) * occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()
+        if self.react and _u is not None:
+            # THE EQUAL AND OPPOSITE, ONTO THE SAME NODES WITH THE SAME WEIGHTS. The particle loses
+            # m_p a per unit time; the grid gains it, as a velocity increment m_p a dt / m_i, so the
+            # pair conserves momentum to the accuracy of the interpolation. `mass` is per particle
+            # when the set carries one and 1 otherwise, which is the same convention the rest of
+            # this file uses for a per-unit-mass law.
+            m_p = getattr(lvl, "mass", None)
+            m_p = torch.ones(lvl.n, device=acc.device) if m_p is None else m_p.to(acc.dtype)
+            dt = float(getattr(H, "sub_dt", None) or getattr(H, "dt", 1.0) or 1.0)
+            dp = (-(m_p[:, None] * acc) * dt)[:, None, :] * w[..., None]      # [N, S, D]
+            m_g = g.m[flat].clamp_min(1e-30)
+            g.v.index_add_(0, flat, (dp.reshape(-1, dp.shape[-1]) / m_g[:, None]))
         return {self.at: acc}
 
 

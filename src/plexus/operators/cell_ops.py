@@ -1055,17 +1055,34 @@ class SeedStateFromFile(Seed):
         return {}
 
 
-@register_operator("seed_state_random", family="seed", set="compartment", kind="seed")
-class SeedStateRandom(Seed):
-    """Fill a named state block with independent uniform noise, once, at x_0.
+@register_operator("seed_state", "seed_state_random", family="seed", set="compartment",
+                   kind="seed")
+class SeedState(Seed):
+    """Fill a named state block from a RULE, once, at x_0. `pattern` is which rule.
 
-    set -> set: writes `block`, reads nothing.
+    set -> set: writes `block`; reads `pos` only when the pattern is spatial.
 
-        v_i ~ U(lo, hi),   independently per element and per component of the block
+        pattern: random   v_i ~ U(lo, hi),  independently per element and per component
+        pattern: wave     v_i = amplitude * sin(2 pi k x_i . axis + phase) * direction
 
     lo and hi are in the units of whatever `block` holds, so this operator has no units of its
     own; `seed` fixes the draw, on the CPU, so the same specification gives the same x_0 on any
     device.
+
+    `pattern: wave` EXISTS FOR ONE MEASUREMENT and it is the standard one: a shear wave
+    u = U0 sin(k z) x_hat decays as exp(-nu k^2 t), so fitting the decay of its amplitude returns
+    the fluid's EFFECTIVE kinematic viscosity -- the physical one plus whatever the discretisation
+    adds. In MLS-MPM the second is not small: the particle-to-grid-to-particle transfer smooths
+    the velocity field every substep, contributing roughly dx^2 / (2 dt) or U dx / 2. On a run
+    with eta = 1e-3 in a unit box at grid 64 that is 0.244 against a physical 1e-6, so the GRID
+    sets the dissipation and the spec's viscosity does nothing at all. A Reynolds number quoted
+    from the spec's eta is then wrong by however far apart those two are, and the only way to
+    know is to measure.
+
+    TWO NAMES, ONE OPERATOR. It was `seed_state_random`, which is what it did; a sinusoid is the
+    same mechanism -- write an initial condition into a block from a rule -- so it is a `pattern`
+    and not a second operator. The old name stays as an alias because about a thousand specs use
+    it, and it defaults to `pattern: random`, so they are untouched.
 
     An initial condition with no structure is still an initial condition, and it has to be an
     operator rather than a `sets:` key for the reason `seed:` exists at all: `build` seeds
@@ -1078,8 +1095,13 @@ class SeedStateRandom(Seed):
     EMIT = None
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["block"]
-    MECHANISM_TAGS = ["initial_condition", "random_state"]
-    PARAM_ROLES = {"block": "state_block", "lo": "lower_bound", "hi": "upper_bound"}
+    MECHANISM_TAGS = ["initial_condition", "random_state", "shear_wave", "benchmark"]
+    PARAM_ROLES = {"block": "state_block", "lo": "lower_bound", "hi": "upper_bound",
+                   "pattern": "random_or_wave", "amplitude": "peak_value_of_the_wave",
+                   "k": "wavenumber_in_cycles_across_the_box",
+                   "axis": "the_axis_the_wave_VARIES_along",
+                   "direction": "the_vector_the_wave_POINTS_along",
+                   "phase": "radians_of_offset"}
     REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
@@ -1089,26 +1111,50 @@ class SeedStateRandom(Seed):
         self.lo = float(params.get("lo", 0.0))
         self.hi = float(params.get("hi", 1.0))
         self.seed = int(params.get("seed", 0))
+        self.pattern = str(params.get("pattern", "random")).lower()
+        if self.pattern not in ("random", "wave"):
+            raise ValueError(f"seed_state: `pattern` is random or wave, got {self.pattern!r}")
+        self.amplitude = float(params.get("amplitude", 1.0))
+        self.k = float(params.get("k", 1.0))
+        self.axis = int(params.get("axis", 2))
+        self.direction = [float(v) for v in (params.get("direction") or [1.0, 0.0, 0.0])]
+        self.phase = float(params.get("phase", 0.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         if self.block not in lvl.state_schema:
             raise ValueError(
-                f"seed_state_random: {lvl.name!r} has no state block {self.block!r} "
+                f"seed_state: {lvl.name!r} has no state block {self.block!r} "
                 f"(has: {', '.join(b.name for b in lvl.state_schema.blocks)}). Declare it under "
                 f"`sets.{lvl.name}.state:`.")
         b0, b1 = lvl.state_schema[self.block]
-        g = torch.Generator(device="cpu").manual_seed(self.seed)
-        v = torch.rand(lvl.n, b1 - b0, generator=g) * (self.hi - self.lo) + self.lo
-        lvl.state[:, b0:b1] = v.to(lvl.state.device)
+        if self.pattern == "wave":
+            # THE WAVE VARIES ALONG ONE AXIS AND POINTS ALONG ANOTHER, and keeping those separate
+            # is the difference between a SHEAR wave and a compression wave. u = U0 sin(k z) x_hat
+            # varies in z and points in x: the fluid slides over itself, which is pure shear and
+            # decays at exactly nu k^2. Point it along the same axis it varies in and it is a
+            # sound wave instead, which decays through the bulk modulus and measures nothing.
+            X = lvl.get("pos")
+            d = torch.tensor(self.direction[:b1 - b0], device=X.device, dtype=lvl.state.dtype)
+            d = d / d.norm().clamp_min(1e-12)
+            ph = 2.0 * math.pi * self.k * X[:, self.axis] + self.phase
+            v = (self.amplitude * torch.sin(ph))[:, None] * d[None, :]
+            lvl.state[:, b0:b1] = v
+        else:
+            g = torch.Generator(device="cpu").manual_seed(self.seed)
+            v = torch.rand(lvl.n, b1 - b0, generator=g) * (self.hi - self.lo) + self.lo
+            lvl.state[:, b0:b1] = v.to(lvl.state.device)
         # SILENT UNDER `engine.quiet`, because a trainer builds the world once per step and this
         # line would otherwise print thousands of times per fit. Imported here and not at module
         # scope: `engine` imports the operator registry, so the dependency only closes at call
         # time, by which point the module is loaded.
         from plexus import engine as _eng
         if not _eng._QUIET:
-            print(f"[seed_state_random] {lvl.name}.{self.block} ~ U({self.lo:g}, {self.hi:g}) "
-                  f"over {lvl.n:,} elements", flush=True)
+            _what = (f"{self.amplitude:g} sin(2 pi {self.k:g} x[{self.axis}]) along "
+                     f"{self.direction}" if self.pattern == "wave"
+                     else f"~ U({self.lo:g}, {self.hi:g})")
+            print(f"[seed_state] {lvl.name}.{self.block} {_what} over {lvl.n:,} elements",
+                  flush=True)
         return {}
 
 
