@@ -1,0 +1,4 @@
+time   2026-09-22 08:59:31
+spec   cil_s1_onerod
+camera azim=90.0 elev=0.0 zoom=1.0
+why    STEP 1, centred and drawn as a filament. Two viz fixes over 0142: the rod's base moves to z = 0.3 so the 0.4-long rod spans 0.3 to 0.7 and sits in the middle of the box rather than cropped against its edge, and plotting.chain draws the 24 nodes as a connected TUBE instead of loose dots. The renderer had no way to draw a filament at all -- _edge_actor works from a half-edge MESH table (E_srce/E_trgt/E_face), which the vertex model has and a particle chain does not -- so a correctly bending rod rendered as eighteen blue dots. Connectivity needs no storage here: consecutive rows ARE the filament, by the layout rod_seed writes. The blue was a second bug: plotting.colors keys on TYPE names and this set has none, so the entry was ignored and the default applied. (before the run)

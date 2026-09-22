@@ -56,7 +56,7 @@ seed:
   base:
   - 0.5
   - 0.5
-  - 0.3
+  - 0.25
   direction:
   - 0.0
   - 0.0
@@ -104,14 +104,11 @@ plotting:
   box_frame: true
   up_axis: 2
   subject: rod_node
-  dot_size: 5.0
+  dot_size: 10.0
   dot_shading: true
   max_frames: 300
   stills: 6
   keep_stills: true
   fps: 20.0
-  chain:
-    set: rod_node
-    per: 24
-    width: 7
-    color: '#ffffff'
+  colors:
+    rod_node: '#ffffff'

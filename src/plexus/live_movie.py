@@ -1224,6 +1224,7 @@ class LiveMovie:
                 except Exception as e:                        # noqa: BLE001
                     print(f"[live-movie] edl unavailable: {e}", flush=True)
             self._static_mesh(H)
+            self._chain_build(H)
             self._add_meshes(H)
             for _n, _l, _m in self._mesh_levels(H):
                 self._edge_actor(H, _l, _m, first=True)
@@ -1236,6 +1237,7 @@ class LiveMovie:
         if tick % self.stride:
             return
         self.cloud.points = self._xyz(lvl)
+        self._chain_update(H)
         self._glyph_update(lvl)
         self._skin_update(H, lvl, self.cloud.points)
         self._contour_update(H, lvl, self.cloud.points)
@@ -3778,6 +3780,67 @@ class LiveMovie:
         if P.shape[1] == 2:
             P = np.concatenate([P, np.zeros((P.shape[0], 1), np.float32)], 1)
         return P
+
+    def _chain_build(self, H):
+        """Draw a set's points as a CONNECTED FILAMENT, `plotting.chain`.
+
+        A rod, a flagellum, a fibre and a chain of crosslinked beads are all ordered sequences of
+        points, and a point renderer draws them as loose dots. On the first cilium rig that was
+        the difference between a picture of a cilium and a picture of eighteen blue dots: the rod
+        was bending correctly and the render could not say so, because nothing joined the nodes.
+
+            plotting:
+              chain: {set: rod_node, per: 24, width: 5, color: "#ffffff"}
+
+        `per` is the nodes per filament, so one set can hold many and the lines do not jump from
+        one filament's tip to the next one's base. Left out, the whole set is one chain.
+
+        WHY IT IS NOT AN EDGE COLOURING. `_edge_actor` draws from a HALF-EDGE MESH table --
+        `E_srce`, `E_trgt`, `E_face`, `nF` -- which is the vertex model's structure and which a
+        particle chain has none of. The connectivity here is not stored anywhere because it does
+        not need to be: consecutive rows ARE the filament, by the layout `rod_seed` writes.
+        """
+        cfg = (self.style or {}).get("chain")
+        if not cfg:
+            return
+        cfg = dict(cfg)
+        name = str(cfg.get("set", ""))
+        if name not in H.levels:
+            print(f"[live-movie] chain: no set {name!r}; nothing drawn", flush=True)
+            return
+        lvl = H.level(name)
+        pos = self._xyz(lvl, all_rows=True) if hasattr(self, "_xyz_all") else None
+        pos = np.asarray(lvl.get("pos").detach().cpu().numpy(), np.float32) if pos is None else pos
+        n = pos.shape[0]
+        per = int(cfg.get("per", n) or n)
+        per = max(min(per, n), 2)
+        n_ch = n // per
+        # two-point line cells, consecutive WITHIN a filament: [2, i, i+1] per segment
+        seg = np.stack([np.full(n_ch * (per - 1), 2, np.int64),
+                        np.concatenate([np.arange(r * per, r * per + per - 1)
+                                        for r in range(n_ch)]),
+                        np.concatenate([np.arange(r * per + 1, r * per + per)
+                                        for r in range(n_ch)])], 1).reshape(-1)
+        self._chain = self.pv.PolyData(pos + self._shift_of(pos))
+        self._chain.lines = seg
+        self._chain_lvl = name
+        self._chain_actor = self.p.add_mesh(
+            self._chain, color=str(cfg.get("color", "#ffffff")), lighting=False,
+            line_width=float(cfg.get("width", 5.0)), render_lines_as_tubes=True)
+        print(f"[live-movie] chain: {n_ch} filament(s) of {per} nodes from {name!r}, "
+              f"drawn as tubes", flush=True)
+
+    def _chain_update(self, H):
+        """Move the filament's points. The connectivity never changes, so only the points do."""
+        if getattr(self, "_chain", None) is None:
+            return
+        pos = np.asarray(H.level(self._chain_lvl).get("pos").detach().cpu().numpy(), np.float32)
+        self._chain.points = pos + self._shift_of(pos)
+
+    def _shift_of(self, pos):
+        """The same offset the subject's cloud is drawn with, so the two cannot separate."""
+        sh = getattr(self, "_draw_shift", None)
+        return np.zeros(3, np.float32) if sh is None else np.asarray(sh, np.float32)
 
     def _glyph_cover_subject(self, H, lvl):
         """Build every set's glyphs, and say whether THE SUBJECT is among them.
