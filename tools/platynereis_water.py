@@ -149,7 +149,37 @@ def main():
     # Stokes flow from a finite swimmer decays like 1/r or faster, so a box that is comfortable
     # shows the wall shell at a few percent of the near shell. Anything approaching parity means
     # the run is measuring its container.
+    # ------------------------------------------------------------------ which regime is this?
+    #
+    # THE NUMBER THAT SAYS WHETHER THIS IS A MODEL OF A CILIATED LARVA AT ALL. A cilium's whole
+    # design -- a fast straight power stroke and a slow bent recovery -- exists because at low
+    # Reynolds number a time-SYMMETRIC stroke moves no net fluid however hard it is driven
+    # (Purcell's scallop theorem). That constraint only binds when Re << 1. Above it, thrust comes
+    # from the fluid's inertia instead, a symmetric stroke swims perfectly well, and the model is
+    # paddling rather than beating.
+    #
+    #     Re = rho U L / eta          eta the DYNAMIC viscosity (mpm_viscosity's `eta`; the
+    #                                 operator's docstring used to call it kinematic, which is
+    #                                 this same number divided by rho)
+    #
+    # A real Platynereis nectochaete: rho 1000 kg/m^3, U about 1 mm/s, L 160 um, mu 1e-3 Pa s,
+    # so Re is about 0.16.
+    eta = next((float(o.get("eta", 0.0)) for o in (d.get("operators") or [])
+                if o.get("op") == "mpm_viscosity"), None)
     B = np.asarray(tr["body_point__pos"])
+    if eta:
+        U = float(np.median(np.linalg.norm(V, axis=2).mean(0)))          # world/s
+        L = float(np.linalg.norm(B[0] - B[0].mean(0), axis=1).mean() * 2)
+        re = rho_spec * U * L / eta
+        print(f"\n  WHICH REGIME IS THIS? Re = rho U L / eta = {re:,.0f}   "
+              f"(rho {rho_spec:g}, U {U * UM:.2f} um/s, L {L * UM:.0f} um, eta {eta:g})")
+        print(f"    a real Platynereis nectochaete swims at Re about 0.16. Above Re ~ 1 the "
+              f"thrust is INERTIAL and\n    a time-symmetric stroke swims fine -- so Purcell's "
+              f"scallop theorem, which is the reason a\n    real cilium beats asymmetrically at "
+              f"all, does not bind and the model is paddling, not beating.")
+        print(f"    eta for Re = 0.16 would be {rho_spec * U * L / 0.16:.1f}, "
+              f"{rho_spec * U * L / 0.16 / eta:,.0f}x the value in this spec")
+
     com = B.mean(1)[0]
     W0 = W[0][occ]
     r_animal = np.linalg.norm(B[0] - com, axis=1).mean()

@@ -1774,9 +1774,15 @@ class MPMViscosity(Lateral):
 
     particle -> particle: reads the affine velocity gradient C, emits an external acceleration.
 
-        a_p = -nu * C_p (x_p - x_cell)      applied only to liquid particles
+        tau_p = eta (C_p + C_p^T)           applied only to liquid particles
 
-    nu is the kinematic viscosity in world units squared per unit time.
+    `eta` IS THE DYNAMIC VISCOSITY, not the kinematic one, and this line used to say the opposite
+    while the code beneath it said `self.eta = float(params["eta"])  # DYNAMIC viscosity mu_dyn`.
+    The formula settles it: tau = 2 mu D with D = (C + C^T)/2 is the Newtonian deviatoric stress,
+    so the constant multiplying it is mu, in pascal-seconds against a density in kg/m^3. Which one
+    it is decides a Reynolds number by a factor of the density -- on the Platynereis larva,
+    Re = rho U L / eta came to 14,721 where reading it as kinematic would have given 14.4, and the
+    whole question of whether that model is in a cilium's regime turns on it.
 
     `material: liquid` sets mu = 0, so the deviatoric stress is IDENTICALLY zero and nothing in
     the constitutive model resists or dissipates shear. The only sinks in the whole scheme are then

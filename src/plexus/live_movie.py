@@ -4255,6 +4255,19 @@ class _ReplayLevel:
         if key == "occ" and self._occ is not None:
             return self._occ[self.t]
         a = self._blocks.get(key)
+        if a is None and key == "vel" and self._pos.shape[0] > 1:
+            # VELOCITY IS NOT RECORDED, AND IT DOES NOT NEED TO BE. `vel` is declared
+            # `record: False` in every spatial set, so a trajectory holds positions only -- which
+            # is why `plotting.color_field: speed` was thrown away on every replay and the movie
+            # came back coloured by type. But the positions ARE the velocity's integral: a forward
+            # difference between consecutive RECORDED frames reconstructs it to first order, and
+            # that is the same quantity the live pass plots.
+            #
+            # `_rec_dt` is the time between recorded FRAMES, not the tick: a strided trajectory
+            # (`record_cap` below `n_frames`) skips ticks, and dividing by the tick would report a
+            # speed too large by exactly the stride. Set by `replay`, which knows both numbers.
+            t = min(int(self.t), self._pos.shape[0] - 2)
+            return (self._pos[t + 1] - self._pos[t]) / float(getattr(self, "_rec_dt", 1.0) or 1.0)
         return None if a is None else a[self.t]
 
 
@@ -4417,11 +4430,32 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
         lm._fixed_ms = float(np.median(_fms[1:]))
     else:
         lm._rate_of = "render"
-    if style.get("color_field"):
-        print("[replay] plotting.color_field needs the per-particle C/F tensors, which a trajectory "
-              "does not store -- colouring by type instead. Use the live renderer for a field.",
-              flush=True)
+    # SPEED SURVIVES A REPLAY; THE TENSOR FIELDS DO NOT, and lumping them together cost the better
+    # artefact every time. `F` and `C` are solver state and are not recorded -- 9 floats per
+    # particle per frame is 1.8 GB on a run this size -- so `deformation`, `strain`, `volume`,
+    # `pressure` and `vorticity` genuinely cannot be drawn from a file. `speed` can: it is the
+    # forward difference of the recorded positions, which `_ReplayLevel.get('vel')` now returns,
+    # and it is the same quantity the live pass plots.
+    #
+    # WHY IT MATTERED. `-o generate` renders live (with the field) and then the caption pass
+    # replays and OVERWRITES movie.mp4 at the same path. Dropping every field here meant a
+    # speed-coloured film of the flow was replaced, every single run, by one coloured by which set
+    # each dot belongs to -- and the only notice was one line of log. `_colour_of` already says as
+    # much at the other end ("use `speed`, which is computed from the recorded velocities"); this
+    # end had not been told.
+    _cf = str(style.get("color_field") or "")
+    if _cf and _cf != "speed":
+        print(f"[replay] plotting.color_field: {_cf!r} needs the per-particle C/F tensors, which a "
+              f"trajectory does not store -- colouring by type instead. Use the live renderer, or "
+              f"`speed`, which a replay reconstructs from the recorded positions.", flush=True)
         lm.style.pop("color_field", None)
+    elif _cf:
+        # the time between RECORDED frames, which is the tick times the stride
+        _st = max(1.0, float(getattr(sim, "n_frames", T - 1) or (T - 1)) / max(T - 1, 1))
+        for _lv in H.levels.values():
+            _lv._rec_dt = float(getattr(sim, "dt", 1.0) or 1.0) * _st
+        print(f"[replay] plotting.color_field: 'speed' reconstructed from the recorded positions "
+              f"over {_st:g} tick(s) a frame -- the movie keeps its field.", flush=True)
     for t in range(T):
         H.seek(t)
         lm(H, t)
