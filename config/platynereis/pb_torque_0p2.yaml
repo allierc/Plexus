@@ -1,10 +1,8 @@
-# R17 -- cilium_anchor at omega_n 200 rad/s, the value the 120-frame probe
-# picked: 71 of 74 blades held against 56 at 40 rad/s, tip/root 1.46 against
-# 1.27, body 99%. 400 and 800 hold no better and move less water.
+# probe: torque = 0.2 on plat_r17_anchored, 120 frames. Written by tools/platynereis_probe.py
 general:
-  name: plat_r17_anchored
+  name: pb_torque_0p2
   seed: 0
-  n_frames: 400
+  n_frames: 120
   dt: 0.05
   dim: 3
   world:
@@ -12815,7 +12813,7 @@ plotting:
   box_frame: true
   up_axis: 2
   dot_shading: true
-  max_frames: 100
+  max_frames: 120
   stills: 6
   keep_stills: true
   fps: 20.0

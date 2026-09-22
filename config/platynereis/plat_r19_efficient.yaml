@@ -1,8 +1,15 @@
-# R17 -- cilium_anchor at omega_n 200 rad/s, the value the 120-frame probe
-# picked: 71 of 74 blades held against 56 at 40 rad/s, tip/root 1.46 against
-# 1.27, body 99%. 400 and 800 hold no better and move less water.
+# R19 -- the drive was 10x too strong. A 120-frame torque probe on R17 (anchor 200 rad/s):
+#   torque  lost  tip/root  swim/drive  body%  angle  cancel
+#     0.02     0      2.49   3.065e-02    100  151.7    0.28
+#     0.05     0      1.68   1.755e-02    100  153.5    0.34
+#     0.20     3      1.46   1.004e-02     99  133.8    0.60
+#     0.50    16      1.36   2.340e-02     99  118.3    0.66
+# At 0.02 the tip sweeps 2.49x its own root -- a real hinge -- nothing detaches, the body is
+# untouched and motion per unit drive is 3x the 0.2 point. Above it the blades are being flung:
+# raw speed keeps rising while the momentum cancellation degrades 0.28 -> 0.66 and the
+# body-vs-water angle falls 152 -> 118 degrees, which is a model coming apart, not a faster swim.
 general:
-  name: plat_r17_anchored
+  name: plat_r19_efficient
   seed: 0
   n_frames: 400
   dt: 0.05
@@ -12688,7 +12695,7 @@ seed:
 operators:
 - op: cilium_pose_map
   at: cilium
-  sweep_deg: 0.2
+  sweep_deg: 0.02
   omega: 1.25
   waveform: stroke
   duty: 0.3

@@ -1,10 +1,8 @@
-# R17 -- cilium_anchor at omega_n 200 rad/s, the value the 120-frame probe
-# picked: 71 of 74 blades held against 56 at 40 rad/s, tip/root 1.46 against
-# 1.27, body 99%. 400 and 800 hold no better and move less water.
+# anchor stiffness probe: omega_n = 800.0 rad/s, 120 frames.
 general:
-  name: plat_r17_anchored
+  name: plat_r17w800
   seed: 0
-  n_frames: 400
+  n_frames: 120
   dt: 0.05
   dim: 3
   world:
@@ -12771,7 +12769,7 @@ operators:
   cilium_set: cilium
   cell_set: cell
   body_set: body_point
-  omega_n: 200.0
+  omega_n: 800.0
   zeta: 1.0
   n_root: 7
   check: true
@@ -12815,7 +12813,7 @@ plotting:
   box_frame: true
   up_axis: 2
   dot_shading: true
-  max_frames: 100
+  max_frames: 120
   stills: 6
   keep_stills: true
   fps: 20.0

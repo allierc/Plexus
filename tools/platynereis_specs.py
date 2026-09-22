@@ -1547,7 +1547,7 @@ def spec_r15(f: dict, n_frames: int = 400, torque: float = 0.2, omega: float = 1
 
 def spec_r16(f: dict, n_frames: int = 400, torque: float = 0.2, omega: float = 1.25,
              blade_um: float = 25.0, width_um: float = 10.0,
-             n_along: int = 16, n_across: int = 7, v_max: float = 0.06) -> dict:
+             n_along: int = 16, n_across: int = 7, v_max: float = 0.06, **kw) -> dict:
     """R16: the girdle points the right way, the blade is the size of the band it stands for.
 
     R15 made the scene a continuum and the numbers came right -- body and water opposing at 161
@@ -1593,7 +1593,7 @@ def spec_r16(f: dict, n_frames: int = 400, torque: float = 0.2, omega: float = 1
     """
     base = spec_r15(f, n_frames=n_frames, torque=torque, omega=omega,
                     blade_um=blade_um, width_um=width_um,
-                    n_along=n_along, n_across=n_across)
+                    n_along=n_along, n_across=n_across, **kw)
     base["general"]["name"] = "plat_r16_girdle"
 
     # ---------------------------------------------------------------- the axis the girdle is on
@@ -1659,6 +1659,83 @@ def spec_r17(f: dict, n_frames: int = 400, omega_n: float = 40.0, zeta: float = 
     return base
 
 
+def spec_r18(f: dict, n_frames: int = 400, grow: float = 2.0, n_grid: int = 96,
+             n_water: int = 3200000, record: int = 101, **kw) -> dict:
+    """R18: the same animal in a box twice as wide, to find out what the walls were worth.
+
+    THE QUESTION THIS RUNG EXISTS TO ANSWER, and it was asked as a measurement first. The animal
+    comes within about 19 um of five of its six walls, so the objection "the animal is in a small
+    box" is obviously true geometrically -- but obvious is not the same as important. Measured on
+    plat_r15_resolved: the water within 20 um of a wall moves at 1.39 um/s while the water within
+    1.5 body radii of the animal moves at 7.46. That is 19%: the flow HAS decayed before it
+    arrives, and the walls are damping what reaches them rather than reflecting it back at full
+    strength. Real, not dominant, and worth one run to bound.
+
+    PERIODIC BOUNDARIES ARE NOT THE ALTERNATIVE, and the reason is in the engine rather than in
+    the physics. `_resolve_default_impl` (engine.py:986) excludes a periodic world from the warp
+    path -- "the warp gather clamps at the box and does not wrap" -- which costs 973.8 ms a frame
+    against 31.8. Worse, these specs name `implementation: warp` EXPLICITLY rather than leaving it
+    to the default, so the exclusion would never fire: the fast kernel would run and silently
+    clamp at the wall instead of wrapping. A wrong answer at full speed is the one failure mode
+    worth more than a 30x slowdown, so the box grows instead.
+
+    HOW THE BOX GROWS, since the world is always the unit cube. `length_um` doubles and the
+    animal's scale halves, so the animal keeps its size IN MICROMETRES and everything denominated
+    in micrometres -- the 25 x 10 um blade, the 4 um cell, the 12 um yolk -- follows it down. The
+    grid doubles with the box so the cell stays 4.08 um and the sampling per cell is unchanged.
+    The animal is also CENTRED now, which it never was: `positions(f, 0.85, [0.08]*3)` put its
+    centroid at (0.353, 0.475, 0.487) rather than at the middle, wasting clearance on one side
+    while crowding the other.
+
+    WHAT IT COSTS, stated before the run. The grid goes 48^3 -> 96^3, eight times the cells, so
+    the water goes 400,000 -> 3,200,000 to hold 4 particles per cell. And the Courant limit halves
+    with dx, so the substep halves too: 1.79e-03 -> 8.93e-04, 56 a frame. Together that is about
+    eleven times R15's work per frame.
+
+    `save_data` HAS TO COME OUT OF THE SPEC FIRST. It overrides `record_cap` outright
+    (engine.py:1736: "when `save_data` is given it wins: True saves EVERY frame"), which is why
+    R15 wrote a 2.9 GB trajectory after being asked for every fourth frame. At 3.2M particles
+    every frame would be 15 GB; `record_cap: 101` makes it every fourth and 3.9 GB.
+
+    WHAT THIS RUNG DOES NOT CLAIM. The animal is half its former size in WORLD units while the
+    moduli are unchanged in world units, so this is not a controlled twin of R17 -- it is the same
+    animal, in micrometres, with more water around it. The comparison to make is the wall
+    statistic, which is dimensionless, and not the swim speed.
+    """
+    f2 = dict(f, side_um=f["side_um"] * grow)
+    # THE GRID GOES DOWN THE CHAIN, NOT ON AFTERWARDS. `spec_r15` sizes the blade's particle
+    # volume as length x width x ONE CELL, so a grid set here rather than there would leave the
+    # blade carrying a cell's worth of thickness from the WRONG grid -- measured, 3.73 particles
+    # per cell instead of 7.5, because the slab came out twice as thick as the cells holding it.
+    # The substep goes with it for the same reason: the Courant limit follows dx = 1 / n_grid.
+    base = spec_r17(f2, n_frames=n_frames, n_grid=n_grid,
+                    dt_sub=(0.05 / 28.0) * 48.0 / n_grid, **kw)
+    base["general"]["name"] = "plat_r18_openwater"
+    um = f2["side_um"]
+
+    # THE ANIMAL, THE SAME SIZE IN MICROMETRES AND CENTRED IN THE BIGGER BOX. `positions` maps
+    # `offset + scale * unit`, so keeping the physical size means scaling by 1/grow, and centring
+    # means solving offset = 0.5 - scale * (the animal's own centroid in unit coordinates).
+    import numpy as _np
+    scale = 0.85 / grow
+    _u = _np.asarray(positions(f, 1.0, [0.0, 0.0, 0.0])).mean(0)
+    off = [round(float(0.5 - scale * c), 6) for c in _u]
+    base["sets"]["cell"]["start"] = positions(f, scale, off)
+
+    base["sets"]["water_particle"]["per_parent"] = n_water
+    for o in base["seed"]:
+        if o.get("op") == "exclude_overlap":
+            o["res"] = n_grid
+    # THE COURANT LIMIT FOLLOWS dx, AND dx IS IN WORLD UNITS. A finer grid on the same unit cube
+    # halves dx and therefore halves the stable substep; the physical cell size being unchanged is
+    # irrelevant to the solver, which only ever sees 1 / n_grid.
+    # `save_data` WINS OVER `record_cap` (engine.py:1736), so it has to go for the cap to bite.
+    base["general"].pop("save_data", None)
+    base["general"]["record_cap"] = record
+    base["plotting"]["max_frames"] = record - 1
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -1679,7 +1756,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "r16", "r17", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "r16", "r17", "r18", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1687,6 +1764,24 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r18", "all"):
+        import yaml
+        sp = spec_r18(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} the same animal in a box twice as wide, to "
+              f"bound what the walls were worth")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R18 -- open water. Measured on R15, the shell within 20 um of a wall\n"
+                         "# moves at 1.39 um/s against 7.46 in the shell the cilia stir: 19%.\n"
+                         "# Periodic is not the alternative -- engine.py:986 excludes a periodic\n"
+                         "# world from the warp path, and these specs name warp explicitly, so it\n"
+                         "# would clamp at the wall instead of wrapping. A wrong answer at full\n"
+                         "# speed. So length_um doubles, the animal's scale halves to keep its\n"
+                         "# size in micrometres, the grid doubles to keep the cell at 4.08 um,\n"
+                         "# and the substep halves with dx. Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r17", "all"):
         import yaml
         sp = spec_r17(F)
