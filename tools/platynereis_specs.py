@@ -1434,6 +1434,117 @@ def spec_r14(f: dict, n_frames: int = 400, torque: float = 0.05, omega: float = 
     return base
 
 
+def spec_r15(f: dict, n_frames: int = 400, torque: float = 0.2, omega: float = 1.25,
+             n_water: int = 400000, n_grid: int = 48, dt_sub: float = 0.05 / 28,
+             blade_um: float = 38.0, width_um: float = 12.0,
+             n_along: int = 24, n_across: int = 9, per_body: int = 32,
+             youngs: float = 12000.0) -> dict:
+    """R15: a scene that is actually resolved. The body stopped breaking for arithmetic reasons.
+
+    EVERY RUNG UP TO HERE RAN AN MLS-MPM SCENE THAT WAS NOT A CONTINUUM, and no amount of tuning
+    the cilia could have fixed it. Two independent faults, both found by the repository's own
+    checkers rather than by looking at pictures:
+
+      THE TIMESTEP WAS 6.76x OVER THE COURANT LIMIT. `mpm_cfl` on plat_r14_paddle:
+      substep_dt = 5.00e-03 against a limit of 7.40e-04 (c_max 5.63 world/s from the 30 kPa
+      blade, dx = 1.04e-02, safety 0.4). An explicit MPM substep past Courant does not drift, it
+      PUMPS: the elastic wave crosses more than a cell per step, the grid transfer re-reads its
+      own overshoot, and the energy that appears has to go somewhere. It went into the body.
+
+      EVERY BODY WAS A DUST. `particles_per_cell` on the same spec: body 0.25 particles per grid
+      cell, yolk 0.47, shaft 0.19, water 0.18 -- against the ~8 MLS-MPM is written for. The
+      checker's own words are "the body will lose stiffness and may fracture numerically", which
+      is the observation this model has been chasing since R12 and treating as a modulus to be
+      raised. It was never a modulus. A solid sampled at a quarter of a particle per cell has
+      almost no cell in which the grid can assemble a stress at all, so it has no stiffness to
+      lose, and stiffening it six-fold moved the blow-up by 4% exactly as measured.
+
+    SO THIS RUNG BUYS RESOLUTION AND SPENDS THE TORQUE BUDGET NOWHERE ELSE.
+
+      grid       96 -> 48 cells (2.04 -> 4.08 um). Eight times the particles per cell for free,
+                 and it doubles the Courant limit rather than costing anything.
+      substep    5.00e-03 -> 1.79e-03, 28 substeps a frame. Now BELOW the limit, which the water
+                 sets (K = 20 kPa, c = 4.42) once the blade is brought down to the body's 12 kPa.
+      body       8 -> 32 points a cell, 131,584 in all: 2.0 particles per cell at n_grid 48.
+      yolk       400 -> 800 points a cell.
+      water      140,000 -> 400,000: 4.1 particles per cell, over MLS-MPM's practical floor of 4.
+      blade      20 points in a LINE -> 24 x 9 on a rectangle, 216 points over ~27 cells.
+
+    THE SHAFT BECOMES A BLADE WITH A FACE, which is the other thing that was never true. A line
+    of points is one-dimensional: it occupies a tube one cell across and drives a thread of water
+    rather than a sheet. Measured on R14, its tip moved 0.8 times as far as its own ROOT -- the
+    shafts were not beating at all, they were being carried. `width_um` and `n_across` lay the
+    points on a rectangle spanning length x beat-axis, so the flat face meets the sweep.
+
+    AND THE BLADE IS SOFTER, NOT STIFFER (30 -> 12 kPa, the body's own). R14 stiffened it on the
+    argument that a soft blade folds under its drag. That argument was about a line, which has no
+    second moment of area to resist anything; a rectangle 12 um across does. The stiffness was
+    also what set c_max and therefore the Courant limit, so it was buying folding resistance with
+    a timestep the run could not afford.
+
+    WHAT IS STILL WRONG AND IS NOT FIXED HERE. The animal is 165 um in a 196 um box, so the walls
+    are some 15 um off its flanks and the near field is reflecting off them. Periodic boundaries
+    are not the escape: `_resolve_default_impl` (engine.py:986) refuses the warp path for a
+    periodic world -- 973.8 ms a frame against 31.8 -- and these specs name `implementation: warp`
+    explicitly, so a periodic world would keep the fast kernel and silently CLAMP at the wall
+    instead of wrapping. A wrong answer at full speed. The box has to grow instead, and that is
+    the next rung's business, after this one has shown a resolved scene behaves.
+    """
+    base = spec_r14(f, n_frames=n_frames, torque=torque, omega=omega)
+    base["general"]["name"] = "plat_r15_resolved"
+    um = f["side_um"]
+    sets = base["sets"]
+
+    # ---------------------------------------------------------------- the grid, and the timestep
+    base["fields"]["mpm_grid"]["n_grid"] = n_grid
+    for st in base["schedule"]:
+        if isinstance(st, dict) and "substep_dt" in st:
+            st["substep_dt"] = round(dt_sub, 8)
+
+    # ---------------------------------------------------------------- sampling, per material set
+    sets["body_point"]["per_parent"] = {c: (0 if c == "yolk" else per_body) for c in f["order"]}
+    sets["body_point"]["types"]["body"]["youngs"] = youngs
+    sets["mpm_particle"]["per_parent"] = {c: (800 if c == "yolk" else 0) for c in f["order"]}
+    sets["water_particle"]["per_parent"] = n_water
+
+    # ---------------------------------------------------------------- the blade
+    per_cil = n_along * n_across
+    sets["cilium_point"]["per_parent"] = per_cil
+    sets["cilium_point"]["types"]["cilium_shaft"]["youngs"] = youngs
+    # THE PARTICLE VOLUME IS THE BLADE'S OWN, DIVIDED BY ITS POINTS, and getting this from the
+    # geometry rather than from a round number is what makes the blade fill the cells it sits in
+    # instead of being a ghost in them. A blade of length x width x ONE CELL thick is the thinnest
+    # slab this grid can represent, so that is the thickness, stated rather than implied.
+    thick_um = um / n_grid
+    v_blade = (blade_um * width_um * thick_um) / um ** 3
+    sets["cilium_point"]["radius"] = round((v_blade * 3.0 / (4.0 * math.pi)) ** (1.0 / 3.0), 6)
+    base["plotting"]["dot_radius"]["cilium_shaft"] = round(1.4 / um, 6)
+
+    for o in base["seed"]:
+        if o.get("op") == "cilium_seed":
+            o["length_um"] = blade_um
+            o["width_um"] = width_um
+            o["n_across"] = n_across
+        if o.get("op") == "exclude_overlap":
+            o["res"] = n_grid          # the carve must be at the grid's own resolution, not 96
+    for o in base["operators"]:
+        if o.get("op") == "cilium_torque":
+            # THE HINGE IS THE BLADE'S ROOT ROW, not the one corner that index 0 now is.
+            o["root_pts"] = n_across
+            # THE REACTION IS SPREAD OVER A COMPARABLE PATCH OF BODY, and `n_react` counts POINTS,
+            # so quadrupling the body's sampling without touching it would have shrunk the patch
+            # to under one cell's worth and concentrated the whole couple on a few points.
+            o["n_react"] = 64
+
+    # ---------------------------------------------------------------- what can be recorded
+    # 400,000 water particles over 401 frames is 1.9 GB of trajectory. The stride is what the
+    # `record_cap` is FOR, and at omega 1.25 rad/s a beat is 100 frames, so every fourth frame
+    # still samples the stroke 25 times -- more than R12 had before the omega came down.
+    base["general"]["record_cap"] = n_frames // 4 + 1
+    base["plotting"]["max_frames"] = n_frames // 4
+    return base
+
+
 def write(rungs: list, f: dict, dry: bool = False) -> list:
     import yaml
     os.makedirs(OUT, exist_ok=True)
@@ -1454,7 +1565,7 @@ def write(rungs: list, f: dict, dry: bool = False) -> list:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "all"])
+    ap.add_argument("rung", nargs="?", default="all", choices=["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r7w", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "all"])
     ap.add_argument("--list", action="store_true", help="say what would be written, write nothing")
     a = ap.parse_args()
     F = facts()
@@ -1462,6 +1573,24 @@ if __name__ == "__main__":
           f"cube {F['side_um']:g} um\n")
     if a.rung in ("r1", "all"):
         write(list(range(len(R1))), F, dry=a.list)
+    if a.rung in ("r15", "all"):
+        import yaml
+        sp = spec_r15(F)
+        p = os.path.join(OUT, sp["general"]["name"] + ".yaml")
+        print(f"  {os.path.relpath(p, REPO):48s} a RESOLVED scene: CFL-legal substep, ~4 "
+              f"particles per cell, and a blade with a face")
+        if not a.list:
+            os.makedirs(OUT, exist_ok=True)
+            with open(p, "w") as fh:
+                fh.write("# R15 -- the scene is actually a continuum. R14 ran 6.76x over the\n"
+                         "# Courant limit (substep 5.0e-03 against 7.4e-04) with every body at\n"
+                         "# 0.18 to 0.47 particles per grid cell against the ~8 MLS-MPM wants.\n"
+                         "# The body was not breaking for want of stiffness; it was breaking\n"
+                         "# because there was no continuum there to be stiff. Grid 96 -> 48,\n"
+                         "# substep -> 1.79e-03 (28 a frame), water 140k -> 400k, body 8 -> 32\n"
+                         "# points a cell, and the shaft becomes a 24 x 9 BLADE with a face.\n"
+                         "# Written by tools/platynereis_specs.py.\n")
+                yaml.safe_dump(sp, fh, sort_keys=False, default_flow_style=False, width=110)
     if a.rung in ("r14", "all"):
         import yaml
         sp = spec_r14(F)

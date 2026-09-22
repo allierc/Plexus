@@ -601,9 +601,32 @@ class CiliumSeed(Seed):
     larva spin. Either way the axis is stored per cilium and the stroke plane follows the
     animal's own geometry rather than a direction written once in the spec.
 
-    `taper` thins the shaft toward the tip by putting fewer points there; it changes only where
-    the mass sits, not the length. A cilium is not a rod of uniform density and the fluid it
-    pushes cares.
+    `width_um` AND `n_across` GIVE THE SHAFT A FACE, and without one it cannot push water. The
+    formula above lays every point on a single LINE, which is a one-dimensional object: on an
+    MLS-MPM grid it occupies a tube one cell across, it drives a thread of fluid rather than a
+    sheet, and its deformation gradient integrates a velocity gradient that nothing constrains in
+    the two directions across it. Measured on plat_r14_paddle: 1,480 shaft points touched 1,263
+    grid cells, 1.17 points per cell, and the tip's excursion came out at 0.8 times its own
+    ROOT's -- the shafts were not beating, they were being carried by the body.
+
+    So the points are laid on a rectangle instead, `n_across` of them spanning `width_um`:
+
+        x = base + (i_along + 1)/n_along * L * u  +  (i_across - (n_across-1)/2) * w * ax
+
+    with i_along = p // n_across and i_across = p % n_across, so index 0 is still at the root and
+    the last index at the tip -- which is what `cilium_torque` and every measurement assume.
+
+    THE WIDTH RUNS ALONG THE BEAT AXIS `ax`, AND THAT IS THE WHOLE POINT. The blade rotates about
+    ax, so a point at offset r moves at ax x r: the sweep direction is perpendicular to both, and
+    a blade spanning length x ax presents its FLAT FACE to that direction. Spanning it the other
+    way would give a blade that beats edge-on and pushes nothing, which is the same failure in a
+    different costume.
+
+    WHAT A BLADE IS AND IS NOT. It is not a cilium. A real Platynereis cilium is 0.25 um thick
+    against a grid cell of 2 to 4 um, and no grid this model can afford will hold one. The blade
+    stands for the collective action of the TUFT a band cell carries plus the fluid layer it
+    entrains, which is the thing that moves water at this scale anyway. Naming it honestly is the
+    difference between a coarse model and a wrong one.
     """
 
     EMIT = None
@@ -620,6 +643,8 @@ class CiliumSeed(Seed):
                    "cell_set": "the_cells_the_shafts_are_rooted_in",
                    "length_um": "shaft_length_in_micrometres",
                    "beat": "tangential_or_azimuthal",
+                   "width_um": "blade_width_across_the_beat_axis_in_micrometres",
+                   "n_across": "points_spanning_that_width",
                    "axis": "the_body_axis", "soma_um": "where_on_the_cell_the_shaft_starts"}
     REFERENCE = ("Veraszto, C. et al. (2017). eLife 6:e26000; shaft kinematics after "
                  "prototype/eye/forced_gaze_ops.py.")
@@ -637,6 +662,18 @@ class CiliumSeed(Seed):
         self.axis = int(params.get("axis", 2))
         self.soma_um = float(params.get("soma_um", 4.0))
         self.block = str(params.get("block", "polarity"))
+        # A LINE BY DEFAULT, so every spec written before the blade existed still seeds what it
+        # seeded: n_across = 1 collapses the rectangle back to the original single file of points.
+        self.n_across = int(params.get("n_across", 1))
+        self.width_um = float(params.get("width_um", 0.0))
+        if self.n_across < 1:
+            raise ValueError(f"cilium_seed: `n_across` is how many points span the blade's width "
+                             f"and must be at least 1, got {self.n_across}")
+        if self.n_across > 1 and self.width_um <= 0.0:
+            raise ValueError(f"cilium_seed: n_across={self.n_across} asks for a blade but "
+                             f"width_um is {self.width_um}. A blade with no width is the line "
+                             f"it was meant to replace, with its points stacked on top of "
+                             f"each other -- give `width_um`.")
 
     def forward(self, H, mask=None):
         p = H.level(self.at)
@@ -677,9 +714,27 @@ class CiliumSeed(Seed):
             cst[:, k0:k1] = cl.get("pos")[c_of_cil].to(dtype=cst.dtype)
             cil.state = cst
         n_per = int(p.n // max(cil.n, 1))
-        k = (torch.arange(p.n, device=dev, dtype=dt) % n_per + 1.0) / float(n_per)
+        if n_per % self.n_across:
+            raise ValueError(
+                f"cilium_seed: {n_per} points per cilium do not divide into rows of "
+                f"n_across={self.n_across}. The blade is laid out as n_along x n_across and a "
+                f"ragged last row would put a stray column of mass at one edge, which beats "
+                f"asymmetrically for a reason that is in nobody's spec. Choose a `per_parent` "
+                f"that {self.n_across} divides.")
+        n_along = n_per // self.n_across
+        idx = torch.arange(p.n, device=dev, dtype=torch.long) % n_per
+        # ALONG FIRST, ACROSS SECOND, so index 0 is a root point and the last index a tip point --
+        # which is the ordering `cilium_torque` takes its rotation origin from and every excursion
+        # measurement reads its tip and root out of.
+        k = ((idx // self.n_across).to(dt) + 1.0) / float(n_along)
         L = self.length_um / um
         rest = (k[:, None] * L) * u[cil_of_pt]                    # offset from the base, rest frame
+        if self.n_across > 1:
+            # ACROSS THE BEAT AXIS, which is what makes the blade's flat face the surface that
+            # meets the water: the sweep velocity at offset r is ax x r, perpendicular to ax.
+            j = (idx % self.n_across).to(dt) - 0.5 * (self.n_across - 1)
+            step = (self.width_um / um) / float(self.n_across - 1)
+            rest = rest + (j * step)[:, None] * ax[cil_of_pt]
         pos = base[cil_of_pt] + rest
 
         # KEPT AS AN OFFSET FROM THE CELL, NOT AS A POSITION. A frozen base is a shaft nailed to
@@ -699,8 +754,10 @@ class CiliumSeed(Seed):
         pa, pb = p.state_schema["pos"]
         st[:, pa:pb] = torch.where(live[cil_of_pt][:, None], pos, st[:, pa:pb])
         p.state = st
-        print(f"[cilium_seed] {int(live.sum()):,} of {cil.n:,} cilia grown, {n_per} points each, "
-              f"{self.length_um:g} um long, beating {self.beat}", flush=True)
+        _shape = (f"{n_along} x {self.n_across} points, {self.length_um:g} x {self.width_um:g} um"
+                  if self.n_across > 1 else f"{n_per} points in a line, {self.length_um:g} um")
+        print(f"[cilium_seed] {int(live.sum()):,} of {cil.n:,} cilia grown, {_shape}, "
+              f"beating {self.beat}", flush=True)
         return {}
 
 
@@ -1101,6 +1158,14 @@ class CiliumTorque(Lateral):
         self.body_set = params.get("body_set")
         self.body_set = str(self.body_set) if self.body_set else None
         self.n_react = int(params.get("n_react", 24))
+        # WHERE THE HINGE IS. The couple is taken about the mean of the first `root_pts` points of
+        # each shaft. For a line of points that is point 0, the root, and 1 is the right default.
+        # For a BLADE it must be the whole root ROW (`n_across`), because point 0 is then only a
+        # root CORNER: hinging there tilts the blade about a diagonal instead of about its base.
+        # The couple's net force and net torque are exact whatever origin is chosen -- both are
+        # enforced downstream -- so this changes only the SHAPE of the force over the blade, which
+        # is the difference between a paddle that sweeps and one that twists.
+        self.root_pts = int(params.get("root_pts", 1))
         self.torque_block = str(params.get("torque_block", "pose_target"))
         self.check = bool(params.get("check", True))
         self._idx = None
@@ -1148,10 +1213,25 @@ class CiliumTorque(Lateral):
         M = (torch.ones(n_c, per, device=dev, dtype=dt) if m_p is None
              else m_p.to(dt).reshape(n_c, per))
 
-        f = self._couple_batched(Xc - Xc[:, :1, :], M, ax, tau)
+        root = Xc[:, :max(self.root_pts, 1), :].mean(1, keepdim=True)
+        f = self._couple_batched(Xc - root, M, ax, tau)
         acc = (f / M[..., None].clamp_min(1e-30)).reshape(-1, 3)
 
         # THE REACTION, on the body points nearest each root, with -tau.
+        #
+        # IT IS RETURNED AS A DELTA, NOT STASHED IN A BUFFER, and that distinction was worth a
+        # run. The first version wrote it to `b.mpm_acceleration_ext` -- a name nothing in the
+        # engine reads. The shafts got their couple, the body never got the equal and opposite,
+        # and the scene therefore gained momentum every substep from an operator whose entire
+        # purpose is that it cannot. Measured on plat_r14_paddle: the total momentum came to 0.97
+        # of |p_body| + |p_water| rather than to zero -- body and water drifting the same way at a
+        # median 34 degrees instead of opposing at 180.
+        #
+        # The route that exists is the one gravity uses: `mpm_scatter` reads the set's OWN delta,
+        # `a_ext = a_ext + H.delta(p.name)` (operators/mpm_ops.py:552 and :2751), and the engine's
+        # operator loop adds one delta per key of the returned dict (engine.py:2386). So a second
+        # key IS the mechanism, and a buffer never was.
+        out = {}
         if self.body_set is not None:
             b = H.level(self.body_set)
             Xb = b.get("pos").to(dt)
@@ -1159,20 +1239,18 @@ class CiliumTorque(Lateral):
             m_b = (torch.ones(b.n, device=dev, dtype=dt) if m_b is None
                    else m_b.to(dt).reshape(-1))
             if self._react is None:
-                self._react = torch.cdist(Xc[:, 0, :], Xb).topk(
+                self._react = torch.cdist(root[:, 0, :], Xb).topk(
                     min(self.n_react, b.n), largest=False).indices
             k = self._react                                       # [n_cilia, n_react]
             Yb = Xb[k]
             Mb = m_b[k]
             fb = self._couple_batched(Yb - Yb.mean(1, keepdim=True), Mb, ax, -tau)
             b_acc = torch.zeros_like(Xb)
+            # ACCELERATIONS SUM WHERE A POINT SERVES TWO CILIA, which is what `index_add_` does
+            # and what is correct: the point carries f1 + f2 over its one mass.
             b_acc.index_add_(0, k.reshape(-1),
                              (fb / Mb[..., None].clamp_min(1e-30)).reshape(-1, 3))
-            _prev = getattr(b, "mpm_acceleration_ext", None)
-            if _prev is None or _prev.shape != b_acc.shape:
-                b.register_buffer("mpm_acceleration_ext", b_acc.detach().clone())
-            else:
-                _prev.copy_(b_acc)
+            out[self.body_set] = b_acc
 
         if self.check and not self._said and not torch.cuda.is_current_stream_capturing():
             self._said = True
@@ -1182,9 +1260,24 @@ class CiliumTorque(Lateral):
                   f"{net / scale:.3e} "
                   f"({'EXACT to float' if net / scale < 1e-5 else 'NOT ZERO, investigate'})",
                   flush=True)
+            # THE INVARIANT THAT ACTUALLY MATTERS IS THE PAIR, not either half of it. Each couple
+            # sums to zero on its own, so the force check above passes even when the reaction is
+            # going nowhere -- which is exactly how the dropped reaction survived a run with a
+            # green check printed over it. This one totals the TORQUE on both sides.
+            if self.body_set is not None:
+                t_c = float((torch.cross(Xc - root, f, dim=2)
+                             * ax[:, None, :]).sum())
+                t_b = float((torch.cross(Yb - Yb.mean(1, keepdim=True), fb, dim=2)
+                             * ax[:, None, :]).sum())
+                rel = abs(t_c + t_b) / max(abs(t_c), 1e-30)
+                print(f"[cilium_torque] shafts {t_c:+.6e} and body {t_b:+.6e}: they cancel to "
+                      f"{rel:.3e} of the drive "
+                      f"({'PAIRED' if rel < 1e-4 else 'NOT PAIRED, the reaction is going nowhere'})",
+                      flush=True)
         if mask is not None:
             acc = acc * mask[:, None].to(dt)
-        return {self.at: acc}
+        out[self.at] = acc
+        return out
 
     @staticmethod
     def _couple_batched(r, M, ax, tau):

@@ -52,23 +52,48 @@ def load(name: str):
 
 
 def masses(spec_path):
-    """Per-particle mass of every material set, from the spec rather than guessed."""
+    """Per-particle mass of every material set, read the way the ENGINE reads it.
+
+    WHY THIS IS NOT THE BALL FORMULA, and the difference is not small. `MPMParticle.provision`
+    (src/plexus/models/entities.py, "per-particle volume") derives p_vol from the ball footprint
+    `4/3 pi r^3 / per_parent` ONLY when the parent's type declares no `block`. A type that names a
+    block instead gets `p_vol = block_volume / per_parent` outright, and the child set's own
+    `radius` never enters the physics at all -- it is left over as a render size.
+
+    The water is declared exactly that way: a `seawater` type filling [0.02, 0.98]^3, which is
+    0.8847 world^3, against a `radius: 0.5` ball of 0.5236. Reading the radius made every water
+    particle 3.833e-03 where the engine uses 6.477e-03 -- the fluid weighed 59% of its own mass in
+    the measurement while weighing 100% of it in the run. Since the pass condition here is the
+    CANCELLATION between the body's momentum and the water's, under-weighing one side of that
+    subtraction does not make the answer slightly wrong, it makes it a different quantity.
+    """
     import yaml
     d = yaml.safe_load(open(spec_path))
+    sets = d.get("sets") or {}
     out = {}
-    for k, v in (d.get("sets") or {}).items():
+    for k, v in sets.items():
         if "density" not in v:
             continue
         pm = v.get("particle_mass")
-        if pm is not None:
-            out[k] = float(pm)
-            continue
-        r = float(v.get("radius", 0.02))
         per = v.get("per_parent")
         if isinstance(per, dict):
             per = max(int(x) for x in per.values())
-        per = int(per) if per else 1
-        out[k] = float(v["density"]) * (4.0 / 3.0 * math.pi * r ** 3) / max(per, 1)
+        per = max(int(per) if per else 1, 1)
+        if pm is not None:                                 # a declared mass sets p_vol outright
+            out[k] = float(pm)
+            continue
+        # A BLOCK ON THE PARENT'S TYPE WINS OVER THE CHILD'S RADIUS, as it does in provision().
+        vol = None
+        par = sets.get(str(v.get("parent", "")), {})
+        for t in (par.get("types") or {}).values():
+            blk = t.get("block")
+            if blk is not None:
+                b = [float(x) for x in blk]
+                vol = abs(b[3] - b[0]) * abs(b[4] - b[1]) * abs(b[5] - b[2])
+                break
+        if vol is None:
+            vol = 4.0 / 3.0 * math.pi * float(v.get("radius", 0.02)) ** 3
+        out[k] = float(v["density"]) * vol / per
     return out
 
 
@@ -97,7 +122,8 @@ def measure(tr, m_of, dt):
     B = np.asarray(tr["body_point__pos"])
     rad = np.linalg.norm(B - B.mean(1, keepdims=True), axis=2).mean(1) * UM
     return {
-        "sets": sets, "total": tot, "angle": np.degrees(np.arccos(np.clip(cos, -1, 1))),
+        "sets": sets, "total": tot, "body_p": body, "water_p": water,
+        "angle": np.degrees(np.arccos(np.clip(cos, -1, 1))),
         "radius": rad, "com": np.linalg.norm(B - B[0].mean(0), axis=2).mean(1) * UM,
         "com_travel": float(np.linalg.norm(B[-1].mean(0) - B[0].mean(0)) * UM),
     }
@@ -114,9 +140,23 @@ def report(st, name):
     for f in (0, n // 8, n // 3, 2 * n // 3, n - 1):
         print(f"    frame {f:4d}: |p| = {np.linalg.norm(tot[f]):.4e}")
     print(f"    peak       : |p| = {np.linalg.norm(tot, axis=1).max():.4e}")
+    print(f"\n  EACH SET'S OWN |p|, because the angle above is only meaningful beside them.")
+    # THE ANGLE ALONE CANNOT BE READ. If the total is near zero then the largest two sets must
+    # oppose each other and 180 degrees follows arithmetically; if the total is the SAME SIZE as
+    # each part, then everything is drifting one way together and the angle reports that drift
+    # rather than any propulsion. Printing the parts is what tells the two apart.
+    for k, v in st["sets"].items():
+        mag = np.linalg.norm(v["p"], axis=1)
+        print(f"    {k:16s} |p| median {np.median(mag):10.4e}   peak {mag.max():10.4e}")
     print(f"\n  BODY vs WATER momentum angle (180 deg is Newton's third law):")
     print(f"    median {np.median(st['angle'][n // 8:]):.1f} deg   "
           f"final {st['angle'][-1]:.1f} deg")
+    _b = np.linalg.norm(st["body_p"], axis=1)
+    _w = np.linalg.norm(st["water_p"], axis=1)
+    _t = np.linalg.norm(tot, axis=1)
+    print(f"    the total is {np.median(_t / np.maximum(_b + _w, 1e-30)):.2f} of |p_body| + "
+          f"|p_water|; near 0 means they cancel and the angle is real, near 1 means the scene is "
+          f"drifting as one and the angle is reporting the drift")
     print(f"\n  IS THE BODY STILL ONE BODY?")
     print(f"    mean radius about its own centre of mass "
           f"{st['radius'][0]:.1f} -> {st['radius'][-1]:.1f} um "

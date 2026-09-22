@@ -1,0 +1,4 @@
+time   2026-09-21 19:57:39
+spec   plat_r14_paddle
+camera azim=20.0 elev=8.0 zoom=1.3
+why    R14 re-run with the reaction couple actually delivered: it was written to b.mpm_acceleration_ext, a name nothing in the engine reads, so the shafts were driven and the body never pushed back. (before the run)

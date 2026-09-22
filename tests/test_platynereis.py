@@ -212,3 +212,71 @@ def test_the_reaction_torque_is_equal_and_opposite():
     assert abs(t_on + t_re) < 1e-9 * abs(t_on), f"{t_on:.6g} and {t_re:.6g} do not cancel"
     for f in (f_on, f_re):
         assert float(f.sum(0).norm()) / float(f.abs().sum()) < 1e-12
+
+
+def test_the_reaction_is_RETURNED_and_not_stashed_in_a_buffer():
+    """`cilium_torque.forward` must return the body's acceleration as a key of its delta dict.
+
+    THIS IS THE TEST THE PREVIOUS TWO COULD NOT FAIL, and that is exactly why it exists. Each
+    couple sums to zero on its own, so both of the tests above passed -- and printed a green
+    check -- on a run where the reaction was computed correctly and then written to
+    `b.mpm_acceleration_ext`, a buffer name that appears nowhere else in the codebase. The shafts
+    were driven, the body was never pushed back, and the scene's total momentum came to 0.97 of
+    |p_body| + |p_water| instead of to zero: body and water drifting the same way at a median 34
+    degrees apart rather than opposing at 180.
+
+    The route that exists is `mpm_scatter`'s `a_ext = a_ext + H.delta(p.name)`
+    (operators/mpm_ops.py:552), fed by the engine adding one delta per KEY of whatever the
+    operator returns (engine.py:2386). So what is asserted is the key, because a correct number
+    on an unread channel is indistinguishable from no number at all.
+    """
+    import inspect
+    from plexus.operators.cilia_ops import CiliumTorque
+    src = inspect.getsource(CiliumTorque.forward)
+    assert "out[self.body_set] = b_acc" in src, (
+        "the reaction must be placed in the returned delta dict under the body's set name")
+    # the NAME may still be mentioned in a comment saying why it is wrong; what must be gone is
+    # the write to it.
+    assert 'register_buffer("mpm_acceleration_ext"' not in src, (
+        "`mpm_acceleration_ext` is read by nothing in the engine -- grep it. A reaction written "
+        "there is a reaction that never reaches the body.")
+
+
+def test_a_blade_is_flat_and_faces_the_way_it_sweeps():
+    """`cilium_seed` with `n_across > 1` lays points on a RECTANGLE whose face meets the stroke.
+
+    A line of points is one-dimensional: on an MLS-MPM grid it occupies a tube one cell across and
+    drives a thread of water rather than a sheet. Measured on plat_r14_paddle, the tips moved 0.8
+    times as far as their own ROOTS -- the shafts were not beating, they were being carried by the
+    body they hang off.
+
+    What makes the rectangle a paddle rather than a knife is WHICH perpendicular it spans. The
+    blade turns about `ax`, so a point at offset r moves at ax x r: the sweep is perpendicular to
+    ax, and a blade spanning length x ax therefore presents its flat face to it. Spanning the
+    sweep direction instead gives a blade that beats edge-on and pushes nothing -- the same
+    failure in a different costume, and one no picture would show.
+    """
+    import math
+    import numpy as np
+    n_along, n_across, L, W = 24, 9, 38.0, 12.0
+    um = 195.9
+    u = np.array([0.0, 0.0, 1.0])                       # the shaft points this way
+    ax = np.array([1.0, 0.0, 0.0])                      # and turns about this
+    idx = np.arange(n_along * n_across)
+    k = (idx // n_across + 1.0) / n_along
+    j = (idx % n_across) - 0.5 * (n_across - 1)
+    rest = k[:, None] * (L / um) * u + (j * ((W / um) / (n_across - 1)))[:, None] * ax
+
+    # IT IS FLAT: the extent along the sweep direction is zero, to floating point.
+    sweep = np.cross(ax, u)
+    assert float(np.ptp(rest @ sweep)) < 1e-12, (
+        f"the blade spans {float(np.ptp(rest @ sweep)) * um:.3g} um along its own SWEEP "
+        f"direction; a paddle is flat there and presents its face to the stroke")
+    # AND IT SPANS WHAT IT WAS ASKED TO SPAN, in micrometres, on both axes.
+    assert math.isclose(np.ptp(rest @ ax) * um, W, rel_tol=1e-9)
+    assert math.isclose(np.ptp(rest @ u) * um, L * (n_along - 1) / n_along, rel_tol=1e-9)
+    # INDEX 0 IS AT THE ROOT AND THE LAST AT THE TIP, which is what `cilium_torque` takes its
+    # rotation origin from and what every excursion measurement reads.
+    assert float(rest[0] @ u) < float(rest[-1] @ u)
+    assert np.allclose((rest[:n_across] @ u), rest[0] @ u), (
+        "the first n_across points must be one root ROW; `root_pts` hinges the blade on them")
