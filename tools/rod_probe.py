@@ -77,7 +77,7 @@ def main():
     dt = float(d["general"]["dt"])
     seed = {o["op"]: o for o in d.get("seed", [])}
     ops = {o["op"]: o for o in d.get("operators", [])}
-    rs, bm = seed.get("rod_seed", {}), ops.get("rod_base_moment", {})
+    rs, bm = seed.get("rod_seed", {}), ops.get("rod_base", {})
     d0 = np.asarray(rs.get("direction", [0, 0, 1.0]), float)
     d0 /= np.linalg.norm(d0)
     n = np.asarray(rs.get("beat_axis", [0, 1.0, 0]), float)
@@ -158,9 +158,9 @@ def main():
     # approximates (B/mu) * d4x/ds4 with a segment length h, so B/mu = k h^4 -- the h^4 is why a
     # rod with more nodes at the same k is a far softer rod, and why the node count cannot be
     # raised for resolution without re-deriving this.
-    kb = float(ops.get("rod_bend", {}).get("k", 0.0))
-    zp = float(ops.get("rod_drag", {}).get("zeta_par", 0.0)) * \
-        float(ops.get("rod_drag", {}).get("ratio", 2.0))
+    kb = float(ops.get("rod_elastic", {}).get("k_bend", 0.0))
+    zp = float(ops.get("drag", {}).get("k", 0.0)) * \
+        float(ops.get("drag", {}).get("ratio", 2.0))
     h = L0 / (N - 1)
     if kb and zp:
         B = kb * h ** 4
@@ -173,20 +173,20 @@ def main():
               f"live at Sp of 1 to 4")
 
     # ---------------------------------------------------------------- is it even stable?
-    k_s = float(ops.get("rod_stretch", {}).get("k", 0.0))
-    w_p = float(ops.get("rod_pin", {}).get("omega_n", 0.0))
+    k_s = float(ops.get("rod_elastic", {}).get("k_stretch", 0.0))
+    w_p = float(ops.get("rod_base", {}).get("omega_n", 0.0))
     # THE BENDING OPERATOR HAS ITS OWN LIMIT, and it is the tightest of the three. Its stiffest
     # mode has eigenvalue about 16k, so dt < 2/sqrt(16k) = 0.5/sqrt(k). Measured: k = 5e5 at
     # dt = 1e-3 needs 7.1e-4 and returns NaN, while 5e4 is stable.
     if kb:
-        print(f"    rod_bend k = {kb:g}: dt / (0.5/sqrt(k)) = {dt / (0.5 / math.sqrt(kb)):.3f}  "
+        print(f"    rod_elastic k_bend = {kb:g}: dt / (0.5/sqrt(k)) = {dt / (0.5 / math.sqrt(kb)):.3f}  "
               f"({'OK' if dt < 0.5 / math.sqrt(kb) else 'OVER -- this will return NaN'})")
     print(f"\n  IS IT STABLE? an explicit spring needs dt < 2/sqrt(k)")
     if k_s:
-        print(f"    rod_stretch k = {k_s:g}: dt * sqrt(k) = {dt * math.sqrt(k_s):.3f}  "
+        print(f"    rod_elastic k_stretch = {k_s:g}: dt * sqrt(k) = {dt * math.sqrt(k_s):.3f}  "
               f"({'OK' if dt * math.sqrt(k_s) < 2 else 'OVER -- this will blow up'})")
     if w_p:
-        print(f"    rod_pin omega_n = {w_p:g}: dt * omega_n = {dt * w_p:.3f}  "
+        print(f"    rod_base omega_n = {w_p:g}: dt * omega_n = {dt * w_p:.3f}  "
               f"({'OK' if dt * w_p < 2 else 'OVER -- this will blow up'})")
     print(f"    rod end-to-end length {L0:.4f} -> {L[-1]:.4f} "
           f"({100 * L[-1] / L0:.1f}% of its rest length; far from 100 means it is stretching or "

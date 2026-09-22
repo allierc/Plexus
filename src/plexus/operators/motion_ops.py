@@ -36,15 +36,44 @@ class Drag(Lateral):
     Drag alone is dissipative; drag plus noise is a thermal bath whose equilibrium temperature
     is set by the ratio eta^2 / k, which is the fluctuation-dissipation relation.
 
+    `along: chain` MAKES IT ANISOTROPIC, which is what a slender body in a fluid actually feels
+    and is the whole mechanism by which a filament waving back and forth produces net thrust.
+
+        t_hat  = the local tangent of the chain at this node
+        a      = -k [ (v.t_hat) t_hat + ratio (v - (v.t_hat) t_hat) ]
+
+    A long thin body in Stokes flow feels roughly TWICE the drag moving sideways as lengthwise
+    (Gray & Hancock 1955), so `ratio` is about 2. On the power stroke the filament is broadside to
+    its own motion and grips the fluid; on the recovery it is edge-on and slips through. Set
+    `ratio: 1` and it is a perfectly symmetric paddle that cannot swim whatever waveform it is
+    given, which is the control worth running once.
+
+    The tangent is the centred difference of a node's neighbours along the chain, one-sided at the
+    ends, with the chain read from `n_rod` exactly as `rod_elastic` reads it -- consecutive rows
+    are one filament. A per-SEGMENT tangent would leave the nodes, which are what carry the
+    velocity, without one of their own.
+
+    THIS IS A PARAMETER AND NOT A SECOND OPERATOR. `rod_drag` was written as its own contract and
+    it should not have been: it was this law with one extra term, and a registry that spells the
+    same mechanism twice makes a reader compare two docstrings to find out which one a spec is
+    getting. Perfection is when there is nothing left to remove.
+
+    IT TAKES MOMENTUM OUT OF THE SCENE, isotropic or not. The momentum goes into a fluid that is
+    not represented, so a scene whose only sink is this operator does not conserve momentum and
+    must not be measured as though it did.
+
     Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
-    motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.
+    motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106. Anisotropy: Gray, J. & Hancock, G.J.
+    (1955). J. Exp. Biol. 32:802 (resistive force theory).
     """
 
     EMIT = "acceleration"            # second-order: a force on a body that has inertia
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
-    MECHANISM_TAGS = ["viscous_drag", "friction", "damping"]
-    PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}
+    MECHANISM_TAGS = ["viscous_drag", "friction", "damping", "resistive_force_theory"]
+    PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise",
+                   "along": "chain_to_make_the_drag_anisotropic_about_the_local_tangent",
+                   "ratio": "transverse_over_tangential_drag_about_2_for_a_slender_filament"}
     REFERENCE = ("Stokes, G. G. (1851). On the effect of the internal friction of fluids on "
                  "the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.")
 
@@ -53,11 +82,28 @@ class Drag(Lateral):
         self.k = float(params["k"])
         self.noise = float(params.get("noise", 0.0))     # isotropic Langevin noise (off by default)
         self.at = params.get("_at", "particle")
+        self.along = str(params.get("along", "") or "").lower()
+        if self.along not in ("", "chain"):
+            raise ValueError(f"drag: `along` is `chain` or nothing, got {self.along!r}")
+        self.ratio = float(params.get("ratio", 2.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         occ = lvl.occ
-        acc = -self.k * lvl.get("vel") * occ[:, None]
+        V = lvl.get("vel")
+        if self.along == "chain":
+            n_rod = int(getattr(lvl, "n_rod", 1))
+            per = lvl.n // max(n_rod, 1)
+            Q = lvl.get("pos").view(n_rod, per, 3)
+            t = torch.zeros_like(Q)
+            t[:, 1:-1, :] = Q[:, 2:, :] - Q[:, :-2, :]
+            t[:, 0, :] = Q[:, 1, :] - Q[:, 0, :]
+            t[:, -1, :] = Q[:, -1, :] - Q[:, -2, :]
+            t = (t / t.norm(dim=2, keepdim=True).clamp_min(1e-12)).reshape(-1, 3)
+            v_par = (V * t).sum(1, keepdim=True) * t
+            acc = -self.k * (v_par + self.ratio * (V - v_par)) * occ[:, None]
+        else:
+            acc = -self.k * V * occ[:, None]
         if self.noise > 0.0:                             # drag + noise = a Brownian/Langevin bath
             N, D = acc.shape
             acc = acc + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None),

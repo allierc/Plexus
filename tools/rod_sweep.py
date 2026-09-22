@@ -32,17 +32,17 @@ OUT = os.path.join(REPO, "config", "platynereis")
 
 # where each knob lives: (which list, the op name, the key)
 KNOBS = {
-    "bend":    ("op", "rod_bend", "k"),
-    "bdamp":   ("op", "rod_bend", "zeta"),
-    "stretch": ("op", "rod_stretch", "k"),
-    "sdamp":   ("op", "rod_stretch", "zeta"),
-    "moment":  ("op", "rod_base_moment", "moment"),
-    "omega":   ("op", "rod_base_moment", "omega"),
-    "duty":    ("op", "rod_base_moment", "duty"),
-    "drag":    ("op", "rod_drag", "zeta_par"),
-    "ratio":   ("op", "rod_drag", "ratio"),
-    "pin":     ("op", "rod_pin", "omega_n"),
-    "clamp":   ("op", "rod_pin", "clamp"),
+    "bend":    ("op", "rod_elastic", "k_bend"),
+    "bdamp":   ("op", "rod_elastic", "zeta_bend"),
+    "stretch": ("op", "rod_elastic", "k_stretch"),
+    "sdamp":   ("op", "rod_elastic", "zeta_stretch"),
+    "moment":  ("op", "rod_base", "moment"),
+    "omega":   ("op", "rod_base", "omega"),
+    "duty":    ("op", "rod_base", "duty"),
+    "drag":    ("op", "drag", "k"),
+    "ratio":   ("op", "drag", "ratio"),
+    "pin":     ("op", "rod_base", "omega_n"),
+    "clamp":   ("op", "rod_base", "clamp"),
     "length":  ("seed", "rod_seed", "length"),
     "nodes":   ("set", "rod_node", "n"),
 }
@@ -94,7 +94,7 @@ def main():
             d = yaml.safe_load(open(sp))
             dt = float(d["general"]["dt"])
             rs = next(o for o in d["seed"] if o["op"] == "rod_seed")
-            bm = next(o for o in d["operators"] if o["op"] == "rod_base_moment")
+            bm = next(o for o in d["operators"] if o["op"] == "rod_base")
             d0 = np.asarray(rs.get("direction", [0, 0, 1.0]), float); d0 /= np.linalg.norm(d0)
             nn = np.asarray(rs.get("beat_axis", [0, 1.0, 0]), float)
             nn = nn - (nn @ d0) * d0; nn /= np.linalg.norm(nn)
