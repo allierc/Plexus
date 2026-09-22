@@ -4,6 +4,15 @@ resources:
   - gallery/
 ---
 
+> *Il semble que la perfection soit atteinte non quand il n'y a plus rien à ajouter,
+> mais quand il n'y a plus rien à retrancher.*
+>
+> — Antoine de Saint-Exupéry, *Terre des hommes* (1939), ch. III
+
+> *What I cannot create, I do not understand.*
+>
+> — Richard P. Feynman, blackboard at Caltech, February 1988
+
 A mechanism is entities and activities organized so that they produce a regular change from
 a set-up condition to a termination condition (Machamer, Darden &amp; Craver, 2000, p. 3).
 Entities have properties and stand in relations. Activities are what entities do.
