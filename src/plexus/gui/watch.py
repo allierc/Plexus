@@ -105,8 +105,8 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
 <div class=sub id=meta>&hellip;</div>
 <div class=row style="margin-bottom:8px">
  <button onclick="step(-10)" title="back ten steps">&laquo;</button>
- <button onclick="step(-1)">&larr; prev</button>
- <button onclick="step(1)">next &rarr;</button>
+ <button onclick="step(-1)">&lt;</button>
+ <button onclick="step(1)">&gt;</button>
  <button onclick="step(10)" title="forward ten steps">&raquo;</button>
  <button onclick="live()" id=livebtn>live</button>
  <button onclick="open3d()" id=d3btn>3D</button>

@@ -107,6 +107,14 @@ def main():
     print(f"    tip  angle swings {amp_t:8.3f} deg peak to peak")
     print(f"    tip / base = {amp_t / max(amp_b, 1e-12):.2f}   "
           f"(>1 the rod levers the drive outward, 1 a rigid stick, <1 it absorbs it in bending)")
+    # THE ANGLE THE BEAT IS CENTRED ON, which is a different question from its amplitude and the
+    # one the base clamp exists to answer. A rod can oscillate 50 degrees perfectly well about a
+    # rest direction that has drifted 70 degrees off vertical -- it starts upright and finishes
+    # lying down, beating all the way. Amplitude alone calls that a beat; this is what says it is
+    # a beat ABOUT THE WRONG PLACE.
+    print(f"    the beat is CENTRED on {tip[s].mean():+7.2f} deg (tip) and "
+          f"{base[s].mean():+.2f} deg (base) -- 0 is upright, and the clamp is what holds it there")
+    print(f"    the tip's LAST angle is {tip[-1]:+.2f} deg, having started at {tip[0]:+.2f}")
     if amp_t < 1e-3:
         print(f"    THE TIP IS NOT MOVING. Either the moment never reached the rod, or the pin is "
               f"holding more than node 0.")

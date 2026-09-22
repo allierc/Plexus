@@ -41,7 +41,7 @@ import numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src"))
 sys.path.insert(0, os.path.join(REPO, "tools"))
-UM = 195.9
+UM = 195.9          # the larva's box; overridden per run from general.units.length_um
 
 
 def cell_counts(P, n_grid):
@@ -56,12 +56,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("name", nargs="?", default="plat_r14_paddle")
     ap.add_argument("--dt", type=float, default=0.05)
+    ap.add_argument("--body", default=None,
+                    help="the set whose extent sets L and whose centre the shells are measured "
+                         "from; default: body_point, else the first non-water spatial set")
     a = ap.parse_args()
 
     tr, sp = load(a.name)
     import yaml
     d = yaml.safe_load(open(sp))
     n_grid = int(((d.get("fields") or {}).get("mpm_grid") or {}).get("n_grid", 96))
+    # THE BOX'S OWN SIZE, NOT THE LARVA'S. This tool was written for a 195.9 um animal and hard-
+    # coded it; pointed at the 50 um rod rig every micrometre it printed was 3.9x too large,
+    # including the length in the Reynolds number.
+    global UM
+    UM = float((d["general"].get("units") or {}).get("length_um", UM))
     m_of = masses(sp)
     cell_um = UM / n_grid
     cell_vol = (1.0 / n_grid) ** 3
@@ -73,7 +81,7 @@ def main():
     # ---------------------------------------------------------------- sampling, per material set
     print(f"  {'set':16s} {'n':>9s} {'per occupied cell':>19s} {'cells used':>12s} "
           f"{'vol/particle':>14s}")
-    for k in ("water_particle", "body_point", "mpm_particle", "cilium_point"):
+    for k in ("water_particle", "body_point", "mpm_particle", "cilium_point", "rod_node"):
         key = f"{k}__pos"
         if key not in tr.files:
             continue
@@ -166,7 +174,10 @@ def main():
     # so Re is about 0.16.
     eta = next((float(o.get("eta", 0.0)) for o in (d.get("operators") or [])
                 if o.get("op") == "mpm_viscosity"), None)
-    B = np.asarray(tr["body_point__pos"])
+    _b = a.body or ("body_point" if "body_point__pos" in tr.files else
+                    next(k[:-5] for k in tr.files
+                         if k.endswith("__pos") and not k.startswith("water")))
+    B = np.asarray(tr[f"{_b}__pos"])
     if eta:
         U = float(np.median(np.linalg.norm(V, axis=2).mean(0)))          # world/s
         L = float(np.linalg.norm(B[0] - B[0].mean(0), axis=1).mean() * 2)
@@ -186,7 +197,7 @@ def main():
     d_wall = np.minimum(W0, 1.0 - W0).min(1)                 # distance to the NEAREST wall
     d_body = np.linalg.norm(W0 - com, axis=1)
     speed = sp_um.mean(0)                                     # per particle, averaged over time
-    print(f"\n  IS THE BOX BIG ENOUGH? the animal's mean radius is {r_animal * UM:.0f} um and the "
+    print(f"\n  IS THE BOX BIG ENOUGH? {_b}'s mean radius is {r_animal * UM:.0f} um and the "
           f"nearest wall is {d_wall.min() * UM:.0f} um from the nearest water")
     print(f"    {'shell':>22s} {'n':>9s} {'speed um/s':>11s}")
     near = speed[d_body < 1.5 * r_animal]

@@ -1,0 +1,247 @@
+# STEP 2 of the rebuild: the cilium beats IN WATER, and the water is real MPM.
+#
+# The stand-in drag is GONE. `drag: {along: chain}` was a local, instantaneous law that knew
+# nothing about the flow the rod itself creates -- it could not show a vortex, could not let one
+# cilium feel another, and could not push water past a cell. Its own docstring said it must be
+# REPLACED by a real coupling rather than supplemented, and this is that replacement: the water
+# now provides the drag, for real, and whatever else it does.
+#
+# HOW THE ROD COUPLES, AND IT NEEDS NO NEW OPERATOR. The rod's nodes become `entity: mpm_particle`,
+# so `mpm_scatter` and `mpm_gather` carry momentum between them and the water exactly as they do
+# for any other material. What the rod does NOT get from MPM is its shape: `youngs` is 1.0, four
+# orders below the water's bulk modulus, so its own constitutive stress is negligible and
+# `rod_elastic` supplies every bit of its stiffness. That is an immersed boundary -- MPM carries
+# the momentum exchange, the springs carry the material -- and it is why a rod thinner than a grid
+# cell is fine here when a 0.25 um MPM cilium was not: the grid never had to hold the shape.
+#
+# SAMPLING FROM `config/si_material`, which is the water in this repository that works.
+# si_ball_splash puts 73,882 particles in about 21^3 cells = 8.0 per cell, which is what MLS-MPM
+# is written for. The larva ran at 0.18 and its body tore itself apart for that reason alone. The
+# water block here is [0.08, 0.92]^3 = 0.593 of the box, which at 64^3 is 155,374 cells, so 8 per
+# cell is 1,242,990 particles. I first wrote 303,000 and `particles_per_cell` said 1.95 -- which
+# is the whole reason it is run BEFORE the spec, not after the pictures look wrong.
+#
+# THE WORKING POINT WAS MEASURED IN WATER, and it is not step 1's. Real water raised the drag by
+# orders over step 1's stand-in of 0.07, so Sp = L (zeta_perp omega / B)^(1/4) shot up and the
+# stroke died a short way up the rod -- the same DEAD TIP step 1 showed at drag 5.0, from real
+# fluid instead of a chosen number. B has to rise and omega fall to bring Sp back. Measured at
+# moment 100, omega 3.14 (0.5 Hz), 600 frames:
+#     k_bend   base deg   tip deg   tip/base
+#       5e4      16.44      1.81      0.11     the stroke dies before the tip
+#       2e5      12.70      5.95      0.47
+#       5e5       5.80      7.38      1.27     the tip now levers PAST the base
+# dt_sub 5e-4 caps k_bend at (0.5/dt)^2 = 1e6, so 5e5 keeps margin.
+#
+# THE BEAT IS 2 Hz, EIGHT CYCLES IN THE 800 FRAMES, and it costs almost nothing to go faster:
+# Sp rises only as omega^(1/4), so 4x the beat rate is 1.41x the sperm number and tip/base of
+# 1.27 had the margin. Measured at omega 12.57 and moment 800: the tip swings 28.0 deg with
+# tip/base 9.58 -- the tip levers well past the base, and the amplitude is back to the 31.8 deg
+# the rod managed in air. At 0.5 Hz it was 2 cycles over the run and too slow to read.
+#
+# `boundary: wall`, WHICH ALSO PUTS THE ROD BACK AT THE MIDDLE. A free scene draws its box at
+# [-world/2, +world/2] and a walled one at [0, world]; step 1 was free, so its rod belonged at the
+# origin. This one is walled, so the middle is (0.5, 0.5, 0.5) and the 0.4-long rod is based at
+# z = 0.3.
+general:
+  name: cil_s2_water
+  seed: 0
+  n_frames: 800
+  dt: 0.005
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: wall
+  save_data: null
+  record_cap: 161
+  units:
+    length_um: 50.0
+    time_s: 1.0
+sets:
+  rod_node:
+    n: 24
+    start:
+    - - 0.5
+      - 0.5
+      - 0.3
+    entity: mpm_particle
+    density: 1100.0
+    radius: 0.01
+    types:
+      cilium:
+        fraction: 1.0
+        material: elastic
+        youngs: 1.0
+        density: 1100.0
+        block:
+        - 0.49
+        - 0.49
+        - 0.3
+        - 0.51
+        - 0.51
+        - 0.7
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        boundary: free
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        count: 1
+        material: liquid
+        bulk_modulus: 100000.0
+        density: 1000.0
+        eta: 0.001
+        block:
+        - 0.08
+        - 0.08
+        - 0.08
+        - 0.92
+        - 0.92
+        - 0.92
+  water_particle:
+    parent: water
+    per_parent: 1242990
+    entity: mpm_particle
+    density: 1000.0
+    radius: 0.5
+seed:
+- op: rod_seed
+  at: rod_node
+  length: 0.4
+  base:
+  - 0.5
+  - 0.5
+  - 0.3
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  n_rod: 1
+operators:
+- op: rod_elastic
+  at: rod_node
+  k_stretch: 100000.0
+  k_bend: 500000.0
+  zeta_stretch: 0.3
+  zeta_bend: 0.05
+  emit: mpm_acceleration
+- op: rod_base
+  at: rod_node
+  moment: 800.0
+  omega: 12.566371
+  waveform: sine
+  omega_n: 600.0
+  zeta: 1.0
+  clamp: 40.0
+  clamp_zeta: 1.0
+  anchor: fixed
+  emit: mpm_acceleration
+- op: mpm_strain
+  at: rod_node
+  implementation: warp
+- op: mpm_strain
+  at: water_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: water_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: rod_node
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: water_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  wall_friction: 0.3
+- op: mpm_gather
+  at: rod_node
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+- op: mpm_gather
+  at: water_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+schedule:
+- substep_dt: 0.0005
+  steps:
+  - rod_elastic
+  - rod_base
+  - mpm_strain
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  subject: water_particle
+  dot_size: 1.6
+  dot_shading: true
+  max_frames: 160
+  stills: 6
+  keep_stills: true
+  fps: 20.0
+  color_field: speed
+  field_cmap: inferno
+  color_range:
+  - 0.0
+  - 0.04
+  cutaway:
+    axis: view
+    at: 0.5
+  chain:
+    set: rod_node
+    per: 24
+    width: 7
+    color: '#ffffff'
+descriptions:
+  movie:
+    description: A thin vertical line of particles is positioned in the center of a large cubic domain.
+      Over time, the particles remain stationary and do not exhibit any significant movement or dispersion.
+      The simulation progresses through several time steps while the central structure maintains its integrity.
+      The visual representation shows a stable state where the velocity field remains near zero.
+    objects: The scene contains a single vertical line composed of many small, white particles. This line
+      is located in the center of a large, black cubic volume. A scale bar in the bottom right corner
+      indicates a length of 10 micrometers. The cubic domain is defined by a wireframe boundary and represents
+      a 50 micrometer box.
