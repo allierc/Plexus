@@ -104,8 +104,10 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
 <h1>Plexus &mdash; watching the session</h1>
 <div class=sub id=meta>&hellip;</div>
 <div class=row style="margin-bottom:8px">
+ <button onclick="step(-10)" title="back ten steps">&laquo;</button>
  <button onclick="step(-1)">&larr; prev</button>
  <button onclick="step(1)">next &rarr;</button>
+ <button onclick="step(10)" title="forward ten steps">&raquo;</button>
  <button onclick="live()" id=livebtn>live</button>
  <button onclick="open3d()" id=d3btn>3D</button>
  <span id=pos class=t></span>
@@ -232,6 +234,10 @@ function pane(w){
  tick();
 }
 function live(){ idx = -1; tick(); }
+// `d` IS ANY STRIDE, which is why the ten-step buttons needed no new function: << is step(-10)
+// and >> is step(10), through the same wrap. The record runs to a hundred and fifty steps and
+// walking it one at a time to reach a rung from a few hours ago is the only thing it was awkward
+// at.
 function step(d){
  if(total === 0) return;
  if(idx < 0) idx = total - 1;           // stepping back from live starts at the newest

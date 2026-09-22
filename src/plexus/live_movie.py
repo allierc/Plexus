@@ -3821,7 +3821,7 @@ class LiveMovie:
                                         for r in range(n_ch)]),
                         np.concatenate([np.arange(r * per + 1, r * per + per)
                                         for r in range(n_ch)])], 1).reshape(-1)
-        self._chain = self.pv.PolyData(pos + self._shift_of(pos))
+        self._chain = self.pv.PolyData(pos)
         self._chain.lines = seg
         self._chain_lvl = name
         self._chain_actor = self.p.add_mesh(
@@ -3835,12 +3835,7 @@ class LiveMovie:
         if getattr(self, "_chain", None) is None:
             return
         pos = np.asarray(H.level(self._chain_lvl).get("pos").detach().cpu().numpy(), np.float32)
-        self._chain.points = pos + self._shift_of(pos)
-
-    def _shift_of(self, pos):
-        """The same offset the subject's cloud is drawn with, so the two cannot separate."""
-        sh = getattr(self, "_draw_shift", None)
-        return np.zeros(3, np.float32) if sh is None else np.asarray(sh, np.float32)
+        self._chain.points = pos
 
     def _glyph_cover_subject(self, H, lvl):
         """Build every set's glyphs, and say whether THE SUBJECT is among them.

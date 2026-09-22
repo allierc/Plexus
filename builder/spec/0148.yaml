@@ -15,11 +15,6 @@
 #   zeta      stretch 1.0 returns NaN, 0.3 is stable; bend 0.15 returns NaN, 0.05 is stable.
 #             Both are needed because the only other sink is the drag, which has to be turned
 #             DOWN to reach a biological Sp -- so the springs ring for the whole run without it.
-#   base      (0, 0, -0.2), so the 0.4-long rod spans z -0.2 to +0.2 and is centred ON THE
-#             ORIGIN. `boundary: free` draws the scene box at [-world/2, +world/2], NOT at
-#             [0, world] -- so a base at (0.5, 0.5, 0.3) put the rod at the box's far corner,
-#             poking out of the top. The `-o plot` replay path does not re-centre, which is why
-#             a direct render looked right while the watcher did not.
 #   clamp     0 lets the rod WINDMILL: a clean 29 deg beat whose CENTRE drifts to +32 deg,
 #             because rod_elastic penalises curvature and a rigid rotation about the pin has
 #             none. 40 rad/s centres it at -1.7 deg with the LARGEST amplitude of any value
@@ -43,9 +38,9 @@ sets:
   rod_node:
     n: 24
     start:
-    - - 0.0
-      - 0.0
-      - -0.2
+    - - 0.5
+      - 0.5
+      - 0.25
     state:
       pos:
         width: 3
@@ -62,9 +57,9 @@ seed:
   at: rod_node
   length: 0.4
   base:
-  - 0.0
-  - 0.0
-  - -0.2
+  - 0.5
+  - 0.5
+  - 0.3
   direction:
   - 0.0
   - 0.0
