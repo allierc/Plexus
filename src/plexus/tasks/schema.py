@@ -9,7 +9,19 @@ every validation path of the first, for two languages that share not one key. So
     stimulus     process: <registered name>, plus its parameters
     teacher      law: <registered name>, plus its parameters
     conditions   a dict of lists, CROSSED -- the grid a task is a family over
+    teachers     a LIST of named laws, one per cell -- the alternative to teacher + conditions
     splits       per split: n_per_cond and seed0
+
+`teachers:` EXISTS BECAUSE A GRID CANNOT CROSS LAWS. `conditions:` varies the parameters of ONE
+law, which is the common case and covers a family -- four integrator time constants, three
+dampings, six filter family x order pairs. It cannot express "cell 0 is an integrator, cell 1 is a
+100 ms delay, cell 2 is a 4th-order Butterworth", because those laws take different parameters and
+no cross product of parameter lists reaches them. A list of named laws does, and it is strictly
+more general: a grid is the special case where every entry shares a law.
+
+Both forms produce the SAME thing downstream -- one condition-cell index per trial, one `per_cell`
+record in `teacher.pt`, one column of the context one-hot -- so nothing that consumes a corpus
+needs to know which was written.
 
 WHAT A CONDITION IS, because it is the key that makes this a task and not a dataset. Each entry
 of `conditions:` names a parameter of the stimulus or of the teacher and lists the values it
@@ -32,7 +44,7 @@ import yaml
 
 from plexus.tasks import get_stimulus, get_teacher
 
-REQUIRED = ("general", "stimulus", "teacher", "splits")
+REQUIRED = ("general", "stimulus", "splits")           # `teacher:` OR `teachers:`, checked below
 
 
 class TaskSpec:
@@ -48,9 +60,14 @@ class TaskSpec:
         self.targets = int(g.get("targets", self.channels))
         self.T = int(round(self.duration_s / self.dt))
         self.stimulus = dict(raw["stimulus"])
-        self.teacher = dict(raw["teacher"])
         self.process_name = self.stimulus.pop("process")
-        self.law_name = self.teacher.pop("law")
+        # THE LIST FORM CARRIES ITS LAW PER CELL; the single form carries one law for all of them.
+        # `law_name` stays as the DEFAULT so every existing reader keeps working, and a cell may
+        # override it.
+        self.teachers = [dict(t) for t in (raw.get("teachers") or [])]
+        self.teacher = dict(raw.get("teacher") or {})
+        self.law_name = self.teacher.pop("law", None) or (self.teachers[0]["law"]
+                                                          if self.teachers else None)
         self.conditions = {k: list(v) for k, v in (raw.get("conditions") or {}).items()}
         self.splits = {k: dict(v) for k, v in raw["splits"].items()}
 
@@ -59,11 +76,21 @@ class TaskSpec:
     def cells(self) -> list:
         """The full cross product of `conditions:`, as a list of dicts. `[{}]` when there is no
         grid, so a task with no conditions is the one-cell case and needs no special path."""
+        if self.teachers:
+            return [dict(t) for t in self.teachers]
         if not self.conditions:
             return [{}]
         keys = sorted(self.conditions)
         return [dict(zip(keys, vals)) for vals in
                 itertools.product(*(self.conditions[k] for k in keys))]
+
+    def cell_names(self) -> list:
+        """A short name per cell, for the per-function plots. `teachers:` names its own; a grid
+        is named by the parameters it varies, which is the only thing that distinguishes its
+        cells."""
+        if self.teachers:
+            return [str(t.get("name") or t.get("law")) for t in self.teachers]
+        return ["_".join(f"{k}{v}" for k, v in sorted(c.items())) or "all" for c in self.cells]
 
     def n_trials(self, split) -> int:
         return len(self.cells) * int(self.splits[split]["n_per_cond"])
@@ -91,12 +118,25 @@ def load_task(path) -> TaskSpec:
             raise ValueError(f"{path}: general needs `{k}:`")
     if "process" not in raw["stimulus"]:
         raise ValueError(f"{path}: stimulus needs `process:` naming a registered input ensemble")
-    if "law" not in raw["teacher"]:
+    if ("teacher" in raw) == ("teachers" in raw):
+        raise ValueError(
+            f"{path}: give EITHER `teacher:` (one law, optionally with a `conditions:` grid over "
+            f"its parameters) OR `teachers:` (a list of named laws, one per cell) -- not both and "
+            f"not neither. They are the same thing downstream; two of them in one spec would "
+            f"leave which cells exist undecided.")
+    if "teacher" in raw and "law" not in raw["teacher"]:
         raise ValueError(f"{path}: teacher needs `law:` naming a registered teacher")
+    for i, t in enumerate(raw.get("teachers") or []):
+        if "law" not in t:
+            raise ValueError(f"{path}: teachers[{i}] needs `law:`; it has {sorted(t)}")
 
     spec = TaskSpec(raw, os.path.abspath(path))
     get_stimulus(spec.process_name)                    # raises with the registered names
-    get_teacher(spec.law_name)
+    for c in spec.cells:                               # every cell's law must be registered
+        get_teacher(c.get("law", spec.law_name))
+    if spec.teachers and len({n for n in spec.cell_names()}) != len(spec.teachers):
+        raise ValueError(f"{path}: two teachers share a name; the per-function results are "
+                         f"written under it and one would overwrite the other.")
     if spec.T < 2:
         raise ValueError(f"{path}: duration_s / dt is {spec.T} frames; a trial needs at least 2")
     for s, cfg in spec.splits.items():
@@ -118,7 +158,7 @@ def load_task(path) -> TaskSpec:
 
     # A condition must name a parameter something actually reads, or it silently does nothing
     # and the grid is a lie about what was varied.
-    known = set(spec.stimulus) | set(spec.teacher) | {
+    known = set(spec.stimulus) | set(spec.teacher) | {"name",
         "process", "law", "amplitude", "cutoff_hz", "order", "family", "band", "tau_s",
         "seconds", "speed", "f_max_hz", "f_min_hz", "hold_s", "turn_rate_hz", "gain", "k"}
     unknown = [k for k in spec.conditions if k not in known]

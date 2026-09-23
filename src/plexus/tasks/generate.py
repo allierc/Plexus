@@ -114,7 +114,6 @@ def build_split(spec, split, verbose=True):
     the spec. Regenerating on another machine gives the same corpus.
     """
     proc = get_stimulus(spec.process_name)
-    law = get_teacher(spec.law_name)
     cells = spec.cells
     n_per = int(spec.splits[split]["n_per_cond"])
     seed0 = int(spec.splits[split]["seed0"])
@@ -136,6 +135,10 @@ def build_split(spec, split, verbose=True):
     for c, cell in enumerate(cells):
         idx = np.where(cond == c)[0]
         tp = {**spec.teacher, **{k: v for k, v in cell.items() if k not in _proc_keys(proc, spec)}}
+        # THE LAW ITSELF MAY BE THE THING THAT VARIES, which is what `teachers:` is for. `name`
+        # is the cell's label and no law's parameter, so it is dropped before the call.
+        law = get_teacher(tp.pop("law", spec.law_name))
+        tp.pop("name", None)
         Y[idx] = law(U[idx], spec.dt, **tp)
     if verbose:
         print(f"  [{split}] {N} trials x {spec.T} frames  "
@@ -211,11 +214,14 @@ def generate(path, root=None, force=False, verbose=True) -> str:
     proc = get_stimulus(spec.process_name)
     pkeys = _proc_keys(proc, spec)
     per_cell = []
+    names = spec.cell_names()
     for c, cell in enumerate(spec.cells):
         tp = {**spec.teacher, **{k: v for k, v in cell.items() if k not in pkeys}}
+        law = get_teacher(tp.pop("law", spec.law_name)); tp.pop("name", None)
         poles = law.poles(spec.dt, **tp) if hasattr(law, "poles") else None
         rep = spectral_coverage(U[cond == c], spec.dt, poles)
         rep["cell"] = cell
+        rep["name"] = names[c]
         per_cell.append(rep)
     prov["excitation"] = {
         "identifiable": all(r["identifiable"] for r in per_cell),
@@ -234,14 +240,15 @@ def generate(path, root=None, force=False, verbose=True) -> str:
     truths = []
     for c, cell in enumerate(spec.cells):
         tp = {**spec.teacher, **{k: v for k, v in cell.items() if k not in pkeys}}
+        law = get_teacher(tp.pop("law", spec.law_name)); tp.pop("name", None)
         pl = law.poles(spec.dt, **tp) if hasattr(law, "poles") else np.array([])
-        truths.append({"cell": cell, "params": tp,
+        truths.append({"cell": cell, "name": names[c], "params": tp,
                        "poles_real": np.real(pl).tolist(), "poles_imag": np.imag(pl).tolist(),
                        "pole_freq_hz": [float(abs(p.imag) / (2 * np.pi)) if abs(p.imag) > 1e-12
                                         else float(abs(p.real) / (2 * np.pi))
                                         for p in np.atleast_1d(pl)]})
     torch.save({"law": spec.law_name, "dt": spec.dt, "channels": spec.channels,
-                "targets": int(law.n_targets(spec.channels, **spec.teacher)),
+                "names": names, "targets": int(spec.targets),
                 "per_cell": truths}, os.path.join(out, "teacher.pt"))
 
     # A figure per split, written HERE rather than by a later pass, because a corpus nobody

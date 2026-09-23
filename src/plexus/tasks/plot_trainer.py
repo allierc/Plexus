@@ -509,10 +509,25 @@ def from_run(name, *, root=None, device="cpu", n_show=4, fps=48, out=None, quiet
             pred = m(U[:n_show]).cpu().numpy()
         unit = ""
 
+    # ONE SET OF OUTPUTS PER CONDITION CELL, because a pooled number hides a dead function among
+    # good ones: "it holds the integrator and loses the delay" is the whole content of a
+    # multi-function fit and it is invisible in one mse. The cell's NAME comes from the task spec
+    # (`teachers: [{name: delay, ...}]`), so the files are readable without a lookup.
+    names, cells = _cell_names(task), np.asarray(cond)
+    if len(names) > 1:
+        made = []
+        for c, cname in enumerate(names):
+            idx = np.where(cells == c)[0][:n_show]
+            if not len(idx):
+                continue
+            made += _one(run, name, task, split, out_dir, dt, unit, fps, quiet, what, reps,
+                         U[idx], Y[idx], cond[idx] if hasattr(cond, "__getitem__") else cond,
+                         device, len(idx), suffix=f"_{cname}", title_extra=f"  [{cname}]")
+        return made
     u_np, y_np = U[:n_show, :, :1].cpu().numpy(), Y[:n_show].cpu().numpy()
     if reps > 1:
         u_np = _concat_trials(u_np, cond, reps, n_show)
-        y_np = _teacher_on(run["task"], u_np)
+        y_np = _teacher_on(task, u_np)
         pred = _predict_long(run, name, out_dir, u_np, cond, device, n_show)
     res = os.path.join(out_dir, "results")
     made = []
@@ -535,6 +550,53 @@ def from_run(name, *, root=None, device="cpu", n_show=4, fps=48, out=None, quiet
                            title=f"{name}  ({split})", quiet=quiet, panels={"c": _numbers},
                            out=os.path.join(res, f"{name}_{split}_rollout.png")))
     return made[0] if len(made) == 1 else made
+
+
+def _cell_names(task):
+    """The per-cell names the task spec declared, from `teacher.pt`."""
+    import torch
+    from plexus.tasks.generate import task_dir
+    t = torch.load(os.path.join(task_dir(task), "teacher.pt"), weights_only=False)
+    nm = t.get("names")
+    return list(nm) if nm else [str(c.get("name") or i)
+                                for i, c in enumerate(t.get("per_cell") or [{}])]
+
+
+def _one(run, name, task, split, out_dir, dt, unit, fps, quiet, what, reps,
+         U, Y, cond, device, n_show, suffix="", title_extra=""):
+    """The movie and figure for ONE condition cell's trials."""
+    import torch
+    res = os.path.join(out_dir, "results")
+    u_np, y_np = U[:n_show, :, :1].cpu().numpy(), Y[:n_show].cpu().numpy()
+    if reps > 1:
+        u_np = _concat_trials(u_np, np.zeros(len(u_np), int), reps, n_show)
+        y_np = _teacher_on_cell(task, u_np, cond)
+    pred = _predict_long(run, name, out_dir, u_np, np.asarray(cond), device, n_show)
+    made = []
+    ttl = f"{name}  ({task}/{split}){title_extra}"
+    if "movie" in what:
+        made.append(rollout_movie(u_np, y_np, pred, dt=dt, fps=fps, unit=unit, n_show=n_show,
+                                  title=ttl, quiet=quiet,
+                                  out=os.path.join(res, f"{name}_{split}{suffix}_rollout.mp4")))
+    if "figure" in what:
+        made.append(figure(u_np, y_np, pred, dt=dt, unit=unit, n_show=n_show, title=ttl,
+                           quiet=quiet,
+                           out=os.path.join(res, f"{name}_{split}{suffix}_rollout.png")))
+    return made
+
+
+def _teacher_on_cell(task, u, cond):
+    """The ground truth for a longer stimulus, using THAT CELL's law rather than cell 0's."""
+    import torch
+    from plexus.tasks import get_teacher
+    from plexus.tasks.generate import task_dir
+    t = torch.load(os.path.join(task_dir(task), "teacher.pt"), weights_only=False)
+    c = int(np.asarray(cond).ravel()[0])
+    rec = t["per_cell"][min(c, len(t["per_cell"]) - 1)]
+    params = dict(rec.get("params") or {})
+    law = get_teacher(params.pop("law", t["law"]))
+    params.pop("name", None)
+    return np.asarray(law(np.asarray(u, np.float64), float(t["dt"]), **params), np.float64)
 
 
 def _predict_long(run, name, out_dir, u_np, cond, device, n_show):
