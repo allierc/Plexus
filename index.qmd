@@ -15,6 +15,13 @@ resources:
 >
 > — Richard P. Feynman, blackboard at Caltech, February 1988
 
+> *The most important hypothesis in all of biology, for example, is that everything that
+> animals do, atoms do. In other words, there is nothing that living things do that cannot
+> be understood from the point of view that they are made of atoms acting according to the
+> laws of physics.*
+>
+> — Richard P. Feynman, *The Feynman Lectures on Physics*, Vol. I (1963), ch. 1
+
 A mechanism is entities and activities organized so that they produce a regular change from
 a set-up condition to a termination condition (Machamer, Darden &amp; Craver, 2000, p. 3).
 Entities have properties and stand in relations. Activities are what entities do.
