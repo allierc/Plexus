@@ -118,3 +118,76 @@ class SeedPositions(Seed):
                 lvl.register_buffer("spawn_group", gbuf)
             lvl.spawn_group_rot = rot
         return {}
+
+
+@register_operator("cloud_seed", family="seed", set="particle", kind="seed")
+class CloudSeed(Seed):
+    """Write every position of a set from a MEASURED POINT CLOUD in the shape library, once.
+
+    set -> set: writes `pos`.
+
+        x_i = origin + scale * q_i        i = 1 .. n, q_i the i-th point of the cloud (metres)
+
+    `cloud` names `<shape>/<part>`: `<root>/shapes/<shape>/points.npz` holds one array of points
+    per part, in metres, in the cloud's own frame (its symmetry axis along z, its centre at the
+    origin -- the frame `tools/bfm_anatomy_from_structure.py --cloud` writes). `origin` is where
+    that frame's origin lands in world units and `scale` is world units per metre, so a spec
+    states the placement in the words of its own box. `every` keeps one point in k, a plain
+    stride, so a scene may hold fewer points than the file without a random draw.
+
+    THE SET'S `n` MUST EQUAL THE COUNT THE FILE AND THE STRIDE GIVE. The set declares how many
+    entities it holds and the seed declares where they are; neither may quietly resize the other,
+    so a mismatch is refused with the right number in the message. The whole point of the
+    operator is that the points are the data -- the alpha-carbon trace of PDB 9HMF, say -- and not
+    a surface fitted around them and filled: what the picture shows is what was deposited.
+
+    Reference: Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["cloud"]
+    MECHANISM_TAGS = ["initial_condition", "placement", "measured_anatomy"]
+    PARAM_ROLES = {"cloud": "point_cloud", "origin": "placement_origin", "scale": "world_per_metre",
+                   "every": "stride"}
+    PARAM_UNITS = {"origin": "length"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.cloud = str(params["cloud"])
+        self.origin = [float(v) for v in (params.get("origin") or [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.every = max(1, int(params.get("every", 1)))
+        if "/" not in self.cloud:
+            raise ValueError(f"cloud_seed: `cloud` names `<shape>/<part>`, got {self.cloud!r}")
+
+    def forward(self, H, mask=None):
+        import os
+        import numpy as np
+        from plexus import shapes
+        shape, part = self.cloud.split("/", 1)
+        path = next((os.path.join(r, shape, "points.npz") for r in shapes.roots()
+                     if os.path.exists(os.path.join(r, shape, "points.npz"))), None)
+        if path is None:
+            raise FileNotFoundError(f"cloud_seed: no shapes/{shape}/points.npz under any of {shapes.roots()}")
+        with np.load(path) as z:
+            if part not in z:
+                raise KeyError(f"cloud_seed: {path} has no part {part!r} (it has {', '.join(sorted(z.keys()))})")
+            q = np.asarray(z[part], np.float64)[:: self.every]
+        p = H.level(self.at)
+        n = int(p.state.shape[0])
+        if n != len(q):
+            raise ValueError(f"cloud_seed: set {self.at!r} holds {n} entities but {self.cloud} gives "
+                             f"{len(q)} points at every={self.every}; declare n: {len(q)}")
+        dev, dt = p.state.device, p.state.dtype
+        pos = torch.as_tensor(q, device=dev, dtype=dt) * self.scale + torch.tensor(self.origin, device=dev, dtype=dt)
+        st = p.state.clone()
+        a, b = p.state_schema["pos"]
+        st[:, a:b] = pos
+        p.state = st
+        r = (pos[:, :2] - pos.new_tensor(self.origin[:2])).norm(dim=1)
+        print(f"[cloud_seed] {self.at}: {n} points from {os.path.relpath(path)}::{part} (every {self.every}), "
+              f"scale {self.scale:.4g} world/m, r {float(r.min()):.4f}-{float(r.max()):.4f} world, "
+              f"z {float(pos[:, 2].min()):.4f}-{float(pos[:, 2].max()):.4f}", flush=True)
+        return {}

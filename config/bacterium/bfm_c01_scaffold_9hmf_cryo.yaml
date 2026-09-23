@@ -1,0 +1,128 @@
+general:
+  name: bfm_c01_scaffold_9hmf_cryo
+  seed: 0
+  n_frames: 10
+  dt: 0.002
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: true
+  record_cap: 301
+  units: {length_um: 0.14, time_s: 0.005, force_nN: 0.5047076668008149}
+sets:
+  FliL:
+    n: 6664
+    start:
+    - &id001 [0.5, 0.5, 0.360714]
+  PflA:
+    n: 13141
+    start:
+    - *id001
+  PflB:
+    n: 11611
+    start:
+    - *id001
+  PflCD:
+    n: 30107
+    start:
+    - *id001
+  Lipo:
+    n: 5406
+    start:
+    - *id001
+  MotB:
+    n: 6137
+    start:
+    - *id001
+  stator_unit:
+    n: 17
+    start:
+    - [0.686635, 0.531567, 0.289285]
+    - [0.662629, 0.596856, 0.289285]
+    - [0.616658, 0.649063, 0.289285]
+    - [0.554933, 0.681139, 0.289285]
+    - [0.485788, 0.688751, 0.289285]
+    - [0.418563, 0.670872, 0.289285]
+    - [0.362336, 0.629915, 0.289285]
+    - [0.324702, 0.571412, 0.289285]
+    - [0.310742, 0.503265, 0.289285]
+    - [0.322343, 0.434676, 0.289285]
+    - [0.357938, 0.374911, 0.289285]
+    - [0.412718, 0.332039, 0.289285]
+    - [0.479287, 0.311851, 0.289285]
+    - [0.548653, 0.317074, 0.289285]
+    - [0.611448, 0.347002, 0.289285]
+    - [0.659191, 0.397593, 0.289285]
+    - [0.685435, 0.462015, 0.289285]
+fields: {}
+seed:
+- op: cloud_seed
+  at: FliL
+  cloud: 9hmf/FliL
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: PflA
+  cloud: 9hmf/PflA
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: PflB
+  cloud: 9hmf/PflB
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: PflCD
+  cloud: 9hmf/PflCD
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: Lipo
+  cloud: 9hmf/Lipo
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: MotB
+  cloud: 9hmf/MotB
+  origin: *id001
+  scale: 7142857.142857143
+operators: []
+schedule: []
+plotting:
+  renderer: vtk_points
+  background: white
+  up_axis: 2
+  box_frame: true
+  hide_sets: [stator_unit]
+  render_3d: compartments
+  compartment_sets: [FliL, PflA, PflB, PflCD, Lipo, MotB]
+  surface:
+    FliL: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    PflA: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    PflB: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    PflCD: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    Lipo: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    MotB: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+  opacity: {FliL: 1.0, PflA: 1.0, PflB: 1.0, PflCD: 1.0, Lipo: 1.0, MotB: 1.0}
+  colors:
+    FliL: [0.75, 0.22, 0.17]
+    PflA: [0.18, 0.44, 0.71]
+    PflB: [0.29, 0.49, 0.35]
+    PflCD: [0.88, 0.51, 0.08]
+    Lipo: [0.48, 0.35, 0.65]
+    MotB: [0.09, 0.75, 0.81]
+  spheres: {set: stator_unit, radius: 0.032143, color: '#e8b04a', specular: 0.0, ambient: 0.25, diffuse: 0.8}
+  subject: PflA
+  keep_stills: true
+  stills: 4
+  max_frames: 10
+  real_time: false
+  fps: 37.5
+  zoom: 1.6
+  ssao: true
+  ssao_radius_frac: 0.03
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio

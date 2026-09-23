@@ -477,7 +477,20 @@ class LiveMovie:
             except Exception as _e:                                  # noqa: BLE001
                 print(f"[live-movie] surface_env unavailable ({type(_e).__name__}: {_e})",
                       flush=True)
-        self.p.set_background("black")
+        # `plotting.background`: black unless the spec says otherwise. The structural-biology
+        # figure is drawn on WHITE (every cryo-EM panel of Drobnic et al. 2025, and the ChimeraX
+        # default), and on white every overlay -- scale bar, its label, the frame header, the
+        # graph pens -- has to turn dark or vanish; `self._fg` is that one colour, read wherever
+        # the overlays used to say "white". Added for builder/exp_02_bacterium step 0013.
+        _bg = str(self.style.get("background", "black") or "black")
+        self.p.set_background(_bg)
+        try:
+            from matplotlib.colors import to_rgb as _to_rgb
+            self._fg = "black" if sum(_to_rgb(_bg)) > 1.5 else "white"
+        except Exception:                                            # noqa: BLE001
+            self._fg = "white"
+        if _bg != "black":
+            print(f"[live-movie] background {_bg}; overlays drawn in {self._fg}", flush=True)
         self.p.enable_anti_aliasing("msaa", multi_samples=8)
 
         # 2D IS DETECTED FROM THE WORLD ITSELF, BEFORE PADDING. This used to pad `world` to three
@@ -639,7 +652,7 @@ class LiveMovie:
                     _a[_off] = _b[_off] = float(self.lo[_off]) - 0.04 * float(span[_off])
                 _lift = float((self.style or {}).get("scale_bar_lift", 0.0)) * float(span[self.up])
                 _a[self.up] = _b[self.up] = float(self.lo[self.up]) + _lift
-                self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
+                self.p.add_mesh(pv.Line(_a, _b), color=self._fg, line_width=4.0, lighting=False)
                 _lab = _si_length(_len_m)
                 # THE LABEL IS 3D TEXT LYING ALONG THE BAR, not a screen-aligned point label.
                 #
@@ -697,7 +710,7 @@ class LiveMovie:
                     _fig = _plt.figure(figsize=(6, 1.4), dpi=200)
                     _fig.patch.set_alpha(0.0)
                     _tx = _fig.text(0.5, 0.5, _lab, ha="center", va="center",
-                                    color="white", fontsize=44)
+                                    color=self._fg, fontsize=44)
                     _fig.canvas.draw()
                     _bb = _tx.get_window_extent(_fig.canvas.get_renderer())
                     _img = np.asarray(_fig.canvas.buffer_rgba())
@@ -724,7 +737,7 @@ class LiveMovie:
                     print(f"[live-movie] 3D scale label unavailable ({type(e).__name__}: {e}); "
                           f"using a flat one", flush=True)
                     _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.09 * float(span[self.up])
-                    self.p.add_point_labels([_mid], [_lab], font_size=26, text_color="white",
+                    self.p.add_point_labels([_mid], [_lab], font_size=26, text_color=self._fg,
                                             bold=False, shape=None, show_points=False,
                                             always_visible=True,
                                             justification_horizontal="center",
@@ -920,7 +933,7 @@ class LiveMovie:
         # grey, and nothing about the colour pipeline was wrong -- the lighting was.
         if obs and not self.is2d and bool(self.style.get("shadows", False)):
             try:
-                self.p.enable_shadows()
+                self.p.enable_shadows(); self._shadows_on = True
             except Exception as e:                      # not fatal: the movie is still readable
                 print(f"[live-movie] shadows unavailable ({type(e).__name__}: {e}); "
                       f"obstacles are flat-shaded without them", flush=True)
@@ -1261,6 +1274,26 @@ class LiveMovie:
         # machine's speed and it is genuinely useful while a run is in flight.
         clk = ""
         if self.speed is not None:
+            # AMBIENT OCCLUSION, `plotting.ssao: true`: the soft shadow a body casts into its own
+            # crevices and onto what it stands on, from the depth buffer (VTK's SSAO pass). The
+            # contour renderer has always had it with its own keys; this is the same pass for any
+            # 3D scene -- spheres, compartment dots, surfaces -- with `ssao_radius_frac` of the box
+            # (0.02) and `ssao_kernel` (128) as its two knobs. And `plotting.shadows: true` without
+            # an obstacle: the obstacle block above only enables VTK's shadow pass when there is an
+            # obstacle to cast one, but a scene of spheres and lit dots casts them too.
+            if not self.is2d and bool((self.style or {}).get("ssao", False)):
+                try:
+                    _box = float(np.max(self.world))
+                    self.p.enable_ssao(radius=_box * float((self.style or {}).get("ssao_radius_frac", 0.02)),
+                                       bias=_box * float((self.style or {}).get("ssao_bias_frac", 0.001)),
+                                       kernel_size=int((self.style or {}).get("ssao_kernel", 128)))
+                except Exception as e:                        # noqa: BLE001
+                    print(f"[live-movie] ssao unavailable: {e}", flush=True)
+            if not self.is2d and bool((self.style or {}).get("shadows", False)) and not getattr(self, "_shadows_on", False):
+                try:
+                    self.p.enable_shadows(); self._shadows_on = True
+                except Exception as e:                        # noqa: BLE001
+                    print(f"[live-movie] shadows unavailable: {e}", flush=True)
             clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
             if abs(getattr(self, "slow_motion", 1.0) - 1.0) > 1e-9:
                 clk += f"   {self.slow_motion:g}x slow"
@@ -1285,7 +1318,7 @@ class LiveMovie:
                         f"frame {tick}/{self.n_frames}   "
                         f"{(self._fixed_ms if self._fixed_ms is not None else el / max(tick, 1) * 1000):.0f}"
                         f" ms/frame {self._rate_of}{clk}{_lut}",
-                        position="upper_left", font_size=11, color="white", name="hdr")
+                        position="upper_left", font_size=11, color=self._fg, name="hdr")
         if self.cs is not None:
             self._update_cross_section(H)
         self.p.write_frame()
@@ -1567,7 +1600,7 @@ class LiveMovie:
                 except Exception:                        # noqa: BLE001
                     pass
                 try:
-                    _a.pen.color = "white"
+                    _a.pen.color = self._fg
                     # NOT BOLD. vtkAxis renders both its title and its tick labels bold by default,
                     # which at this size reads as emphasis the panel is not making -- and bold white
                     # on black blooms, so the strokes close up and a 3 becomes an 8. `SetColor` was
@@ -1717,7 +1750,7 @@ class LiveMovie:
                     if lab["unit"]:
                         txt += f" {lab['unit']}"
                 self.p.add_text(txt, position=(lab["x"], lab["y"]), viewport=True,
-                                font_size=lab["fs"], color="white", name=lab["name"])
+                                font_size=lab["fs"], color=self._fg, name=lab["name"])
 
     # ---- the cloud AS a surface -----------------------------------------------------------
     #
@@ -2292,7 +2325,7 @@ class LiveMovie:
                                            st.get("surface_specular_power", 24))))),
                                 ambient=float(_m.get("ambient", st.get("surface_ambient", 0.22))),
                                 diffuse=float(_m.get("diffuse", st.get("surface_diffuse", 0.78))),
-                                show_scalar_bar=False)
+                                show_scalar_bar=False, **self._silhouette())
                 # BACKFACE CULLING IS AN ACTOR PROPERTY, not an `add_mesh` keyword -- pyvista's
                 # signature has no such argument in this version, so passing it raised and the
                 # whole compartment fell back to dots. Set on the actor, where VTK keeps it.
@@ -2341,7 +2374,7 @@ class LiveMovie:
                     else (self.style or {}).get("dot_size", 2.0))
         self.p.add_mesh(pd, color=col, opacity=float(opa.get(nm, dflt_op)),
                         render_points_as_spheres=True, point_size=_ps,
-                        lighting=False, show_scalar_bar=False)
+                        show_scalar_bar=False, **self._dot_light())
         return {"kind": "dots", "surf": pd, "sub": sel, "name": nm, "n": int(sel.size),
                 "set": set_name}
 
@@ -2379,12 +2412,48 @@ class LiveMovie:
         if occ.size == 0:
             return None
         iso = float(st.get("surface_iso", 0.0)) or 0.5 * float(np.median(occ))
+        # `dot_shading: true` LIGHTS THESE SPRITES TOO. The subject cloud already honours it (see
+        # the FLAT block); a compartment's dots were always unlit, so a scene made of six
+        # compartment sets -- the six proteins of the C. jejuni scaffold, PDB 9HMF, one point per
+        # alpha carbon (builder/exp_02_bacterium step 0012) -- came out as flat confetti while the
+        # spheres beside it were shaded. Same keys, same defaults, except `dot_specular` defaults
+        # to 0 here: a protein drawn from a cryo-EM model is matte in every figure it comes from.
         g = self.pv.ImageData(dimensions=tuple(int(v) for v in dim),
                               spacing=(h, h, h), origin=tuple(float(v) for v in lo))
         g.point_data["d"] = D.ravel(order="F")
         surf = g.contour([iso], scalars="d")
         if surf.n_points == 0:
             return None
+    def _dot_light(self):
+        """The lighting keywords of a dot sprite: unlit unless `plotting.dot_shading: true`."""
+        st = self.style or {}
+        if st.get("dot_shading", False) is not True:
+            return dict(lighting=False)
+        return dict(lighting=True, ambient=float(st.get("dot_ambient", 0.3)),
+                    diffuse=float(st.get("dot_diffuse", 0.7)), specular=float(st.get("dot_specular", 0.0)),
+                    specular_power=float(st.get("dot_specular_power", 20)))
+
+    def _silhouette(self):
+        """`plotting.silhouette: {color, width}` -- THE OUTLINE OF THE STRUCTURAL-BIOLOGY FIGURE.
+        ChimeraX draws every surface with a dark line where its depth jumps against what is behind
+        it (`graphics silhouettes true`), and that line is what makes a segmented cryo-EM map read
+        as bodies in front of bodies instead of one coloured blob; every panel of Drobnic et al.
+        2025 is drawn so. VTK's silhouette filter is that line for a mesh (pyvista `silhouette=`),
+        so surfaces and spheres take it here; point sprites cannot carry one, and for them `edl`
+        is the same cue computed from the depth buffer instead."""
+        sil = (self.style or {}).get("silhouette")
+        if not sil:
+            return {}
+        sil = sil if isinstance(sil, dict) else {}
+        # NO `feature_angle` UNLESS A NUMBER IS GIVEN: pyvista turns any non-None value into
+        # SetEnableFeatureAngle(True) with that value as the angle, and False is the angle 0, at
+        # which EVERY edge is a feature -- measured as 17 wireframe globes where 17 outlined balls
+        # were asked for.
+        out = dict(color=str(sil.get("color", "black")), line_width=float(sil.get("width", 2.0)))
+        if isinstance(sil.get("feature_angle"), (int, float)) and not isinstance(sil.get("feature_angle"), bool):
+            out["feature_angle"] = float(sil["feature_angle"])
+        return dict(silhouette=out)
+
         # NOT `extract_largest`, which is right for one body and wrong for a COMPARTMENT: there are
         # 77 mitochondria and 421 membrane patches, and keeping only the biggest connected piece
         # would draw one of them.
