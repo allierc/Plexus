@@ -104,7 +104,8 @@ class BasementMembraneNode:
         lvl.register_buffer("alive", torch.zeros(n, dtype=torch.bool, device=device))
 
 
-@register_operator("bm_seed", family="seed", set="particle", kind="seed")
+@register_operator("bm_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_i=\mathbf c+\mathbf u_i\big(S\,R(\theta_i,\phi_i)+\text{offset}\big)$$""")
 class BasementMembraneSeed(Structural):
     """Lay the membrane down once, as a shell just OUTSIDE the epithelium's surface.
 
@@ -366,7 +367,8 @@ class BasementMembraneSeed(Structural):
         return {}
 
 
-@register_operator("bm_bond", family="mechanics", set="particle", kind="lateral")
+@register_operator("bm_bond", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$L_e=\lVert\mathbf x_j-\mathbf x_i\rVert,\qquad \mathbf f_e=k\,(L_e-L_e^{0})\,\frac{\mathbf x_j-\mathbf x_i}{L_e}$$""")
 class BasementMembraneBond(Lateral):
     """Crosslinks: springs between neighbouring membrane particles, built once and thereafter
     breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.
@@ -833,7 +835,8 @@ class BasementMembraneBondBreak(Structural):
         return float(torch.bincount(lab).max().item() / max(denom or n, 1))
 
 
-@register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral")
+@register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i=k\,(\mathbf x^{\mathrm{anchor}}_i-\mathbf x_i)-\text{damp}\,\mathbf v_i$$""")
 class IntegrinAdhesion(Lateral):
     """Anchor the basement membrane to the epithelium, the way integrins do: each particle is
     pulled back toward the angular position it was seeded on, on a surface that is growing.
@@ -1052,7 +1055,8 @@ class IntegrinAdhesion(Lateral):
         return {lvl.name: acc}
 
 
-@register_operator("bm_remodel", family="population", set="particle", kind="lateral")
+@register_operator("bm_remodel", family="population", set="particle", kind="lateral",
+                   equation=r"""$$L_e^{0}\leftarrow L_e^{0}+\big(L_e-L_e^{0}\big)\frac{\Delta t}{\tau}$$""")
 class BasementMembraneRemodel(Lateral):
     """Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW
     rather than only stretch.
@@ -1168,7 +1172,8 @@ class BasementMembraneRemodel(Lateral):
 
 
 
-@register_operator("bm_contact", family="boundary", set="particle", kind="lateral")
+@register_operator("bm_contact", family="boundary", set="particle", kind="lateral",
+                   equation=r"""$$d_i=S\,R(\theta_i,\phi_i)+\text{standoff}-\lVert\mathbf x_i-\mathbf c\rVert,\qquad \mathbf a_i=k\,d_i\,\mathbf u_i$$""")
 class BasementMembraneContact(Lateral):
     """Non-penetration between the sheet and the epithelium, imposed as a FORCE on each particle
     rather than as a boundary condition on the grid.
@@ -1289,7 +1294,8 @@ class BasementMembraneContact(Lateral):
 # is the force, `adhesion_turnover` is the rewire that breaks and re-forms.
 # ---------------------------------------------------------------------------------------------------
 
-@register_operator("adhesion_seed", family="seed", set="particle", kind="seed")
+@register_operator("adhesion_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_a=\mathbf c+u_a\,S\,R(\theta_a,\phi_a),\qquad \mathrm{bound}(a)=\arg\min_i\lVert\mathbf x_i-\mathbf x_a\rVert$$""")
 class AdhesionSeed(Structural):
     """Place hemidesmosomes on the basal surface and bind each to the nearest membrane particle,
     once, at the opening of the trajectory.
@@ -1363,7 +1369,8 @@ class AdhesionSeed(Structural):
         return {}
 
 
-@register_operator("adhesion_pull", family="mechanics", set="particle", kind="exchange")
+@register_operator("adhesion_pull", family="mechanics", set="particle", kind="exchange",
+                   equation=r"""$$\dot{\mathbf x}_i=\frac{k}{\gamma}\,(\mathbf x_a-\mathbf x_i)$$""")
 class AdhesionPull(Lateral):
     """The force a hemidesmosome exerts on the membrane patch it binds.
 
@@ -1513,7 +1520,8 @@ class AdhesionTurnover(Rewire):
         return {}
 
 
-@register_operator("bm_repel", family="boundary", set="particle", kind="lateral")
+@register_operator("bm_repel", family="boundary", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i=k_{\mathrm{rep}}\sum_j\big(\ell^{*}-L_{ij}\big)\frac{\mathbf x_i-\mathbf x_j}{L_{ij}}$$""")
 class BasementMembraneRepel(Lateral):
     """Excluded volume between membrane nodes: push apart anything closer than a target spacing,
     and never pull.
@@ -2057,7 +2065,8 @@ def _radius(M, u):
              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
 
 
-@register_operator("integrin_fibre_seed", family="seed", set="particle", kind="seed")
+@register_operator("integrin_fibre_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_{a,l}=\mathbf c+\mathbf u_a\left(S\,R(\theta_a,\phi_a)+l\,\frac{\text{length}}{\text{layers}}\right),\qquad l=0\ldots\text{layers}-1$$""")
 class IntegrinSeed(Structural):
     """Lay the integrin fibres down once: `layers` particles per fibre, running outward from the
     epithelial surface.
@@ -2135,7 +2144,8 @@ class IntegrinSeed(Structural):
         return {}
 
 
-@register_operator("integrin_fibre_track", family="mechanics", set="particle", kind="structural")
+@register_operator("integrin_fibre_track", family="mechanics", set="particle", kind="structural",
+                   equation=r"""$$\mathbf x_{a,0}=\mathbf c+\mathbf u_a\,S\,R(\theta_a,\phi_a,t),\qquad \mathbf v_{a,0}=\frac{\mathbf x_{a,0}(t)-\mathbf x_{a,0}(t-1)}{\Delta t}$$""")
 class IntegrinTrack(Structural):
     """Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row
     of particles, rather than on the grid.
@@ -2215,7 +2225,8 @@ class IntegrinTrack(Structural):
         return {}
 
 
-@register_operator("integrin_fibre_pull", family="mechanics", set="particle", kind="lateral")
+@register_operator("integrin_fibre_pull", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf f=k\,(\mathbf x_{\mathrm{tip}}-\mathbf x_{\mathrm{membrane}})$$""")
 class IntegrinPull(Lateral):
     """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and
     opposite reaction on the fibre.

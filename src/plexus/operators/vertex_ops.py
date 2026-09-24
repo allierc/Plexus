@@ -878,7 +878,7 @@ def _engine_owns_clock(params, default=1):
 # follows the `seed_<noun>` convention core already uses for `seed_from_segmentation`, while the
 # okuda classes kept the old spelling, so 325 specs, including every `r0*` the campaign has ever
 # written, could not be run at all. `seed_cell_chem` (320 specs) had the same break.
-@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed")
+@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed", title="Build the cell mesh")
 class SeedMesh3D(Structural):
     """Build the surface the whole model lives on, once, at frame 0: a closed half-edge mesh whose
     faces are the cells.
@@ -1144,7 +1144,7 @@ class SeedMesh3D(Structural):
 
 
 @register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed",
-                   model="apicobasal")
+                   model="apicobasal", title="Build the cell mesh")
 class SeedMeshApicoBasal(SeedMesh3D):
     """`apicobasal` IMPLEMENTATION of seed_mesh -- the same epithelium, seeded WITH ITS THICKNESS.
 
@@ -1355,7 +1355,8 @@ class SeedMeshApicoBasal(SeedMesh3D):
         return out
 
 
-@register_operator("cell_mechanics", set="vertex", kind="lateral", family="mechanics")
+@register_operator("cell_mechanics", set="vertex", kind="lateral", family="mechanics", title="Vertex-model shape energy",
+                   equation=r"""$$E=\sum_f\Big[K_A\big(A_f-A^{0}\big)^2+K_P\big(P_f-P^{0}\big)^2+K_V\big(v_f-v^{\mathrm{eq}}_f\big)^2\Big]+\Lambda\sum_e\ell_e,\qquad \mathbf f=-\nabla E$$""")
 class ShapeEnergy3D(Lateral):
     """3D vertex-model shape-energy force on the vesicle vertices:
         E = sum_f [ K_A(A_f-A0)^2 + K_P(P_f-P0)^2 + K_V(v_f - v_eq_f)^2 ] + Lambda*sum_e l_e .
@@ -1645,7 +1646,8 @@ class ShapeEnergy3D(Lateral):
 # VOLUME, so the same plateau is `vth_frac = max_scale ** 3`.
 
 
-@register_operator("cell_divide", set="vertex", kind="divide", family="population")
+@register_operator("cell_divide", set="vertex", kind="divide", family="population", title="Cell division",
+                   equation=r"""$$w\ \longrightarrow\ \tfrac{w}{2},\ \tfrac{w}{2}\qquad\text{a septum through the face, one cell becoming two}$$""")
 class Divide3D(Structural):
     """Cell division: a septum through a face, so one cell becomes two, and the surface gains a
     cell without losing its closure.
@@ -2147,7 +2149,8 @@ class Divide3D(Structural):
         return {}
 
 
-@register_operator("cell_die", set="vertex", kind="die", family="population")
+@register_operator("cell_die", set="vertex", kind="die", family="population", title="Cell death",
+                   equation=r"""$$A^{0}_j\leftarrow A^{0}_j\left(1-\frac{1}{\tau}\right)\quad\text{while the cell is dying}$$""")
 class Apoptosis3D(Structural):
     """Cell elimination: the die family, and the inverse of `cell_divide`. A marked cell contracts
     its own ring to a point over several frames and is then removed from the surface.
@@ -2935,7 +2938,7 @@ class Apoptosis3D(Structural):
 
 
 @register_operator("cell_die", model="competition", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DCompetition(Apoptosis3D):
     """`competition` model of cell_die: a cell growing more slowly than its neighbours is
     out-proliferated and removed -- the Myc-style loser of cell competition.
@@ -2958,7 +2961,7 @@ class Apoptosis3DCompetition(Apoptosis3D):
 
 
 @register_operator("cell_die", model="smaller", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DSmaller(Apoptosis3D):
     """`smaller` model of cell_die: a cell smaller than its neighbours is squeezed out by a
     tissue that can no longer accommodate it.
@@ -2980,7 +2983,7 @@ class Apoptosis3DSmaller(Apoptosis3D):
 
 
 @register_operator("cell_die", model="dimmer", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DDimmer(Apoptosis3D):
     """`dimmer` model of cell_die: a cell carrying less activator than its neighbours -- the
     LOCAL form of `chem_low`, which compares against the whole tissue instead.
@@ -3003,7 +3006,7 @@ class Apoptosis3DDimmer(Apoptosis3D):
 
 
 @register_operator("cell_die", model="older", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DOlder(Apoptosis3D):
     """`older` model of cell_die: a cell that has gone longer without dividing than its
     neighbours -- one that has stopped cycling while the tissue around it has not.
@@ -3022,7 +3025,7 @@ class Apoptosis3DOlder(Apoptosis3D):
 
 
 @register_operator("cell_die", model="crowded", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DCrowded(Apoptosis3D):
     """`crowded` model of cell_die: a cell with more neighbours than a trivalent sheet should
     give it -- density-driven extrusion.
@@ -3043,7 +3046,7 @@ class Apoptosis3DCrowded(Apoptosis3D):
 
 
 @register_operator("cell_die", model="lonely", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DLonely(Apoptosis3D):
     """`lonely` model of cell_die: a cell with fewer neighbours than a sheet should give it, so
     the tissue closes over a gap.
@@ -3064,7 +3067,7 @@ class Apoptosis3DLonely(Apoptosis3D):
 
 
 @register_operator("cell_die", model="small", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DSmall(Apoptosis3D):
     """`small` model of cell_die: below an ABSOLUTE volume threshold, not a relative one -- the
     one selection that is genuinely about the cell's own state and not about where it sits.
@@ -3086,7 +3089,7 @@ class Apoptosis3DSmall(Apoptosis3D):
 
 
 @register_operator("cell_die", model="stalled", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DStalled(Apoptosis3D):
     """`stalled` model of cell_die: below an absolute GROWTH-RATE threshold -- a cell that has
     stopped growing, judged against a number rather than against its neighbours.
@@ -3106,7 +3109,7 @@ class Apoptosis3DStalled(Apoptosis3D):
 
 
 @register_operator("cell_die", model="chem_low", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DChemLow(Apoptosis3D):
     """`chem_low` model of cell_die: below an absolute activator threshold, so cells die BETWEEN
     the spots of a pattern.
@@ -3128,7 +3131,7 @@ class Apoptosis3DChemLow(Apoptosis3D):
 
 
 @register_operator("cell_die", model="prescribed", set="vertex", kind="die",
-                   family="population")
+                   family="population", title="Cell death")
 class Apoptosis3DPrescribed(Apoptosis3D):
     """`prescribed` model of cell_die: the EXPERIMENTER ablates a patch, and the tissue did not
     choose it. A control, and the way to ask what a wound does.
@@ -3148,7 +3151,7 @@ class Apoptosis3DPrescribed(Apoptosis3D):
     DEATH = "prescribed"
 
 
-@register_operator("cell_die", model="field", set="vertex", kind="die", family="population")
+@register_operator("cell_die", model="field", set="vertex", kind="die", family="population", title="Cell death")
 class Apoptosis3DField(Apoptosis3D):
     """`field` model of cell_die: death keyed to a per-cell quantity SOME OTHER operator
     published, so a new measurement needs no new branch here.
@@ -3172,7 +3175,7 @@ class Apoptosis3DField(Apoptosis3D):
     DEATH = "field"
 
 
-@register_operator("cell_divide", model="doubler", set="vertex", kind="divide", family="population")
+@register_operator("cell_divide", model="doubler", set="vertex", kind="divide", family="population", title="Cell division")
 class Divide3DDoubler(Divide3D):
     """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until
     kept because it is the null the absolute-size rule has to beat, and because a large part of
@@ -3191,7 +3194,7 @@ class Divide3DDoubler(Divide3D):
         return v_now >= self.factor * jit * v_birth
 
 
-@register_operator("cell_divide", model="timer", set="vertex", kind="divide", family="population")
+@register_operator("cell_divide", model="timer", set="vertex", kind="divide", family="population", title="Cell division")
 class Divide3DTimer(Divide3D):
     """Divide on the CLOCK: `age >= cycle * jit` division-calls since birth, size ignored entirely.
 
@@ -3217,7 +3220,8 @@ class Divide3DTimer(Divide3D):
         return age >= self.cycle * jit
 
 
-@register_operator("seed_cycle", set="vertex", kind="seed", family="population")
+@register_operator("seed_cycle", set="vertex", kind="seed", family="population",
+                   equation=r"""$$V^{0}_f\leftarrow\frac{V^{0}_f\,(1+u)}{1.5},\qquad u\sim\mathcal U(0,1)$$""")
 class SeedCycle3D(Seed):
     """Spread a seeded population over the cell cycle, once, before frame 0.
 
@@ -3905,7 +3909,7 @@ class CellCycleInhibitorDilution(CellCycle3D):
         return np.where(ctx["conc"] <= self.inhib_thresh, np.maximum(r, ctx["to_boundary"]), r)
 
 
-@register_operator("cell_divide", model="cycle", set="vertex", kind="divide", family="population")
+@register_operator("cell_divide", model="cycle", set="vertex", kind="divide", family="population", title="Cell division")
 class Divide3DCycle(Divide3D):
     """Divide when `cell_cycle` says the cell is in M. The trigger reads a phase and nothing else.
 
@@ -3935,7 +3939,7 @@ class Divide3DCycle(Divide3D):
         return ph >= CellCycle3D.M
 
 
-@register_operator("cell_divide", model="adder", set="vertex", kind="divide", family="population")
+@register_operator("cell_divide", model="adder", set="vertex", kind="divide", family="population", title="Cell division")
 class Divide3DAdder(Divide3D):
     """Divide once the cell has ADDED a constant volume since birth: `v >= v_birth + delta*jit*v_ref`.
 
@@ -3982,7 +3986,7 @@ class Divide3DAdder(Divide3D):
 
 
 @register_operator("cell_divide", model="concerted", set="vertex", kind="divide",
-                   family="population")
+                   family="population", title="Cell division")
 class Divide3DConcerted(Divide3D):
     """Size AND time together: divide when `w*(v/(factor*jit*v_ref)) + (1-w)*(age/(cycle*jit)) >= 1`.
 
@@ -4024,7 +4028,7 @@ class Divide3DConcerted(Divide3D):
         return (w * by_size + (1.0 - w) * by_time) >= 1.0
 
 
-@register_operator("topo_record", set="vertex", kind="structural", family="harness")
+@register_operator("topo_record", set="vertex", kind="structural", family="harness", title="Record the mesh each frame", probe=True)
 class TopoSnapshot3D(Structural):
     """A measurement, as an operator: record the current mesh once per frame, so a vesicle whose
     topology changes can be rendered frame by frame.
@@ -4373,7 +4377,8 @@ def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None, plane_axis=No
 # --------------------------------------------------------------------------------------------------
 #  plexus operator
 # --------------------------------------------------------------------------------------------------
-@register_operator("edge_flip", set="vertex", kind="rewire", family="topology")
+@register_operator("edge_flip", set="vertex", kind="rewire", family="topology", title="T1 neighbour exchange",
+                   equation=r"""$$\ell_e<\ell_{\mathrm{th}}\ \Rightarrow\ \text{reconnect: } (a,b)\ \longleftrightarrow\ (c,d)$$""")
 class ReconnectT1_3D(Rewire):
     """The T1 transition: a reversible neighbour exchange, and the ingredient that makes this a
     dynamic vertex model rather than a repeatedly re-tessellated one.
@@ -4873,7 +4878,7 @@ def _monolayer_energy_core(pos, es, et, ef, nF, h_cell, V_eq, alive, k_v, kappa_
     return E
 
 
-@register_operator("cell_mechanics", model="monolayer", set="vertex", kind="lateral", family="mechanics")
+@register_operator("cell_mechanics", model="monolayer", set="vertex", kind="lateral", family="mechanics", title="Vertex-model shape energy")
 class MonolayerShapeEnergy3D(Lateral):
     """The MONOLAYER implementation of the cell_mechanics contract (plexus2 sec. 5: same biological
     operator -- the mechanical force that shapes the epithelial vesicle -- different NUMERICS). The
@@ -5080,7 +5085,7 @@ class MonolayerShapeEnergy3D(Lateral):
 
 
 @register_operator("cell_mechanics", model="apicobasal", set="vertex", kind="lateral",
-                   family="mechanics")
+                   family="mechanics", title="Vertex-model shape energy")
 class ApicoBasalShapeEnergy3D(Lateral):
     """R3 OF THE APICO-BASAL PROMOTION: the energy, written on the doubled degree-of-freedom set.
 
@@ -5373,7 +5378,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
 
 
 @register_operator("cell_mechanics", model="marinari", set="vertex", kind="lateral",
-                   family="mechanics")
+                   family="mechanics", title="Vertex-model shape energy")
 class ShapeEnergy3DMarinari(ShapeEnergy3D):
     """The work function of Marinari et al., Nature 484:542 (2012), Supplementary p.1:
 
@@ -5728,7 +5733,7 @@ def try_shape_energy_grad(op, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, 
 
 
 @register_operator("cell_mechanics", implementation="warp", set="vertex", kind="lateral",
-                   family="mechanics")
+                   family="mechanics", title="Vertex-model shape energy")
 class ShapeEnergy3DWarp(ShapeEnergy3D):
     """`cell_mechanics` with the shape-energy gradient in warp -- WHICH IS THE DEFAULT.
 

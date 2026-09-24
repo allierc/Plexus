@@ -84,7 +84,8 @@ def _neighbours(it, ph, G):
     return torch.stack(out, 2).reshape(it.shape[0], 9)                # [n,9]
 
 
-@register_operator("mesh_contact", family="boundary", set="particle", kind="lateral")
+@register_operator("mesh_contact", family="boundary", set="particle", kind="lateral", title="Contact with a live surface",
+                   equation=r"""$$\mathbf a_n=k\,d_i\,\mathbf n,\qquad \mathbf v_t=(\mathbf v_i-\mathbf v_{\mathrm{face}})-\big((\mathbf v_i-\mathbf v_{\mathrm{face}})\cdot\mathbf n\big)\mathbf n,\qquad \mathbf a_t=-\mu\lVert\mathbf a_n\rVert\frac{\mathbf v_t}{\lVert\mathbf v_t\rVert+\varepsilon_v}$$""")
 class MeshContact(Lateral):
     """Particle-to-surface contact against a LIVE triangulated surface: the surface pushes
     material points out of itself, drags on them, and feels the equal and opposite reaction.
@@ -607,7 +608,7 @@ class MeshContact(Lateral):
                                                                         torch.float32).numpy()
 
 
-@register_operator("mesh_inside", family="hierarchy", set="particle", kind="lateral")
+@register_operator("mesh_inside", family="hierarchy", set="particle", kind="lateral", title="How much matrix lies inside the surface", probe=True)
 class MeshInsideCount(Lateral):
     """A measurement, as an operator: how many matrix particles are behind the surface, and how
     deep. It counts and does not correct, which is the whole point of it.
@@ -774,7 +775,8 @@ def selftest(surface="sphere", dev="cuda:0", n=40000, n_brute=400, **kw):
 SENSE_TRACE: list = []
 
 
-@register_operator("bm_sense", family="signalling", set="vertex", kind="structural")
+@register_operator("bm_sense", family="signalling", set="vertex", kind="structural",
+                   equation=r"""$$\mathbf u_f=\frac{\mathbf c_f-\mathbf c}{\lVert\mathbf c_f-\mathbf c\rVert},\qquad \mathrm{def}_f=\mathrm{clamp}\!\left(1-\frac{L_f}{p_{\mathrm{ref}}},0,1\right)^{\text{sharp}}$$""")
 class BMSense3D(Structural):
     """The epithelium reads the membrane it is resting on: each cell senses how much basement
     membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act
@@ -881,7 +883,8 @@ class BMSense3D(Structural):
 PLATE_CONTACT: list = []
 
 
-@register_operator("plate_confine", family="boundary", set="vertex", kind="structural")
+@register_operator("plate_confine", family="boundary", set="vertex", kind="structural",
+                   equation=r"""$$g(t)=g_0+(g_1-g_0)\,\mathrm{clamp}\!\left(\frac{t-t_0}{t_1-t_0},0,1\right),\qquad x_a\leftarrow c_a+\mathrm{sign}(x_a-c_a)\min\big(\lvert x_a-c_a\rvert,\,g(t)\big)$$""")
 class PlateConfine3D(Structural):
     """Confine a set between two rigid plates: a hard boundary imposed as a PROJECTION rather
     than as a force, so nothing can be pushed through it however hard it is pressed.
@@ -1066,7 +1069,7 @@ def _plate_half_edges(quads):
     return es[o], et[o], ef[o]
 
 
-@register_operator("seed_plate", family="seed", set="vertex", kind="seed")
+@register_operator("seed_plate", family="seed", set="vertex", kind="seed", title="Lay out the plate")
 class SeedPlate(Structural):
     """An open planar half-edge patch, laid out once at frame 0: the rigid tool a
     parallel-plate or nanoindentation assay presses with.
@@ -1213,7 +1216,8 @@ class SeedPlate(Structural):
 
 
 @register_operator("surface_drive", "plate_drive", family="mechanics", set="vertex",
-                   kind="structural")
+                   kind="structural", title="Drive the surface at a set rate",
+                   equation=r"""$$x_a(t)\leftarrow x_a(0)+b_y\,\mathrm{clamp}\!\left(\frac{t-t_{\mathrm{hold}}}{t_{\mathrm{over}}},0,1\right),\qquad v_a=\frac{b_y}{t_{\mathrm{over}}}$$""")
 class SurfaceDrive(Structural):
     """Move a seeded surface along one axis at a prescribed rate, and publish its velocity: the
     loading protocol of a displacement-controlled indentation.
@@ -1419,7 +1423,8 @@ class SurfaceElement:
         lvl.register_buffer("R", torch.zeros(n, device=device))
 
 
-@register_operator("surface_track", family="hierarchy", set="particle", kind="structural")
+@register_operator("surface_track", family="hierarchy", set="particle", kind="structural",
+                   equation=r"""$$\mathbf R(u,t)=\frac{\sum_j w_j\,\mathbf R_j}{\sum_j w_j}$$""")
 class SurfaceTrack(Structural):
     """Write a recorded epithelial surface into the `surface` set each frame, interpolated rather
     than binned, so the surface a strain field sees is smooth.
@@ -1530,7 +1535,8 @@ class SurfaceTrack(Structural):
 LOAD_TRACE: list = []
 
 
-@register_operator("ecm_load", family="mechanics", set="vertex", kind="structural")
+@register_operator("ecm_load", family="mechanics", set="vertex", kind="structural",
+                   equation=r"""$$s_i=\min\!\left(\frac{\text{gain}\,P(\theta_i,\phi_i,t)}{\mu}\,\Delta t,\;\text{cap}\cdot r_i\right),\qquad \mathbf x_i\leftarrow\mathbf x_i-s_i\,\mathbf u_i$$""")
 class ECMLoad3D(Structural):
     """The second half of the coupling: the matrix pushing back on the tissue, from a pressure
     map the matrix pass recorded.
@@ -1625,7 +1631,8 @@ class ECMLoad3D(Structural):
         return {}
 
 
-@register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural")
+@register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural",
+                   equation=r"""$$\mathrm{gate}_f=\mathrm{floor}+\frac{1-\mathrm{floor}}{1+(P_f/p_{1/2})^{n}},\qquad s_f\leftarrow s_{\mathrm{prev}}\big(1+\mathrm{gate}_f\,(f-1)\big)$$""")
 class ECMGrowthGate3D(Structural):
     """Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses
     hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.
@@ -1863,7 +1870,7 @@ class ECMGrowthGate3D(Structural):
 
 
 @register_operator("mesh_contact", model="centre", family="boundary", set="particle",
-                   kind="lateral")
+                   kind="lateral", title="Contact with a live surface")
 class MeshContactCentre(MeshContact):
     """`mesh_contact` as it has always worked, named: the surface indexed by DIRECTION from a centre.
 
@@ -1879,7 +1886,7 @@ class MeshContactCentre(MeshContact):
 
 
 @register_operator("mesh_contact", model="spatial_hash", family="boundary", set="particle",
-                   kind="lateral")
+                   kind="lateral", title="Contact with a live surface")
 class MeshContactHash(MeshContact):
     """The same contact, with candidates found by POSITION instead of by direction.
 

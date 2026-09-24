@@ -3,6 +3,8 @@
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -> open space (the flow is bounded by its dissipation).
 general:
+
+  title: "60,000 particles riding the Halvorsen attractor"
   name: halvorsen
   seed: 0
   n_frames: 10000

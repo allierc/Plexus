@@ -82,7 +82,8 @@ class MetaboliteSeed(Seed):
         return {}
 
 
-@register_operator("reaction_rate", family="metabolism", set="reaction", kind="aggregate")
+@register_operator("reaction_rate", family="metabolism", set="reaction", kind="aggregate",
+                   equation=r"""$$v_j=k_j\!\!\prod_{i\,:\,S_{ij}<0}\!\! c_i^{\,\lvert S_{ij}\rvert}$$""")
 class ReactionRate(Aggregate):
     """The mass-action rate of every reaction, from its substrates' concentrations.
 
@@ -164,7 +165,8 @@ class ReactionRate(Aggregate):
         return {}
 
 
-@register_operator("metabolite_flux", family="metabolism", set="metabolite", kind="aggregate")
+@register_operator("metabolite_flux", family="metabolism", set="metabolite", kind="aggregate",
+                   equation=r"""$$\frac{dc_i}{dt}=\sum_j S_{ij}\,v_j$$""")
 class MetaboliteFlux(Aggregate):
     """What the reactions do to every concentration: the stoichiometric sum of their rates.
 
@@ -206,7 +208,8 @@ class MetaboliteFlux(Aggregate):
         return {self.at: dc}
 
 
-@register_operator("metabolite_homeostasis", family="metabolism", set="metabolite", kind="lateral")
+@register_operator("metabolite_homeostasis", family="metabolism", set="metabolite", kind="lateral",
+                   equation=r"""$$\frac{dc_i}{dt}\mathrel{+}=-\lambda\left(c_i-c^{0}_i\Big(1+A\sin\frac{2\pi t}{T}\Big)\right)$$""")
 class MetaboliteHomeostasis(Lateral):
     """The homeostatic pull of every concentration towards its baseline.
 

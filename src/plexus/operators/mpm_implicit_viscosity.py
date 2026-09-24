@@ -8,7 +8,8 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_ops import sub_dt
 
 
-@register_operator("mpm_grid_viscosity", family="mpm", set="field", kind="field")
+@register_operator("mpm_grid_viscosity", family="mpm", set="field", kind="field",
+                   equation=r"""$$\big(\mathbf I-\nu\,\Delta t\,\mathbf L\big)\mathbf u^{\,\mathrm{new}}=\mathbf u^{\,\mathrm{old}},\qquad \nu=\frac{\eta}{\rho}$$""")
 class MPMGridViscosity(FieldUpdate):
     """Implicit (backward-Euler) shear diffusion of the grid velocity.
 

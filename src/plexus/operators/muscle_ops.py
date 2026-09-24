@@ -233,7 +233,8 @@ def _load_fit(path, need=("beta", "C", "K")):
 
 
 # --------------------------------------------------------------------------- g -- the static map
-@register_operator("muscle_pose_map", family="mechanics", set="muscle", kind="aggregate")
+@register_operator("muscle_pose_map", family="mechanics", set="muscle", kind="aggregate",
+                   equation=r"""$$g^{k}(\mathbf m)=\sum_i a^{k}_i m_i+\sum_{i\le j} b^{k}_{ij} m_i m_j$$""")
 class MusclePoseMap(Aggregate):
     """g, the static map: where the eye would come to rest if these six drives were held.
 
@@ -348,7 +349,8 @@ class MusclePoseMap(Aggregate):
 
 
 # --------------------------------------------------------------------------- the body
-@register_operator("organ_mechanics", family="mechanics", set="organ", kind="lateral")
+@register_operator("organ_mechanics", family="mechanics", set="organ", kind="lateral",
+                   equation=r"""$$\ddot{\mathbf u}+\mathbf C\dot{\mathbf u}+\mathbf K\mathbf u=\mathbf K\mathbf u_\infty,\qquad \dot{\mathbf u}'=(\mathbf I+\Delta t\,\mathbf C)^{-1}\big(\dot{\mathbf u}+\Delta t\,\mathbf K(\mathbf u_\infty-\mathbf u)\big)$$""")
 class OrganMechanics(Lateral):
     """The plant: a damped second-order body pulled toward the commanded equilibrium.
 

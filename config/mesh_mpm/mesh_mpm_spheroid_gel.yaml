@@ -27,6 +27,8 @@
 # the whole run instead of railing at its floor the way a dividing tissue's did.
 
 general:
+
+  title: "A spheroid of 400 cells inflating inside a gel"
   name: mesh_mpm_spheroid_gel
   seed: 0
   n_frames: 400

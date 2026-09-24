@@ -21,7 +21,8 @@ from plexus.models.base import Seed
 from plexus.models.registry import register_operator
 
 
-@register_operator("seed_positions", family="seed", set="cell", kind="seed")
+@register_operator("seed_positions", family="seed", set="cell", kind="seed", title="The initial positions",
+                   equation=r"""$$\mathbf x_i=\mathrm{placement}(\text{mode},\,r,\,i)$$""")
 class SeedPositions(Seed):
     """Write every position of a set, once, at the opening of the trajectory -- and with it the
     two things the engine used to derive from the placement: a unit heading per entity, and for a
@@ -120,7 +121,8 @@ class SeedPositions(Seed):
         return {}
 
 
-@register_operator("cloud_seed", family="seed", set="particle", kind="seed")
+@register_operator("cloud_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_i=\mathbf x_{\mathrm{origin}}+\text{scale}\cdot\mathbf q_i$$""")
 class CloudSeed(Seed):
     """Write every position of a set from a MEASURED POINT CLOUD in the shape library, once.
 

@@ -1,4 +1,6 @@
 general:
+
+  title: "Gray-Scott chemistry on a disc of 4,000 cells"
   name: turing2d_gs_eta
   seed: 0
   n_frames: 6000

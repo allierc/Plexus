@@ -181,7 +181,8 @@ def _live_edges(m, pos):
     return es, live, vi, vj, stride, _edge_key(vi, vj, stride), length
 
 
-@register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural")
+@register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural",
+                   equation=r"""$$m^{\mathrm{ss}}=a\,\frac{\ell_e}{\ell_{\mathrm{ref}}},\qquad \frac{dm}{dt}=\frac{m^{\mathrm{ss}}-m}{\tau}$$""")
 class JunctionMyosin(Structural):
     """Per-junction myosin, recruited by tension: a stretched junction recruits more, pulls
     harder, and so shrinks -- the positive mechanical feedback a constant line tension cannot
@@ -396,7 +397,8 @@ INHERIT_TRACE: list = []
 SYNC_TRACE: list = []
 
 
-@register_operator("junction_sync", family="mechanics", set="vertex", kind="rewire")
+@register_operator("junction_sync", family="mechanics", set="vertex", kind="rewire",
+                   equation=r"""$$m_e=\text{gain}\cdot\mathrm{store}\big[\mathrm{key}(v_i,v_j)\big],\qquad N_e=\mathrm{store}\big[\mathrm{key}(v_i,v_j)\big]\,\ell_e$$""")
 class JunctionMyosinSync(Rewire):
     """Re-key the per-junction myosin onto the half-edge arrays a topology operator has just
     changed, so what is recorded for a frame is what that frame's mechanics actually used.
@@ -499,7 +501,8 @@ def _face_carry(m, name):
     m.setdefault("face_carry", set()).add(name)
 
 
-@register_operator("medioapical_myosin", family="mechanics", set="cell", kind="lateral")
+@register_operator("medioapical_myosin", family="mechanics", set="cell", kind="lateral",
+                   equation=r"""$$M_f=\rho_f A_f,\qquad \frac{dM_f}{dt}=k_{\mathrm{on}}A_f-\frac{M_f}{\tau_{\mathrm{med}}}-\sum_e J_{f\to e},\qquad J_{f\to e}=k_{\mathrm{ex}}\rho_f\ell_e\!\left(1+\beta_T\!\left(\frac{T_e}{\langle T\rangle}-1\right)\right)$$""")
 class MedioapicalMyosin(Lateral):
     """The apical meshwork: a second myosin pool, spread over the FACE as an areal density
     rather than along its edges, which assembles there and flows outward onto the belt.
@@ -800,7 +803,8 @@ class JunctionMyosinTwoPool(Structural):
         return {}
 
 
-@register_operator("cytokinetic_ring", family="mechanics", set="vertex", kind="structural")
+@register_operator("cytokinetic_ring", family="mechanics", set="vertex", kind="structural",
+                   equation=r"""$$n_e=\text{ring}\cdot n^{*}_f,\qquad n^{*}_f=\tau_{\mathrm{jun}}\,k_{\mathrm{ex}}\,\rho_f$$""")
 class CytokineticRing(Structural):
     """The cytokinetic ring: the myosin a division leaves on the junction it just built, debited
     from the cortex that built it.

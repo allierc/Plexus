@@ -41,7 +41,10 @@ except Exception:
     HAVE_WARP = False
 
 
-@register_operator("attraction_repulsion", family="interaction", set="particle", kind="lateral")
+@register_operator("attraction_repulsion", family="interaction", set="particle", kind="lateral", title="Attraction and repulsion",
+                   equation=r"""$$f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
+\qquad
+\dot{\mathbf{x}}_i \;=\; \sum_{j\in\mathcal{N}(i)} f(r_{ij})\,(\mathbf{x}_j-\mathbf{x}_i)$$""")
 class AttractionRepulsion(Lateral):
     """Soft-core attraction-repulsion: a smooth pairwise law whose two competing Gaussians,
     a long-range pull and a short-range push, set the phase the set settles into.
@@ -142,7 +145,9 @@ def _inv_square_sum(pos, src, soft2):
     return pull
 
 
-@register_operator("squared_law", family="interaction", set="particle", kind="lateral")
+@register_operator("squared_law", family="interaction", set="particle", kind="lateral",
+                   equation=r"""$$\ddot{\mathbf x}_i \;=\; \mathrm{sign}\,k\;r_i\!\!\sum_{j}\, s_j\,
+\frac{\mathbf x_j-\mathbf x_i}{\big(\lVert\mathbf x_j-\mathbf x_i\rVert^{2}+\varepsilon^{2}\big)^{3/2}}$$""")
 class SquaredLaw(Lateral):
     """The inverse-square law between particles: Newtonian gravity between masses, or
     Coulomb electrostatics between signed charges, as one contract with two conventions.
@@ -257,7 +262,8 @@ class SquaredLaw(Lateral):
         return {self.at: acc}
 
 
-@register_operator("cohesion", family="interaction", set="particle", kind="lateral")
+@register_operator("cohesion", family="interaction", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i \;=\; a_1\,w^c_i\,\big\langle \mathbf x_j-\mathbf x_i\big\rangle_{j\in\mathcal N(i)}$$""")
 class Cohesion(Lateral):
     """Cohesion, the first boids steering rule: accelerate toward the mean position of the
     live neighbours, which is what holds a flock together against the other two rules.
@@ -304,7 +310,9 @@ class Cohesion(Lateral):
         return {self.at: acc}
 
 
-@register_operator("separation", family="interaction", set="particle", kind="lateral")
+@register_operator("separation", family="interaction", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i \;=\; -\,a_3\,w^s_i\,
+\Big\langle \frac{\mathbf x_j-\mathbf x_i}{\lVert\mathbf x_j-\mathbf x_i\rVert^{2}}\Big\rangle_{j\in\mathcal N(i)}$$""")
 class Separation(Lateral):
     """Separation, the second boids steering rule: accelerate away from close neighbours, which
     is what stops `cohesion` from collapsing the flock to a point.
@@ -353,7 +361,8 @@ class Separation(Lateral):
         return {self.at: acc}
 
 
-@register_operator("velocity_align", "alignment", family="interaction", set="particle", kind="lateral")
+@register_operator("velocity_align", "alignment", family="interaction", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i \;=\; a_2\,w^a_i\,\big\langle \mathbf v_j-\mathbf v_i\big\rangle_{j\in\mathcal N(i)}$$""")
 class VelocityAlign(Lateral):
     """Velocity alignment: accelerate toward the mean velocity of the neighbours. The third
     boids steering rule, and on its own the Vicsek model -- the one term that turns a set of
@@ -443,7 +452,8 @@ class VelocityAlign(Lateral):
 _A, _B, _P = 7.049556277, 0.6022245584, 4.0
 
 
-@register_operator("stillinger_weber", set="particle", kind="lateral", family="interaction")
+@register_operator("stillinger_weber", set="particle", kind="lateral", family="interaction",
+                   equation=r"""$$E=\epsilon\Big[\sum_{i<j}\phi_2(r_{ij})+\lambda\sum_i\sum_{j<k}h(r_{ij})h(r_{ik})\big(\cos\theta_{jik}-\cos\theta_0\big)^2\Big],\qquad \phi_2(r)=A\big(Br^{-p}-1\big)e^{1/(r-a)}$$""")
 class StillingerWeber(Lateral):
     """The Stillinger-Weber potential: a two-body well plus a three-body penalty on bond
     ANGLES. The angular term is the point -- it is what makes a liquid tetrahedral, and so
@@ -563,7 +573,8 @@ class StillingerWeber(Lateral):
         return {self.at: acc}
 
 
-@register_operator("radius_graph", family="topology", set="particle", kind="rewire")
+@register_operator("radius_graph", family="topology", set="particle", kind="rewire", title="Neighbours within a radius",
+                   equation=r"""$$E \;=\; \big\{\,(i,j)\;:\; r_{\min} \le \lVert\mathbf x_i-\mathbf x_j\rVert < r\,\big\}$$""")
 class RadiusGraph(Rewire):
     """The neighbour relation: two particles interact when they are close enough. Every
     lateral law in this module reads what this writes, so it is scheduled before them.

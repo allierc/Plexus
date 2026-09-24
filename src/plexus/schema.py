@@ -85,6 +85,13 @@ class Spec:
     fields: dict
     operators: list[OpSpec]
     schedule: list
+    # THE NAME A HUMAN READS. `name` is the run's identifier -- it names the directory, the
+    # trajectory and the movie, so it is terse and machine-shaped (`turing2d_gs_eta`). `title` is
+    # what that run is CALLED in a figure caption, a slide or the paper ("Gray-Scott on a disc of
+    # 4,000 cells, feed rate swept"). They are two different jobs and a spec states both, because
+    # deriving one from the other gives either an unreadable caption or an unusable filename.
+    # Declared under `general.title:`; empty when a spec has not been given one yet.
+    title: str = ""
     seed_ops: list[OpSpec] = field(default_factory=list)   # the seed: section (x_0), NOT
                                                             # a schedule -- see `engine.seed()`
     obstacles: list = field(default_factory=list)   # wall rectangles [x0,y0,x1,y1] or discs [cx,cy,r]
@@ -314,13 +321,34 @@ def load(path: str) -> Spec:
                     f"set {sname!r} still declares `cell_set: {s['cell_set']}`. That key retired: "
                     f"a face of the mesh IS a cell, and the pairing is now `maps.face` on the "
                     f"{mk!r} set. Delete it from here and from every operator line.")
+            # ---- `face` IS WHAT MAKES IT A SURFACE, AND IT IS OPTIONAL ------------------------
+            # `srce` and `trgt` are what make it a MESH at all: an element of the mesh set runs
+            # between two elements of the set that declares it, and without both ends there is no
+            # topology to speak of. `face` is the third function, and it says the mesh BOUNDS
+            # something -- it is the one that turns a network of segments into a cellular surface.
+            #
+            # A MESH WITH NO `face` IS A CURVE. That is the 1D case, and it needs no new primitive
+            # and no new mesh kind, which is the whole reason it is spelled this way: a cilium is
+            # the same half-edge table as an epithelium with one map fewer, so `MeshTable` carries
+            # it at `nF = 0` (the count it is already built with, engine.py `_build_mesh`), the
+            # renderers reach it through the same `E_srce`/`E_trgt`, and `rod_elastic` reads its
+            # edges from a declared table instead of assuming that node i+1 follows node i in the
+            # state array.
+            #
+            # WHY ROW ORDER WAS NOT GOOD ENOUGH, since it ran: an axoneme is nine doublets on a
+            # ring with cross-links between neighbours, so its segment set is NOT a sequence and
+            # no row ordering can express it. A declared table can. The 1D mesh is what makes the
+            # nine-fold cilium a spec rather than a new operator.
             hs = raw["sets"][mk]
-            for role in ("srce", "trgt", "face"):
+            for role in ("srce", "trgt"):
                 if role not in (hs.get("maps") or {}):
                     raise ValueError(
-                        f"set {mk!r} is used as {sname!r}'s mesh but declares no `maps.{role}:`. A "
-                        f"half-edge has exactly one source vertex, one target vertex and one face; "
-                        f"all three are functions out of it and all three must be declared.")
+                        f"set {mk!r} is used as {sname!r}'s mesh but declares no `maps.{role}:`. An "
+                        f"element of a mesh set runs BETWEEN two elements of {sname!r}, so both "
+                        f"ends are functions out of it and both must be declared. (`maps.face:` is "
+                        f"the third, and it is optional: with it the mesh is a closed surface whose "
+                        f"faces are cells, without it the mesh is a curve -- a filament, a chain, "
+                        f"an axoneme -- and `nF` stays 0.)")
 
         # ---- `maps:` -- named functions OUT of this set, one row to one row of the codomain -------
         mp = s.get("maps")
@@ -631,8 +659,30 @@ def load(path: str) -> Spec:
             if tok not in op_names:
                 raise ValueError(f"schedule step {tok!r} is not a declared operator or builtin")
 
+    # A SCATTER WITHOUT A GRID SOLVE IS A DEAD MATERIAL, AND IT RAN SILENTLY. The MPM cycle is four
+    # steps in one order and no other; a schedule that names `mpm_scatter` and never
+    # `mpm_grid_update` deposits mass and momentum on the grid every substep and never divides the
+    # one by the other, so the gather reads a velocity of exactly zero and every body stands still
+    # whatever force is applied to it. Measured on the flagellar motor of builder/exp_02_bacterium
+    # (step 0003): a spec written by a script that scheduled strain, scatter and gather per set and
+    # forgot the solve ran 1,500 frames at 63 ms each to a finished movie of a rotor that did not
+    # turn, with its operator log reporting the full torque delivered on every printed frame. Nothing
+    # else can catch this -- a scatter without a solve is a legal schedule to the engine -- so the
+    # spec is refused here, where the whole schedule is visible at once.
+    _named = []
+    for step in raw["schedule"]:
+        _named += list(step.get("steps", [])) if isinstance(step, dict) else \
+            (list(step) if isinstance(step, list) else [step])
+    if any(t in ("mpm_scatter", "p2g") for t in _named) and "mpm_grid_update" not in _named:
+        raise ValueError(
+            "schedule names mpm_scatter (particle -> grid) but never mpm_grid_update (the grid "
+            "solve): momentum would be deposited and never divided by mass, every gather would read "
+            "zero, and every MPM body would stand still under any force. Schedule the cycle as "
+            "mpm_strain, mpm_scatter (one per set), mpm_grid_update (once), mpm_gather (one per set).")
+
     _spec = Spec(
         name=gv("name"),
+        title=str(gv("title", "") or ""),
         seed=int(gv("seed", 0)),
         n_frames=int(gv("n_frames", 200)),
         dt=float(gv("dt", 0.05)),

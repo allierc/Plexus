@@ -96,7 +96,8 @@ def _emit(chem, chan, terms, rate, occ):
     return out * occ
 
 
-@register_operator("cell_geometry", set="cell", kind="aggregate", family="hierarchy")
+@register_operator("cell_geometry", set="cell", kind="aggregate", family="hierarchy", title="Cell geometry from the mesh",
+                   equation=r"""$$\mathbf{cen}_f=\frac{1}{n_f}\sum_{e\in f}\mathbf x_{\mathrm{srce}(e)},\qquad A_f=\tfrac12\left\lVert\sum_{e\in f}\mathbf x_{\mathrm{srce}(e)}\times\mathbf x_{\mathrm{trgt}(e)}\right\rVert$$""")
 class CellGeometry3D(Aggregate):
     """Aggregate the 3D vertex mesh into per-cell scalars: the cross-scale readout the
     reaction-diffusion runs on.
@@ -143,7 +144,8 @@ class CellGeometry3D(Aggregate):
         return {}
 
 
-@register_operator("cell_neighbours", set="cell", kind="rewire", family="topology")
+@register_operator("cell_neighbours", set="cell", kind="rewire", family="topology", title="Who neighbours whom",
+                   equation=r"""$$E=\big\{(f,g)\ :\ \text{some mesh edge is shared by faces } f \text{ and } g\big\}$$""")
 class CellAdjacency(Rewire):
     """The relation the reaction-diffusion runs on: two cells are neighbours if and only if
     they share a mesh edge.
@@ -192,7 +194,8 @@ class CellAdjacency(Rewire):
 
 # CANONICAL `seed_cell_chem`, ALIAS `cell_chem_seed` -- see `mesh_ops.SeedMesh3D` for why both
 # spellings must resolve: 320 specs use the first and the rest use the second.
-@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed")
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed", title="The initial morphogen",
+                   equation=r"""$$u_j=1\ \ \text{everywhere},\qquad a_j=0\ \ \text{but on the seeded patch}$$""")
 class CellRDSeed(Structural):
     """The initial morphogen field on the cell set, written once at the opening of the trajectory.
     The default `scatter` model is the Gray-Scott initial condition.
@@ -371,7 +374,7 @@ class CellRDSeed(Structural):
 
 
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
-                   model="noise")
+                   model="noise", title="The initial morphogen")
 class CellRDSeedNoise(CellRDSeed):
     """`noise` MODEL of seed_cell_chem -- the homogeneous steady state plus NOISE -- patterning from fluctuation alone, the strictest test that the pattern is emergent.
 
@@ -382,7 +385,7 @@ class CellRDSeedNoise(CellRDSeed):
 
 
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
-                   model="patch")
+                   model="patch", title="The initial morphogen")
 class CellRDSeedPatch(CellRDSeed):
     """`patch` MODEL of seed_cell_chem -- a LOCALIZED activation source, placed by hand -- a bud/tube driver.
 
@@ -393,7 +396,7 @@ class CellRDSeedPatch(CellRDSeed):
 
 
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
-                   model="cones")
+                   model="cones", title="The initial morphogen")
 class CellRDSeedCones(CellRDSeed):
     """`cones` MODEL of seed_cell_chem -- N FIXED radial activation cones (Okuda Fig 5's multi-tube) -- the strongest hand in the answer, and the honest place to declare it.
 
@@ -404,7 +407,7 @@ class CellRDSeedCones(CellRDSeed):
 
 
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
-                   model="simplex")
+                   model="simplex", title="The initial morphogen")
 class CellRDSeedSimplex(CellRDSeed):
     """`simplex` MODEL of seed_cell_chem -- three species normalised to a simplex -- the May-Leonard initial condition for cyclic competition.
 
@@ -414,7 +417,8 @@ class CellRDSeedSimplex(CellRDSeed):
     NUCLEATION = "simplex"
 
 
-@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian")
+@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian", title="Morphogen diffusion between neighbouring cells",
+                   equation=r"""$$\frac{dc_i}{dt}=D_s\sum_{j\sim i}\frac{c_j-c_i}{\deg(i)}$$""")
 class CellDiffuse(Lateral):
     """Morphogen exchange between neighbouring cells, as a purely combinatorial graph diffusion:
     every neighbour counts the same, whatever the geometry between them.
@@ -501,7 +505,7 @@ class CellDiffuse(Lateral):
         return {self.at: (coef[None, :] * lap) * occ}
 
 
-@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", model="interface_weighted")
+@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", model="interface_weighted", title="Morphogen diffusion between neighbouring cells")
 class CellDiffuseInterfaceWeighted(Lateral):
     """`interface_weighted` MODEL of cell_chem_diffuse -- the OKUDA finite-volume form, and the
     MISSING HALF of the chemistry<->shape coupling.
@@ -647,7 +651,8 @@ class CellDiffuseInterfaceWeighted(Lateral):
         return {self.at: (coef[None, :] * lap) * occ}
 
 
-@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gray_scott")
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gray_scott", title="Autocatalytic reaction",
+                   equation=r"""$$\frac{da}{dt}=r\big(u a^{2}-(F+k)a\big),\qquad \frac{du}{dt}=r\big(-u a^{2}+F(1-u)\big)$$""")
 class CellReactGrayScott(Lateral):
     """Gray-Scott autocatalysis: an activator that makes more of itself by consuming a substrate
     the system slowly replenishes. Pattern by substrate DEPLETION rather than by inhibition.
@@ -711,7 +716,7 @@ class CellReactGrayScott(Lateral):
 
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields",
-                   model="rock_paper_scissor")
+                   model="rock_paper_scissor", title="Autocatalytic reaction")
 class CellReactRPS(Lateral):
     """May-Leonard cyclic competition -- THREE species, each suppressing the next. chem = [u, v, w]:
 
@@ -765,7 +770,7 @@ class CellReactRPS(Lateral):
 
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields",
-                   model="gray_scott_coupled")
+                   model="gray_scott_coupled", title="Autocatalytic reaction")
 class CellReactGrayScottCoupled(Lateral):
     """TWO Gray-Scott systems that compete for each other's activator. chem = [a1, u1, a2, u2]:
 
@@ -825,7 +830,7 @@ class CellReactGrayScottCoupled(Lateral):
         return {self.at: _emit(chem, self.chan, terms, self.rate, occ)}
 
 
-@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gierer_meinhardt")
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gierer_meinhardt", title="Autocatalytic reaction")
 class CellReactGiererMeinhardt(Lateral):
     """Gierer-Meinhardt activator(a)-inhibitor(h) -- the RD OKUDA uses (ref 37). chem = [a, h]:
         da/dt = gm_rho * a^2/h - mu_a * a + a0     (SELF-ENHANCING activator: the a^2/h AUTOCATALYSIS is the
@@ -869,7 +874,8 @@ class CellReactGiererMeinhardt(Lateral):
 # optional slot. With the gate open (`a_sw = 0`) the same operator is plain uniform growth. Naming
 # the gate in the operator made the optional half look mandatory, and made the sibling pair
 # unreadable -- `cell_grow` / `cell_divide` says what the schedule actually does.
-@register_operator("cell_grow", set="vertex", kind="lateral", family="population")
+@register_operator("cell_grow", set="vertex", kind="lateral", family="population", title="Growth where the morphogen is high",
+                   equation=r"""$$\frac{ds_j}{dt}=s_j\,\text{rate}\big(\rho+\mathrm{Hill}(a_j)\big),\qquad \mathrm{Hill}(a)=\frac{a^{n}}{a^{n}+a_{sw}^{n}}$$""")
 class Grow3D(Lateral):
     """Chemistry-to-shape: the morphogen decides where the tissue grows. Each cell's mechanical
     TARGETS are raised, and the mechanics then inflates the cell by force balance.
@@ -1231,7 +1237,7 @@ class Grow3D(Lateral):
 # epithelial TUBE -- a coherent structure -- and its tissue drifts toward the second picture.
 
 
-@register_operator("cell_grow", model="sizer", set="vertex", kind="lateral", family="population")
+@register_operator("cell_grow", model="sizer", set="vertex", kind="lateral", family="population", title="Growth where the morphogen is high")
 class Grow3DSizer(Grow3D):
     """Growth rate falls with the cell's own size: small cells grow faster, large ones slower.
 
@@ -1261,7 +1267,7 @@ class Grow3DSizer(Grow3D):
         return s_prev * self.rate * (self.rho + hillv) * f
 
 
-@register_operator("cell_grow", model="balance", set="vertex", kind="lateral", family="population")
+@register_operator("cell_grow", model="balance", set="vertex", kind="lateral", family="population", title="Growth where the morphogen is high")
 class Grow3DBalance(Grow3D):
     """Size emerges from a synthesis/degradation balance, with no size sensor anywhere.
 
@@ -1296,7 +1302,7 @@ class Grow3DBalance(Grow3D):
         return dv * s_prev / (3.0 * v_now)
 
 
-@register_operator("cell_grow", model="timer", set="vertex", kind="lateral", family="population")
+@register_operator("cell_grow", model="timer", set="vertex", kind="lateral", family="population", title="Growth where the morphogen is high")
 class Grow3DTimer(Grow3D):
     """Grow at whatever rate lands the cell on its target size after `cycle_frames` frames.
 
@@ -1335,7 +1341,8 @@ class Grow3DTimer(Grow3D):
         return s_prev * torch.log(v_tgt / v_now) / (3.0 * max(self.cycle_frames, 1.0))
 
 
-@register_operator("interface_tension", set="vertex", kind="lateral", family="mechanics")
+@register_operator("interface_tension", set="vertex", kind="lateral", family="mechanics", title="Purse-string line tension",
+                   equation=r"""$$E=K_{\mathrm{purse}}\!\!\sum_{e\in\mathrm{interface}}\!\!\ell_e,\qquad \mathbf f_v=-\frac{\partial E}{\partial\mathbf x_v}=-K_{\mathrm{purse}}\sum_{e\ni v}\frac{\mathbf x_v-\mathbf x_{\mathrm{other}}}{\ell_e}$$""")
 class InterfaceLineTension3D(Lateral):
     """A purse-string line tension on the activator interface -- and nothing else.
 
@@ -1433,7 +1440,8 @@ class InterfaceLineTension3D(Lateral):
         return {self.at: vel * occ}
 
 
-@register_operator("interface_push", set="vertex", kind="lateral", family="mechanics")
+@register_operator("interface_push", set="vertex", kind="lateral", family="mechanics",
+                   equation=r"""$$E=-K_{\mathrm{ext}}\!\!\sum_{j\,:\,a_j>a_{sw}}\!\! a_j\,r_j,\qquad \mathbf f_v=+K_{\mathrm{ext}}\,a_j\,\mathbf u_v$$""")
 class ExtrusionForcing3D(Lateral):
     """The disqualified term, on its own and under its own name. A run carrying this is a control.
 
@@ -1509,7 +1517,7 @@ class ExtrusionForcing3D(Lateral):
         return {self.at: vel * occ}
 
 
-@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="brusselator")
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="brusselator", title="Autocatalytic reaction")
 class CellReactBrusselator(Lateral):
     """The Brusselator: the textbook activator-inhibitor system, and the one whose Turing
     condition is exactly solvable, so whether a pattern is possible can be checked before running.
@@ -1673,7 +1681,8 @@ class _ShapeToChemBase(Lateral):
 
 # --------------------------------------------------------------------------- implementations
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
-                   model="curvature")
+                   model="curvature", title="Chemistry driven by curvature",
+                   equation=r"""$$H_j=\frac{2\big(\overline{\mathbf x}_k-\mathbf x_j\big)\cdot\mathbf n_j}{d_j^{2}}$$""")
 class ShapeToChemCurvature(_ShapeToChemBase):
     """The chemistry listens to CURVATURE: the tissue's shape telling its cells where they are.
 
@@ -1722,7 +1731,7 @@ class ShapeToChemCurvature(_ShapeToChemBase):
 
 
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
-                   model="tension")
+                   model="tension", title="Chemistry driven by curvature")
 class ShapeToChemTension(_ShapeToChemBase):
     """The chemistry listens to CORTICAL TENSION: mechanotransduction.
 
@@ -1755,7 +1764,7 @@ class ShapeToChemTension(_ShapeToChemBase):
 
 
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
-                   model="apical_area")
+                   model="apical_area", title="Chemistry driven by curvature")
 class ShapeToChemApicalArea(_ShapeToChemBase):
     """The chemistry listens to APICAL AREA: crowding and density sensing.
 
@@ -1784,7 +1793,7 @@ class ShapeToChemApicalArea(_ShapeToChemBase):
 
 
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
-                   model="pressure")
+                   model="pressure", title="Chemistry driven by curvature")
 class ShapeToChemPressure(_ShapeToChemBase):
     """The chemistry listens to VOLUME-ELASTIC PRESSURE.
 
@@ -2020,7 +2029,8 @@ class _ShapeProbeBase(Lateral):
 
 
 @register_operator("cell_shape_probe", set="cell", kind="lateral", family="hierarchy",
-                   model="shape_index")
+                   model="shape_index", title="Shape index", probe=True,
+                   equation=r"""$$q_j=\frac{P_j}{\sqrt{A_j}}$$""")
 class ShapeIndexProbe(_ShapeProbeBase):
     """The dimensionless shape index: what the vertex model itself minimises towards p0, and
     the tissue's own order parameter for rigid against fluid.
@@ -2048,7 +2058,7 @@ class ShapeIndexProbe(_ShapeProbeBase):
 
 
 @register_operator("cell_shape_probe", set="cell", kind="lateral", family="hierarchy",
-                   model="aspect")
+                   model="aspect", title="Shape index", probe=True)
 class AspectProbe(_ShapeProbeBase):
     """"Thin and elongated" as a number: the aspect ratio of the cell's own vertex ring.
 

@@ -285,7 +285,8 @@ class OrganelleSeed(Seed):
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("organelle_project", family="mechanics", set="particle", kind="structural")
+@register_operator("organelle_project", family="mechanics", set="particle", kind="structural",
+                   equation=r"""$$\mathbf x_p\leftarrow\mathbf c_f(t)+\mathbf R_f(t)\big(\mathbf x_p-\mathbf c_f(t-1)\big)$$""")
 class OrganelleProject(Structural):
     """Carry every piece with the cell that owns it, and keep it inside its species' region.
 
@@ -422,7 +423,8 @@ class OrganelleProject(Structural):
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("organelle_express", family="population", set="particle", kind="structural")
+@register_operator("organelle_express", family="population", set="particle", kind="structural",
+                   equation=r"""$$\frac{dN_{fs}}{dt}=\frac{\text{count}_s-N_{fs}}{\tau_s}$$""")
 class OrganelleExpress(Structural):
     """Biogenesis and turnover: per cell and species, relax the number of pieces toward the
     count that species declares.

@@ -1,0 +1,120 @@
+%!TEX program = pdflatex
+% Every content slide is GENERATED. `python presentation/make_slides.py` reads each movie's own
+% spec through tools/spec_summary.py and writes slides/*.tex; this file only sets the style and
+% inputs them, so nothing here has to be re-typed when a spec changes.
+%
+% Movies follow the deck convention: an MP4 and a same-basename PNG poster in Movies/, embedded
+% as a run: link annotation that pdfpc turns into the video.
+\documentclass[aspectratio=169]{beamer}
+
+\usetheme{Janelia}
+\usepackage{people}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[overlay,absolute]{textpos}
+\setlength{\TPHorizModule}{1cm}
+\setlength{\TPVertModule}{1cm}
+
+\usepackage{amsmath,amssymb}
+\usepackage{multimedia}
+\usepackage{tabularx,booktabs}
+\usepackage{helvet}
+\usepackage{xcolor}
+\usepackage{xfp}                      % \fpeval, for the divisions \fitcol needs
+\usepackage{varwidth}                 % a box that takes its NATURAL width, up to a maximum
+
+% ------------------------------------------------------------------
+% BLACK SLIDES. The renders are all black-background, so the slide is black too and a frame's
+% white text sits on the same field as the movie inside it -- no white margin around a black
+% clip. Only the colours change; the Janelia theme's layout is untouched.
+\setbeamercolor{background canvas}{bg=black}
+\setbeamercolor{normal text}{fg=white,bg=black}
+\setbeamercolor{structure}{fg=white}
+\setbeamercolor{itemize item}{fg=white}
+\usebeamercolor[fg]{normal text}
+\AtBeginDocument{\color{white}}
+% `gray` is redefined, not replaced: the generated slides ask for the standard colour name, so
+% lightening it here is what makes a secondary line legible on black without touching the tool.
+\definecolor{gray}{gray}{0.62}
+% A title here is a whole sentence ("An elastic sheet pressed into a gel of 500,000 material
+% points"), so the frame title is set smaller than the theme's \LARGE default: two lines of that
+% do not fit the band's 1 cm and the second one fell out of it, over the slide.
+\renewcommand{\frametitlesize}{\normalsize}
+
+% ------------------------------------------------------------------
+% NOTHING OVERFLOWS A SLIDE, and that is enforced rather than hoped for.
+%
+%   \panelbox    the height a movie or figure may occupy. A poster is bounded in BOTH
+%                directions with keepaspectratio, so LaTeX shrinks whichever dimension binds
+%                and a portrait render cannot grow past the frame.
+%   \colheight   the height the generated spec column may occupy. `\fitcol` measures the
+%                column it is given and, only if it is taller than that, scales it down to
+%                exactly \colheight. Nothing is dropped: an over-full slide gets smaller type,
+%                not fewer operators.
+% The band is 1 cm of a 9.6 cm slide and the theme reserves nothing for it, so every generated
+% frame opens with \vspace*{\bandgap}; \colheight is the rest of the slide, less the footer.
+\newlength{\bandgap}
+\setlength{\bandgap}{16pt}
+\newlength{\panelbox}
+\setlength{\panelbox}{0.72\textheight}
+\newlength{\colheight}
+\setlength{\colheight}{0.80\textheight}   % the slide, less the band and the footer
+\newcommand{\panelboxfull}{\setlength{\panelbox}{0.78\textheight}}
+\newcommand{\fitgfx}[2][\linewidth]{%
+  \includegraphics[width=#1,height=\panelbox,keepaspectratio]{#2}}
+% The media column carries the picture and NOTHING ELSE -- no caption, no title. What the clip
+% is, is said once in the frame title; a label under it would say it twice.
+% The leading \vspace{0pt} is not decoration. In a [T] column the first box is set with \vtop
+% semantics, so a tall picture placed first extends UPWARD from the baseline and climbs over the
+% title band; an empty first line gives the column an ordinary top to hang from.
+\newcommand{\topgfx}[1]{\vtop{\hbox to \linewidth{\hss#1\hss}}}
+\newcommand{\panel}[2][\linewidth]{\vspace{0pt}\topgfx{\fitgfx[#1]{#2}}}
+% A movie: same fitting, over the poster PNG that pdfpc swaps for the video.
+\newcommand{\playmovie}[2][\linewidth]{%
+  \vspace{0pt}\topgfx{\href{run:#2.mp4?autostart&loop&noprogress}{\fitgfx[#1]{#2.png}}}}
+% ONE TYPE SIZE FOR THE WHOLE DECK. `\fitfixed` is the scale every generated column is drawn
+% at; 0 means "measure this slide and shrink it if it overflows", which is the fallback and
+% gives a different size on every slide. presentation/fit_deck.py compiles once, reads the
+% FITSCALE line each slide reports, and writes slides/fit.tex with the SMALLEST of them -- the
+% densest slide's size -- so every slide is set at that one size and none has to be scaled again.
+\providecommand{\fitfixed}{0}
+\InputIfFileExists{slides/fit.tex}{}{}
+\newsavebox{\fitbox}
+\newlength{\fitht}                     % a NAMED length: beamer's columns clobber \dimen0
+\makeatletter
+% The scale factor is computed and applied with \scalebox rather than handing the target height
+% to \resizebox{!}{...}: that form re-typesets the saved box here and keeps only its first line,
+% blown up to the target -- the giant letter that was filling the right half of a slide.
+% The column is measured at its NATURAL width (varwidth, not minipage) so no line ever wraps:
+% "Morphogen diffusion between neighbouring cells" is one line whatever the column is worth, and
+% the scale that makes it fit is taken from BOTH dimensions -- width and height, whichever binds.
+\newlength{\fitwd}
+\newcommand{\fitcol}[1]{%
+  \sbox{\fitbox}{\begin{varwidth}{2\linewidth}#1\end{varwidth}}%
+  \setlength{\fitht}{\dimexpr\ht\fitbox+\dp\fitbox\relax}%
+  \setlength{\fitwd}{\wd\fitbox}%
+  \edef\fit@f{\fpeval{min(1, \strip@pt\colheight / \strip@pt\fitht,
+                             \strip@pt\linewidth / \strip@pt\fitwd)}}%
+  \typeout{FITSCALE=\fit@f}%
+  \vspace{0pt}%
+  \ifdim\fitfixed pt>0pt \scalebox{\fitfixed}{\usebox{\fitbox}}%
+  \else \scalebox{\fit@f}{\usebox{\fitbox}}\fi}
+\makeatother
+% `\srcpath` -- the file a slide was generated from, in the corner -- comes from the Janelia
+% theme; it is not redefined here.
+% ------------------------------------------------------------------
+
+\title{\textbf{Plexus}}
+\subtitle{A language for saying what a biological mechanism \emph{is}, precisely enough to run it}
+\author{Cedric Allier}
+\institute{Saalfeld lab, Janelia}
+\date{October 2026}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\input{slides/all.tex}
+
+\end{document}

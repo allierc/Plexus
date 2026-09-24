@@ -77,7 +77,8 @@ _ACTIVATIONS = {"relu": nn.ReLU, "gelu": nn.GELU, "softplus": nn.Softplus, "tanh
 
 
 @register_operator("hash_encoding", family="fields", set="field", kind="field",
-                   model="multires_hash")
+                   model="multires_hash",
+                   equation=r"""$$c(\mathbf x)=\text{scale}\cdot\mathrm{MLP}\Big(\bigoplus_{l=1}^{L}\mathrm{interp}\big(T_l[\,\mathrm{hash}(\lfloor \mathbf x\,n_l\rfloor)\,]\big)\Big),\qquad n_l=n_{\min}b^{\,l-1}$$""")
 class HashEncoding(FieldUpdate):
     """A learnable field: the value at every cell is computed from that cell's own coordinates,
     through a multiresolution hash table and a small MLP (multi-layer perceptron) head.
@@ -242,7 +243,8 @@ class HashEncoding(FieldUpdate):
 # ----------------------------------------------------------------------------------------------
 # `voxelize` -- the other direction: a field built FROM a set, rather than from coordinates.
 # ----------------------------------------------------------------------------------------------
-@register_operator("voxelize", family="harness", set="neuron", kind="exchange")
+@register_operator("voxelize", family="harness", set="neuron", kind="exchange",
+                   equation=r"""$$A(v)=\frac{\sum_i K\big(\lVert\mathbf c_v-\mathbf r_i\rVert\big)\,x_i}{\varepsilon+\sum_i K\big(\lVert\mathbf c_v-\mathbf r_i\rVert\big)}$$""")
 class Voxelize(Exchange):
     """Splat a per-element scalar onto a regular grid: the discrete set becomes a continuous
     field that can be viewed, saved, or handed to a model that expects a volume.

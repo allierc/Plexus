@@ -123,7 +123,8 @@ def _type_params(lvl, params) -> torch.Tensor:
 #  phi -- the local update
 # --------------------------------------------------------------------------- #
 @register_operator("neuron_update", family="signalling", set="neuron", kind="lateral",
-                   model="leaky_tanh")
+                   model="leaky_tanh",
+                   equation=r"""$$\frac{dx_i}{dt}\mathrel{+}=-a_i x_i+b_i+s_i\tanh(x_i)+\eta_i$$""")
 class NeuronUpdate(Lateral):
     """phi, the local update: a neuron's own dynamics, with no reference to any other neuron.
     A leaky integrator plus a self-coupling term.
@@ -358,7 +359,8 @@ class _NeuronSignal(Lateral):
 
 
 @register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
-                   model="shared")
+                   model="shared",
+                   equation=r"""$$\psi(x_j)=\phi(x_j)$$""")
 class NeuronSignalShared(_NeuronSignal):
     """One transfer function for every connection in the network:
 
@@ -425,7 +427,8 @@ class NeuronSignalTypePairwise(_NeuronSignal):
 # --------------------------------------------------------------------------- #
 #  Omega -- the external field, onto the neurons
 # --------------------------------------------------------------------------- #
-@register_operator("neuron_field_input", family="signalling", set="neuron", kind="exchange")
+@register_operator("neuron_field_input", family="signalling", set="neuron", kind="exchange",
+                   equation=r"""$$\Omega_i=\text{gain}\cdot F(\mathbf x_i)+\text{offset}$$""")
 class NeuronFieldInput(Exchange):
     """Omega, the external modulation: sample a field at each neuron's position and write the
     value into a state block, for `neuron_signal` to multiply its message by.
@@ -501,7 +504,8 @@ class NeuronFieldInput(Exchange):
 # --------------------------------------------------------------------------- #
 #  the seed -- x_0 from a frozen connectome region
 # --------------------------------------------------------------------------- #
-@register_operator("neuron_drive", family="signalling", set="neuron", kind="exchange")
+@register_operator("neuron_drive", family="signalling", set="neuron", kind="exchange",
+                   equation=r"""$$\frac{dx_i}{dt}\mathrel{+}=\text{gain}\cdot\Omega(\mathbf x_i)+\text{offset}$$""")
 class NeuronDrive(Exchange):
     """An external CURRENT into the neurons it is applied to, read off a field at their positions.
 
@@ -545,7 +549,8 @@ class NeuronDrive(Exchange):
         return {self.at: dx}
 
 
-@register_operator("neural_seed", family="seed", set="neuron", kind="seed")
+@register_operator("neural_seed", family="seed", set="neuron", kind="seed",
+                   equation=r"""$$\mathbf x_i=\mathbf o+\text{scale}\,\frac{\mathbf X_i-\mathbf X_{\mathrm{lo}}}{\text{side}},\qquad v_i=\bar v_0+\sigma_{v_0} z_i,\ \ z_i\sim\mathcal N(0,1)$$""")
 class NeuralSeed(Seed):
     """Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at
     their real positions, rather than points scattered in a box.
@@ -957,7 +962,8 @@ class MorphologySeed(Seed):
         return {}
 
 
-@register_operator("paint_children", family="observation", set="points", kind="aggregate")
+@register_operator("paint_children", family="observation", set="points", kind="aggregate",
+                   equation=r"""$$\text{paint}_i=x_{\pi(i)}$$""")
 class PaintChildren(Exchange):
     """Copy a parent's scalar onto every point that draws it, each frame.
 

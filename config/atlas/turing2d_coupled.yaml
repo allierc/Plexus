@@ -1,4 +1,6 @@
 general:
+
+  title: "Two coupled chemistries on a disc of 4,000 cells"
   name: turing2d_coupled
   seed: 0
   n_frames: 12000

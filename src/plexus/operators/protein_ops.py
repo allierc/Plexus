@@ -263,7 +263,8 @@ def _set_block(lvl, name, idx, value):
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("protein_seed", family="seed", set="particle", kind="seed")
+@register_operator("protein_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$N_{fs}(0)=\mathrm{round}\big(s_s A_f \tau_s\big)$$""")
 class ProteinSeed(Seed):
     """Place every species' starting clusters on its region of each cell, once, at x_0, and
     write the per-cell synthesis and turnover rates the expression operator reads.
@@ -352,7 +353,8 @@ class ProteinSeed(Seed):
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("protein_project", family="mechanics", set="particle", kind="structural")
+@register_operator("protein_project", family="mechanics", set="particle", kind="structural",
+                   equation=r"""$$\mathbf x_p\leftarrow\mathbf c_f(t)+\mathbf R_f(t)\big(\mathbf x_p-\mathbf c_f(t-1)\big)$$""")
 class ProteinProject(Structural):
     """Keep every cluster inside its species' region of its parent cell, and share the clusters
     between the daughters at a division.
@@ -442,7 +444,8 @@ class ProteinProject(Structural):
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("protein_express", family="population", set="particle", kind="structural")
+@register_operator("protein_express", family="population", set="particle", kind="structural",
+                   equation=r"""$$\frac{dN_{fs}}{dt}=s_s A_f-\frac{N_{fs}}{\tau_s}$$""")
 class ProteinExpress(Structural):
     """Synthesis and turnover: per cell and species, birth new clusters and retire old ones at
     the rates the cell carries.

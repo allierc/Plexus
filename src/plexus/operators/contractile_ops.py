@@ -78,7 +78,8 @@ def _clock(t, t0, tr, dur, td):
     return torch.sigmoid((t - t0) / tr) * torch.sigmoid((t0 + dur - t) / td)
 
 
-@register_operator("active_strain", family="mechanics", set="particle", kind="lateral")
+@register_operator("active_strain", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf F\leftarrow\big(\mathbf I+\delta\gamma_j\,\mathbf f_j\mathbf f_j^{\mathsf T}+\delta\gamma^{(2)}_j\,\mathbf p_j\mathbf p_j^{\mathsf T}\big)\mathbf F,\qquad \gamma_j(t)=g_j\,s\!\left(\phi_j(t)\right)$$""")
 class ActiveStrain(Lateral):
     """The contraction, as a rest-length change on the material points of each cell.
 
@@ -278,7 +279,8 @@ class ActiveStrain(Lateral):
         return {}
 
 
-@register_operator("material_from_cell", family="mechanics", set="particle", kind="lateral")
+@register_operator("material_from_cell", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$E_j=e^{\,\log E_j}$$""")
 class MaterialFromCell(Lateral):
     """Per-cell stiffness onto the material points that belong to the cell.
 

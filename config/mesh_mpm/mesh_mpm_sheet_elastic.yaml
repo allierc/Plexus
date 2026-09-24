@@ -34,6 +34,8 @@
 # contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
 general:
+
+  title: "An elastic sheet pressed into a gel of 500,000 material points"
   name: mesh_mpm_sheet_elastic
   seed: 0
   n_frames: 400

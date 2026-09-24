@@ -209,7 +209,8 @@ def rod_layout(direction, beat_axis, n_rod, sphere_radius=0.0, cap_deg=30.0,
     return d_r, n_r, off
 
 
-@register_operator("rod_seed", family="mechanics", set="particle", kind="seed")
+@register_operator("rod_seed", family="mechanics", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_k=\mathbf x_{\mathrm{base}}+\frac{k}{N-1}\,L\,\hat{\mathbf d},\qquad k=0\ldots N-1$$""")
 class RodSeed(Seed):
     """Lay each rod out straight from its base, and remember what straight meant.
 
@@ -347,7 +348,8 @@ class RodSeed(Seed):
 
 
 
-@register_operator("rod_elastic", family="mechanics", set="particle", kind="lateral")
+@register_operator("rod_elastic", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf f_i=\Big[k_s\big(\lVert\mathbf e\rVert-\ell^{0}\big)+c_s\tfrac{d\lVert\mathbf e\rVert}{dt}\Big]\hat{\mathbf e},\qquad \mathbf c_i=\mathbf x_{i-1}-2\mathbf x_i+\mathbf x_{i+1},\qquad \mathbf g_i=k_b\mathbf c_i+c_b\dot{\mathbf c}_i$$""")
 class RodElastic(Lateral):
     """THE ROD'S OWN MATERIAL: it does not stretch, and it resists being bent.
 
@@ -473,7 +475,8 @@ class RodElastic(Lateral):
         return {self.at: a}
 
 
-@register_operator("rod_base", family="mechanics", set="particle", kind="lateral")
+@register_operator("rod_base", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_0\mathrel{+}=\omega_n^2(\mathbf x^{\mathrm{target}}-\mathbf x_0)-2\zeta\omega_n(\mathbf v_0-\mathbf v^{\mathrm{target}}),\qquad \tau=-\,\mathrm{clamp}^2\,\theta\,\hat{\mathbf k}-2\zeta_c\,\mathrm{clamp}\,\omega$$""")
 class RodBase(Lateral):
     """THE BASE: held in PLACE and held in DIRECTION. One joint, two laws.
 
@@ -664,7 +667,8 @@ class RodBase(Lateral):
         return out
 
 
-@register_operator("rod_motor", family="motility", set="particle", kind="lateral")
+@register_operator("rod_motor", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$M_i(t)=k_{\mathrm{motor}}h^{3}A\sin\!\left(\omega t-\frac{2\pi s_i}{\lambda}\right),\qquad E=\sum_i M_i\theta_i,\qquad \mathbf a=-\frac{\partial E}{\partial\mathbf x}$$""")
 class RodMotor(Lateral):
     """THE DRIVE, DISTRIBUTED ALONG THE FILAMENT instead of applied at its base.
 

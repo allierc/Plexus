@@ -135,7 +135,8 @@ class _Project(Lateral):
         return {es.post_name: y}
 
 
-@register_operator("project", family="relation", set="neuron", kind="lateral")
+@register_operator("project", family="relation", set="neuron", kind="lateral",
+                   equation=r"""$$\frac{dx_i}{dt}\mathrel{+}=\mathrm{act}\Big(\text{gain}\!\!\sum_{e\,:\,\mathrm{post}(e)=i}\!\! w_e\,\mathrm{send}\big(x_{\mathrm{pre}(e)}\big)+\text{bias}\Big)$$""")
 class Project(_Project):
     """A rate across a relation: the message is summed into the receiver's derivative.
 
@@ -155,7 +156,8 @@ class Project(_Project):
     WRITES_BLOCK = False
 
 
-@register_operator("readout", family="relation", set="neuron", kind="lateral")
+@register_operator("readout", family="relation", set="neuron", kind="lateral",
+                   equation=r"""$$x_i=\mathrm{act}\Big(\text{gain}\!\!\sum_{e\,:\,\mathrm{post}(e)=i}\!\! w_e\,\mathrm{send}\big(x_{\mathrm{pre}(e)}\big)+\text{bias}\Big)$$""")
 class Readout(_Project):
     """A value across a relation: the message IS the receiver's `into:` block, written each frame.
 

@@ -264,7 +264,8 @@ def _in_ball(n: int, gen: torch.Generator) -> torch.Tensor:
 
 
 # --------------------------------------------------------------------------- the seed
-@register_operator("seed_cell_atlas", family="seed", set="compartment", kind="seed")
+@register_operator("seed_cell_atlas", family="seed", set="compartment", kind="seed",
+                   equation=r"""$$v_p=\frac{V_{\mathrm{piece}}}{n_{\mathrm{per\,piece}}},\qquad m_p=v_p\,\rho$$""")
 class SeedCellAtlas(Seed):
     """Lay a cell atlas out once, at x_0: where every compartment PIECE sits, how it is oriented,
     where its material points go, and what each of those points is worth in volume.
@@ -836,7 +837,8 @@ def form_points(shape: str, n: int, params: dict, volume: float, copies: int = 1
 ATLAS_FORMS = _SHAPES
 
 
-@register_operator("aggregate_centroid", family="hierarchy", set="compartment", kind="aggregate")
+@register_operator("aggregate_centroid", family="hierarchy", set="compartment", kind="aggregate",
+                   equation=r"""$$\mathbf x_p=\frac{\sum_{c\in\pi^{-1}(p)} m_c\,\mathbf x_c}{\sum_{c\in\pi^{-1}(p)} m_c}$$""")
 class AggregateCentroid(Aggregate):
     """A parent's position as the mass-weighted mean of its children's: sum_pi, and nothing else.
 
@@ -1056,7 +1058,8 @@ class SeedStateFromFile(Seed):
 
 
 @register_operator("seed_state", "seed_state_random", family="seed", set="compartment",
-                   kind="seed")
+                   kind="seed",
+                   equation=r"""$$\mathbf v_i=A\sin\!\big(2\pi k\,\mathbf x_i\cdot\hat{\mathbf a}+\varphi\big)\,\hat{\mathbf d}$$""")
 class SeedState(Seed):
     """Fill a named state block from a RULE, once, at x_0. `pattern` is which rule.
 
@@ -1158,7 +1161,8 @@ class SeedState(Seed):
         return {}
 
 
-@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral")
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral",
+                   equation=r"""$$\frac{dv_i}{dt}=D\sum_{j\sim i}\frac{v_j-v_i}{\deg(i)}$$""")
 class StateDiffuse(Lateral):
     """Diffusion of a scalar along a set's own relation -- the graph Laplacian, nothing more.
 
@@ -1242,7 +1246,8 @@ class StateDiffuse(Lateral):
 # along the polarity axis for protrusion -- so speed emerges from the mechanics instead of being
 # set. They compose: traction is the grip, protrusion is the step.
 
-@register_operator("seed_polarity", family="motility", set="cell", kind="seed")
+@register_operator("seed_polarity", family="motility", set="cell", kind="seed",
+                   equation=r"""$$\theta_i=\theta_0+\text{spread}\,\pi\,u_i,\qquad \mathbf p_i=\cos\theta_i\,\mathbf e_a+\sin\theta_i\,\mathbf e_b$$""")
 class SeedPolarity(Seed):
     """A unit direction per element, lying IN the substrate plane, written to `block`.
 
@@ -1302,7 +1307,8 @@ class SeedPolarity(Seed):
         return {}
 
 
-@register_operator("substrate_traction", family="motility", set="particle", kind="lateral")
+@register_operator("substrate_traction", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i=f\,w(h_i)\,\mathbf p_{c(i)}$$""")
 class SubstrateTraction(Lateral):
     """A tangential acceleration on the material within a contact layer of the substrate.
 
@@ -1372,7 +1378,8 @@ class SubstrateTraction(Lateral):
         return {p.name: a}
 
 
-@register_operator("protrusion", family="motility", set="particle", kind="lateral")
+@register_operator("protrusion", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$s_i=\frac{(\mathbf x_i-\mathbf x_c)\cdot\mathbf p_c}{R},\qquad \mathbf a_i=f\,\tanh\!\left(\frac{s_i}{w}\right)\mathbf p_c$$""")
 class Protrusion(Lateral):
     """An active push at the leading edge and a pull at the rear -- the step, not the grip.
 
@@ -1461,7 +1468,8 @@ class Protrusion(Lateral):
 # its own angle, the spread of angles is an initial condition, `omega` can vary from cell to cell,
 # and the phase is recorded -- so "are they synchronised?" becomes a question about the data
 # instead of about the code.
-@register_operator("phase_clock", family="motility", set="cell", kind="lateral")
+@register_operator("phase_clock", family="motility", set="cell", kind="lateral",
+                   equation=r"""$$\frac{d\phi_i}{dt}=\omega_i$$""")
 class PhaseClock(Lateral):
     """Advance a per-element phase at a fixed rate: the frequency source, as state.
 
@@ -1538,7 +1546,8 @@ def _gate(op, H, idx):
     return (fl + (1.0 - fl) * 0.5 * (1.0 + c))[idx]
 
 
-@register_operator("polar_active_stress", family="motility", set="particle", kind="lateral")
+@register_operator("polar_active_stress", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$\boldsymbol\sigma_{\mathrm{act}}=A\cos(\phi_c+\delta)\left(\mathbf n\mathbf n^{\mathsf T}-\tfrac{1}{3}\mathbf I\right)$$""")
 class PolarActiveStress(Lateral):
     """The cytoskeleton extending and retracting along the cell's polarity, as a STRESS.
 
@@ -1631,7 +1640,8 @@ class PolarActiveStress(Lateral):
         return {}
 
 
-@register_operator("polar_growth", family="motility", set="particle", kind="lateral")
+@register_operator("polar_growth", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$\lambda(\phi)=\text{stretch}^{\,s(\phi)},\qquad \mathbf G=\mathbf I+(r-1)\mathbf n\mathbf n^{\mathsf T}+\big(r^{-1/2}-1\big)(\mathbf I-\mathbf n\mathbf n^{\mathsf T}),\qquad r=\frac{\lambda_{\mathrm{now}}}{\lambda_{\mathrm{prev}}}$$""")
 class PolarGrowth(Lateral):
     """The cytoskeleton ELONGATING along the cell's polarity by a stated factor, and retracting.
 
@@ -1743,7 +1753,8 @@ class PolarGrowth(Lateral):
         return {}
 
 
-@register_operator("park_reserve", family="cell", set="particle", kind="seed")
+@register_operator("park_reserve", family="cell", set="particle", kind="seed",
+                   equation=r"""$$m^{\mathrm{rest}}_i\leftarrow m_i,\qquad \mathrm{occ}_i\leftarrow 0,\qquad m_i\leftarrow 0$$""")
 class ParkReserve(Seed):
     """Hold material points back, dormant, as a monomer pool for something else to spend.
 
@@ -1823,7 +1834,8 @@ class ParkReserve(Seed):
         return {}
 
 
-@register_operator("polymerize_tips", family="motility", set="particle", kind="structural")
+@register_operator("polymerize_tips", family="motility", set="particle", kind="structural",
+                   equation=r"""$$\mathbf F_{\mathrm{new}}=\mathbf I+(c-1)\,\mathbf d\mathbf d^{\mathsf T},\qquad J=\det\mathbf F_{\mathrm{new}}=c<1$$""")
 class PolymerizeTips(Structural):
     """Add material at the growing end of every fibre, and let the cell be pushed by it.
 
@@ -2254,7 +2266,8 @@ class Depolymerize(Structural):
         return {}
 
 
-@register_operator("cortical_tension", family="motility", set="particle", kind="lateral")
+@register_operator("cortical_tension", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$\boldsymbol\sigma_{\mathrm{cortex}}=\gamma\big(\mathbf I-\mathbf m\mathbf m^{\mathsf T}\big)$$""")
 class CorticalTension(Lateral):
     """The cortex pulling in: an IN-PLANE tension on the membrane, isotropic and undirected.
 
@@ -2543,7 +2556,8 @@ class MeshFromRun(Seed):
         return {}
 
 
-@register_operator("seed_mpm_in_cells", family="cell", set="particle", kind="seed")
+@register_operator("seed_mpm_in_cells", family="cell", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x=(1-u)\,\mathbf c_j+u\big[(1-v)\,\mathbf s_h+v\,\mathbf t_h\big]+\left(w-\tfrac12\right)\mathrm{sep}(\mathbf x)$$""")
 class SeedMPMInCells(Seed):
     """Fill every cell of an apico-basal epithelium with material points.
 
@@ -2664,7 +2678,8 @@ class SeedMPMInCells(Seed):
         return {}
 
 
-@register_operator("deform_control", family="motility", set="particle", kind="lateral")
+@register_operator("deform_control", family="motility", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf A=\begin{pmatrix}a_{xx}&a_{xy}&a_{xz}\\ a_{xy}&a_{yy}&a_{yz}\\ a_{xz}&a_{yz}&a_{zz}\end{pmatrix}$$""")
 class DeformControl(Lateral):
     """A declared rate of rest-shape change: the control variable of a shape-morphing optimisation.
 
@@ -2803,3 +2818,166 @@ class DeformControl(Lateral):
         else:
             p.F.copy_(F)
         return {}
+
+
+# ---------------------------------------------------------------------------------------------
+# `polar_active_stress [model: driven]` MOVED HERE from `cilia_ops.py`, which was deleted.
+#
+# THAT FILE WAS THE MPM CILIUM, AND THE MPM CILIUM IS A DEAD END. Its ten other operators built
+# a cilium out of MLS-MPM material points, which carries one velocity per grid node: a body
+# thinner than a grid cell cannot move relative to the fluid it shares nodes with, it is simply
+# advected. A Platynereis cilium is 0.25 um thick against a 4.08 um grid cell, so the work kept
+# widening the cilium until the grid could hold it -- a 6 um paddle, then a 25 x 10 um blade --
+# and what beat was never a cilium. `rod_ops.py` replaces all of it: a filament whose thickness
+# is a DRAG COEFFICIENT rather than a volume has no resolution floor at all.
+#
+# THIS ONE OPERATOR WAS NEVER PART OF THAT. It is a driven variant of `PolarActiveStress` just
+# above, used by five `config/cell` adhesion-flow specs and by nothing ciliary, so it follows its
+# parent class rather than the file it happened to sit in.
+_RECTIFY = {
+    "relu": lambda x: torch.clamp(x, min=0.0),
+    "softplus": lambda x: torch.nn.functional.softplus(x),
+    "abs": torch.abs,
+    "identity": lambda x: x,
+}
+
+
+@register_operator("polar_active_stress", model="driven", family="motility", set="particle",
+                   kind="lateral")
+class PolarActiveStressDriven(PolarActiveStress):
+    """`polar_active_stress`, with its amplitude taken from a state block instead of the spec.
+
+    particle -[containment]-> particle: reads its cell's `polarity`, `phase` and `drive` block;
+    writes the per-particle active stress `mpm_scatter` consumes. Everything about the stroke --
+    deviatoric, sign-reversing over the cycle, transmitted as a divergence rather than applied
+    pointwise -- is the parent operator's and unchanged.
+
+    The one addition is `g(v) = rectify((v - v0) / v_scale)` multiplying the amplitude, with `v`
+    the cell's own membrane state. A cell below `v0` is silent. `v_scale` is the membrane state
+    at which the cell beats at the declared amplitude, so it is the number that says how hard the
+    circuit has to work to produce a full stroke, and it belongs in the spec where it can be read.
+
+    Reference: as `polar_active_stress`, with the amplitude gated by a membrane state --
+    excitation-contraction coupling, in its simplest rectified-linear form.
+    """
+
+    READS = ["polarity", "phase", "drive"]
+    MECHANISM_TAGS = ["active_stress", "cilia", "ciliary_beat", "neuromuscular",
+                      "excitation_contraction_coupling"]
+    PARAM_ROLES = dict(PolarActiveStress.PARAM_ROLES,
+                       drive="the_cells_membrane_state_block",
+                       drive_set="the_set_that_carries_the_membrane_state",
+                       v0="membrane_state_below_which_the_cell_is_silent",
+                       v_scale="membrane_state_giving_a_full_stroke",
+                       rectify="relu_softplus_abs_or_identity",
+                       gain_max="ceiling_on_the_gain")
+    REFERENCE = ("Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; "
+                 "Veraszto, C. et al. (2017). eLife 6:e26000.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.drive = str(params.get("drive", "voltage"))
+        # `drive_set` names the set the membrane state lives on, which usually cannot be the
+        # polarity set: `voltage` and `pos` are both coordinates, and one set has only one, so a
+        # cell that is both a neuron and a lump of matter is two sets joined by containment.
+        self.drive_set = str(params.get("drive_set", self.cell_set))
+        self.v0 = float(params.get("v0", 0.0))
+        self.v_scale = float(params.get("v_scale", 1.0))
+        if self.v_scale == 0.0:
+            raise ValueError("polar_active_stress[driven]: `v_scale` is the membrane state that "
+                             "gives a full stroke and cannot be 0")
+        self.rectify = str(params.get("rectify", "relu")).lower()
+        if self.rectify not in _RECTIFY:
+            raise ValueError(f"polar_active_stress[driven]: `rectify` must be one of "
+                             f"{sorted(_RECTIFY)}, got {self.rectify!r}")
+        # A CEILING, because the drive is not bounded. `neuron_update`'s state is a real number,
+        # and a cell that runs away would ask for an unbounded stress -- which in MLS-MPM is not a
+        # big deformation, it is a velocity that breaks the Courant condition and a run that ends
+        # in NaN several hundred frames after the actual fault.
+        self.gain_max = float(params.get("gain_max", 4.0))
+
+    def _drive_per_cell(self, H, cl, dtype, device):
+        """The membrane state of each CELL, gathered from whichever set carries it. [n_cells]."""
+        dl = H.level(self.drive_set)
+        if self.drive not in dl.state_schema:
+            raise KeyError(
+                f"polar_active_stress[driven]: the set {dl.name!r} has no block {self.drive!r}. "
+                f"This operator's whole purpose is to read the circuit's output, so the set it "
+                f"points at must declare the block `neuron_update` integrates. Blocks present: "
+                f"{sorted(dl.state_schema)}.")
+        d0, d1 = dl.state_schema[self.drive]
+        v = dl.state[:, d0:d1][:, 0].to(device=device, dtype=dtype)
+        if dl.name == cl.name:
+            return v
+        # A CHILD SET CARRIES IT: invert the containment map. `lift_index` gives each driver its
+        # cell; scattering the drivers back by that index gives each cell its driver. With one
+        # driver per cell the scatter is a permutation and nothing is averaged away; with more
+        # than one the LAST wins, which is why the spec is required to declare `per_parent: 1`.
+        try:
+            up = H.lift_index(dl.name, cl.name)
+        except Exception:                                            # noqa: BLE001
+            up = None
+        if up is not None:
+            out = torch.zeros(cl.n, device=device, dtype=dtype)
+            out[up] = v
+            return out
+        # NO CONTAINMENT: FALL BACK TO ROW ORDER, AND CHECK IT RATHER THAN TRUST IT. A flat
+        # neuron set beside the cells is the only way to name cell classes (type counts on a
+        # child set are per parent), and then row i of one is row i of the other by construction
+        # -- the kind of correspondence that breaks silently, so it is asserted.
+        if dl.n != cl.n:
+            raise ValueError(
+                f"polar_active_stress[driven]: `drive_set` {dl.name!r} holds {dl.n:,} elements "
+                f"and `cell_set` {cl.name!r} holds {cl.n:,}, and they are not joined by "
+                f"containment -- so there is no correspondence between them. Either parent one "
+                f"to the other with `per_parent: 1`, or declare both with the same count in the "
+                f"same row order.")
+        return v
+
+    def gain(self, H, cl, idx, dtype, device):
+        """g(v) per material point: its cell's membrane state, shifted, scaled, rectified, capped."""
+        v = self._drive_per_cell(H, cl, dtype, device)
+        g = _RECTIFY[self.rectify]((v - self.v0) / self.v_scale)
+        return g.clamp(max=self.gain_max)[idx]
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        D = X.shape[1]
+        cl = H.level(self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        q0, q1 = cl.state_schema[self.phase_block]
+        idx = H.lift_index(p.name, self.cell_set)
+        n = cl.state[:, b0:b1][:, :D][idx]
+        # A CELL WITH NO POLARITY HAS NO STROKE AXIS, SO IT DOES NOT STROKE.
+        #
+        # This is how a spec says WHICH cells beat, and it needs no mask on this operator: seed
+        # `polarity` on the ciliary band alone -- `at: 'cell[type=ciliary band]'` -- and every
+        # other cell keeps the zero the entity provisioned it with. Normalising that zero, which
+        # the parent operator does unconditionally, turns it into whatever
+        # `clamp_min(1e-12)` leaves behind and gives 4,000 interior cells an arbitrary stroke
+        # direction at full amplitude. Here a zero-length polarity zeroes the gain instead.
+        nrm = n.norm(dim=1, keepdim=True)
+        has_axis = (nrm[:, 0] > 1e-9).to(X.dtype)
+        n = n / nrm.clamp_min(1e-12)
+        ph = cl.state[:, q0:q1][:, 0][idx]
+        A = (torch.as_tensor(float(self.amplitude), device=X.device, dtype=X.dtype)
+             if self.amplitude is not None
+             else float(self.frac) * (p.la + 2.0 * p.mu))
+        g = A * has_axis * self.gain(H, cl, idx, X.dtype, X.device) * torch.cos(ph + self.offset)
+        if mask is not None:
+            g = g * mask.float()
+        M = n[:, :, None] * n[:, None, :]
+        if self.deviatoric:
+            M = M - torch.eye(D, device=X.device, dtype=X.dtype)[None] / float(D)
+        sig = g[:, None, None] * M
+        # ALLOCATED ONCE AND WRITTEN IN PLACE, for the parent operator's reason: the substep is
+        # captured as a CUDA graph, which bakes in the addresses it saw, so a fresh tensor per
+        # tick would leave the replay reading the one from the tick it was captured on.
+        buf = getattr(p, "act_stress", None)
+        if buf is None or buf.shape != sig.shape:
+            p.register_buffer("act_stress", torch.zeros_like(sig))
+            buf = p.act_stress
+        buf.copy_(sig)
+        return {}
+

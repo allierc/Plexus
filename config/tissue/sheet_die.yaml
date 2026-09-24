@@ -1,4 +1,6 @@
 general:
+
+  title: "An epithelial sheet of 400 cells extruding its dying cells"
   name: sheet_die
   seed: 0
   n_frames: 400

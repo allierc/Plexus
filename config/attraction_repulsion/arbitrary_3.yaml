@@ -2,6 +2,8 @@
 # max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
 # because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
 general:
+
+  title: "Three particle types under one pairwise force law"
   name: arbitrary_3
   seed: 0
   n_frames: 250
