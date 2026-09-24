@@ -59,16 +59,39 @@ def amplitude(tr, k, axis, comp, dt):
     return np.arange(T - 1) * dt, A
 
 
-def fit(t, A, lo=0.15, hi=0.75):
-    """Slope of log|A| over the middle of the run. Returns (nu_over_k2, r2, mask)."""
-    m = (t >= lo * t[-1]) & (t <= hi * t[-1]) & (np.abs(A) > 1e-12)
+def fit(t, A):
+    """Slope of log|A| from frame 1 to just before the noise floor. Returns (nu_over_k2, r2, mask).
+
+    The projection onto sin(k z) isolates the k=1 mode, so |A(t)| is ONE exponential decay until it
+    reaches the run's noise floor, after which it merely fluctuates and can bounce UP (builder fig
+    0530). A fixed middle window fails on a fast decay because it lands in that floor and fits the
+    bounce (negative nu); picking the best-r^2 SUB-window fails on a slow decay because it locks onto
+    a steeper early sliver. So: fit the WHOLE clean decay -- frame 1 (skip the finite-difference edge)
+    up to the first frame that has fallen to within 1.3x of the run's floor. For a slow decay that
+    never bottoms out this is essentially the whole run; for a fast decay it is the early exponential
+    and stops before the floor."""
+    Aa = np.abs(A)
+    peak = float(Aa[1:6].max())
+    # the floor is the run's noise level, but never below 1% of the peak: a fast decay flattens
+    # onto a plateau ~1% of the peak and then a sign-crossing cliff, and fitting THROUGH the
+    # plateau shears the slope (fig 0551, nu 147 vs the clean-window ~370). A slow decay never
+    # reaches 1% of its peak, so this leaves rc0-rc5 untouched.
+    floor = max(float(Aa[max(1, len(Aa) // 4):].min()), 0.01 * peak)
+    below = np.where(Aa < 1.3 * floor)[0]
+    end = int(below[0]) if below.size else len(Aa)
+    end = end if end > 6 else len(Aa)
+    m = np.zeros(len(Aa), bool); m[1:end] = True; m &= Aa > 1e-12
     if m.sum() < 5:
         return float("nan"), float("nan"), m
-    y = np.log(np.abs(A[m]))
-    p = np.polyfit(t[m], y, 1)
+    y = np.log(Aa[m]); pp = np.polyfit(t[m], y, 1)
     r = np.corrcoef(t[m], y)[0, 1] ** 2
-    return -p[0], r, m
-
+    # A SOUND FIT OR NOTHING. If the window is not a clean decreasing exponential -- r^2 below 0.8,
+    # or the "decay" is actually a rise (positive slope, e.g. a run whose wave collapsed to the
+    # noise floor before the first recorded frame) -- report nan rather than a number nobody should
+    # trust. re_seawater (small amplitude, wave gone by frame 1) is the case this rejects.
+    if r < 0.8 or -pp[0] <= 0:
+        return float("nan"), r, m
+    return -pp[0], r, m
 
 def main():
     import yaml
@@ -92,7 +115,8 @@ def main():
         d = yaml.safe_load(open(sp))
         ng = int(d["fields"]["mpm_grid"]["n_grid"])
         sub = next(st["substep_dt"] for st in d["schedule"] if isinstance(st, dict))
-        eta = next(float(o["eta"]) for o in d["operators"] if o.get("op") == "mpm_viscosity")
+        eta = next(float(o["eta"]) for o in d["operators"]
+                   if o.get("op") in ("mpm_viscosity", "mpm_grid_viscosity"))
         rho = float(d["sets"]["water_particle"]["density"])
         sd = next(o for o in d["seed"] if o["op"] == "seed_state")
         k, axis = float(sd["k"]), int(sd["axis"])
