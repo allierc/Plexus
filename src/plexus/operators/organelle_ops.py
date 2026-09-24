@@ -208,7 +208,24 @@ def _write_count(H, lvl, tissue_set, species):
 # ---------------------------------------------------------------------------------------------
 @register_operator("organelle_seed", family="seed", set="particle", kind="seed")
 class OrganelleSeed(Seed):
-    """Place every live piece in its species' region of its cell, once, spread apart."""
+    """Place every organelle piece inside its species' region of its own cell, once, at x_0.
+
+    organelle -> organelle: reads the tissue mesh and each piece's parent cell, writes `pos`.
+
+        x_p ~ uniform over region(species(p)) of cell parent(p),
+              rejected while  |x_p - x_q| < r_p + r_q  for an already-placed q in the same cell
+
+    r is the species' `radius` in world units, and `region` names the part of the cell the
+    species belongs to (nucleus, cortex, cytoplasm). Species are placed largest first, so the
+    big pieces take their room and the small ones fit around them; `spread_tries` bounds the
+    rejection loop, after which a piece is left where it fell rather than the seed failing.
+
+    A piece whose cell has no face is dormant, and is parked outside the box rather than left
+    at the origin -- a dormant piece has no mechanics, so its position is free, and parking it
+    keeps it out of every extent read off the set.
+
+    Reference: Plexus (this work); the per-cell counts are those of the cell atlas.
+    """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"tissue": "tissue_set"}
     OPTIONAL_TYPE_PROPS = ["count", "radius", "region", "on_divide", "body"]
@@ -270,7 +287,23 @@ class OrganelleSeed(Seed):
 # ---------------------------------------------------------------------------------------------
 @register_operator("organelle_project", family="mechanics", set="particle", kind="structural")
 class OrganelleProject(Structural):
-    """Carry every piece with its cell and keep it in its region; apply `on_divide` at a division."""
+    """Carry every piece with the cell that owns it, and keep it inside its species' region.
+
+    organelle -> organelle: reads the tissue mesh and `pos`, writes `pos` in place.
+
+        x_p <- c_f(t) + R_f(t) (x_p - c_f(t-1)),     then projected back into region(species(p))
+
+    c_f is the cell's centroid and R_f the rotation its face frame turned through since the last
+    frame, so a piece rides its cell rigidly and is only then clamped back into its region. The
+    projection is what makes the region a constraint rather than an initial condition: a cell
+    that deforms cannot leave a nucleus outside itself.
+
+    At a division the species' `on_divide` decides what the daughters get -- the pieces are
+    split between them, duplicated, or re-drawn -- because that choice is biology and differs by
+    organelle: a nucleus is rebuilt, mitochondria are partitioned.
+
+    Reference: Plexus (this work).
+    """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"tissue": "tissue_set"}
     OPTIONAL_TYPE_PROPS = ["count", "radius", "region", "on_divide", "body"]
@@ -391,7 +424,27 @@ class OrganelleProject(Structural):
 # ---------------------------------------------------------------------------------------------
 @register_operator("organelle_express", family="population", set="particle", kind="structural")
 class OrganelleExpress(Structural):
-    """Per cell and species, relax the number of pieces to the declared `count`: `dN/dt = (count - N) / tau`."""
+    """Biogenesis and turnover: per cell and species, relax the number of pieces toward the
+    count that species declares.
+
+    organelle -> organelle: reads the tissue mesh and the live piece count, wakes or retires
+    dormant slots.
+
+        dN_fs/dt = (count_s - N_fs) / tau_s
+
+    N_fs is the number of live pieces of species s in cell f and count_s the declared per-cell
+    number, both dimensionless; tau_s is that species' turnover time in frames. A fractional
+    remainder is carried between frames rather than rounded away, so a slow tau still reaches
+    the set point instead of stalling below it. `tau: inf` opts a species out entirely.
+
+    It is what makes the count a SET POINT rather than an initial condition: after a division
+    halves them, the daughters rebuild to `count` over tau instead of staying halved forever.
+
+    Reference: mitochondrial mass is restored over the cell cycle after halving at division --
+    Posakony, J. W., England, J. M. & Attardi, G. (1977). Mitochondrial growth and division
+    during the cell cycle in HeLa cells. J. Cell Biol. 74:468-491. The first-order set-point law
+    is this work's.
+    """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"tissue": "tissue_set"}
     OPTIONAL_TYPE_PROPS = ["count", "radius", "region", "on_divide", "body", "tau"]

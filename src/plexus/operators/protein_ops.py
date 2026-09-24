@@ -265,7 +265,24 @@ def _set_block(lvl, name, idx, value):
 # ---------------------------------------------------------------------------------------------
 @register_operator("protein_seed", family="seed", set="particle", kind="seed")
 class ProteinSeed(Seed):
-    """Place every species' starting clusters on its region, once, and write the cell's rates."""
+    """Place every species' starting clusters on its region of each cell, once, at x_0, and
+    write the per-cell synthesis and turnover rates the expression operator reads.
+
+    protein -> protein: reads the tissue mesh and each cluster's parent cell, writes `pos` and
+    the cell's per-species rates.
+
+        N_fs(0) = round(s_s A_f tau_s),     x_p ~ uniform over region(s) of cell f
+
+    N_fs(0) is the steady state of the rate law below, so a run starts where it would settle
+    rather than climbing to it: s_s is the species' synthesis rate per unit area per unit time,
+    A_f the cell's area in world units squared, and tau_s its residence time in frames. Clusters
+    are spaced apart within a species, since two receptor clusters on top of each other are one
+    cluster.
+
+    Reference: Plexus (this work); cluster spacing after Changede, R. & Sheetz, M. (2017).
+    Integrin and cadherin clusters: a robust way to organize adhesions for cell mechanics.
+    Dev. Cell 40:1-10.
+    """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"tissue": "tissue_set"}
     SUPPORTED_DIMS = (3,)
@@ -337,7 +354,23 @@ class ProteinSeed(Seed):
 # ---------------------------------------------------------------------------------------------
 @register_operator("protein_project", family="mechanics", set="particle", kind="structural")
 class ProteinProject(Structural):
-    """Keep every cluster in its species' region of its parent cell; share them at division."""
+    """Keep every cluster inside its species' region of its parent cell, and share the clusters
+    between the daughters at a division.
+
+    protein -> protein: reads the tissue mesh and `pos`, writes `pos` in place.
+
+        x_p <- c_f(t) + R_f(t) (x_p - c_f(t-1)),     then projected back into region(species(p))
+
+    c_f is the cell's centroid and R_f the rotation its face frame turned through since the last
+    frame, so a cluster rides its cell and is only then clamped back into its region. A cluster
+    is a POINT, not matter -- no deformation gradient, no mass, no grid -- so nothing here is a
+    force: the cell's motion is imposed on the cluster, never the other way round.
+
+    At a division each daughter keeps the clusters that fall on its own side of the septum,
+    which is what makes the number a shared quantity rather than one duplicated per daughter.
+
+    Reference: Plexus (this work).
+    """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"tissue": "tissue_set"}
     SUPPORTED_DIMS = (3,)
@@ -411,7 +444,25 @@ class ProteinProject(Structural):
 # ---------------------------------------------------------------------------------------------
 @register_operator("protein_express", family="population", set="particle", kind="structural")
 class ProteinExpress(Structural):
-    """Birth and retirement per species at the cell's rates: `dN/dt = s_i A_i - N / tau_i`."""
+    """Synthesis and turnover: per cell and species, birth new clusters and retire old ones at
+    the rates the cell carries.
+
+    protein -> protein: reads the tissue mesh and the live cluster count, wakes or retires
+    dormant slots.
+
+        dN_fs/dt = s_s A_f  -  N_fs / tau_s
+
+    N_fs is the number of live clusters of species s on cell f, dimensionless; s_s is that
+    species' synthesis rate per unit area per unit time, A_f the cell's area in world units
+    squared, and tau_s the residence time in frames. The steady state is s_s A_f tau_s, so a cell
+    that GROWS makes more clusters without anything being told to: the area is in the law.
+
+    A fractional remainder is carried between frames rather than rounded away, so a species whose
+    per-frame birth rate is below one still reaches its set point instead of never starting.
+
+    Reference: the receptor rate law follows the adhesion operators of the okuda discovery
+    campaign, where it was gated on receptor number being conserved under binding.
+    """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"tissue": "tissue_set"}
     SUPPORTED_DIMS = (3,)

@@ -142,6 +142,9 @@ class Organ:
 
     `depth=1` because it holds a contained set (its effectors), the same hint `cell` carries.
     Nothing dispatches on depth; the containment the engine traverses is `parent`.
+
+    Reference: a body its effectors move, in the sense of the oculomotor plant of Robinson, D. A.
+    (1964). The mechanics of human saccadic eye movement. J. Physiol. 174:245-264.
     """
 
 
@@ -155,6 +158,10 @@ class Muscle:
     this set makes the innervation an ordinary relation rather than a column index chosen inside
     an operator. It is also what lets a circuit reach some muscles and not others by simply
     having no edge to the rest.
+
+    Reference: one extraocular muscle; six of them act on the eye in the arrangement of Robinson, D. A.
+    (1975). A quantitative analysis of extraocular muscle cooperation and squint. Invest.
+    Ophthalmol. 14:801-825.
     """
 
 
@@ -261,6 +268,13 @@ class MusclePoseMap(Aggregate):
     IO, and this operator takes a muscle's position within its parent's fibre as its index into
     that order. A spec that declares the six in another order gets a different eye with no error
     raised anywhere, so the count is checked here and the order is stated in `MUSCLES`.
+
+    Reference: The static half of a Hammerstein cascade -- a memoryless nonlinearity ahead of a
+    linear body: Hammerstein, A. (1930). Nichtlineare Integralgleichungen nebst
+    Anwendungen. Acta Math. 54:117-176. The quadratic pull of muscle drive on gaze
+    follows Robinson, D. A. (1975). A quantitative analysis of extraocular muscle
+    cooperation and squint. Invest. Ophthalmol. 14:801-825; coefficients fitted from the
+    soft-body eye characterisation in this repository's eye prototype.
     """
 
     EMIT = None                        # writes the parent's pose_target; no integrable delta
@@ -389,6 +403,11 @@ class OrganMechanics(Lateral):
     already has. Keeping it is deliberate: it makes the difference measurable rather than
     asserted. Run both over one trial and report the gaze difference in degrees; if it is under
     the fit's own residual, the choice is genuinely free and the run may say so.
+
+    Reference: The linear half of the Hammerstein cascade. A damped second-order plant is the
+    classical model of the oculomotor periphery: Robinson, D. A. (1964). The mechanics
+    of human saccadic eye movement. J. Physiol. 174:245-264. C and K are fitted to the
+    step responses of the soft-body eye in this repository's eye prototype.
     """
 
     EMIT = "acceleration"              # second-order: an organ has inertia
@@ -457,6 +476,8 @@ class OrganMechanicsExplicit(OrganMechanics):
     chosen for exact agreement with the reference, not because the other one is wrong. On a
     stiffer fit, where dt * max(eig C) approaches the explicit limit of 2 rather than sitting at
     0.096, they would separate and this is the body that would show it.
+
+    Reference: same plant and same coefficients as `organ_mechanics`; see it for the citation.
     """
 
     def _accel(self, u, u_dot, u_inf, dt):

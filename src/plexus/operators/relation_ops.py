@@ -4,25 +4,15 @@
     readout   lateral   the same three steps, but the message IS the receiver's block
 
 A relation is already a first-class Plexus object: a set with `edge_set: true` and two incidence
-maps, which is the paper's own move for structure that is not a function -- give the relation the
-status of entities and both of its legs become ordinary maps. What this module adds is the thing
-that TRAVELS along one: gather the sender's state, weight it by the edge, aggregate onto the
-receiver.
+maps. What this module adds is the thing that TRAVELS along one -- gather the sender's state,
+weight it by the edge, aggregate onto the receiver:
 
-WHY THIS IS NOT IN `neuron_ops`. `neuron_signal` is the same three steps with a neuron's biology
-welded on -- a per-type transfer function, a Dale sign, a coupling gain read off the receiving
-cell's row -- and it is rightly filed with the neurons. But the three steps themselves are not
-about neurons at all. They are what happens whenever one population drives another through a
-weighted relation, and the cases that need them are not one biology:
+    y_i = act( gain * sum_{e : post(e) = i} w_e * send(x_pre(e)) + bias )
 
-    a sensor population into a circuit          (the input map, W_in)
-    a circuit into an effector population       (the output map, W_out)
-    one circuit into another circuit            (two connectomes, composed)
-    any set into any set, across any edge set
-
-Naming it `neuron_project` and filing it with the neurons would make the general case reachable
-only through a word that misdescribes it, which is how `structural` came to mean "may write in
-place" and then absorbed twenty operators that were nothing of the kind.
+`neuron_signal` is these same three steps with a neuron's biology welded on, and is rightly filed
+with the neurons. The steps themselves are not about neurons: they are what happens whenever one
+population drives another through a weighted relation -- a sensor into a circuit (W_in), a circuit
+into an effector (W_out), one circuit into another, any set into any set across any edge set.
 """
 from __future__ import annotations
 
@@ -46,35 +36,17 @@ class _Project(Lateral):
     scalar offset, both after the sum and before `act`. Both nonlinearities are named from the
     shared activation table and both default to identity.
 
-    TWO NONLINEARITIES, AND THEY ARE NOT INTERCHANGEABLE. `send:` is what the SENDER emits --
-    the map is applied to the sender's state before the weights, once per sender. `act:` is what
-    the RECEIVER does with what arrives -- applied after the sum, once per receiver. A rate-coded
-    population is the ordinary case for `send:` (a membrane voltage is not what a downstream set
-    receives; a firing rate is, and `send: tanh` is that saturation), while rectification belongs
-    on the receiving side (`act: softplus` on a muscle, because a muscle pulls or does nothing).
-    Collapsing them into one would silently move a nonlinearity across a linear map, which is a
-    different model: sum(w * tanh(x)) is not tanh(sum(w * x)).
+    TWO NONLINEARITIES, AND THEY ARE NOT INTERCHANGEABLE. `send:` is applied to the sender's
+    state before the weights, once per sender; `act:` after the sum, once per receiver. Collapsing
+    them would move a nonlinearity across a linear map, and sum(w tanh(x)) is not tanh(sum(w x)).
 
-    TWO CONTRACTS, NOT ONE WITH A SWITCH. What can happen to an arriving message is one of two
-    ordinary things, and they are registered separately because what an operator emits IS its
-    contract with the clock -- the engine resolves a whole SET's integration order from it, so
-    hiding the choice in a parameter would let a spec change how a set moves in time without
-    that showing anywhere the engine looks:
+    TWO CONTRACTS, NOT ONE WITH A SWITCH, because what an operator emits IS its contract with the
+    clock: `project` emits a RATE summed into the receiver's derivative (W_in), `readout` writes
+    the receiver's `into:` block in place (W_out). Everything else is shared, which is why they
+    are one class with two registrations.
 
-        project   the message is a RATE, summed into the receiver's derivative like any other
-                  operator's delta. An input current into a circuit: what arrives changes how
-                  fast the receiver's state moves. This is W_in, and circuit -> circuit.
-        readout   the message IS the receiver's `into:` block, written in place each frame. An
-                  effector reading its drive: a muscle's contraction is not something it
-                  integrates, it is what it is being told right now. This is W_out.
-
-    Everything else -- the gather, the weight, the sum, the gain, the bias, the activation --
-    is shared, which is why they are one class with two registrations rather than two operators.
-
-    THE TWO ENDPOINTS MAY BE DIFFERENT KINDS, and that is the whole point. `H.gather` and
-    `H.scatter_along` resolve each leg through the edge set's own `incidence_name`, so nothing
-    here assumes the sender and the receiver are the same set -- `neuron_signal` assumes it only
-    because it indexes ONE type table with both `es.pre` and `es.post`.
+    The two endpoints may be different SETS: each leg resolves through the edge set's own
+    incidence map, where `neuron_signal` indexes one type table with both legs.
 
     Reference: Plexus (this work). The three-step gather/weight/scatter is the general form of
     which `neuron_signal` is the neural specialisation.
@@ -105,20 +77,12 @@ class _Project(Lateral):
         super().__init__(params, device)
         self.edge_set = params["edge_set"]
         self.block = params["block"]
-        # `into:` AND NOT `to:`. `to:` is a reserved spec key naming a destination FIELD, and
-        # the schema rejects it when it names a state block -- which is the right refusal, the
-        # same one `cell_ops` records for `from:`. An Exchange writes a field, a readout writes a
-        # BLOCK, and spelling both `to` would make the two indistinguishable in a spec.
+        # `into:` and not `to:`: `to:` is reserved for a destination FIELD.
         self.to_block = params.get("into", self.block)
         self.weight_block = params.get("weight", "w")
         self.gain = float(params.get("gain", 1.0))
-        # `bias:` IS EITHER A NUMBER OR THE NAME OF A RECEIVER STATE BLOCK, the same choice
-        # `neuron_update` offers for `tau:`. A scalar says the offset is a property of the MAP;
-        # a block says it is a property of each receiving element, which is what `torch.nn.Linear`
-        # means by its bias vector and what the reference this rig reproduces
-        # (`train_eyeG.CTRNNEyeG`) learns on both of its maps. It matters most on `readout`:
-        # without a per-muscle offset every muscle's resting drive is softplus(0) = 0.693, the
-        # same tonic contraction on all six, and the eye's resting gaze cannot be set at all.
+        # `bias:` is a number (a property of the MAP) or a receiver state block (a property of
+        # each receiving element, as `torch.nn.Linear`'s bias vector is).
         _b = params.get("bias", 0.0)
         self.bias_block = _b if isinstance(_b, str) else None
         self.bias = 0.0 if self.bias_block else float(_b)
@@ -149,25 +113,16 @@ class _Project(Lateral):
         if mask is not None:
             y = y * mask[:, None].to(y.dtype)
         if self.WRITES_BLOCK:
-            # The message IS the block. Written in place, clone-and-reassign under autograd so
-            # the tape keeps the previous state alive (see `aggregate_centroid` for why the
-            # forward path must not clone).
+            # The message IS the block: written in place, cloned only under autograd.
             b0, b1 = post.state_schema[self.to_block]
-            # THE WIDTH IS THE LAST AXIS, not axis 1: a batched run carries y as [B, N, w], where
-            # axis 1 is the receiver count and comparing it to the block width would reject every
-            # batched run whose receiver count differs from its block width.
+            # The width is the LAST axis: a batched run carries y as [B, N, w].
             if b1 - b0 != y.shape[-1]:
                 raise ValueError(
                     f"readout: the message is {y.shape[-1]} wide but {es.post_name}."
                     f"{self.to_block!r} is {b1 - b0}. The width comes from the SENDER's "
                     f"{self.block!r} block, so these must agree.")
-            # A MASKED `readout` WRITES ONLY THE ELEMENTS IT ACTS ON. `at: muscle[type=LR]` means
-            # this operator drives the lateral rectus; it does not mean every other muscle is
-            # driven to zero. Writing the whole block would make two readouts over disjoint
-            # muscles impossible -- the second would erase the first -- which is exactly what the
-            # zebrafish pool needs, AMN onto LR and AIN onto MR with the other four muscles left
-            # at the zero they were seeded with. `project` is unaffected: a delta of zero is
-            # already "contributes nothing".
+            # A masked `readout` writes only the elements it acts on, so two readouts over
+            # disjoint receivers compose instead of the second erasing the first.
             keep = y if mask is None else torch.where(
                 mask[:, None].to(torch.bool), y, post.get(self.to_block))
             if torch.is_grad_enabled():
@@ -184,9 +139,16 @@ class _Project(Lateral):
 class Project(_Project):
     """A rate across a relation: the message is summed into the receiver's derivative.
 
+    (pre, edge_set) -> post: gathers `block` along `pre`, weights by the edge, aggregates
+    along `post`, emits a rate.
+
+        dx_i/dt += act( gain * sum_{e : post(e) = i} w_e * send(x_pre(e)) + bias )
+
     W_in (a sensor population into a circuit) and circuit -> circuit are both this. The receiver
-    integrates what arrives, so the message has the units of the receiver's coordinate per unit
-    time, and `into:` is not read -- the delta goes to the receiver's own integrated block.
+    INTEGRATES what arrives, so the message carries the units of the receiver's coordinate per
+    unit time, and `into:` is not read -- the delta goes to the receiver's own integrated block.
+
+    Reference: Plexus (this work); the general form of which `neuron_signal` is the neural case.
     """
 
     EMIT = "velocity"
@@ -197,10 +159,16 @@ class Project(_Project):
 class Readout(_Project):
     """A value across a relation: the message IS the receiver's `into:` block, written each frame.
 
-    W_out (a circuit into an effector population) is this. The receiver does not integrate what
-    arrives -- it holds it -- so the message has the units of `into:` itself, and `into:` is
+    (pre, edge_set) -> post: the same gather, weight and aggregate, written in place.
+
+        x_i = act( gain * sum_{e : post(e) = i} w_e * send(x_pre(e)) + bias )
+
+    W_out (a circuit into an effector population) is this. The receiver does NOT integrate what
+    arrives -- it holds it -- so the message carries the units of `into:` itself, and `into:` is
     required. Every block written this way should be `integration: none` in its own schema; a
     block that is both integrated and overwritten each frame has two laws and the last one wins.
+
+    Reference: Plexus (this work); the general form of which `neuron_signal` is the neural case.
     """
 
     EMIT = None

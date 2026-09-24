@@ -367,6 +367,10 @@ class NeuronSignalShared(_NeuronSignal):
     The claim is that neurons differ in how they integrate but speak a common language. This is
     the reference's first experiment, and the NeuralGraph PDE_N2 generator, whose message is
     W @ phi(u) with no per-type term inside phi.
+
+    Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+    the activity of neural assemblies -- the first experiment, one transfer function for the
+    whole network (the NeuralGraph PDE_N2 generator).
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -383,6 +387,9 @@ class NeuronSignalTypePre(_NeuronSignal):
     h_j and w_j are the threshold and width from the SENDING neuron's type row, both in the
     units of x. The claim is about the presynaptic terminal: how a neuron's state is converted
     into a signal is a property of the neuron sending it. The NeuralGraph PDE_N4 generator.
+
+    Reference: Allier, C. et al., as above -- the presynaptic-terminal variant, where the scale and
+    threshold belong to the neuron sending the signal (the NeuralGraph PDE_N4 generator).
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -405,6 +412,9 @@ class NeuronSignalTypePairwise(_NeuronSignal):
     The asymmetry is deliberate and IS the model: w off the post-synaptic row, h and log w off
     the pre-synaptic one. Making both pre would silently turn this into `type_pre` with an
     extra term.
+
+    Reference: Allier, C. et al., eqn. (simulation3) -- the pairwise variant, and the form under
+    which the transfer functions were recovered (the NeuralGraph PDE_N5 generator).
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -500,6 +510,9 @@ class NeuronDrive(Exchange):
     where `neuron_field_input` is the multiplicative modulation Omega of the reference CTRNN. Which
     neurons receive it is the `at:` selector's business (`at: neuron[type=AF5]`), as for every
     operator; the masked neurons get nothing, not a zero written over their state.
+
+    Reference: Plexus (this work); an injected current, the experimental counterpart of a current
+    clamp rather than a mechanism the tissue owns.
     """
 
     EMIT = "velocity"
@@ -956,6 +969,8 @@ class PaintChildren(Exchange):
     changes is its voltage, and a morphology render is worth its 400,000 points only if those
     points carry it. This is an OBSERVATION -- it moves nothing and no dynamics reads `paint` --
     which is why it is a copy and not a coupling.
+
+    Reference: none -- this copies a value for the renderer to draw; it is not a mechanism. Plexus (this work).
     """
 
     EMIT = None

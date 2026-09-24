@@ -85,6 +85,17 @@ class ActiveStrain(Lateral):
     cell -> mpm_particle: reads the parent's `phi`, `g`, `g2` (and its timing blocks if declared),
     writes the particle set's deformation gradient and the parent's `gam_prev`.
 
+        F  <-  ( I + dgam_j f_j f_j^T + dgam2_j p_j p_j^T )  F
+        gam_j(t) = g_j s(phi_j(t)),     dgam_j = gam_j(t) - gam_j(t-1)
+
+    f_j is cell j's unit fibre direction and p_j the unit direction across it, so the two terms
+    shorten the material along the fibre and let it thicken across; g_j is the contraction
+    amplitude along the fibre and g2_j across it, both dimensionless strains, and s(phi) is the
+    beat's shape as a function of the cell's own phase. The INCREMENT is applied each frame, so
+    the accumulated active part over a whole beat is exactly I + gam_j and the material returns
+    to the length it started at -- which is what makes this a rest-length change rather than a
+    drift.
+
     IT IS REGISTERED `lateral` AND THAT IS THE WRONG WORD, for the same reason `neuron_update`'s
     and `organ_mechanics`'s are: `KINDS` has no name for an entity's own dynamics. Nothing here
     traverses a relation between peers -- it is a Broadcast down one containment map and then a
@@ -93,6 +104,12 @@ class ActiveStrain(Lateral):
     IT EMITS NOTHING. The active strain is not an acceleration the engine integrates; it is a
     change to the material's unstressed configuration, which `mpm_strain` then turns into stress
     on the next substep. `EMIT = None` is the same contract `readout` has.
+
+    Reference: The active-strain (multiplicative decomposition) formulation of muscle contraction:
+    Nardinocchi, P. & Teresi, L. (2007). On the active response of soft living tissues.
+    J. Elasticity 88:27-39; Ambrosi, D. & Pezzuto, S. (2012). Active stress vs. active
+    strain in mechanobiology. J. Elasticity 107:199-212. The per-cell strain here is
+    fitted from motion alone on cardiomyocyte sheets (Plexus, this work).
     """
 
     EMIT = None
@@ -285,6 +302,10 @@ class MaterialFromCell(Lateral):
     recovers to 0.64 of its planted spread (correlation 0.45) where the active strain reaches
     0.32 and the fibre axis 10 degrees, and left free on real data it spread over a factor of 200
     while absorbing model error. It is loaded and reported, never claimed.
+
+    Reference: Plexus (this work): per-cell stiffness, reported and never claimed -- it is not
+    identifiable per cell from motion alone. The Lame conversion is the standard
+    isotropic-elasticity one.
     """
 
     EMIT = None

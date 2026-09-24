@@ -41,7 +41,10 @@ class MetaboliteSeed(Seed):
     """x_0 for the metabolites: every concentration drawn uniformly in [c_min, c_max], once.
 
     metabolite -> metabolite: writes `conc`, and remembers the draw as `c0` (the homeostatic
-    baseline, `baseline_mode: initial` in the reference) when the set carries that block."""
+    baseline, `baseline_mode: initial` in the reference) when the set carries that block.
+
+    Reference: Plexus (this work); the uniform draw of the MetabolismGraph reference generator.
+    """
 
     EMIT = None
     INPUTS = ["metabolite"]
@@ -93,6 +96,11 @@ class ReactionRate(Aggregate):
     concentration below which log c is held, so a species driven to zero stops a reaction rather
     than producing -inf. `rate_noise` fluctuates each k_j by that relative sd per tick
     (enzyme-activity noise; S still conserves mass every step).
+
+    Reference: Guldberg, C. M. & Waage, P. (1864). Studies concerning affinity -- the law of mass
+    action, that a reaction rate is the product of its substrate concentrations raised to
+    their stoichiometric powers. The forward model is that of the MetabolismGraph
+    reference generator, run with mass action.
     """
 
     EMIT = None
@@ -164,6 +172,10 @@ class MetaboliteFlux(Aggregate):
     sums onto the metabolite along `pre`, emits dc/dt.
 
         dc_i/dt = SUM_j S_ij v_j
+
+    Reference: The stoichiometric balance dc/dt = S v, the standard statement of a reaction network;
+    see Palsson, B. O. (2015). Systems Biology: Constraint-based Reconstruction and
+    Analysis, ch. 3, for S as the object the whole network is written in.
     """
 
     EMIT = "velocity"                  # first-order: the engine integrates `conc`
@@ -204,6 +216,9 @@ class MetaboliteHomeostasis(Lateral):
 
     lambda is `strength` in inverse time; c0_i is the `c0` block the seed wrote (else `baseline`);
     A and T (`circadian_amplitude`, `circadian_period`, in ticks) modulate the target, 0 = none.
+
+    Reference: Plexus (this work); a first-order pull toward a baseline, with the optional
+    circadian modulation of the MetabolismGraph reference generator.
     """
 
     EMIT = "velocity"
@@ -247,7 +262,12 @@ class ReactionSeed(Seed):
     """x_0 for the reactions: every rate constant k_j drawn log-uniformly in [k_min, k_max], once.
 
     reaction -> reaction: writes `k` (and zeroes `v`). The rate constants are the inverse
-    model's target, so they are state of the reaction set, not a number inside an operator."""
+    model's target, so they are state of the reaction set, not a number inside an operator.
+
+    Reference: Plexus (this work); the log-uniform draw of rate constants the MetabolismGraph
+    reference generator uses, kept as state of the reaction set because it is what an
+    inverse run has to recover.
+    """
 
     EMIT = None
     INPUTS = ["reaction"]
