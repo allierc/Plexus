@@ -240,9 +240,13 @@ def generate(path, root=None, force=False, verbose=True) -> str:
     truths = []
     for c, cell in enumerate(spec.cells):
         tp = {**spec.teacher, **{k: v for k, v in cell.items() if k not in pkeys}}
-        law = get_teacher(tp.pop("law", spec.law_name)); tp.pop("name", None)
+        law_name = tp.pop("law", spec.law_name); tp.pop("name", None)
+        law = get_teacher(law_name)
         pl = law.poles(spec.dt, **tp) if hasattr(law, "poles") else np.array([])
-        truths.append({"cell": cell, "name": names[c], "params": tp,
+        # `law` IS RECORDED PER CELL. It was popped into the local variable and dropped, so a
+        # reader recomputing a cell's target had only the header's law -- which is the FIRST
+        # cell's, and wrong for every other one in a `teachers:` corpus.
+        truths.append({"cell": cell, "name": names[c], "law": law_name, "params": tp,
                        "poles_real": np.real(pl).tolist(), "poles_imag": np.imag(pl).tolist(),
                        "pole_freq_hz": [float(abs(p.imag) / (2 * np.pi)) if abs(p.imag) > 1e-12
                                         else float(abs(p.real) / (2 * np.pi))

@@ -517,12 +517,15 @@ def from_run(name, *, root=None, device="cpu", n_show=4, fps=48, out=None, quiet
     if len(names) > 1:
         made = []
         for c, cname in enumerate(names):
-            idx = np.where(cells == c)[0][:n_show]
+            # ENOUGH TRIALS FOR `n_show` ROWS OF `reps`, not n_show total. Handing `_one` only
+            # n_show trials made it wrap: row 0 and row 2 drew the same pair, which showed up as
+            # per-trial error bars in exact pairs -- the same defect `_concat_trials` had.
+            idx = np.where(cells == c)[0][:n_show * max(reps, 1)]
             if not len(idx):
                 continue
             made += _one(run, name, task, split, out_dir, dt, unit, fps, quiet, what, reps,
                          U[idx], Y[idx], cond[idx] if hasattr(cond, "__getitem__") else cond,
-                         device, len(idx), suffix=f"_{cname}", title_extra=f"  [{cname}]")
+                         device, n_show, suffix=f"_{cname}", title_extra=f"  [{cname}]")
         return made
     u_np, y_np = U[:n_show, :, :1].cpu().numpy(), Y[:n_show].cpu().numpy()
     if reps > 1:
@@ -567,10 +570,18 @@ def _one(run, name, task, split, out_dir, dt, unit, fps, quiet, what, reps,
     """The movie and figure for ONE condition cell's trials."""
     import torch
     res = os.path.join(out_dir, "results")
-    u_np, y_np = U[:n_show, :, :1].cpu().numpy(), Y[:n_show].cpu().numpy()
+    need = n_show * max(reps, 1)
+    u_np, y_np = U[:need, :, :1].cpu().numpy(), Y[:need].cpu().numpy()
     if reps > 1:
-        u_np = _concat_trials(u_np, np.zeros(len(u_np), int), reps, n_show)
+        # DISJOINT WINDOWS: row j is trials [j*reps, (j+1)*reps). Every row is different data,
+        # which is the only way the per-trial panel means anything.
+        m = min(n_show, len(u_np) // reps)
+        u_np = np.stack([np.concatenate([u_np[j * reps + r] for r in range(reps)], axis=0)
+                         for j in range(m)])
         y_np = _teacher_on_cell(task, u_np, cond)
+        n_show = u_np.shape[0]
+    else:
+        u_np, y_np = u_np[:n_show], y_np[:n_show]
     pred = _predict_long(run, name, out_dir, u_np, np.asarray(cond), device, n_show)
     made = []
     ttl = f"{name}  ({task}/{split}){title_extra}"
@@ -594,13 +605,25 @@ def _teacher_on_cell(task, u, cond):
     c = int(np.asarray(cond).ravel()[0])
     rec = t["per_cell"][min(c, len(t["per_cell"]) - 1)]
     params = dict(rec.get("params") or {})
-    law = get_teacher(params.pop("law", t["law"]))
-    params.pop("name", None)
+    # THE CELL'S OWN LAW, NOT THE HEADER'S. `generate` pops `law` out of `params` before writing,
+    # so falling back to `teacher["law"]` silently applied the FIRST cell's law to every cell: a
+    # six-function corpus plotted its delay, its low-pass and its high-pass against an INTEGRATOR,
+    # and the model -- which was right -- looked like a wild oscillation next to a smooth curve.
+    # The full cell dict keeps the law, so it is recoverable even in corpora written before the
+    # writer was fixed.
+    law_name = rec.get("law") or (rec.get("cell") or {}).get("law") or t["law"]
+    law = get_teacher(law_name)
+    params.pop("law", None); params.pop("name", None)
     return np.asarray(law(np.asarray(u, np.float64), float(t["dt"]), **params), np.float64)
 
 
 def _predict_long(run, name, out_dir, u_np, cond, device, n_show):
-    """Roll the fitted model out over a stimulus longer than the trials it was fitted on."""
+    """Roll the fitted model out over a stimulus longer than the trials it was fitted on.
+
+    ALWAYS RETURNS `[B, T, 1]`, even for B = 1. `spec_trainer.rollout` drops the leading axis when
+    the batch is one -- it takes `[T, C]` for a single trial and returns `[T, w]` -- and a caller
+    asking for ONE trial (the montage does) then indexes a 2-D array as though it were 3-D.
+    """
     import torch
     from plexus.tasks.trainer import with_context, n_condition_cells
     U = torch.as_tensor(np.asarray(u_np, np.float32), device=device)
@@ -613,7 +636,9 @@ def _predict_long(run, name, out_dir, u_np, cond, device, n_show):
         with torch.no_grad():
             _, P = rollout(sim, U, io["drive_set"], io["drive_block"],
                            io["read_set"], io["read_block"], device, grad=False)
-        return P[..., int(io.get("read_channel", 0)):int(io.get("read_channel", 0)) + 1].cpu().numpy()
+        ch = int(io.get("read_channel", 0))
+        out = P[..., ch:ch + 1].cpu().numpy()
+        return out if out.ndim == 3 else out[None]
     from plexus.tasks.trainer import CircuitRNN
     ck = torch.load(os.path.join(out_dir, "models", "best.pt"),
                     weights_only=False, map_location=device)
@@ -621,7 +646,74 @@ def _predict_long(run, name, out_dir, u_np, cond, device, n_show):
                    tau0=float(ck["circuit"].get("tau0", 0.5)), dt=ck["dt"]).to(device)
     m.load_state_dict(ck["state"]); m.eval()
     with torch.no_grad():
-        return m(U).cpu().numpy()
+        out = m(U).cpu().numpy()
+    return out if out.ndim == 3 else out[None]
+
+
+def montage(name, *, root=None, device="cpu", out=None, cols=3, n_show=1, seconds=None,
+            theme=None, quiet=False):
+    """One panel per function: ground truth against the model, all of them on one page.
+
+    THE FIGURE THE LADDER IS FOR. Six separate rollout plots answer "how does it do on the
+    high-pass"; this one answers "does ONE circuit hold all six", which is the question -- and it
+    answers it at a glance, because every panel is the same weights under a different context
+    one-hot. Each panel carries its own held-out error, so a panel that looks right and scores
+    badly cannot hide behind the picture.
+
+    EVERY PANEL ON ITS OWN Y SCALE, deliberately, where the stacked trace plots share one. These
+    are DIFFERENT LAWS: the differentiator's output has four times the rms of the low-pass's, and
+    a shared scale would flatten five panels to show one.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import yaml
+    from plexus.tasks.trainer import load_split, log_dir
+    from plexus.tasks.generate import task_dir
+
+    out_dir = log_dir(name, root)
+    run = yaml.safe_load(open(os.path.join(out_dir, "config.yaml")))
+    run["_path"] = os.path.join(out_dir, "config.yaml")
+    tr = run.get("training") or {}
+    task = tr.get("test_task") or run["task"]
+    split = "test" if os.path.isdir(os.path.join(task_dir(task), "test")) else "train"
+    dt = float(json.load(open(os.path.join(task_dir(task), "provenance.json")))["dt"])
+    U, Y, cond = load_split(task, split, device)
+    names = _cell_names(task)
+    res_p = os.path.join(out_dir, "results", f"{name}_{split}.json")
+    per = (json.load(open(res_p)).get("normalised_per_cell") or {}) if os.path.exists(res_p) else {}
+
+    run = dict(run, task=task)
+    th = THEMES[theme or "light"]
+    rows = int(np.ceil(len(names) / cols))
+    fig = plt.figure(figsize=(4.8 * cols, 3.0 * rows), facecolor=th["bg"])
+    gs = fig.add_gridspec(rows, cols, hspace=0.50, wspace=0.24)
+    T = min(int(round(seconds / dt)) if seconds else U.shape[1], U.shape[1])
+    for c, cname in enumerate(names):
+        ax = _panel(fig.add_subplot(gs[c // cols, c % cols]), th,
+                    xlabel="time (s)" if c // cols == rows - 1 else None,
+                    ylabel="output" if c % cols == 0 else None, letter="abcdef"[c % 6])
+        idx = np.where(np.asarray(cond) == c)[0][:n_show]
+        if not len(idx):
+            ax.axis("off")
+            continue
+        pred = _predict_long(run, name, out_dir, U[idx, :, :1].cpu().numpy(),
+                             np.asarray(cond)[idx], device, len(idx))
+        t = np.arange(T) * dt
+        for j in range(len(idx)):
+            ax.plot(t, Y[idx[j], :T, 0].cpu(), color=th["gt"], lw=2.4, alpha=0.9)
+            ax.plot(t, pred[j, :T, 0], color=th["pred"], lw=0.9)
+        e = per.get(str(c))
+        ax.text(0.0, 1.16, cname + (f"    {e:.4f} of variance" if e is not None else ""),
+                transform=ax.transAxes, ha="left", va="bottom", color=th["ink"], fontsize=9)
+    fig.text(0.5, 1.0, f"{name}   ({task}/{split})   green: ground truth   black: model",
+             ha="center", va="bottom", color=th["muted"], fontsize=9)
+    out = out or os.path.join(out_dir, "results", f"{name}_{split}_montage.png")
+    fig.savefig(out, dpi=140, facecolor=th["bg"], bbox_inches="tight")
+    plt.close(fig)
+    if not quiet:
+        print(f"[montage] {out}  {len(names)} function(s)", flush=True)
+    return out
 
 
 def main():
@@ -635,7 +727,9 @@ def main():
     ap.add_argument("--fps", type=int, default=48)
     ap.add_argument("--reps", type=int, default=2,
                     help="trials of the same condition joined end to end, for a longer rollout")
-    ap.add_argument("--what", nargs="+", default=["movie"], choices=["movie", "figure"])
+    ap.add_argument("--what", nargs="+", default=["movie"],
+                    choices=["movie", "figure", "montage"])
+    ap.add_argument("--montage-seconds", type=float, default=None)
     a = ap.parse_args()
     from plexus.tasks.trainer import log_dir
     names = list(a.names)
@@ -648,8 +742,12 @@ def main():
     ok, bad = 0, []
     for n in names:
         try:
-            from_run(n, root=a.root, device=a.device, n_show=a.n_show, fps=a.fps,
-                     what=tuple(a.what), reps=a.reps)
+            w = tuple(x for x in a.what if x != "montage")
+            if w:
+                from_run(n, root=a.root, device=a.device, n_show=a.n_show, fps=a.fps,
+                         what=w, reps=a.reps)
+            if "montage" in a.what:
+                montage(n, root=a.root, device=a.device, seconds=a.montage_seconds)
             ok += 1
         except Exception as e:                      # one bad run must not stop the sweep
             bad.append((n, f"{type(e).__name__}: {e}"))
