@@ -1,14 +1,14 @@
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 32
+    n_grid: 48
 general:
   boundary: wall
   dim: 3
   dt: 1.0e-05
-  n_frames: 20000
-  name: iv_beat_visc_lo
-  record_cap: 120
+  n_frames: 4000
+  name: iv_beat_g48
+  record_cap: 80
   save_data: null
   seed: 0
   units:
@@ -75,7 +75,7 @@ operators:
   zeta: 47940.0
 - at: mpm_grid
   cg_iters: 40
-  eta: 145000.0
+  eta: 1450000.0
   op: mpm_grid_viscosity
   rho: 1000.0
 plotting:
@@ -88,8 +88,8 @@ plotting:
     width: 7
   color_field: radial
   color_range:
-  - -0.13
-  - 0.13
+  - -0.013
+  - 0.013
   cutaway:
     at: 0.5
     axis: y
@@ -184,5 +184,5 @@ sets:
     density: 1000.0
     entity: mpm_particle
     parent: water
-    per_parent: 155374
+    per_parent: 524000
     radius: 0.5
