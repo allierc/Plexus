@@ -81,3 +81,24 @@ this runs at dt 1e-5, a 500-1000x larger step -- the days/run wall is broken for
 NEXT: Phase II (cilium beat + coupling in the implicit fluid at seawater nu, dt 1e-5) once eta is
 set to 1.45e6 for the seawater working point. The 0.276 factor means the coupling operator's grid
 correction may need the same recalibration -- check before reading swim speeds.
+
+## GATE II RESULT -- Phase II.1 PASSED 2026-09-24 (runs 0568-0585)
+Coupled cilium working point (cil_s32_odwater3: 8-node overdamped rod, 10 Hz, the drag operator's
+two-way fluid-structure exchange) with the explicit mpm_viscosity swapped for implicit
+mpm_grid_viscosity at seawater eta 1.45e6 (nu_eff ~400 sim = 1e-6 m^2/s, Re ~5e-3), dt 1e-5.
+- BEAT SURVIVES: base 28.13 deg (= baseline 28.3), 10.04 Hz (sinusoid fit, r2 0.995; the FFT's
+  8.71 Hz was bin-width over 1.5 beats), strain 5.23% (<10%), in-box (0.70), oop 0. The explicit
+  baseline at these settings DIVERGED (box 2.6e5) -- the implicit fluid is far more stable.
+- NO RECTIFICATION at high viscosity (the run-160 worry): the tip traces a SYMMETRIC figure-8
+  (lobes pump equal & opposite), and net water transport is 7-8 nm/beat at BOTH 1x and 10x seawater
+  -- it does not grow with viscosity, and a grid cell is 1560 nm. (fig 0583)
+- CAVEAT: base amplitude is FLAT across 10x viscosity (28.13 -> 28.18 deg), so the beat is set by
+  the rod's own drag coefficient (zeta), not the water viscosity. The rod exchanges momentum with
+  the water (stirs the dipole) but its kinematics are self-dominated at coupling 0.1.
+- PERF: the coupled runs are eager (~90 ms/frame) -- only the MPM substep captures into a CUDA
+  graph; the rod ops and the drag exchange run per-frame eager. Warp the drag scatter/gather before
+  any long Phase III swim run (100 beats = 1e6 frames would be ~1 day eager).
+- MOVIE fps bug: plotting.fps is NOT honored by the movie writer (encodes at 1 fps); re-time in
+  place. fig 0585 is the representative 10 s seawater movie.
+NEXT: Phase II.2 controls (reciprocal/rigid pumps ~nothing -- partly shown by the symmetric
+figure-8; drag ratio 1 no swim) then Phase III (free cell + anisotropic drag, 10 s swim-vs-random-walk).
