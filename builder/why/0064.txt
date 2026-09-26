@@ -1,4 +1,0 @@
-time   2026-09-19 10:58:14
-spec   plat_r3_connectome
-camera azim=20.0 elev=8.0 zoom=1.45
-why    R3: the connectome. 4,664 measured synapses as an edge set -- edges_file on a set with edge_set true -- so the wiring arrives with the hierarchy and neuron_signal and readout can both walk it with nothing else declared. Only 1,009 of the 4,117 cells carry an edge, because the adjacency matrix joins the geometry by CELL NAME and only 1,196 cells have one: degree zero means UNJOINED, not unwired. The classes the motor rungs need are present anyway -- 98% of motoneurons, 99% of the ciliary band, 89% of interneurons. The DIRECTION of these edges was wrong until today and is now locked by tests/test_platynereis.py.

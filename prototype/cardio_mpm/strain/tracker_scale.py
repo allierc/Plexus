@@ -10,7 +10,7 @@ import json, os, sys
 import numpy as np, torch
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import recording as R
-RT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+RT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 rec = R.load(); pos = rec["pos"]
 h = np.load(f"{RT}/healthy.npy").astype(np.float32); T2 = h.shape[0]
 p2 = torch.as_tensor(0.15 + 0.7 * h.reshape(T2, -1, 2) / 2048.0)

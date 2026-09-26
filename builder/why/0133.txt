@@ -1,4 +1,0 @@
-time   2026-09-21 19:08:21
-spec   plat_r13_torque
-camera azim=20.0 elev=8.0 zoom=1.3
-why    R13: the cilium feels the fluid, and momentum is conserved by construction. The shaft is ordinary elastic matter -- it strains, scatters, gathers, and the water pushes back. The drive is a PURE COUPLE at the root whose forces sum to zero identically, plus the equal and opposite couple on the 24 body points nearest it, so the reaction goes where a basal body's reaction goes. Proven to 1e-16 in float64 and locked by two tests; the live run reports its own residual. organ_mechanics is gone -- the plant IS the shaft's inertia, elasticity and drag. (before the run)

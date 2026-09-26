@@ -42,5 +42,5 @@
   "world_lo": 0.15,
   "world_hi": 0.85
  },
- "source": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy"
+ "source": "$GNN_OUTPUT_ROOT/graphs_data/cardiomyocytes_real_data/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy"
 }

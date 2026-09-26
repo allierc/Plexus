@@ -1,5 +1,0 @@
-time   2026-09-19 11:14:46
-spec   plat_r5_beat
-camera azim=20.0 elev=8.0 zoom=1.3
-movie  mp4/0071.mp4  (64.4 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r5_beat/movie.mp4)
-why    R5: the motor pathway, end to end. The connectome already carries 255 motoneuron-to-ciliary-band edges -- including the single MC cell contacting all 23 prototroch cells across 340 synapses -- so the band cells' membrane state IS the motor command; R4 measured them as the loudest class in the animal. The missing step, absent from Plexus AND from connectome-gnn, was an operator turning a membrane state into a mechanical quantity. polar_active_stress[driven] is that step: the existing sign-reversing deviatoric beat with its amplitude read from the cell's own voltage block. Only the 74 band cells carry a polarity, and a cell with no stroke axis does not stroke. No gravity: R2 established that the animal falls, and a body that is also falling makes it impossible to tell whether the circuit moved it. (after the run)

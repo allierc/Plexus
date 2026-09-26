@@ -1,4 +1,0 @@
-time   2026-09-21 15:46:53
-spec   plat_r12_cilia
-camera azim=20.0 elev=8.0 zoom=1.3
-why    Step 126: the seeded scene, NO RUN, so the 3D button has a still to open and turn. The water is now the subject cloud at dot size 2.8 -- only one set can be the subject and the water is the thing whose motion this rung is about, so it takes it. The body is gold glyphs at 14 percent opacity over the water, showing its silhouette without hiding what is behind it; the cilia are white and solid because they are what is being watched. The yolk is NOT drawn: it is still matter and still displaces water, but a type with no dot_radius is not drawn at all. The shafts are now rooted in their cells LIVE rather than at a frozen frame-0 base, so they stay attached as the body moves.

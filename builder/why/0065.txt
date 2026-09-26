@@ -1,4 +1,0 @@
-time   2026-09-19 10:59:30
-spec   plat_r4_activity
-camera azim=20.0 elev=8.0 zoom=1.45
-why    R4: the connectome doing something. neuron_update (the membrane half) and neuron_signal with model type_pairwise over the synapse edge set (the synaptic half) -- both already registered, so this rung declares rather than writes. Every soma is coloured by its own membrane state on a FIXED range, so two frames can be compared: an autoscaled range makes a quiet moment look exactly like a loud one. Nothing drives the circuit yet; the activity is noise of sd 0.01 per step relaxed through a connectome scaled to spectral radius 0.9, which is the honest first picture -- it shows the wiring transporting something without a stimulus whose shape would be the thing you were really watching. (before the run)

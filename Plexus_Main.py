@@ -171,16 +171,16 @@ if __name__ == "__main__":
 
 # python Plexus_Main.py -o generate attraction_repulsion
 # python Plexus_Main.py -o generate interaction/attraction_repulsion --force
-# PLEXUS_OUTPUT_ROOT=/groups/saalfeld/home/allierc/GraphData python Plexus_Main.py -o generate attraction_repulsion
+# PLEXUS_OUTPUT_ROOT=$GNN_OUTPUT_ROOT python Plexus_Main.py -o generate attraction_repulsion
 # cd /workspace/Plexus && PYTHONPATH=src /workspace/.conda_envs/neural-graph-linux/bin/python -u \
 #   tools/mpm_live_movie.py --spec config/material/material_3d_water_bench_100m.yaml \
 #   --frames 90 --render-n 400000 --device cuda:1 \
 #   --out graphs_data/cell/mpm_100m/movie.mp4
-# bsub -n 8 -gpu "num=1" -q gpu_a100 -W 96:00 \
-#   "cd /groups/saalfeld/home/allierc/Graph/Plexus && PYTHONPATH=src python -u Plexus_Main.py \
+# bsub -n 8 -gpu "num=1" -q ${CLUSTER_QUEUE_PREFIX}a100 -W 96:00 \
+#   "cd $CLUSTER_HOME/Graph/Plexus && PYTHONPATH=src python -u Plexus_Main.py \
 #      -o generate material_3d_water_bench_100mL --device cuda:0 \
 #      --render-n 100000008 --render-max-frames 500 --no-describe"
 
-# bsub -n 2 -gpu "num=1" -q gpu_a100 -W 24:00 -Is "python Plexus_Main.py -o generate si_waterfall"   28 ms / frame
+# bsub -n 2 -gpu "num=1" -q ${CLUSTER_QUEUE_PREFIX}a100 -W 24:00 -Is "python Plexus_Main.py -o generate si_waterfall"   28 ms / frame
 
 

@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-DR = "/groups/saalfeld/home/allierc/GraphData/graphs_data/slime"
+DR = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/slime"
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "inverse_gt_vs_stages.pdf")
 

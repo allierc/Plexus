@@ -1,4 +1,0 @@
-time   2026-09-21 15:24:28
-spec   plat_r12_cilia
-camera (a figure, not a render)
-why    R12 measured: are the cilia moving? The TIP is the thing that either goes somewhere and comes back, and the ROOT is the free control -- pinned to its cell, it should not move at all. Measured against 2 L sin(sweep/2), the arc the command asked for, because a plant that cannot track its input makes every amplitude in the spec a fiction.

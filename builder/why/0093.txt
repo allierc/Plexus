@@ -1,4 +1,0 @@
-time   2026-09-19 12:00:14
-spec   plat_r7_rhythm
-camera (a figure, not a render)
-why    R7, the mechanical consequence: with the rhythm carried to the band, is the STROKE still there and is it gated by it? The fast stroke is the phase clock at omega 3.0 rad/s (0.477 Hz); the slow envelope should be the pacemakers' 0.125 Hz arriving through 255 motoneuron-to-band synapses.

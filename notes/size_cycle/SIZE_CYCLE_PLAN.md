@@ -366,7 +366,7 @@ the 0.04 band from frame ~250 without the pin), so R3b is a layer-0 rung with no
     frustum -- is closed by it.
 
 **R3d (8fb4f80d, archives `log/size_cycle/R3d`) -- ACCEPTED, the ladder's working point.**
-`kappa_h 0.2`, `K_R 0` on the eleven specs, 1601 frames, deterministic, on gpu_l4.
+`kappa_h 0.2`, `K_R 0` on the eleven specs, 1601 frames, deterministic, on ${CLUSTER_QUEUE_PREFIX}l4.
 
 Gauge, both band sets: `size_adder`, `size_grow_sizer`, `size_two_channel`, `cycle_dilution`,
 `mech_target_percell` SPHEROID for the whole run; `size_sizer`, `size_timer`, `cycle_sizer`,
@@ -448,7 +448,7 @@ death, birth volume, age, phase, neighbours and mark-to-removal latency. `cell_d
 growth readings are the measured volume now (they read the target, which is the mother's half
 for every daughter, so `small` could not see a small daughter).
 
-Landed (`log/size_cycle/R4rig`, 1601 frames, gpu_l4). Gauge: every arm's shell holds its
+Landed (`log/size_cycle/R4rig`, 1601 frames, ${CLUSTER_QUEUE_PREFIX}l4). Gauge: every arm's shell holds its
 thickness and prism bands (thickness CV <= 0.13, trapezoids <= 0.06); asphericity drifts to
 0.045-0.063 on the sizer arms (the 0.04 band is marginal without the pin; to be widened for the
 rig) and a single inverting cell appears from frame 950 -- an extrusion in progress, which the

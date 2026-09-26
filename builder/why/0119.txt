@@ -1,4 +1,0 @@
-time   2026-09-21 15:16:21
-spec   plat_r12_cilia
-camera azim=20.0 elev=8.0 zoom=1.3
-why    R12 RUN: the beat at large amplitude and middle frequency -- an 85 degree sweep at omega 10 rad/s (1.59 Hz), against a plant whose corner sqrt(K) is 40 rad/s, so the shaft follows its command instead of being low-passed out of existence. 74 cilia of 38 um on 4 um cells, driven OPEN-LOOP at drive 1 with the connectome left out entirely, no gravity, and 125,866 water particles that no longer start inside the animal. The question is only whether the cilia move, and then whether the water does. (before the run)

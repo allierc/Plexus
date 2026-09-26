@@ -1,8 +1,8 @@
 #!/bin/bash -l
-# One density arm of the free-surface level sweep, on a gpu_l4 node. The five arms are submitted
+# One density arm of the free-surface level sweep, on a ${CLUSTER_QUEUE_PREFIX}l4 node. The five arms are submitted
 # as five jobs so they run in parallel rather than the ~3 h they take in sequence locally.
-PY=/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/bin/python
-cd /groups/saalfeld/home/allierc/Graph/Plexus
+PY=${CLUSTER_HOME}/miniforge3/envs/connectome-gnn/bin/python
+cd ${CLUSTER_HOME}/Graph/Plexus
 export PYTHONPATH=src
 # `type/name` if a slash is given, else the historical `material/` default -- so the same script
 # drives config/material/ and config/si_material/ without a second copy.

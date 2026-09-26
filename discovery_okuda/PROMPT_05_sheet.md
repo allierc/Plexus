@@ -159,16 +159,16 @@ run, so the run is reproducible from its own folder), `metrics.json`, `metrics.p
 `strip.png`, `3d.png`. The module docstring states what the rig combines, what it replaces, what it
 measures — each measurement able to come back wrong — and what it is NOT. Copy `test_03`'s.
 
-One path trap: a `spec.yaml` written by a cluster run holds `/groups/saalfeld/home/allierc/Graph/Plexus/...`
+One path trap: a `spec.yaml` written by a cluster run holds `$CLUSTER_HOME/Graph/Plexus/...`
 paths (see `04c_spheroid_fibres/spec.yaml`), and that tree is NOT visible from inside the devcontainer,
 where the same files are `/workspace/Plexus/...`. Do not copy a saved spec's `tissue:` path verbatim
 into a local run.
 
 Two local RTX A6000s (`cuda:0`, `cuda:1`). The cluster is up and faster for anything long:
-`/workspace` is the same filesystem as `/groups/saalfeld/home/allierc/Graph`, submit with
+`/workspace` is the same filesystem as `$CLUSTER_HOME/Graph`, submit with
 
 ```bash
-ssh $CLUSTER_SSH "bsub -n 8 -gpu num=1 -q gpu_a100 -W 240 -J pg_05 -o <log>.out -e <log>.err bash -l <script>.sh"
+ssh $CLUSTER_SSH "bsub -n 8 -gpu num=1 -q ${CLUSTER_QUEUE_PREFIX}a100 -W 240 -J pg_05 -o <log>.out -e <log>.err bash -l <script>.sh"
 ```
 
 with the job script `cd`-ing to the `/groups/...` path and running `conda run -n connectome-gnn python ...`.

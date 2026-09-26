@@ -400,7 +400,7 @@ this** — it is the direct antidote to "a passed metric ≠ qualitative fidelit
 - **A passed metric ≠ qualitative fidelity.** `protr`/`hollow` passed a lumpy blob; only a new
   metric (`red_frac`) caught it. Expect to author new metrics mid-campaign.
 - **Cluster:** never trust a `bsub` submit's return; verify against the queue (`--status`/`--wait`).
-  `gpu_l4` rejects jobs without `-gpu num=1`; keep `TV_NCPUS=8`; $CLUSTER_SSH throttles rapid SSH so a
+  `${CLUSTER_QUEUE_PREFIX}l4` rejects jobs without `-gpu num=1`; keep `TV_NCPUS=8`; $CLUSTER_SSH throttles rapid SSH so a
   submit that looks timed-out **may still land** (this spawned duplicate jobs before).
 - **Env:** `/workspace/.conda_envs/neural-graph-linux/bin/python`, `PYTHONPATH=/workspace/Plexus/src`.
   Default `python3` has no torch.

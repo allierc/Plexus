@@ -19,7 +19,7 @@ operators:
 - op: load_mesh_3d
   at: vertex
   cell_set: cell
-  ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/r001n_10_cellfix_B_new/ckpt_end.npz
+  ckpt: $CLUSTER_HOME/Graph/Plexus/log/okuda/r001n_10_cellfix_B_new/ckpt_end.npz
   before_frame: 1
 - at: cell
   op: cell_geometry

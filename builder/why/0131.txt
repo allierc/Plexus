@@ -1,4 +1,0 @@
-time   2026-09-21 19:04:25
-spec   plat_r13_torque
-camera azim=20.0 elev=8.0 zoom=1.3
-why    R13: the cilium feels the fluid. The shaft is ordinary elastic matter now -- it strains, it scatters, it gathers, the water pushes back on it, and its root is held by the same grid that holds the body. The only thing added is a PURE COUPLE at the root, forces that sum to zero by construction so a driven shaft cannot accelerate its own centre of mass however hard it is driven, plus the equal and opposite couple on the 24 body points nearest that root -- the reaction going where a basal body's reaction goes. Both are exact to the last bit of float64 and tested. organ_mechanics is gone: the plant IS the shaft's own inertia, elasticity and drag. The shaft is widened to 1.2 um radius because MLS-MPM cannot hold a body thinner than its 2.04 um cell, which is a fatter cilium than the animal's and the honest cost of this grid. (before the run)

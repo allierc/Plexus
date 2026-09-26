@@ -54,7 +54,7 @@ def main():
         dirs.append(d)
 
     env = dict(os.environ, GNN_OUTPUT_ROOT=os.environ.get(
-        "GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData"))
+        "GNN_OUTPUT_ROOT", os.environ["GNN_OUTPUT_ROOT"]))
     running, failed = [], []
     for d in dirs:
         code = CHILD.format(here=HERE, src=os.path.join(ROOT, "src"),

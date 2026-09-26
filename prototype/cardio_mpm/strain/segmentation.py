@@ -38,7 +38,7 @@ import seeded as SD       # noqa: E402  nuclei_on_grid / bnd_from / voronoi
 
 import argparse
 _ap = argparse.ArgumentParser(add_help=False)
-_ap.add_argument("--tif", default="/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/"
+_ap.add_argument("--tif", default=f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data/"
                  "Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif")
 _ap.add_argument("--out", default=os.path.join(HERE, "data"))
 _ap.add_argument("--onsets", default="2,51,101,152,204", help="speed-peak onsets of the recording")

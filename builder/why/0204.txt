@@ -1,5 +1,0 @@
-time   2026-09-22 12:42:32
-spec   rs_moment1000
-camera azim=35.0 elev=12.0 zoom=1.3
-movie  mp4/0204.mp4  (36.2 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/rs_moment1000/movie.mp4)
-why    rod sweep on cil_s6_measured: moment = 1000. Is there a regime where the beat is big enough to see AND the fluid's inertia does not tip the rod over? `tip mean` is the angle the beat is centred on, 0 being upright, and `flow` is the time-averaged fluid velocity along the sweep -- zero for a symmetric stroke in a Stokes fluid, non-zero only from inertial streaming, which is what tips it. (after the run)

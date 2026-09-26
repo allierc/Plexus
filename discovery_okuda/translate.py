@@ -43,7 +43,7 @@ from composition_space import (DIVIDE_CALL_PERIOD_BEFORE_D1, OPERATORS,
 HERE = os.path.dirname(os.path.abspath(__file__))
 TYSSUE = os.path.abspath(os.path.join(HERE, "ops"))
 # REPO-RELATIVE. The devcontainer mounts the NFS export at /workspace and the cluster mounts the
-# SAME export at /groups/saalfeld/home/allierc/Graph, so an absolute path baked into a TRACKED
+# SAME export at $CLUSTER_HOME/Graph, so an absolute path baked into a TRACKED
 # config is portable to exactly one of the two. run_one.py resolves this against its own location.
 CKPT = os.path.join("discovery_okuda", "ops", "assets", "smoke_hom", "ckpt.npz")
 

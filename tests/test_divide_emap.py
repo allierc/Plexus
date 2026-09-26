@@ -5,7 +5,7 @@ whole O(E) map for them, once per dividing cell. Both the edge count and the num
 ripening on a tick grow with the tissue, so `cell_divide` was quadratic in the thing the run grows:
 profiled on `mesh_mpm_spheroid_nominal` at frame 380, `_edge_face_map` was 19.4 s of the operator's
 24.2 s across 5,480 rebuilds in 96 frames. That is the term behind 246 ms/frame at frame 50 becoming
-85 s/frame at frame 700, and behind four gpu_l4 jobs dying on the wall clock at frame 736 of 801.
+85 s/frame at frame 700, and behind four ${CLUSTER_QUEUE_PREFIX}l4 jobs dying on the wall clock at frame 736 of 801.
 
 WHAT IS ASSERTED. Not "the map looks right" -- that a MAINTAINED map and a REBUILT one produce the
 same topology, division for division. `_edge_face_map` is a pure function of `rings`, so the

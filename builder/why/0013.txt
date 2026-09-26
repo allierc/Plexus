@@ -1,5 +1,0 @@
-time   2026-09-19 09:53:57
-spec   platynereis_a3_plankton
-camera azim=35.0 elev=12.0 zoom=1.3
-movie  mp4/0013.mp4  (27.5 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/platynereis_a3_plankton/movie.mp4)
-why    A3 run: the animal and the grain cloud fall together. Gravity is still on here on purpose -- it is the cheapest test that the two sets are COUPLED through the one MPM grid rather than passing through each other. Grains the body meets should be pushed; grains it misses should land undisturbed. Zero gravity comes next, with the cilia drive. (after the run)

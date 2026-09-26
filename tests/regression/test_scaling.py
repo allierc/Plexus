@@ -4,7 +4,7 @@ A frame-time budget is bound to one GPU; a RATIO between two problem sizes is no
 the same operation at size n and at a multiple of n, takes the median of three timings, and asserts
 the ratio stays under what a linear (or launch-bound) implementation gives, with slack for a shared
 machine. A quadratic path returning -- `_edge_face_map` rebuilt per division cost 19.4 s of a
-24.2 s frame and killed four gpu_l4 jobs on the wall clock -- pushes the 4x ratio to 16x and fails
+24.2 s frame and killed four ${CLUSTER_QUEUE_PREFIX}l4 jobs on the wall clock -- pushes the 4x ratio to 16x and fails
 on any host.
 """
 import os

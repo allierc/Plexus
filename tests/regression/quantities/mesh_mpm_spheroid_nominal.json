@@ -1,5 +1,5 @@
 {
- "archive": "/groups/saalfeld/home/allierc/GraphData/graphs_data/mesh_mpm/mesh_mpm_spheroid_nominal",
+ "archive": "$GNN_OUTPUT_ROOT/graphs_data/mesh_mpm/mesh_mpm_spheroid_nominal",
  "curve": {
   "cell_set": "cell",
   "mesh_set": "vertex",

@@ -13,7 +13,7 @@ import numpy as np, tifffile, torch
 from scipy.signal import fftconvolve
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import recording as R
-RT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+RT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 TIF = f"{RT}/Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif"
 
 ap = argparse.ArgumentParser(); ap.add_argument("--n", type=int, default=400)

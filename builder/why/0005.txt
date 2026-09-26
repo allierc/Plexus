@@ -1,4 +1,0 @@
-time   2026-09-19 09:39:36
-spec   si_demo
-camera azim=38.0 elev=15.0 zoom=1.15
-why    proving the record end to end: a short fall of the eight blocks, so a step that RUNS leaves its movie beside its picture, spec and reason (after the run)

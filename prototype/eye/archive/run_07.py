@@ -72,7 +72,7 @@ PHASES = [("up", ["LR", "SO"], (1, +1)), ("down", ["IR", "IO"], (1, -1)),
 # /groups/.../Graph, the partition the reverse. So the geometry paths are rewritten for
 # whichever host is building the spec -- not translated unconditionally, which is what
 # sent the loader hunting for a cache that was not there and made it re-cut the .blend.
-MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
+MAP = ("/workspace", f"{os.environ['CLUSTER_HOME']}/Graph")
 
 
 def host_path(p):

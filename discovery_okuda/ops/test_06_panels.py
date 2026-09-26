@@ -251,7 +251,7 @@ def main():
     import yaml
     spec = yaml.safe_load(open(os.path.join(src, "spec_run.yaml")))
     op = next(o for o in spec["operators"] if o["op"] == "mesh_contact")
-    mf = np.asarray(np.load(op["tissue"].replace("/groups/saalfeld/home/allierc/Graph", "/workspace"),
+    mf = np.asarray(np.load(op["tissue"].replace(f"{os.environ['CLUSTER_HOME']}/Graph", "/workspace"),
                             mmap_mode="r")["mesh_frames"])
     st = int(op.get("mesh_stride", 1))
     # THE ABSENCE OF BM-ECM COUPLING IS NOT IN THE PANEL'S LABEL. It is a property of the RUN, not of

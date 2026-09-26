@@ -50,7 +50,7 @@ import ecm_spec as ES
 LOG = os.path.join(_ROOT, "log", "okuda_ECM")
 # THE SPEC RECORDS THE CLUSTER'S PATH. Same file, two mounts; the run is not re-runnable from here
 # either way, and this only ever reads the tissue cache.
-REMOTE = "/groups/saalfeld/home/allierc/Graph/Plexus/log"
+REMOTE = f"{os.environ['CLUSTER_HOME']}/Graph/Plexus/log"
 LOCAL = os.path.join(_ROOT, "log")
 
 # CYAN, BECAUSE NOTHING ELSE IN THIS PANEL IS. The stroma owns inferno, the membrane green-to-amber, the

@@ -1,4 +1,0 @@
-time   2026-09-22 13:38:46
-spec   cil_s8_d1k
-camera azim=35.0 elev=12.0 zoom=1.3
-why    DENSITY LADDER (cil_s8_d1k), continuing the coupling test. The rod is 0.53% of the mass its own velocity is averaged with at water density, and mpm_gather REPLACES a particle's velocity with the grid's mass-weighted average -- so 99.5% of whatever the moment does in a substep is discarded before it returns. x100 density already took the tip from 0.00 to 4.79 deg with NOTHING else changed, which confirms the coupling and not the parameters was the blocker. This rung pushes further to check the trend is monotonic. A cilium is not denser than water and this is not a proposal: it is the measurement that justifies replacing velocity replacement with a drag-based exchange, after which the density goes back to the water's. (before the run)

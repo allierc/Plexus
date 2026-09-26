@@ -158,7 +158,7 @@
   }
  },
  "tracker_reproducibility": {
-  "second_tracking": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/healthy.npy",
+  "second_tracking": "$GNN_OUTPUT_ROOT/graphs_data/cardiomyocytes_real_data/healthy.npy",
   "overlap_nodes": "80x80",
   "frame_offset": -1,
   "frames_compared": 239,

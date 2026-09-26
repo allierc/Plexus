@@ -1,5 +1,0 @@
-time   2026-09-19 12:58:51
-spec   plat_r11_null
-camera azim=20.0 elev=8.0 zoom=1.15
-movie  mp4/0110.mp4  (74.1 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r11_null/movie.mp4)
-why    R11-null, THE CONTROL: identical to R11 except the stroke's amplitude is zero. The connectome still runs, the pacemakers still fire, the band still carries their rhythm, the phases still wind around the girdle, and no cell strokes. R11 measured a net displacement of 0.239 um at straightness 0.858 in the direction [0.575, 0.577, 0.580] -- almost exactly the box diagonal, which is the signature of a numerical bias and not of propulsion. If this control drifts the same way, R11's motion is not swimming and saying so is the result. (after the run)

@@ -68,7 +68,7 @@ def _pick_device():
 
 DEV = os.environ.get("PLEXUS_VLM_DEVICE") or _pick_device()
 DEFAULT_ROOT = os.environ.get(
-    "PLEXUS_OUTPUT_ROOT", os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
+    "PLEXUS_OUTPUT_ROOT", os.environ["GNN_OUTPUT_ROOT"]
 ) + "/graphs_data"
 
 PROMPT = (

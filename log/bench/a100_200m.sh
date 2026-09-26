@@ -1,6 +1,6 @@
 #!/bin/bash -l
-PY=/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/bin/python
-cd /groups/saalfeld/home/allierc/Graph/Plexus
+PY=${CLUSTER_HOME}/miniforge3/envs/connectome-gnn/bin/python
+cd ${CLUSTER_HOME}/Graph/Plexus
 export PYTHONPATH=src
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 echo "### material_3d_water_bench_200m  $(date +%H:%M:%S)"

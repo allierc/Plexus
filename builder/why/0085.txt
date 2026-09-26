@@ -1,4 +1,0 @@
-time   2026-09-19 11:40:17
-spec   plat_r6_water
-camera azim=20.0 elev=8.0 zoom=1.15
-why    R6: water. 98,808 animal points and 140,000 seawater points scatter into ONE mpm_grid -- that sharing IS the coupling, since mpm_scatter zeroes the grid only on the substep's first scatter and accumulates thereafter. Nothing applies a force TO the water. Finding this rung forced a real fix: mpm_viscosity published its viscous stress to the GLOBAL H.extra_stress, one slot for every particle set in the model, so the water's 140,000-point stress was added to the animal's 98,808 and the run died on the first scatter. It is per-set now, as polar_active_stress already was, with the global kept as a fallback for one-cloud models. (after the run)

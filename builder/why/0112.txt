@@ -1,4 +1,0 @@
-time   2026-09-21 14:54:27
-spec   plat_r12_cilia
-camera azim=20.0 elev=8.0 zoom=1.35
-why    R12 ANATOMY, seeded: true cilia for the first time. 74 slender shafts of 20 um, twelve material points each, rooted at the surface of the 74 ciliary-band cells -- a 4 um cell bearing a 20 um appendage, so the lever arm the cell-only model had no way to express finally exists. What is MATTER here is the yolk (2,000 points), the cilia (888) and the water (140,000); the 4,117 cells keep their measured positions and their polarity, because that is where the shafts are rooted, but they are not integrated. A cilium exists only where a cell bears one: per_parent as a mapping from the parent's TYPE, so the other 4,043 cells have no cilium rather than a dead one whose shaft points would still push water.

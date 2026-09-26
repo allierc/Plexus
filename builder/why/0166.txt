@@ -1,5 +1,0 @@
-time   2026-09-22 11:39:48
-spec   rs_moment10_bend50000
-camera azim=35.0 elev=12.0 zoom=1.3
-movie  mp4/0166.mp4  (73.4 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/rs_moment10_bend50000/movie.mp4)
-why    rod sweep on cil_s3_onlywater: moment = 10, bend = 50000. Is there a regime where the beat is big enough to see AND the fluid's inertia does not tip the rod over? `tip mean` is the angle the beat is centred on, 0 being upright, and `flow` is the time-averaged fluid velocity along the sweep -- zero for a symmetric stroke in a Stokes fluid, non-zero only from inertial streaming, which is what tips it. (after the run)

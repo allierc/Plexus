@@ -1,4 +1,0 @@
-time   2026-09-19 10:37:13
-spec   plat_r2_fall
-camera azim=20.0 elev=8.0 zoom=1.1
-why    R2: the assembled anatomy, dropped. 4,117 cells, each a soft ball of 1.90 um radius made of 24 MPM material points, 98,808 in all, sharing one background grid so they push on each other. 240 frames at dt 20 us = 4.8 ms of fall under 9.81 m/s2 along -z. What this rung answers: is the measured anatomy MECHANICALLY coherent -- does the episphere stay a head and do the parapodia stay parapodia through an impact? A cloud of dots falls the same way whatever the dots mean; a body does not. (before the run)

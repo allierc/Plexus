@@ -1,4 +1,0 @@
-time   2026-09-19 11:32:27
-spec   plat_r6_water
-camera azim=20.0 elev=8.0 zoom=1.15
-why    R6: water. 98,808 animal points and 140,000 seawater points scatter into ONE mpm_grid, which is the whole coupling -- mpm_scatter zeroes the grid only on the substep's first scatter and accumulates thereafter, so the two sets exert forces on each other through the grid's momentum and nothing applies a force TO the water. The water is a liquid and says so: bulk_modulus instead of youngs, plus mpm_viscosity, because without viscosity a liquid here is a pressure-only gas that shears not at all and the wake this rung exists to see is a shear wake. (after the run)

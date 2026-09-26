@@ -1,4 +1,0 @@
-time   2026-09-19 10:35:56
-spec   plat_r2_fall
-camera azim=20.0 elev=8.0 zoom=1.1
-why    R2 seeded, take two: the anatomy as MATTER. The 4,117 measured soma positions are now the cell set's own start, so each cell is where it belongs BEFORE its 24 material points are placed around it -- 98,808 points in all, one shared background grid. The first attempt seeded the cells with neural_seed, which runs after the hierarchy is built, so the cells moved to their positions and their matter stayed at the origin: the whole animal rendered as one blob.

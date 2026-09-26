@@ -1,6 +1,6 @@
 # One connectome, several functions, selected by context
 
-*Plan. Five rungs, each one thing harder than the last, on `gpu_l4`.*
+*Plan. Five rungs, each one thing harder than the last, on `${CLUSTER_QUEUE_PREFIX}l4`.*
 
 ## The question
 
@@ -95,7 +95,7 @@ and would be invisible at rung 3 onwards.
 
 ## Running it
 
-`gpu_l4`, one `bsub` per run, the pattern in `tools/submit_specs.py`: relative paths after a `cd`,
+`${CLUSTER_QUEUE_PREFIX}l4`, one `bsub` per run, the pattern in `tools/submit_specs.py`: relative paths after a `cd`,
 `cluster.cpath` for the mount translation, `conda run -n` for the environment. Nothing runs on a
 login node — `python`, `conda` and `rsync` are watched there and the admins kill them.
 

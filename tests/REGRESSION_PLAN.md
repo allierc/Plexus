@@ -133,7 +133,7 @@ Initial registry (all exist as archives today; dates are the archive's):
 | one Turing-on-tissue run from the epithelial gallery | morphogen | spot count and amplitude |
 
 Cost: a 150-frame cut of a tissue working point takes 30-90 s on an A6000; the whole registry is
-10-15 minutes. That is a nightly job (`jobs/regression_nightly.sh`, bsub on gpu_l4) and a
+10-15 minutes. That is a nightly job (`jobs/regression_nightly.sh`, bsub on ${CLUSTER_QUEUE_PREFIX}l4) and a
 `pytest -m regression --quick` subset of the cheapest (mech_uniform_target 60 frames,
 apop2_ks0p1 60 frames; size_adder 60 frames once registered) for a local run before pushing.
 
@@ -192,7 +192,7 @@ week's defects on the day it was written:
         fingerprints/*.json     the registry, one file per working point, refreshed only with --because
         WORKING_POINTS.md       the human registry: name, archive folder, date, who accepted it, why
     tools/fingerprint.py        generate / refresh / diff a fingerprint from an archive or a fresh run
-    jobs/regression_nightly.sh  bsub gpu_l4: the full series, result posted to log/regression/<date>.md
+    jobs/regression_nightly.sh  bsub ${CLUSTER_QUEUE_PREFIX}l4: the full series, result posted to log/regression/<date>.md
 
 The rule that makes it hold: **a working point is registered the day it is accepted**, by running
 `tools/fingerprint.py` on its archive folder and committing the JSON with the archive's date. An

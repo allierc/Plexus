@@ -95,7 +95,7 @@ def load(run, src="06_spheroid_ecm"):
                                                           "ecm_from_cell"))
     scale = float(op.get("scale", 1.0))
     surf = (op.get("tissue") or op.get("surface")).replace(
-        "/groups/saalfeld/home/allierc/Graph", "/workspace")
+        f"{os.environ['CLUSTER_HOME']}/Graph", "/workspace")
     # THE RUN'S OWN TISSUE, NOT THE MATRIX RUN'S. This path comes from `06_spheroid_ecm`'s spec
     # because that is where the matrix was seeded against a surface, and for every run up to 07 it was
     # also the tissue being replayed -- one tissue, one path, no ambiguity. The 08 series broke that:

@@ -1,5 +1,0 @@
-time   2026-09-21 16:00:10
-spec   plat_r12_cilia
-camera azim=20.0 elev=8.0 zoom=1.3
-movie  mp4/0128.mp4  (199.3 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r12_cilia/movie.mp4)
-why    R12 RUN, at a beat the film can resolve. At omega 10 rad/s one cycle was 12.6 frames and the movie's stride of 2 sampled it 6.3 times -- barely above Nyquist, so a stroke that is perfectly smooth in the data reads on screen as a jitter and what you watch is the sampling rather than the cilium. At 2.5 rad/s (0.40 Hz) a cycle is 50 frames, max_frames equals n_frames so the stride is 1, and every one of those 50 is in the film: 8 beats over the run at 20 fps, two and a half seconds of screen time each. Same 85 degree sweep, same asymmetric stroke, shafts now rooted in their cells LIVE so they stay attached as the body moves. (after the run)

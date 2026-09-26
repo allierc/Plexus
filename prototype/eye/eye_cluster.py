@@ -27,13 +27,18 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 SRC = os.path.join(ROOT, "src")
 LOGDIR = os.path.join(HERE, "archive", "_cluster")
 
-MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
-SSH = os.environ.get("PG_SSH", "$CLUSTER_SSH")
+# WHERE THE CLUSTER IS, AND AS WHOM, IS A LOCAL SETTING. This repo is public, so the ssh target
+# (user@login-node), the cluster-side home and the queue-name prefix come from the environment --
+# CLUSTER_SSH, CLUSTER_HOME, CLUSTER_QUEUE_PREFIX, set in the devcontainer's containerEnv -- and
+# are never written here. The PG_* variables still override. Nothing is checked at import;
+# the first ssh refuses to run until they are set.
+MAP = ("/workspace", os.environ.get("CLUSTER_HOME", "") + "/Graph")
+SSH = os.environ.get("PG_SSH", os.environ.get("CLUSTER_SSH", ""))
 ENV = os.environ.get("PG_ENV", "connectome-gnn")
-QUEUE = os.environ.get("PG_QUEUE", "gpu_l4")
+QUEUE = os.environ.get("PG_QUEUE", os.environ.get("CLUSTER_QUEUE_PREFIX", "") + "l4")
 NCPUS = os.environ.get("PG_NCPUS", "8")
 WALL = os.environ.get("PG_WALL", "240")
-EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "<node>").split(",")
+EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "").split(",")
                  if h.strip()]
 PREFIX = "eye_"
 

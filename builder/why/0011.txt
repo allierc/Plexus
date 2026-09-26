@@ -1,4 +1,0 @@
-time   2026-09-19 09:52:36
-spec   platynereis_a3_plankton
-camera azim=35.0 elev=12.0 zoom=1.3
-why    A3: the animal among floating grains. 240 blue grains (a 8x5x6 lattice of copies, then scattered at random through the box from 0.06 to 0.44 on every axis) share the same particle mass as the body, so each grain carries 1/240 of the body's volume -- they are real MPM matter, not markers. This is the medium the microswimmer is meant to FEEL: the thing it must sense the density of before it can turn toward it.

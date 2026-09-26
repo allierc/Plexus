@@ -3,8 +3,8 @@
 Plexus keeps three roots:
   * the **repo** holds `config/<pre_folder>/<name>.yaml` (the specs, version-controlled);
   * the **data root** holds `graphs_data/<pre_folder>/<name>/` (generated trajectories)
-    and `log/<pre_folder>/<name>/` (run logs);  default = the shared GraphData area,
-    overridable with `--output_root` / `$PLEXUS_OUTPUT_ROOT` / `$GNN_OUTPUT_ROOT`.
+    and `log/<pre_folder>/<name>/` (run logs);  set with `--output_root` /
+    `$PLEXUS_OUTPUT_ROOT` / `$GNN_OUTPUT_ROOT` (no default in code: its location is local).
 
 The **pre-folder** is the simulation *type* (interaction / boids / mpm / divide ...).
 It is inferred from the config name -- the way the prototype scenarios were named
@@ -19,8 +19,8 @@ import os
 # --------------------------------------------------------------------------- #
 #  data root (graphs_data/ + log/)
 # --------------------------------------------------------------------------- #
-_DEFAULT_DATA_ROOT = "/groups/saalfeld/home/allierc/GraphData"
-_data_root = os.environ.get("PLEXUS_OUTPUT_ROOT") or os.environ.get("GNN_OUTPUT_ROOT") or _DEFAULT_DATA_ROOT
+# No default in code: the shared data area is a local setting (this repo is public).
+_data_root = os.environ.get("PLEXUS_OUTPUT_ROOT") or os.environ.get("GNN_OUTPUT_ROOT") or ""
 
 
 def warn(msg: str) -> None:
@@ -42,6 +42,8 @@ def warn(msg: str) -> None:
 
 
 def get_data_root() -> str:
+    if not _data_root:
+        raise RuntimeError("no data root: pass --output_root or set PLEXUS_OUTPUT_ROOT / GNN_OUTPUT_ROOT")
     return _data_root
 
 

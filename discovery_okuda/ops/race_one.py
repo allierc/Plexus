@@ -1,6 +1,6 @@
 import os, sys, json, numpy as np
 # ROOT-RELATIVE PATHS, because this file runs on the cluster where the repo is mounted at
-# /groups/saalfeld/home/allierc/Graph/Plexus, not /workspace. Same NFS export, different mount point.
+# $CLUSTER_HOME/Graph/Plexus, not /workspace. Same NFS export, different mount point.
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(os.path.dirname(_HERE))
 for p in (_HERE, os.path.join(_ROOT, "src"), os.path.join(_ROOT, "discovery_okuda", "ops"),

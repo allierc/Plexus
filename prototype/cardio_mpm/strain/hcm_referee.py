@@ -11,7 +11,7 @@ import json, os, sys
 import numpy as np, tifffile
 from scipy.signal import fftconvolve
 HERE = os.path.dirname(os.path.abspath(__file__))
-RT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+RT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 TIF = f"{RT}/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif"
 T1 = np.load(f"{TIF}.derivatives.npy", mmap_mode="r"); T2 = np.load(f"{RT}/Cardio_0/derivatives.npy", mmap_mode="r")
 T3 = np.load(f"{RT}/diseased.npy", mmap_mode="r")

@@ -1,4 +1,0 @@
-time   2026-09-21 15:02:23
-spec   plat_r12_cilia
-camera azim=20.0 elev=8.0 zoom=1.3
-why    R12 anatomy, corrected: the cilia now sit on a BODY. The first take made only the yolk out of matter and the picture showed why that cannot work -- the five yolk cells span 15 x 12 x 19 um in the middle of the animal while the ciliary band spans 97 x 115 x 128 um at its SURFACE, a median 54.5 um apart, so a 12 um yolk ball left a 43 um gap and the shafts floated in open water with nothing beneath them. The yolk is an internal mass, not the body. The body is now the 4,112 non-yolk cells at eight points each and a 4.0 um radius -- the size R10 measured as the one at which cells touch and the animal holds its own shape. White body, yellow yolk, white cilia, blue water. The scale bar is fixed too: it is a line in WORLD space and its label a viewport annotation pinned to the window, so a 180-degree roll put the bar top-left and left the number it refers to bottom-right.

@@ -164,3 +164,13 @@ builder/*/mp4/
 builder/*/png/
 builder/*/papers/
 builder/*/data/
+
+# Local working records and run output -- not versioned (2026-09-26): builder/ (builder records),
+# experiments/, and cluster job logs (bsub -o/-e output names compute nodes, the submitting user
+# and cluster paths; this repo is public).
+builder/
+experiments/
+jobs/logs/
+prototype/eye/archive/_cluster/
+bsub_*.out
+bsub_*.err

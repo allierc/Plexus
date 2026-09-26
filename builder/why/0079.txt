@@ -1,4 +1,0 @@
-time   2026-09-19 11:28:12
-spec   plat_r5_beat
-camera (a figure, not a render)
-why    R5 MEASURED, and the chain closes. The connectome's own 255 motoneuron-to-ciliary-band edges drive the band to |v| 0.95 against 0.066 for every other class (14x); polar_active_stress[driven] turns that into a 6% target strain along each band cell's own outward radius; the band's peak-to-peak excursion is 0.052 um against 0.012 um for the 4,043 control cells that carry no polarity (4.4x), and it is PERIODIC at 0.488 Hz with 44% of the power in that line. The phase clock was declared at omega 3.0 rad/s, which is 0.477 Hz -- the measured beat is the clock's own rate, which is the check that the stroke is the operator's and not an artefact.

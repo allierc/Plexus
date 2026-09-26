@@ -1,5 +1,0 @@
-time   2026-09-19 12:21:02
-spec   plat_r8_metachronal
-camera azim=20.0 elev=8.0 zoom=1.15
-movie  mp4/0098.mp4  (64.5 MB, copied from /groups/saalfeld/home/allierc/GraphData/graphs_data/studio/plat_r8_metachronal/movie.mp4)
-why    R8: a metachronal wave. R6 and R7 are the controls and are already run -- a clocked band in random phase moved water 0.049 um at its peak, and gating it with a neural rhythm made its cells move 5.7x FURTHER while moving the water 2.3x LESS. Neither is swimming, and the reason is the stroke's SHAPE: extend and retract along one axis is RECIPROCAL, and a reciprocal stroke moves no fluid at low Reynolds number whatever its amplitude (Purcell 1977). The only thing changed here is where each band cell starts in the cycle: metachronal_phase winds the phase six times around the girdle, so one arc extends while the arc behind it retracts and the BAND carries a travelling deformation even though each cell's own stroke is as reciprocal as ever. (after the run)

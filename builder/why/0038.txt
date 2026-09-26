@@ -1,4 +1,0 @@
-time   2026-09-19 10:21:54
-spec   plat_r1_00_outline
-camera azim=20.0 elev=8.0 zoom=1.45
-why    R1.00 the body's own surface, and nothing inside it yet. All 4,117 somata are seeded at their measured positions -- `neural_seed` against the frozen region, which CHECKS the 195.9 um cube against the manifest rather than assuming it -- and none is drawn. Everything after this can then be seen sitting INSIDE the body rather than floating.

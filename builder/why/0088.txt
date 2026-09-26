@@ -1,4 +1,0 @@
-time   2026-09-19 11:49:29
-spec   plat_r6_water
-camera (a figure, not a render)
-why    R6 measured: did the beat move the water? Every water particle is scored by how far it STARTED from the nearest ciliary-band cell, so near and far are the same material in the same pool under the same walls in the same run -- the only difference is whether a beating cell was next to them. A ratio of 1 would mean the animal is stirring nothing and the movie is showing the pool settle.

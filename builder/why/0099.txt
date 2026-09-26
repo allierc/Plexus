@@ -1,4 +1,0 @@
-time   2026-09-19 12:23:08
-spec   plat_r8_metachronal
-camera (a figure, not a render)
-why    R8 measured: does a metachronal wave transport fluid where a synchronous band could not? Same animal, same pool, same drive, same amplitude, same coupling as R7 -- the ONLY change is where each band cell starts in the cycle, wound six times around the girdle. R6 (random phase, clocked) peaked at 0.049 um and reached 31.1 um; R7 (random phase, rhythm-gated) peaked at 0.021 um and reached 25.7 um.

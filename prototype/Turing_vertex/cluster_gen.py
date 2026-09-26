@@ -6,8 +6,8 @@ traj.npz + strip.png + movie.mp4 under archive/<preset>/). The sims are CPU/scip
 ConvexHull/Voronoi), so we ask for CPU cores on an L4 node -- the GPU is reserved but idle; the win
 is a DEDICATED node per job (no devcontainer core contention, which was slowing local runs ~3x).
 
-The devcontainer mounts the NFS export prfs:/groups/saalfeld/home/allierc/Graph at /workspace, and
-the cluster mounts the SAME export at /groups/saalfeld/home/allierc/Graph -- so files are shared live
+The devcontainer mounts the NFS export prfs:${CLUSTER_HOME}/Graph at /workspace, and
+the cluster mounts the SAME export at ${CLUSTER_HOME}/Graph -- so files are shared live
 (no rsync); only the PATH is translated for the cluster-side `cd` / PYTHONPATH / -o logs.
 
     python cluster_gen.py fig4_coral_v fig4_coral_ext ...   # submit these presets
@@ -18,11 +18,15 @@ import os, sys, re, subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.abspath(os.path.join(HERE, "..", "..", "src"))
-MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")     # local mount -> cluster path
-SSH = os.environ.get("TV_SSH", "$CLUSTER_SSH")
-LSF = os.environ.get("TV_LSF", "/dev/null")
+# WHERE THE CLUSTER IS, AND AS WHOM, IS A LOCAL SETTING. This repo is public, so the ssh target
+# (user@login-node), the cluster-side home and the queue-name prefix come from the environment --
+# CLUSTER_SSH, CLUSTER_HOME, CLUSTER_QUEUE_PREFIX, set in the devcontainer's containerEnv -- and
+# are never written here. The TV_* variables still override. Nothing is checked at import;
+# the first ssh refuses to run until they are set.
+MAP = ("/workspace", os.environ.get("CLUSTER_HOME", "") + "/Graph")     # local mount -> cluster path
+SSH = os.environ.get("TV_SSH", os.environ.get("CLUSTER_SSH", ""))
 ENV = os.environ.get("TV_ENV", "connectome-gnn")
-QUEUE = os.environ.get("TV_QUEUE", "gpu_l4")
+QUEUE = os.environ.get("TV_QUEUE", os.environ.get("CLUSTER_QUEUE_PREFIX", "") + "l4")
 NCPUS = os.environ.get("TV_NCPUS", "16")
 WALL = os.environ.get("TV_WALL", "240")                        # minutes
 GPU = os.environ.get("TV_GPU", "1")                            # "0" -> CPU queue, no -gpu flag
@@ -34,7 +38,20 @@ def cpath(p):
     return MAP[1] + ap[len(MAP[0]):] if ap.startswith(MAP[0]) else ap
 
 
+
+def _require_local_settings():
+    missing = [what for what, ok in (("CLUSTER_SSH (or TV_SSH)", SSH),
+                                     ("CLUSTER_HOME", os.environ.get("CLUSTER_HOME")),
+                                     ("CLUSTER_QUEUE_PREFIX (or TV_QUEUE)",
+                                      "TV_QUEUE" in os.environ or os.environ.get("CLUSTER_QUEUE_PREFIX")))
+               if not ok]
+    if missing:
+        raise RuntimeError("cluster access needs " + ", ".join(missing) +
+                           " -- local settings, deliberately not in the repo")
+
+
 def _ssh(cmd, timeout=90):
+    _require_local_settings()
     try:
         return subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", SSH, cmd],
                               capture_output=True, text=True, timeout=timeout)

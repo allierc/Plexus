@@ -46,7 +46,7 @@ def _disc(name):
     return m
 
 
-HCM_DER = ("/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/"
+HCM_DER = (f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data/Cardio_1/"
            "1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy")
 HCM_ONSETS = [17, 61, 121, 181, 241]           # speed peaks of the HCM recording (299 frames)
 DATA_HCM = os.path.join(HERE, "data_hcm")

@@ -1,4 +1,0 @@
-time   2026-09-22 13:29:36
-spec   rs_clamp10000
-camera azim=35.0 elev=12.0 zoom=1.3
-why    rod sweep on cil_s7_beat: clamp = 10000. Is there a regime where the beat is big enough to see AND the fluid's inertia does not tip the rod over? `tip mean` is the angle the beat is centred on, 0 being upright, and `flow` is the time-averaged fluid velocity along the sweep -- zero for a symmetric stroke in a Stokes fluid, non-zero only from inertial streaming, which is what tips it. (before the run)

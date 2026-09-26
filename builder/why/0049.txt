@@ -1,4 +1,0 @@
-time   2026-09-19 10:33:04
-spec   plat_r2_fall
-camera azim=20.0 elev=8.0 zoom=1.15
-why    R2 before the drop: the anatomy now has MATTER. Each of the 4,117 cells is a parent of 24 MPM material points -- 98,808 in all -- so every cell is a soft ball of 1.90 um radius and they all share one background grid, which is what lets them push on each other. The region is scaled to 0.55 of the world and lifted, so there is about 69 um to fall through.

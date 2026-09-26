@@ -5,7 +5,7 @@ branching morphogenesis / **budding**. Tracked cell centroids, ParticleGraph
 format.
 
 ## Source
-* Raw (Wang lab, not mounted here): `/groups/wang/wanglab/GNN/240408-LVpD80-E10-IAI/SMG2-processed/`
+* Raw (Wang lab, not mounted here): the lab's `240408-LVpD80-E10-IAI/SMG2-processed/` folder on the cluster filesystem (full path kept out of this public repo)
   (`masks_smooth2_label_props/`, `masks_smooth2_mesh_csv/`).
 * Processed tensors (used here):
   `/workspace/ParticleGraph/graphs_data/cell/cell_gland_SMG2_smooth{2,10}/x_list_0.pt`

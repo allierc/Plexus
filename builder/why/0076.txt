@@ -1,4 +1,0 @@
-time   2026-09-19 11:24:07
-spec   plat_r5_beat
-camera azim=20.0 elev=8.0 zoom=1.3
-why    R5: the motor pathway, with the stroke sized and the cell following its own matter. The band's measured drive is |v| 0.95 against 0.066 for every other class -- 14x -- and polar_active_stress[driven] turns that into a target strain of 6% per cell. The first take asked for 30% and the gain multiplied it to over 50%, sending one band particle 307 um, further than the animal is long. aggregate_centroid makes each cell's position its material's centre of mass: without it the MPM moves the POINTS and the cell set never moves at all, which is why the first measurement read exactly 0.0000 um of excursion for all 4,117 cells while their particles travelled tens of micrometres. (before the run)

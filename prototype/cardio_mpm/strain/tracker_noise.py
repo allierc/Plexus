@@ -29,7 +29,7 @@ import json, os, sys
 import numpy as np, torch
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import recording as R
-RT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+RT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 
 rec = R.load(); C = rec["n_cells"]; pos = rec["pos"]; lab = rec["labels"]
 rng = np.random.default_rng(0)

@@ -25,7 +25,7 @@ import yaml
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(os.path.dirname(_HERE))
 LOG = os.path.join(_ROOT, "log", "okuda_ECM")
-REMOTE = "/groups/saalfeld/home/allierc/Graph/Plexus/log"
+REMOTE = f"{os.environ['CLUSTER_HOME']}/Graph/Plexus/log"
 
 
 def row(run):

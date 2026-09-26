@@ -1,4 +1,0 @@
-time   2026-09-19 11:50:14
-spec   plat_r6_water
-camera (a figure, not a render)
-why    R6 MEASURED. The pool starts at rest with no gravity and uniform density, so water the animal never touched moves EXACTLY zero -- which makes the reach, not a ratio, the statistic that means something. The beat's disturbance holds near 0.047 um out to about 18 um from the band and falls to nothing by 33 um: a local feeding-current scale, not whole-body propulsion. 68,642 of 140,000 particles never moved at all.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Submit a list of specs to `gpu_l4`, one job each, so a sweep runs in parallel instead of in turn.
+"""Submit a list of specs to `${CLUSTER_QUEUE_PREFIX}l4`, one job each, so a sweep runs in parallel instead of in turn.
 
 WHY. A ten-arm sweep of `divide_growing_ball` is ten 800-frame runs. Sequentially on one local GPU
 that is fifty minutes of wall clock in which nothing else can use the card; as ten LSF jobs it is

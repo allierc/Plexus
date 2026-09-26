@@ -162,7 +162,7 @@ def remeasure(out_dir):
     """
     spec = yaml.safe_load(open(os.path.join(out_dir, "spec_run.yaml")))
     # A RUN SUBMITTED TO THE CLUSTER RECORDS CLUSTER PATHS. The same NFS export is mounted at
-    # /workspace in the devcontainer and at /groups/saalfeld/home/allierc/Graph on gpu_l4, so a spec
+    # /workspace in the devcontainer and at $CLUSTER_HOME/Graph on ${CLUSTER_QUEUE_PREFIX}l4, so a spec
     # written there names files this side cannot open -- re-rendering 69 locally died on a surface map
     # that exists, under its other name. The mapping is `cluster.MAP`; it is read from there rather
     # than restated, so there is one place it can be wrong.
@@ -170,7 +170,7 @@ def remeasure(out_dir):
         sys.path.insert(0, "/workspace/Plexus/discovery_okuda")
         from cluster import MAP as _MAP
     except Exception:
-        _MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
+        _MAP = ("/workspace", f"{os.environ['CLUSTER_HOME']}/Graph")
     def _here(v):
         return _MAP[0] + v[len(_MAP[1]):] if isinstance(v, str) and v.startswith(_MAP[1]) else v
     for _o in spec.get("operators", []):
@@ -208,7 +208,7 @@ def rerender(out_dir, dest=None, **kw):
               f"spec.yaml, which is the SUBMITTED spec, not the resolved one", flush=True)
     spec = yaml.safe_load(open(sp))
     # A RUN SUBMITTED TO THE CLUSTER RECORDS CLUSTER PATHS. The same NFS export is mounted at
-    # /workspace in the devcontainer and at /groups/saalfeld/home/allierc/Graph on gpu_l4, so a spec
+    # /workspace in the devcontainer and at $CLUSTER_HOME/Graph on ${CLUSTER_QUEUE_PREFIX}l4, so a spec
     # written there names files this side cannot open -- re-rendering 69 locally died on a surface map
     # that exists, under its other name. The mapping is `cluster.MAP`; it is read from there rather
     # than restated, so there is one place it can be wrong.
@@ -216,7 +216,7 @@ def rerender(out_dir, dest=None, **kw):
         sys.path.insert(0, "/workspace/Plexus/discovery_okuda")
         from cluster import MAP as _MAP
     except Exception:
-        _MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
+        _MAP = ("/workspace", f"{os.environ['CLUSTER_HOME']}/Graph")
     def _here(v):
         return _MAP[0] + v[len(_MAP[1]):] if isinstance(v, str) and v.startswith(_MAP[1]) else v
     for _o in spec.get("operators", []):

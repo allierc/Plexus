@@ -32,7 +32,7 @@ operators:
 - op: load_mesh_3d
   at: vertex
   cell_set: cell
-  ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/zz_dt1_probe/ckpt_end.npz
+  ckpt: $CLUSTER_HOME/Graph/Plexus/log/okuda/zz_dt1_probe/ckpt_end.npz
   before_frame: 1
 - op: cell_geometry
   at: cell

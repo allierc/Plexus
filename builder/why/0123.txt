@@ -1,4 +1,0 @@
-time   2026-09-21 15:25:23
-spec   plat_r12_cilia
-camera (a figure, not a render)
-why    R12 MEASURED: the cilia move. Tip excursion 87.4 um peak-to-peak against 4.4 um at the root -- the root is pinned to its cell and is the free control -- so the tip swings 20x its own base. The beat is 1.6047 Hz measured against 1.5915 commanded, and the tip runs at 360 um/s with peaks near 774. It delivers 115% of the commanded chord 2 L sin(85 deg) = 75.7 um, which is the underdamped plant overshooting the sawtooth's corners at a damping ratio of 0.75.

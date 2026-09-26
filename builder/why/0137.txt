@@ -1,4 +1,0 @@
-time   2026-09-21 19:34:41
-spec   plat_r14_paddle
-camera azim=20.0 elev=8.0 zoom=1.3
-why    R14 take two, with the shafts ACTUALLY IN THE SCHEDULE. They had 0.00000 momentum at every frame of R13 and of R14's first take -- the torque was right, its invariant verified inside the running process, the command a clean +-0.05 -- and they were simply not scheduled: four material sets declare four mpm_scatter and the schedule named three. Nothing raised, because three scatters is a legal schedule and a set that does not move is a legal set. The engine warns about it now, naming the set that would be left out. Water is coloured by speed on a dark map so still fluid is black and only flow is visible. (before the run)

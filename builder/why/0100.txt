@@ -1,4 +1,0 @@
-time   2026-09-19 12:24:51
-spec   plat_r9_tangential
-camera azim=20.0 elev=8.0 zoom=1.15
-why    R9: the stroke sweeps ALONG the surface instead of pointing out of it. Three controls are already run and all three failed to swim -- R6 random phase and clocked (peak 0.049 um), R7 rhythm-gated (0.021), R8 with a metachronal wave (0.020). R8 is the informative one: adding the wave changed NOTHING, because a radial stroke extends and retracts along the same outward line, so winding the phase around the girdle changes only when each cell pushes and never which way. Metachrony cannot rescue a stroke pointed the wrong way. A ciliary power stroke sweeps tangentially, so each band cell's axis is now the cross product of the body axis with its own outward radius. One change from R8. (before the run)

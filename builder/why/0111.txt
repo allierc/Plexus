@@ -1,4 +1,0 @@
-time   2026-09-19 12:59:57
-spec   plat_r11_null
-camera (a figure, not a render)
-why    R11-null, the control: identical to R11 with the stroke's amplitude set to zero. Whatever the body does here, it does for reasons that are not the beat.

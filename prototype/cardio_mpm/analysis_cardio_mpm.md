@@ -4332,7 +4332,7 @@ Same `$CLUSTER_SSH` Janelia LSF credential that killed B24 and the embryogenesis
 `embryo-ssh-auth-blocker.md`).
 
 **New observation this batch — the preflight is NOT a reliable gate.** `resume3.out` line 1 logged
-`[loop] cluster preflight OK: $CLUSTER_SSH -> gpu_a100, env 'neural-graph'`, yet the actual `bsub` submit
+`[loop] cluster preflight OK: $CLUSTER_SSH -> ${CLUSTER_QUEUE_PREFIX}a100, env 'neural-graph'`, yet the actual `bsub` submit
 still returned `Permission denied`. So the preflight passes (or is stale from an earlier window) while real
 submission fails — the loop's own guard did NOT catch the dead credential and advanced into the batch anyway.
 Ops note: the preflight should exercise the SAME auth path as `bsub` (a real no-op remote command), and a
@@ -4905,7 +4905,7 @@ _2026-07-03. Design step running under the restarted driver (`loop_logs/campaign
 
 **The biggest event this batch is operational, not scientific, and it is GOOD NEWS: the operator restarted the
 loop.** A new session log `campaign_resume4.out` appeared (the burn era ran under `resume3.out`), showing
-`cluster preflight OK: $CLUSTER_SSH -> gpu_a100` and `BATCH 24/40 (gpu_a100) -- agent designing slots...`.
+`cluster preflight OK: $CLUSTER_SSH -> ${CLUSTER_QUEUE_PREFIX}a100` and `BATCH 24/40 (${CLUSTER_QUEUE_PREFIX}a100) -- agent designing slots...`.
 The state file was rewound from `{"batch":37}` to `{"batch":24}` (written 10:03:18) — the operator deliberately
 reset the counter to B24, the first infra-lost batch, so the lost size/contrast science re-runs from where the
 instrument last produced data (B23). This design step (me) is loop.py's `run_claude(design_prompt(24))` at
@@ -5903,7 +5903,7 @@ called from `cardio_mpm_train.py:522` (`D.load_real(...)`). This is the fast-fai
 `cardio_mpm/` itself (co-located with the training code) at 03:52 today; the loader `cardio_mpm_data.py:18`
 hard-coded `NPZ = HERE/../cardio/cardio_real.npz`, which no longer exists. Confirmed the relocation is real, not a
 sandbox artifact: `cardio_mpm_cluster.py:49–54` documents that `/workspace` is an **NFS mount** of the cluster's
-`/groups/saalfeld/home/allierc/Graph`, so the file I see at `cardio_mpm/cardio_real.npz` (54 MB, valid Zip/npz,
+`$CLUSTER_HOME/Graph`, so the file I see at `cardio_mpm/cardio_real.npz` (54 MB, valid Zip/npz,
 Jul 8 03:52) is the SAME file the cluster job saw — and the sibling `../cardio/` is now a DIFFERENT project
 (its own `cardio_loop.py`/`analysis.md`, no npz). So the data genuinely lives at `cardio_mpm/cardio_real.npz`
 on both filesystems; only the loader path was stale. (Likely collateral of the same `signaling`-branch churn

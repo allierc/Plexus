@@ -34,7 +34,7 @@ sys.path.insert(0, HERE)
 import model as M      # noqa: E402
 import recording as R  # noqa: E402
 
-RT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1"
+RT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data/Cardio_1"
 TIFS = dict(healthy=f"{RT}/0_B_15kPa_1_MMStack_Pos0.ome.tif",
             hcm=f"{RT}/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif")
 WHITE, GREY = "#f2f2f2", "#8a8a8a"

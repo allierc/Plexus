@@ -1,4 +1,0 @@
-time   2026-09-19 10:15:33
-spec   plat_r1_00_outline
-camera azim=20.0 elev=8.0 zoom=1.45
-why    R1.00 the body outline, take two. All 4,117 somata are seeded at their measured positions but NONE is drawn -- this rung is the animal's segmented surface alone, so every layer after it can be seen sitting inside the body rather than floating.

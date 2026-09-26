@@ -175,8 +175,8 @@ than a cross-run comparison (I made that mistake twice last night — see the re
 ```
 $PY          /workspace/.conda_envs/neural-graph-linux/bin/python   (default python3 has no torch)
 PYTHONPATH   /workspace/Plexus/src
-cluster      $CLUSTER_SSH, queue gpu_l4, -gpu num=1 mandatory, env `connectome-gnn`
-paths        /workspace  <->  /groups/saalfeld/home/allierc/Graph   (same NFS export)
+cluster      $CLUSTER_SSH, queue ${CLUSTER_QUEUE_PREFIX}l4, -gpu num=1 mandatory, env `connectome-gnn`
+paths        /workspace  <->  $CLUSTER_HOME/Graph   (same NFS export)
 configs      config/okuda/   ·   job artefacts  log/okuda/<name>/   ·   evidence  discovery/_archive/
 git          push may need --no-verify (git-lfs absent in the devcontainer)
 ```

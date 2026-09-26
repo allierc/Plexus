@@ -12,7 +12,7 @@ stays interpretable (plexus2.tex §"Mechanistic inverse modelling").
 ## 0. Data — built, verified, on disk
 
 ```
-/groups/saalfeld/home/allierc/GraphData/graphs_data/zebrafish/zapbench/zapbench.zarr   (1.8 GB)
+$GNN_OUTPUT_ROOT/graphs_data/zebrafish/zapbench/zapbench.zarr   (1.8 GB)
 ```
 
 | array | shape | what |

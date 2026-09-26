@@ -107,7 +107,7 @@ def load_cut(blend=DEFAULT_BLEND, parts_dir=DEFAULT_PARTS, rebuild=False):
     """
     # relative paths resolve against THIS prototype, not the cwd: a spec that names
     # "archive/run_03/blend_parts" has to mean the same thing in the devcontainer
-    # (/workspace/Plexus/...) and on the cluster (/groups/saalfeld/.../Plexus/...), which
+    # (/workspace/Plexus/...) and on the cluster ($CLUSTER_HOME/Graph/Plexus/...), which
     # mount the same NFS export at different roots.
     blend = blend if os.path.isabs(blend) else os.path.join(HERE, blend)
     parts_dir = parts_dir if os.path.isabs(parts_dir) else os.path.join(HERE, parts_dir)

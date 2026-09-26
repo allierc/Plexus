@@ -1,5 +1,5 @@
 {
- "archive": "/groups/saalfeld/home/allierc/GraphData/graphs_data/mesh_mpm/mesh_mpm_spheroid_nominal",
+ "archive": "$GNN_OUTPUT_ROOT/graphs_data/mesh_mpm/mesh_mpm_spheroid_nominal",
  "archived_on": "2026-09-12 17:58",
  "because": "regression reruns are deterministic now (PLEXUS_STRICT_DETERMINISM=1, like every archive); this reference was taken on the non-deterministic runner earlier today",
  "checkpoints": {

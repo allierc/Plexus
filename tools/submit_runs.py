@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Submit fitted-model RUNS to `gpu_l4`, one job each -- `submit_specs.py` for training.
+"""Submit fitted-model RUNS to `${CLUSTER_QUEUE_PREFIX}l4`, one job each -- `submit_specs.py` for training.
 
 `tools/submit_specs.py` sends a forward SPEC through `Plexus_Main.py -o generate`. A run spec is a
 different object: it names a forward spec OR a standalone circuit, a task, what is learnable and
