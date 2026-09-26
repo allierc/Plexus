@@ -1036,6 +1036,14 @@ class SeedStateFromFile(Seed):
             b0, b1 = lvl.state_schema[block]
             v = np.asarray(z[array], dtype=np.float32)
             v = v[:, None] if v.ndim == 1 else v
+            # ONE ROW PER CHILD OF ONE PARENT, ON A CONTAINED SET: the file describes one copy (a
+            # channel's charged residues) and every parent carries that copy, in block order --
+            # the same tiling `cloud_seed` places the copies' positions by.
+            _par = getattr(lvl, "parent", None)
+            if (v.shape[0] != lvl.n and lvl.parent_name is not None and _par is not None
+                    and _par.numel() == lvl.n and v.shape[0] > 0 and lvl.n % v.shape[0] == 0
+                    and bool((torch.bincount(_par) == v.shape[0]).all())):
+                v = np.tile(v, (lvl.n // v.shape[0], 1))
             if v.shape[0] != lvl.n:
                 raise ValueError(
                     f"seed_state_from_file: {array!r} has {v.shape[0]} rows but {lvl.name!r} has "

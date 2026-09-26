@@ -179,6 +179,10 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # `assemblies_*` -- rather than for the folder, unlike the three above.
     ("neural",      ("neural", "ctrnn", "assemblies", "connectome")),
     ("metabolism",  ("metabol", "massaction", "stoich")),
+    # MEMBRANE PORES AND CHANNELS (experiments/exp04_membrane_channels): a protein's alpha carbons
+    # in a bead bilayer, the electrolyte as a conductor. No trigger substrings, like `tissue`: the
+    # specs are `channel/exp04_v<K><s>`, addressed explicitly.
+    ("channel",     ()),
 ]
 _VALID_PRE_FOLDERS = {f for f, _ in _PRE_FOLDER_RULES}
 

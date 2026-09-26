@@ -97,6 +97,10 @@ from . import rod_ops               # noqa: F401  a cilium as a DISCRETE ELASTIC
 #                                                 gets a cilium that is 0.25 um thick.
 from . import flagellum_ops         # noqa: F401  stator_push -- stator units pushing a rotor's
 #                                                 material tangentially; the bacterial motor's drive
+from . import channel_ops           # noqa: F401  membrane pores and channels: elastic_network, pair_potential,
+#                                                 brownian, tether, radial_drive (the patch frame),
+#                                                 electrolyte_conduction (the current through the open lumen),
+#                                                 pore_probe -- experiments/exp04_membrane_channels
 from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
                                     #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
 #                                                 (psi: shared | type_pre | type_pairwise),

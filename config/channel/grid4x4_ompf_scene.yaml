@@ -1,0 +1,106 @@
+general:
+  name: grid4x4_ompf_scene
+  seed: 0
+  n_frames: 2
+  dt: 5.802270158694975e-07
+  boundary: wall
+  dim: 3
+  world: [6.0, 6.0, 1.0]
+  record_cap: 3
+  units: {length_um: 0.014, time_s: 2.6967247887748886e-07, force_nN: 0.0002935714285714285}
+sets:
+  channel:
+    n: 16
+    start:
+    - [0.857143, 0.857143, 0.453101]
+    - [2.285714, 0.857143, 0.453101]
+    - [3.714286, 0.857143, 0.453101]
+    - [5.142857, 0.857143, 0.453101]
+    - [0.857143, 2.285714, 0.453101]
+    - [2.285714, 2.285714, 0.453101]
+    - [3.714286, 2.285714, 0.453101]
+    - [5.142857, 2.285714, 0.453101]
+    - [0.857143, 3.714286, 0.453101]
+    - [2.285714, 3.714286, 0.453101]
+    - [3.714286, 3.714286, 0.453101]
+    - [5.142857, 3.714286, 0.453101]
+    - [0.857143, 5.142857, 0.453101]
+    - [2.285714, 5.142857, 0.453101]
+    - [3.714286, 5.142857, 0.453101]
+    - [5.142857, 5.142857, 0.453101]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+      orient: {width: 1, integration: none, unit: '1'}
+  lipid:
+    n: 100000
+    start: [0.0, 0.0, 0.349101, 6.0, 6.0, 0.557101]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  OmpF_1:
+    parent: channel
+    per_parent: 340
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  OmpF_2:
+    parent: channel
+    per_parent: 340
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  OmpF_3:
+    parent: channel
+    per_parent: 340
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+seed:
+- {op: seed_state, at: channel, block: orient, pattern: random, lo: 0.0, hi: 360.0, seed: 1}
+- {op: cloud_seed, at: OmpF_1, cloud: exp04r_ompf_v11t/c0, scale: 71428571.42857142, rotate: orient, displace: lipid, reach: 0.035714}
+- {op: cloud_seed, at: OmpF_2, cloud: exp04r_ompf_v11t/c1, scale: 71428571.42857142, rotate: orient, displace: lipid, reach: 0.035714}
+- {op: cloud_seed, at: OmpF_3, cloud: exp04r_ompf_v11t/c2, scale: 71428571.42857142, rotate: orient, displace: lipid, reach: 0.035714}
+fields: {}
+operators: []
+schedule: []
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [OmpF_1, OmpF_2, OmpF_3, lipid]
+  hide_sets: [channel]
+  surface:
+    OmpF_1: {render: surface, spacing: 0.021429, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    OmpF_2: {render: surface, spacing: 0.021429, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    OmpF_3: {render: surface, spacing: 0.021429, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    lipid: {render: surface, spacing: 0.028571, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+  opacity: {OmpF_1: 1.0, OmpF_2: 1.0, OmpF_3: 1.0, lipid: 0.45}
+  colors:
+    OmpF_1: [0.36, 0.58, 0.8]
+    OmpF_2: [0.9, 0.62, 0.36]
+    OmpF_3: [0.47, 0.72, 0.52]
+    lipid: [0.82, 0.82, 0.84]
+  camera: {elev: 40.0, azim: 30.0}
+  zoom: 1.0
+  subject: OmpF_1
+  max_frames: 3
+  real_time: false
+  duration_s: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The video shows a static 3D simulation of several small clusters of particles resting
+      on a textured surface. The particles do not move or change position throughout the duration of the
+      sequence. The scene remains completely still, representing a single frame of a larger simulation.
+      The lighting and perspective are fixed, highlighting the spatial arrangement of the clusters.
+    objects: 'There are 16 distinct clusters of particles distributed across a grey, bumpy surface. Each
+      cluster is composed of three spheres in different colors: orange, blue, and green. The spheres are
+      small and arranged in a triangular formation within each cluster. The entire scene is contained
+      within a rectangular bounding box with a scale bar indicating a dimension of 0.025 μm.'

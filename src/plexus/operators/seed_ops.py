@@ -122,13 +122,40 @@ class SeedPositions(Seed):
 
 
 @register_operator("cloud_seed", family="seed", set="particle", kind="seed",
-                   equation=r"""$$\mathbf x_i=\mathbf x_{\mathrm{origin}}+\text{scale}\cdot\mathbf q_i$$""")
+                   equation=r"""$$\mathbf x_i=\mathbf x_{\mathrm{origin}}+\text{scale}\cdot\mathbf q_i\quad\text{or, contained,}\quad\mathbf x_i=\mathbf x_{\pi(i)}+\text{scale}\cdot\mathbf q_{k(i)}$$""", title="Place a measured point cloud")
 class CloudSeed(Seed):
     """Write every position of a set from a MEASURED POINT CLOUD in the shape library, once.
 
     set -> set: writes `pos`.
 
         x_i = origin + scale * q_i        i = 1 .. n, q_i the i-th point of the cloud (metres)
+
+    A CONTAINED SET GETS ONE COPY OF THE CLOUD PER PARENT, at that parent's own position:
+
+        x_i = x_pi(i) + scale * q_k(i)    pi(i) the parent of point i, k(i) its rank in its parent's block
+
+    That is how a spec says "ten of this channel": a `channel` set with `n: 10` whose `start:`
+    lists ten positions, and each protomer or lipid patch a child set (`parent: channel`,
+    `per_parent:` the cloud's point count). The loop is the parent set; no set is written ten
+    times, and a per-copy parameter is a block or a type on the parent. `origin` is then refused,
+    since the parents are the origins and a second statement of them could only disagree.
+
+    `rotate: <block>` TURNS EACH COPY BY ITS PARENT'S OWN ANGLES, read from that block of the
+    parent set, in degrees and in the convention of the `rotate` type key (`entities._rot_matrix`,
+    R = Rz Ry Rx, about the cloud's own centre): a 1-wide block is the angle about z, the cloud's
+    symmetry axis (a channel turned in its membrane); a 3-wide block is [x, y, z]. The angles are
+    state, so `seed_state` draws them (random in 0..360) or a file sets them, and the rotation is
+    x_i = x_pi(i) + R_pi(i) scale q_k(i).
+
+    `displace: <set>` INSERTS THE CLOUD INTO A HOST, clearing the host's points under each copy
+    (their `occ` set to 0, so every occupancy-aware reader -- the surface renderer, the channel
+    forces -- skips them). "Under" is the copy's outline across the host's own thickness, the
+    rule `tools/channel_spec._outline_area` uses: in each of 72 sectors about the copy's centre,
+    the outermost point of the cloud whose z lies within the host's z range, plus `reach` (world;
+    a residue's side chain beyond its alpha carbon, ~0.5 nm). A host point dormant under ANY copy
+    is dormant, so the three protomers of a trimer, each displacing, clear the trimer's whole
+    footprint -- its pores included, which a distance test to the nearest point would leave
+    plugged. A sector the cloud does not reach clears nothing.
 
     `cloud` names `<shape>/<part>`: `<root>/shapes/<shape>/points.npz` holds one array of points
     per part, in metres, in the cloud's own frame (its symmetry axis along z, its centre at the
@@ -150,17 +177,22 @@ class CloudSeed(Seed):
     REQUIRES_PARAMS = ["cloud"]
     MECHANISM_TAGS = ["initial_condition", "placement", "measured_anatomy"]
     PARAM_ROLES = {"cloud": "point_cloud", "origin": "placement_origin", "scale": "world_per_metre",
-                   "every": "stride"}
-    PARAM_UNITS = {"origin": "length"}
+                   "every": "stride", "rotate": "parent_block_of_euler_degrees",
+                   "displace": "host_set_cleared_under_the_cloud", "reach": "outline_margin_world"}
+    PARAM_UNITS = {"origin": "length", "reach": "length"}
     REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "particle")
         self.cloud = str(params["cloud"])
+        self.origin_given = params.get("origin") is not None
         self.origin = [float(v) for v in (params.get("origin") or [0.5, 0.5, 0.5])]
         self.scale = float(params.get("scale", 1.0))
         self.every = max(1, int(params.get("every", 1)))
+        self.rotate = params.get("rotate")
+        self.displace = params.get("displace")
+        self.reach = float(params.get("reach", 0.0))
         if "/" not in self.cloud:
             raise ValueError(f"cloud_seed: `cloud` names `<shape>/<part>`, got {self.cloud!r}")
 
@@ -179,17 +211,73 @@ class CloudSeed(Seed):
             q = np.asarray(z[part], np.float64)[:: self.every]
         p = H.level(self.at)
         n = int(p.state.shape[0])
-        if n != len(q):
-            raise ValueError(f"cloud_seed: set {self.at!r} holds {n} entities but {self.cloud} gives "
-                             f"{len(q)} points at every={self.every}; declare n: {len(q)}")
         dev, dt = p.state.device, p.state.dtype
-        pos = torch.as_tensor(q, device=dev, dtype=dt) * self.scale + torch.tensor(self.origin, device=dev, dtype=dt)
+        qw = torch.as_tensor(q, device=dev, dtype=dt) * self.scale
+        pidx = p.parent
+        if p.parent_name is not None and pidx.numel() == n:
+            if self.origin_given:
+                raise ValueError(f"cloud_seed: set {self.at!r} is contained in {p.parent_name!r}, so each copy "
+                                 f"lands on its parent's position; drop `origin`")
+            par = H.level(p.parent_name)
+            counts = torch.bincount(pidx, minlength=par.n)
+            if not bool((counts == len(q)).all()):
+                raise ValueError(f"cloud_seed: set {self.at!r} holds {sorted(set(counts.tolist()))} points per "
+                                 f"{p.parent_name!r} but {self.cloud} gives {len(q)} at every={self.every}; "
+                                 f"declare per_parent: {len(q)}")
+            pp = str((H.config.sets.get(self.at) or {}).get("parent_pos", "pos"))
+            k = torch.arange(n, device=dev) - (torch.cumsum(counts, 0) - counts)[pidx]
+            centre = par.get(pp)[:, :3].to(dt)
+            qk = qw[k]
+            where = f"{par.n} copies of {len(q)}, one per {p.parent_name!r}"
+            if self.rotate:
+                from plexus.models.entities import _rot_matrix
+                if self.rotate not in par.state_schema:
+                    raise ValueError(f"cloud_seed: `rotate: {self.rotate}` names no block of {p.parent_name!r}; "
+                                     f"declare it under `sets.{p.parent_name}.state:` (width 1 = degrees about z, "
+                                     f"3 = [x, y, z] degrees)")
+                ang = par.get(self.rotate).tolist()
+                ang = [[0.0, 0.0, a[0]] if len(a) == 1 else a for a in ang]
+                R = torch.stack([_rot_matrix(a, 3, dev) for a in ang]).to(dt)
+                qk = torch.einsum("nij,nj->ni", R[pidx], qk)
+                where += f", each turned by its own {p.parent_name}.{self.rotate}"
+            pos = centre[pidx] + qk
+        else:
+            if self.rotate:
+                raise ValueError(f"cloud_seed: `rotate` reads a block of the PARENT, and {self.at!r} has none")
+            if n != len(q):
+                raise ValueError(f"cloud_seed: set {self.at!r} holds {n} entities but {self.cloud} gives "
+                                 f"{len(q)} points at every={self.every}; declare n: {len(q)}")
+            centre = torch.tensor([self.origin], device=dev, dtype=dt)
+            pidx = torch.zeros(n, dtype=torch.long, device=dev)
+            pos = qw + centre[0]
+            where = f"{n} points"
         st = p.state.clone()
         a, b = p.state_schema["pos"]
         st[:, a:b] = pos
         p.state = st
-        r = (pos[:, :2] - pos.new_tensor(self.origin[:2])).norm(dim=1)
-        print(f"[cloud_seed] {self.at}: {n} points from {os.path.relpath(path)}::{part} (every {self.every}), "
-              f"scale {self.scale:.4g} world/m, r {float(r.min()):.4f}-{float(r.max()):.4f} world, "
+        r = (pos[:, :2] - centre[pidx, :2]).norm(dim=1)
+        print(f"[cloud_seed] {self.at}: {where} from {os.path.relpath(path)}::{part} (every {self.every}), "
+              f"scale {self.scale:.4g} world/m, r {float(r.min()):.4f}-{float(r.max()):.4f} world from its centre, "
               f"z {float(pos[:, 2].min()):.4f}-{float(pos[:, 2].max()):.4f}", flush=True)
+        if self.displace:
+            self._displace(H, pos, pidx, centre)
         return {}
+
+    def _displace(self, H, pos, pidx, centre, nb=72):
+        host = H.level(self.displace)
+        hx = host.get("pos")[:, :3].to(pos.dtype)
+        live = host.occ > 0
+        z0, z1 = hx[live, 2].min(), hx[live, 2].max()
+        m = (pos[:, 2] >= z0) & (pos[:, 2] <= z1)
+        d = pos[m, :2] - centre[pidx[m], :2]
+        sector = ((torch.atan2(d[:, 1], d[:, 0]) + math.pi) / (2 * math.pi) * nb).long().clamp(0, nb - 1)
+        P = centre.shape[0]
+        R = torch.zeros(P * nb, device=pos.device, dtype=pos.dtype)
+        R.scatter_reduce_(0, pidx[m] * nb + sector, d.norm(dim=1) + self.reach, reduce="amax")
+        R = R.view(P, nb)
+        e = hx[:, None, :2] - centre[None, :, :2]
+        es = ((torch.atan2(e[..., 1], e[..., 0]) + math.pi) / (2 * math.pi) * nb).long().clamp(0, nb - 1)
+        under = (e.norm(dim=2) < R[torch.arange(P, device=pos.device)[None, :], es]).any(1) & live
+        host.occ[under] = 0.0
+        print(f"[cloud_seed] {self.at} displaced {int(under.sum()):,} of {int(live.sum()):,} live "
+              f"{self.displace} points, reach {self.reach:.4g} world", flush=True)
