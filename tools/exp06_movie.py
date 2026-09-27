@@ -66,6 +66,12 @@ def main():
         blk = "chem" if p == "u" else "gam_prev"
         series[p] = np.stack([np.asarray(T.state(blk, t), float)[:, 0] for t in rows])
     vmax["gam"] = float(np.nanmax(series["gam"])) if "gam" in series else None
+    # junction outlines in grey: a sheet at rest (u = 0) is black in inferno, i.e. the background colour,
+    # and without its outlines reads as an empty panel
+    edge = np.zeros(lab.shape, bool)
+    edge[1:, :] |= lab[1:, :] != lab[:-1, :]
+    edge[:, 1:] |= lab[:, 1:] != lab[:, :-1]
+    edge = np.ma.masked_where(~edge, np.ones(lab.shape))
     frames = []
     for i, t in enumerate(rows):
         fig, axs = plt.subplots(1, len(panels), figsize=(5 * len(panels), 5.3), facecolor="black")
@@ -75,6 +81,7 @@ def main():
             img = val[np.clip(lab, 0, len(val) - 1)]
             img[lab == 0] = np.nan
             ax.imshow(img, cmap=cmaps[p], vmin=0.0, vmax=vmax[p] or 1.0, interpolation="nearest")
+            ax.imshow(edge, cmap="gray", vmin=0.0, vmax=2.0, interpolation="nearest")
             ax.set_axis_off()
             ax.set_title(titles[p], color="white", fontsize=12, loc="left")
         fig.suptitle(f"{os.path.basename(a.run)}   t = {tt[t] * ts * 1e3:.2f} ms", color="white", fontsize=11, x=0.02, ha="left")
