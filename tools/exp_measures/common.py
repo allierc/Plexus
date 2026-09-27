@@ -153,6 +153,14 @@ def neighbour_pairs(T, t, c: Cells | None = None, cut: float = 2.0) -> np.ndarra
 
 
 # ============================================================================ registry and scoring
+# A MEASURE WHOSE DEFINITION CHANGED, and when: the scorer's cache re-measures every value written before
+# that minute (tools/exp_gate_score.py, `measure_all`). Add a line when a ruler's answer changes for the
+# same run; a pure speed-up or a new output key needs none.
+CHANGED = {
+    "shared.growth_audit": "2026-09-27 14:30",   # vertex-jump and finiteness tests on every frame, not every 20th
+}
+
+
 def register_run(name: str, fn, dim=None, doc=""):
     """A whole-run measure `fn(T, **kw) -> dict`, in the same registry as the gate rows."""
     return register(name, "run", fn, dim, doc)

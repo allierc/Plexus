@@ -18,14 +18,16 @@ def _spec_name(T):
     return rel.replace(os.sep, "/")
 
 
-def growth_audit(T, every=20, window=60, **_):
-    """exp 3's auditor on this run: score 0-10, band, and the reason that set it. Mesh runs only."""
+def growth_audit(T, every=20, window=60, jump_every=1, **_):
+    """exp 3's auditor on this run: score 0-10, band, and the reason that set it. Mesh runs only.
+    The vertex-jump and finiteness tests run on every frame (`jump_every` 1, since 2026-09-27)."""
     import growth_audit as GA
     try:
-        r = GA.audit(_spec_name(T), every=every, window=window)
+        r = GA.audit(_spec_name(T), every=every, window=window, jump_every=jump_every)
     except Exception as e:                                                   # noqa: BLE001
         return {"available": False, "why": f"{type(e).__name__}: {e}"}
-    return {"available": True, "score": finite(r.get("score")), "band": r.get("band"), "why": r.get("reason"), "growth": finite(r.get("growth"))}
+    return {"available": True, "score": finite(r.get("score")), "band": r.get("band"), "why": r.get("reason"), "growth": finite(r.get("growth")),
+            "jump_max": finite(r.get("jump_max")), "jump_at": r.get("jump_at"), "jumps_over": r.get("jumps_over"), "wrecked_at": r.get("wrecked_at")}
 
 
 def cell_count(T, **_):

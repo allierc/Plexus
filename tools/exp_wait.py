@@ -14,14 +14,25 @@ exactly once, with the summary.
 WHAT IT CHECKS, and only this: each run's own folders, through `tools/exp.py`'s `measure` (the same
 definition `exp.py poll` uses): LANDED when the run's `trajectory.npz` reads (and, for a generate
 arm, its `movie.mp4` exists too, unless `--no-movie` -- the movie is what the record and the judge
-look at); DIED when the job's `cluster.out` carries an LSF `TERM_` reason. Nothing is run on the
+look at); DIED when the job's `cluster.out` carries an LSF `TERM_` reason or "Exited with exit code N" (a crash). Nothing is run on the
 cluster and no login node is touched: `/groups` is mounted, so the folders are read locally.
+
+THEN IT LANDS THE BATCH (2026-09-27, unless `--no-land`): `tools/exp_land.py` checks every run's
+health (counts, extent, non-finite values in every set, the growth audit, a still movie), scores the
+card, runs `--check`, rebuilds the watcher's record, writes the landing report into the experiment's
+markdown, and prints it -- so the session wakes to a batch already checked and scored, and the time
+its next batch is due (10 minutes later).
+
+RUNS OUTSIDE THE MARKDOWN'S ARMS: `--spec <group>/<name> ...` waits on those output folders directly
+(landed = trajectory.npz, and movie.mp4 unless `--no-movie`; died = an LSF failure in
+`log/experiments/expNN/<name>/cluster.out` if that exists).
 
 EXIT CODES: 0 every run landed | 1 a run died (the others are reported) | 2 timeout.
 """
 from __future__ import annotations
 
 import argparse
+import re
 import os
 import sys
 import time
@@ -32,7 +43,26 @@ sys.path[:0] = [os.path.join(ROOT, "tools"), os.path.join(ROOT, "src")]
 import exp  # noqa: E402
 
 
+def _lsf_died(n, run):
+    """The LSF verdict of a finished job that did NOT succeed, read from its cluster.out: 'Exited with exit code
+    N' or a TERM_ reason. exp.measure only knew TERM_, so a job that crashed with exit code 1 (exp12's CUDA OOM,
+    2026-09-27: movie written, no trajectory) was never reported and the waiter sat on it for 2.5 h."""
+    co = os.path.join(exp.job_dir(n, run), "cluster.out")
+    if not os.path.isfile(co):
+        return None
+    txt = open(co, errors="ignore").read()
+    m = re.search(r"Exited with exit code (\d+)", txt)
+    if m:
+        why = re.search(r"(CUDA out of memory|Traceback \(most recent call last\)|Killed|MemoryError)", txt)
+        return f"exit code {m.group(1)}" + (f" ({why.group(1)})" if why else "")
+    t = re.search(r"(TERM_\w+)", txt)
+    return t.group(1) if t else None
+
+
 def _state(arm, run, n, need_movie):
+    dead = _lsf_died(n, run)
+    if dead:
+        return "died", {"died": dead}
     try:
         m = exp.measure(arm, run, n)
     except Exception:                                                        # noqa: BLE001  a half-written npz
@@ -55,11 +85,16 @@ def main():
     ap.add_argument("--every", type=int, default=120, help="seconds between checks (default 120)")
     ap.add_argument("--timeout", type=int, default=6 * 3600, help="give up after this many seconds (default 6 h)")
     ap.add_argument("--no-movie", action="store_true", help="landed = trajectory only, do not wait for the movie")
+    ap.add_argument("--spec", nargs="*", default=[], help="<group>/<name> runs not in the markdown's arms")
+    ap.add_argument("--no-land", action="store_true", help="do not run tools/exp_land.py when the batch is decided")
     a = ap.parse_args()
     fm, _ = exp.load(exp.exp_path(a.n))
     todo = []
+    for sp in a.spec:
+        group, name = sp.split("/", 1)
+        todo.append(({"id": "(spec)", "kind": "generate", "spec": sp}, name))
     submitted = set((fm.get("job_ids") or {}).keys())
-    for arm, _p, run in exp.runs(fm):
+    for arm, _p, run in ([] if a.spec and not (a.runs or a.arm) else exp.runs(fm)):
         if a.arm and arm["id"] not in a.arm:
             continue
         if a.runs:
@@ -87,6 +122,15 @@ def main():
     left = [r for r, (s, _) in st.items() if s not in ("landed", "died")]
     print(f"[wait] exp{a.n:02d}: after {el} s -- {len(st) - len(died) - len(left)} landed, {len(died)} died, "
           f"{len(left)} still open{' (TIMEOUT)' if left else ''}")
+    landed = [(arm, r) for arm, r in todo if st[r][0] == "landed" and arm["kind"] == "generate"]
+    if a.no_land or not landed:
+        print(f"[wait] NEXT: score this batch now -- PYTHONPATH=src:tools python tools/exp_gate_score.py {a.n}"
+              f"  (and --check if a gate reads 'no value' or 'INVALID')")
+    else:
+        import exp_land
+        summary = (f"waited {el} s: {len(st) - len(died) - len(left)} landed, {len(died)} died"
+                   + (f" ({', '.join(died)})" if died else "") + (f", {len(left)} still open" if left else ""))
+        print(exp_land.land(a.n, [f"{arm['spec'].split('/')[0]}/{r}" for arm, r in landed], waited=summary), flush=True)
     return 2 if left else (1 if died else 0)
 
 

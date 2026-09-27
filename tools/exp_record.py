@@ -172,6 +172,35 @@ def _readout(r: dict) -> str:
     return (nl + nl).join(out)
 
 
+def undeclared_rows(number: int, rows: list[dict]) -> list[dict]:
+    """EVERY RUN OF THE EXPERIMENT REACHES THE WATCHER, declared or not (added 2026-09-27). The steps above
+    come from the markdown's arms and results rows only, so a phase whose arms were not yet declared --
+    exp11's whole Phase 2, nine runs on disk -- never appeared and the watcher stayed frozen at its last
+    declared step. Every folder graphs_data/<group>/exp{NN}* that holds a trajectory or a movie and is not
+    already a step is appended AFTER the declared ones, oldest first, marked UNDECLARED so the record says
+    it is not yet in the markdown. Declaring it later moves it into the declared steps."""
+    have = {(r["_group"], r["_run"]) for r in rows}
+    found = []
+    for d in glob.glob(os.path.join(GD, "*", f"exp{number:02d}*")):
+        if not os.path.isdir(d):
+            continue
+        group, run = os.path.basename(os.path.dirname(d)), os.path.basename(d)
+        if (group, run) in have:
+            continue
+        tj, mv = os.path.join(d, "trajectory.npz"), os.path.join(d, "movie.mp4")
+        if not (os.path.exists(tj) or os.path.exists(mv)):
+            continue
+        t = max(os.path.getmtime(x) for x in (tj, mv) if os.path.exists(x))
+        found.append((t, group, run))
+    out = []
+    for t, group, run in sorted(found):
+        out.append({"_v": f"UNDECLARED {run}", "_group": group, "_run": run, "_pred": {}, "_read": {},
+                    "arm": "(undeclared)", "label": "a run on disk not yet in the markdown's arms or results rows",
+                    "verdict": "undeclared -- not scored in the record",
+                    "what changed": "declare its arm (front matter) or add its results row"})
+    return out
+
+
 def build(number: int) -> str:
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     from exp import load                                         # the tool's own md reader
@@ -182,6 +211,7 @@ def build(number: int) -> str:
         os.makedirs(os.path.join(folder, k), exist_ok=True)
     grid = fm.get("branch") == "grid" or "arms" in fm
     rows = grid_rows(number, fm, body) if grid else table(body)
+    rows += undeclared_rows(number, rows)
     desc = descriptions()
     keep = set()
     journal = [f"# exp {number} {fm.get('name', '')} -- rebuilt from {os.path.basename(md)} "

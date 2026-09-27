@@ -80,12 +80,20 @@ def load(path):
     return yaml.safe_load(text[3:end]), text[end + 4:]
 
 
-_BY_OP = re.compile(r"^(\w+)\[([\w:]+)\]$")
+_BY_OP = re.compile(r"^(\w+)\[([\w:@#]+)\]$")
 
 
 def _by_op(lst, name, key):
-    """The one element of a list of operator dicts whose `op` is `name`."""
-    hit = [o for o in lst if isinstance(o, dict) and o.get("op") == name]
+    """The one element of a list of operator dicts whose `op` is `name` -- or, as `op@set`, whose `op`
+    is `op` and `at` is `set`, for a spec that runs one operator on two sets (exp 15 rig 4's
+    `cell_chem_react@cell` and `cell_chem_react@host`) -- or, as `op@set#k`, the k-th (from 0) such
+    operator on that set, for a spec that runs one operator twice on one set (the metabolite medium's
+    two `project`s)."""
+    name, _, k = name.partition("#")
+    name, _, at = name.partition("@")
+    hit = [o for o in lst if isinstance(o, dict) and o.get("op") == name and (not at or o.get("at") == at)]
+    if k:
+        hit = hit[int(k):int(k) + 1]
     if len(hit) != 1:
         raise SystemExit(f"differs_by: {key!r} -- {len(hit)} operators named {name!r}, need exactly 1")
     return hit[0]
@@ -179,11 +187,30 @@ def write_spec(fm, arm, point, run_name, number):
     return out
 
 
+def _op_labels(lst):
+    """Each operator's `differs_by` address: its `op`; `op@at` when the list holds that `op` twice;
+    `op@at#k` when it holds it twice on the same set (k counts from 0 in list order)."""
+    n, na, seen, out = {}, {}, {}, []
+    for o in lst:
+        n[o["op"]] = n.get(o["op"], 0) + 1
+        na[(o["op"], o.get("at"))] = na.get((o["op"], o.get("at")), 0) + 1
+    for o in lst:
+        key = (o["op"], o.get("at"))
+        if n[o["op"]] == 1:
+            out.append(o["op"])
+        elif na[key] == 1:
+            out.append(f"{o['op']}@{o.get('at')}")
+        else:
+            out.append(f"{o['op']}@{o.get('at')}#{seen.get(key, 0)}")
+            seen[key] = seen.get(key, 0) + 1
+    return out
+
+
 def _diff_keys(a, b, prefix=""):
     """Dotted keys whose value differs between two nested dicts.
 
-    A list of operator dicts with unique `op` names is compared per operator, reported as
-    `operators[<op>].<key>` -- the same address `differs_by` uses -- so a one-parameter patch on
+    A list of operator dicts with unique `op` names (or unique `op@at`) is compared per operator,
+    reported as `operators[<op>].<key>` (`operators[<op>@<set>].<key>`) -- the same address `differs_by` uses -- so a one-parameter patch on
     one operator reads as exactly that and not as "the whole list changed".
     """
     out = set()
@@ -195,9 +222,9 @@ def _diff_keys(a, b, prefix=""):
         elif (isinstance(va, list) and isinstance(vb, list) and len(va) == len(vb)
               and all(isinstance(o, dict) and "op" in o for o in va + vb)
               and [o["op"] for o in va] == [o["op"] for o in vb]
-              and len({o["op"] for o in va}) == len(va)):
-            for oa, ob in zip(va, vb):
-                out |= _diff_keys(oa, ob, f"{p}[{oa['op']}].")
+              and len(set(_op_labels(va))) == len(va) and _op_labels(va) == _op_labels(vb)):
+            for oa, ob, lab in zip(va, vb, _op_labels(va)):
+                out |= _diff_keys(oa, ob, f"{p}[{lab}].")
         elif va != vb:
             out.add(p)
     return out
@@ -264,7 +291,7 @@ def _command(fm, arm, point, run_name, spec, jd):
     return f"python -u -m {mod} --device cuda:0 -o {ph} {rel}"
 
 
-def _submit(where, cmd, jd, run_name):
+def _submit(where, cmd, jd, run_name, wall=240, job_prefix="exp_"):
     sh = os.path.join(jd, "run.sh")
     with open(sh, "w") as f:
         f.write("\n".join([
@@ -286,7 +313,7 @@ def _submit(where, cmd, jd, run_name):
         return f"local:{run_name}"
     gpu = "-gpu num=1 " if C.GPU != "0" else ""
     excl = "".join(f'-R "hname!={h}" ' for h in C.EXCLUDE_HOSTS if h)
-    bs = (f"bsub -n {C.NCPUS} {gpu}{excl}-q {C.QUEUE} -W 240 -J exp_{run_name} "
+    bs = (f"bsub -n {C.NCPUS} {gpu}{excl}-q {C.QUEUE} -W {int(wall)} -J {job_prefix}{run_name} "
           f"-o {C.cpath(o)} -e {C.cpath(o[:-4])}.err bash -l {C.cpath(sh)}")
     r = C._ssh(bs, timeout=60)
     if r is None or r.returncode != 0:

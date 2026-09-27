@@ -17,7 +17,8 @@ THE SCALE (the auditor's rubric, `experiments/exp03_size_hypotheses/AGENT_growth
 THE AXES ARE READ IN THAT ORDER AND THE FIRST FAILING ONE SETS THE BAND; the position inside the
 band is the quality of the axis that failed (or of the weakest margin, in 8-10):
 
-    explosion   score = 2 x (fraction of the run before the first wrecked frame)
+    explosion   score = 2 x (fraction of the run before the first wrecked frame); the jump and
+                finiteness tests run on EVERY frame, the other wreck tests on every `every`-th
     no growth   score = 2 + 2 x smoothness quality
     not smooth  score = 4 + 2 x smoothness quality
     not uniform score = 6 + 2 x uniformity quality
@@ -137,6 +138,30 @@ def _jump(z, t):
     return float(np.nanmax(d) / max(np.nanmedian(L), 1e-9)) if d.size else 0.0
 
 
+def _every_frame(z, t0, T):
+    """THE JUMP AND FINITENESS TESTS ON EVERY FRAME, not every `every`-th (added 2026-09-27). Sampled
+    at every 20th frame, a vertex that jumped 4 edge lengths between two samples was never seen, so a
+    clean audit did not mean a clean run: exp07's arms read 1.7 against 4.0 by sampling luck (its
+    finding 54). The arrays are decompressed once (LazyNpz) and one frame costs ~1 ms at 20,000
+    vertices (a 1,501-frame, 1.9 GB run: 1.7 s). Returns (first bad frame or None, why, the largest
+    jump in median edge lengths, its frame, the number of frames whose jump exceeds X_JUMP)."""
+    jmax, jat, bad, why, n_over = 0.0, None, None, "", 0
+    for t in range(max(t0, 1), T):
+        P = np.asarray(z["vertex__pos"][t], float)[:int(z["vertex__mesh_Nv"][t])]
+        if not np.isfinite(P).all():
+            return (t if bad is None else bad), (why or "non-finite positions"), jmax, jat, n_over
+        j = _jump(z, t)
+        if j > jmax:
+            jmax, jat = j, t
+        if j > X_JUMP:
+            n_over += 1
+            if bad is None:
+                bad, why = t, f"a vertex jumped {j:.2f} edge lengths in one frame"
+    if n_over > 1:
+        why += f" ({n_over} frames over {X_JUMP} in the run, the largest {jmax:.2f} at frame {jat})"
+    return bad, why, jmax, jat, n_over
+
+
 def _jitter(z, t0, t1, kind):
     """p90 over cells of RMS(size - 5-frame moving average)/mean, for cells present through [t0, t1)."""
     ids = "cell__cell_id" in z.files
@@ -159,7 +184,7 @@ def _jitter(z, t0, t1, kind):
     return (float(np.percentile(J, 90)), float(np.median(J)), len(J)) if J else (np.nan, np.nan, 0)
 
 
-def audit(spec, every=20, window=60):
+def audit(spec, every=20, window=60, jump_every=1):
     from spheroid_gauge import frame_metrics
     d, z, settle = _load(spec)
     T = int(len(z["vertex__mesh_nF"]))
@@ -190,6 +215,12 @@ def audit(spec, every=20, window=60):
             hit = [w for b, w in bad if b]
             if hit:
                 wrecked, why = t, "; ".join(hit)
+    jump_max, jump_at = max(((r["jump"], r["t"]) for r in series), default=(0.0, None))
+    n_over = sum(r["jump"] > X_JUMP for r in series)
+    if jump_every == 1:
+        ev, ev_why, jump_max, jump_at, n_over = _every_frame(z, t0, T)
+        if ev is not None and (wrecked is None or ev < wrecked):
+            wrecked, why = ev, ev_why
     first, last = series[0], series[-1]
     growth = max(last["cells"] / max(first["cells"], 1), last["total"] / max(first["total"], 1e-12))
     end = T - 1 if wrecked is None else max(t0 + window + 4, wrecked - 1)
@@ -229,7 +260,8 @@ def audit(spec, every=20, window=60):
         reason = f"x{growth:.2f} growth, p90 wobble {jit:.4f}, every uniformity band held"
     return dict(spec=spec, kind=kind, frames=T, settle=t0, score=round(float(score), 2), band=band,
                 reason=reason, wrecked_at=wrecked, growth=round(float(growth), 3),
-                cells=[first["cells"], last["cells"]], jitter_p90=round(float(jit), 5),
+                cells=[first["cells"], last["cells"]],
+                jump_max=round(float(jump_max), 3), jump_at=jump_at, jumps_over=int(n_over), jump_every=jump_every, jitter_p90=round(float(jit), 5),
                 jitter_mid=[round(x, 5) if isinstance(x, float) else x for x in jit_mid],
                 jitter_end=[round(x, 5) if isinstance(x, float) else x for x in jit_end],
                 uniformity={k: (round(float(v), 4) if v is not None else None) for k, v in u.items()},
@@ -242,10 +274,12 @@ def main():
     ap.add_argument("specs", nargs="+", help="<group>/<run>")
     ap.add_argument("--every", type=int, default=20, help="frame stride for the whole-run series")
     ap.add_argument("--window", type=int, default=60, help="frames per smoothness window")
+    ap.add_argument("--sampled-jump", action="store_true",
+                    help="the pre-2026-09-27 audit: jump and finiteness only on the --every frames")
     ap.add_argument("--json", default=None, help="append one JSON line per run here")
     a = ap.parse_args()
     for sp in a.specs:
-        r = audit(sp, a.every, a.window)
+        r = audit(sp, a.every, a.window, jump_every=a.every if a.sampled_jump else 1)
         print(f"{r['spec']:<34} {r['score']:5.2f}  {r['band']:<32} {r['reason']}")
         if a.json:
             with open(a.json, "a") as f:
