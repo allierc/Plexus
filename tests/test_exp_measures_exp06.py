@@ -201,3 +201,55 @@ def test_cell_trace_unknown_model_is_unavailable(tmp_path):
     x = hex_sheet(3)
     T = write_run(tmp_path / "gs", x, np.zeros((5, len(x))))
     assert exp_measures.run_measure("exp06.cell_trace", T, model="gray_scott", params={})["available"] is False
+
+
+# --------------------------------------------------------------------- Phase 2 rulers
+def write_two_sets(d, cell_x, U, dt=0.01, time_s=0.0129, n_part=3):
+    """A real-sheet-like run: a bigger particle set (the seed's material points) and the cell set."""
+    rows, n = U.shape
+    part = np.repeat(cell_x, n_part, 0) + 0.001
+    os.makedirs(d, exist_ok=True)
+    np.savez(os.path.join(d, "trajectory.npz"),
+             mpm_particle__pos=np.repeat(part[None], rows, 0).astype(np.float32),
+             mpm_particle__occ=np.ones((rows, len(part)), bool),
+             cell__pos=np.repeat(cell_x[None], rows, 0).astype(np.float32),
+             cell__occ=np.ones((rows, n), bool),
+             cell__chem=np.stack([U, np.zeros_like(U)], -1).astype(np.float32))
+    yaml.safe_dump({"general": {"dt": dt, "n_frames": rows - 1, "units": {"time_s": time_s}}},
+                   open(os.path.join(d, "spec.yaml"), "w"))
+    return open_run(d)
+
+
+def test_real_reads_the_cells_not_the_particles_and_reports_ms(tmp_path):
+    x = hex_sheet()[:, :2]
+    v, dt = 2.0, 0.01                                            # cells per time unit
+    U = planted_wave(np.c_[x, np.zeros(len(x))], v=v, dt=dt, rows=900, origin=(-12.0, 0.0, 0.0))
+    T = write_two_sets(tmp_path / "r", x, U, dt=dt)
+    interior = np.abs(x[:, 0]) <= 6.0                            # a planted "fit interior"
+    fit = tmp_path / "fit.npz"
+    np.savez(fit, interior=interior, delay=np.zeros(len(x)))
+    r = exp_measures.run_measure("exp06.real", T, fit=str(fit))
+    assert r["n_cells"] == len(x) and r["frac_reached"] == 1.0
+    span = (x[interior, 0].max() - x[interior, 0].min())         # radial from (-12, 0): x-extent is close
+    assert 0.7 * span / v * 12.9 < r["arrival_spread_ms"] < 1.6 * span / v * 12.9
+    assert r["arrival_spread_ms_all"] > r["arrival_spread_ms"]
+    assert r["map_plane_wave_r2"] > 0.8                          # a planted front reads as a front
+
+
+def test_real_synchronous_sheet_has_no_front(tmp_path):
+    x = hex_sheet()[:, :2]
+    U = np.zeros((50, len(x))); U[10:, :] = 1.0                  # everyone fires on the same row
+    r = exp_measures.run_measure("exp06.real", write_two_sets(tmp_path / "s", x, U))
+    assert r["arrival_spread_ms"] == 0.0
+
+
+def test_apd_first_and_late(tmp_path):
+    x = hex_sheet(3)
+    dt, rows = 0.5, 400
+    t = np.arange(rows) * dt
+    U = np.zeros((rows, len(x)))
+    for s, dur in ((0, 25.0), (40, 12.0), (60, 12.0), (80, 12.0), (100, 12.0)):
+        U[(t >= s) & (t < s + dur)] = 1.0
+    r = exp_measures.run_measure("exp06.apd", write_run(tmp_path / "a", x, U, dt=dt))
+    assert r["n_fire_max"] == 5 and abs(r["apd_first"] - 25.0) <= dt and abs(r["apd_late"] - 12.0) <= dt
+    assert abs(r["apd_ratio"] - 12.0 / 25.0) < 0.03

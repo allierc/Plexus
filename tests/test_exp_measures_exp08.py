@@ -202,7 +202,7 @@ def test_celsr_nematic_on_planted_sheets(tmp_path):
     z["vertex__mesh_e_fz"] = (enr / 2).astype(np.float32); z["vertex__mesh_e_vang"] = (enr / 2).astype(np.float32)
     np.savez(os.path.join(tmp_path / "c1", "trajectory.npz"), **z)
     r = exp_measures.run_measure("exp08.celsr", open_run(str(tmp_path / "c1")), deform_axis=[0, 1, 0])
-    assert r["MP_last"] > 0.55 and abs(r["P_axis_deg_last"]) < 1e-3       # (4+4-1-1)/(4+4+1+1) = 0.6
+    assert abs(r["MP_last"] - 6 / (5 * np.pi)) < 1e-4 and abs(r["P_axis_deg_last"]) < 1e-3   # (4x1x2 - 1x1x2) / (10 x pi/2)
     assert abs(r["ang_P_deform_deg_last"] - 90) < 1e-3
     zr = dict(z); rng = np.random.default_rng(0)
     rnd = np.concatenate([np.roll(enr[4 * f:4 * f + 4], rng.integers(0, 2)) for f in range(144)])
@@ -213,10 +213,13 @@ def test_celsr_nematic_on_planted_sheets(tmp_path):
 
 
 def test_celsr_elongation_of_stretched_cells(tmp_path):
-    """Cells stretched 2x along y read ME = (4 - 1)/(4 + 1) = 0.6 with the axis at 90 deg."""
+    """Cells stretched 2x along y read ME = (4 - 1)/(4 + 1) = 0.6 with the axis at 90 deg -- and, with
+    the same complex on every side, MP = 0: the angular integral reads enrichment, not shape."""
     run = write_run(tmp_path / "e", 8, 8, [np.zeros(64)])
     z = dict(np.load(os.path.join(run, "trajectory.npz")))
     z["vertex__pos"] = z["vertex__pos"] * np.array([1.0, 2.0, 1.0], np.float32)
+    z["vertex__mesh_e_fz"] = np.ones_like(z["vertex__mesh_e_fz"]); z["vertex__mesh_e_vang"] = np.ones_like(z["vertex__mesh_e_vang"])
     np.savez(os.path.join(run, "trajectory.npz"), **z)
     r = exp_measures.run_measure("exp08.celsr", open_run(run), deform_axis=[0, 1, 0])
     assert abs(r["ME_last"] - 0.6) < 1e-6 and abs(abs(r["E_axis_deg_last"]) - 90) < 1e-6
+    assert r["MP_last"] < 1e-9

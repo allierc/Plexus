@@ -48,7 +48,7 @@ def parts_from_spec(d):
     global ROTOR, STATIC, REF
     pts = [s for s in d["sets"] if s.endswith("_pt")]
     anchored = {o["at"].split("[")[0] for o in d["operators"] if o["op"] == "mpm_anchor"}
-    pushed = next((o["at"].split("[")[0] for o in d["operators"] if o["op"] in ("stator_push", "stator_contact")), None)
+    pushed = next((o["at"].split("[")[0] for o in d["operators"] if o["op"] == "stator_push"), None)
     STATIC = [s for s in pts if s in anchored]
     ROTOR = [s for s in pts if s not in anchored]
     if pushed in ROTOR:
@@ -154,9 +154,9 @@ def main():
     # (row 0 of the trajectory) when it is the cell's child and a seed put it there.
     centre = (np.array(d["sets"]["stator_unit"]["start"]).mean(0) if "start" in d["sets"]["stator_unit"]
               else np.asarray(tr["stator_unit__pos"][0]).mean(0))
-    push = next(o for o in d["operators"] if o["op"] in ("stator_push", "stator_contact"))
-    drive = ("constant force per unit" if push["op"] == "stator_push"
-             else "a stepping stator on an elastic linkage (stator_contact + stator_step)")
+    push = next(o for o in d["operators"] if o["op"] == "stator_push")
+    drive = ("constant force per unit" if push.get("model") != "contact"
+             else "a stepping stator on an elastic linkage (stator_push[contact] + stator_step)")
     drag = next(o["drag"] for o in d["operators"] if o["op"] == "mpm_scatter")
 
     keys = {k: k for k in (tr.files if hasattr(tr, "files") else tr.keys())}

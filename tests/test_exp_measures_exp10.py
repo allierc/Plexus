@@ -323,3 +323,115 @@ def test_a_broad_crypt_does_not_set_its_own_reference_sphere(tmp_path):
     r = crypt(write_run(str(tmp_path / "mesa"), [x], fate_axis=[0, 0, 1], fate_alpha=53.13))
     assert r["n_buds_last"] == 1 and r["on_patch_last"] > 0.8    # an all-cell fit read 0 (R 5.35)
     assert abs(r["R_last"] - R) < 0.1                            # the rest's radius, not an inflated one
+
+
+# ============================================================================ phase 2 rulers
+def with_chem(T_path, chem):
+    """Add a planted cell__chem block [rows, cells, 4] (= [N, D, Y, W]) to a written run."""
+    f = os.path.join(T_path, "trajectory.npz")
+    z = dict(np.load(f))
+    z["cell__chem"] = np.asarray(chem, np.float32)
+    np.savez(f, **z)
+    return open_run(T_path)
+
+
+def cap_cells(axis, alpha):
+    a = np.asarray(axis, float) / np.linalg.norm(axis)
+    uc = U[TRI].mean(1)
+    uc /= np.linalg.norm(uc, axis=1, keepdims=True)
+    return np.arccos(np.clip(uc @ a, -1, 1)) < np.radians(alpha)
+
+
+def test_choice_reads_the_decision_and_one_patch(tmp_path):
+    nF = len(TRI)
+    ch = np.zeros((4, nF, 4))
+    ch[0, :, :2] = 0.6                                              # row 0: every cell's D high, N high: nobody wins
+    ch[1, :, 1] = 1.0                                               # row 1: every cell D high, N low: overshoot, not a choice
+    ch[2, :, 0] = 1.0; ch[2, 0, :2] = [0.0, 1.0]                    # row 2: one winner
+    ch[3, :, 0] = 1.0; ch[3, :2, :2] = [0.0, 1.0]                   # row 3: two winners, and a Wnt cap
+    ch[3, cap_cells([0, 0, 1], 30), 3] = 1.0
+    p = str(tmp_path / "c")
+    write_run(p, [U * R] * 4)
+    r = exp_measures.run_measure("exp10.choice", with_chem(p, ch), frames_per_row=3)
+    assert r["decided"] == 1.0 and r["decision_row"] == 2 and r["frame_at_decision"] == 6.0
+    assert r["cells_at_decision"] == nF and r["winners_at_decision"] == 1 and r["winners_last"] == 2
+    assert r["patch_parts_last"] == 1
+    assert abs(r["patch_frac_last"] - cap_cells([0, 0, 1], 30).mean()) < 1e-9
+
+
+def test_choice_lost_winner_is_no_decision_and_two_caps_are_two_parts(tmp_path):
+    nF = len(TRI)
+    ch = np.zeros((3, nF, 4))
+    ch[:, :, 0] = 1.0
+    ch[1, 0, :2] = [0.0, 1.0]                                       # a winner at row 1, gone at row 2
+    ch[2, cap_cells([0, 0, 1], 25) | cap_cells([0, 0, -1], 25), 3] = 1.0
+    p = str(tmp_path / "l")
+    write_run(p, [U * R] * 3)
+    r = exp_measures.run_measure("exp10.choice", with_chem(p, ch))
+    assert r["decided"] == 0.0 and r["cells_at_decision"] is None
+    assert r["patch_parts_last"] == 2
+
+
+def test_budded_and_one_crypt_if_budded(tmp_path):
+    r0 = crypt(write_run(str(tmp_path / "s"), [U * R]))
+    assert r0["budded"] == 0.0 and r0["one_crypt_if_budded"] is None
+    r1 = crypt(write_run(str(tmp_path / "b"), [dome(U, [0, 0, 1], 0.8 * R)], fate_axis=[0, 0, 1]))
+    assert r1["budded"] == 1.0 and r1["one_crypt_if_budded"] == 1.0
+    x = dome(U, [0, 0, 1], 0.8 * R)
+    x2 = dome(U, [0, 0, -1], 0.8 * R)
+    two = np.where(U[:, 2:] < 0, x2, x)
+    r2 = crypt(write_run(str(tmp_path / "t"), [two]))
+    assert r2["budded"] == 1.0 and r2["one_crypt_if_budded"] == 0.0
+
+
+def test_solid_moments_of_a_ball_and_a_spheroid():
+    from exp_measures.exp10 import solid_moments
+    es = TRI.reshape(-1); et = TRI[:, [1, 2, 0]].reshape(-1); ef = np.repeat(np.arange(len(TRI)), 3)
+    faces = np.arange(len(TRI))
+    V, mu, C = solid_moments(U * R, es, et, ef, faces)
+    assert abs(V / (4 / 3 * np.pi * R ** 3) - 1) < 0.01 and np.abs(mu).max() < 0.02
+    assert np.allclose(np.diag(C), R ** 2 / 5, rtol=0.02)           # a ball: <x^2> = R^2 / 5
+    V2, _, C2 = solid_moments(U * R * [1, 1, 1.5], es, et, ef, faces)
+    w = np.linalg.eigvalsh(C2)
+    assert abs(np.sqrt(w[0] / w[2]) - 1 / 1.5) < 0.01 and abs(V2 / V - 1.5) < 1e-6
+
+
+def test_precrypt_on_a_planted_shell(tmp_path):
+    T = write_run(str(tmp_path / "p"), [U * R])
+    n = len(TRI)
+    r = exp_measures.run_measure("exp10.precrypt", T, n_lo=n, n_hi=n)
+    fr = ((R - 0.2) / (R + 0.2)) ** 3
+    assert r["n_rows"] == 1 and abs(r["axis_ratio"] - 1) < 0.01
+    assert abs(r["lumen_frac"] / fr - 1) < 0.01
+    assert abs(r["thick_over_R"] - 0.4 / (R + 0.2)) < 0.005
+    r0 = exp_measures.run_measure("exp10.precrypt", T, n_lo=1, n_hi=10)
+    assert r0["n_rows"] == 0 and r0["axis_ratio"] is None
+
+
+def test_lstree_reader_on_a_planted_organoid(tmp_path):
+    import json
+    import tifffile
+    from exp_measures.exp10 import lstree_precrypt
+    root = tmp_path / "org"
+    (root / "features").mkdir(parents=True); (root / "lumen_segmentation").mkdir()
+    sp = [1.0, 0.5, 0.5]
+    json.dump({"spacing": sp}, open(root / "experiment.json", "w"))
+    z, y, x = np.mgrid[0:60, 0:120, 0:120].astype(float)
+    Z, Y, X = (z - 29.5) * sp[0], (y - 59.5) * sp[1], (x - 59.5) * sp[2]
+    for T, sx in (("T0001", 1.0), ("T0002", 1.5)):
+        rr = np.sqrt(Z ** 2 + Y ** 2 + (X / sx) ** 2)               # T0002: stretched 1.5x along x
+        L = np.zeros(Z.shape, np.uint8)
+        L[rr < 20] = 2
+        L[rr < 10] = 1
+        tifffile.imwrite(str(root / "lumen_segmentation" / f"org-{T}.tif"), L)
+        with open(root / "features" / f"{T}.csv", "w") as fh:
+            fh.write("channel,region,object_id,feature_name,feature_value\n")
+            fh.write('na,cell,1,neighbors,"[2, 3]"\nna,cell,2,neighbors,"[1]"\nna,cell,3,neighbors,"[1]"\n')
+            for i in (1, 2, 3):
+                fh.write(f"na,cell,{i},volume,1.0\n")
+    r = lstree_precrypt(str(root))
+    a, b = r["per_timepoint"]["T0001"], r["per_timepoint"]["T0002"]
+    assert a["n_cells"] == 3 and abs(a["neighbours"] - 4 / 3) < 1e-9
+    assert abs(a["lumen_frac"] - 0.125) < 0.01 and abs(a["thick_over_R"] - 0.5) < 0.01
+    assert abs(a["axis_ratio"] - 1) < 0.01 and abs(b["axis_ratio"] - 1 / 1.5) < 0.01
+    assert abs(b["lumen_frac"] - 0.125) < 0.01

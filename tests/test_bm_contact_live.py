@@ -396,3 +396,42 @@ def test_shape_contact_ledger_and_push(tmp_path):
         return float((P - c).norm(dim=1).median()), float(sheet)
     (rt, rs), (rt0, rs0) = radii(H), radii(Hk)
     assert rt < rt0 - 0.01 and rs > rs0 + 0.01
+
+
+# ------------------------------------------------------------------------------ the inner cell mass
+def _core_volume_series(tmp_path, name, k_core, core_rate, n_frames=12):
+    s = _spec(tmp_path, name, n_frames=n_frames, hole=False, k=0.0, sense=False, gated=False)
+    cm = [o for o in s["operators"] if o["op"] == "cell_mechanics"][0]
+    cm.update(k_core=k_core, core_rate=core_rate)
+    from plexus.operators.vertex_ops import enclosed_ring_volume
+    rec = []
+
+    def on_frame(H, t, rec=rec):
+        m = H.level("vertex")._mesh
+        nv = int(m["Nv"])
+        x = H.level("vertex").get("pos")[:nv]
+        sp = H.level("vertex").get("sep")[:nv]
+        es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
+        eo = torch.ones(es.shape[0])
+        o = x.mean(0)
+        rec.append(min(float(enclosed_ring_volume(x + sp, es, et, ef, int(m["nF"]), eo, o)),
+                       float(enclosed_ring_volume(x - sp, es, et, ef, int(m["nF"]), eo, o))))
+    MO.CONTACT_TRACE.clear()
+    engine.run(s, device="cpu", on_frame=on_frame)
+    return np.asarray(rec)
+
+
+def test_inner_mass_off_is_the_variant_unchanged(tmp_path):
+    """k_core 0 (with a core_rate set): the relaxation is the variant's own, bit for bit."""
+    a = _core_volume_series(tmp_path, "core_off", 0.0, 0.0, n_frames=6)
+    b = _core_volume_series(tmp_path, "core_off_rate", 0.0, 0.05, n_frames=6)
+    assert np.array_equal(a, b)
+
+
+def test_inner_mass_grows_the_lumen(tmp_path):
+    """A growing inner-mass target (5 % of the first lumen volume per frame) swells the lumen past the
+    uncoupled tissue's -- the surface layer is pushed out by the interior it wraps."""
+    free = _core_volume_series(tmp_path, "core_free", 0.0, 0.0)
+    grow = _core_volume_series(tmp_path, "core_grow", 0.3, 0.05)
+    assert grow[-1] > free[-1] * 1.05
+    assert grow[-1] > grow[1]

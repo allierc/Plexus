@@ -5,6 +5,12 @@
                        arrival spread across the field; whether the sheet stayed intact
     exp06.cell_trace   every cell's recorded (u, v) against an independent numpy integration of the
                        declared kinetics from the same row-0 state: the identity control
+    exp06.real         Phase 2, the REAL Utrecht sheet: the wave's arrival map over the cells of the
+                       segmentation -- spread in ms over the fit's interior cells, and the model's own
+                       delay map through `tools/cardio_delay_wave.py` (plane wave, point source,
+                       neighbour coherence), the same check the recordings' fitted delays went through
+    exp06.apd          APD90 of every activation of every cell: the free pulse's against the vortex's
+                       (Aliev & Panfilov Fig 5: the vortex's falls to 0.53 of the free pulse's)
 
 A FIRING IS AN UPWARD CROSSING OF `thr` BY THE EXCITATION VARIABLE, WITH HYSTERESIS. A cell fires at the
 first row where u >= thr while it is armed; it re-arms only once u has fallen below `rearm` (default
@@ -254,6 +260,115 @@ register_run("exp06.wave", wave, None, "excitation front: reach, speed, constanc
 register_run("exp06.cell_trace", cell_trace, None, "identity: recorded kinetics vs independent integration")
 
 
+# ============================================================================ Phase 2: the real sheet
+def _on_set(T, set_name):
+    """The run read through the named set. A particle-layout run with several positional sets is
+    opened on its BIGGEST one by default -- on the real sheet that is the seed's material points, not
+    the cells -- so the set is chosen by name, never by size."""
+    from plexus.measures import ParticleTraj
+    if set_name is None or getattr(T, "s", set_name) == set_name or not isinstance(T, ParticleTraj):
+        return T
+    U = ParticleTraj(T.path, set_name=set_name)
+    U.dir, U.spec = getattr(T, "dir", None), getattr(T, "spec", {})
+    return U
+
+
+def real(T, set="cell", fit=None, chan=0, thr=0.5, rearm=None, dt=None, frame_ms=1000.0 / 24.0,
+         cut=None, cut_margin=1.0, **_):
+    """The wave on the measured sheet, cell by cell.
+
+    arrival_spread_ms        last minus first arrival over the fit's INTERIOR cells (the cells the
+                             cardio fit scores and delay_wave.json reports), ms
+    arrival_spread_ms_all    the same over every cell
+    frac_reached             fraction of cells that fired
+    plane_wave_r2 ...        `tools/cardio_delay_wave.check` on the model's own arrival map, in
+                             frames of 1/24 s -- the numbers `data/delay_wave.json` holds for the fits
+    frac_before_cut / frac_beyond_cut   with `cut:`, as exp06.wave reports them
+    """
+    import os
+    import tempfile
+    import sys
+    from .common import ROOT
+    U = _on_set(T, set)
+    w = wave(U, chan=chan, thr=thr, rearm=rearm, dt=dt, cut=cut, cut_margin=cut_margin)
+    rearm = thr / 2.0 if rearm is None else rearm
+    tt = _row_times(U, dt)
+    X, c0, _ = _series(U, chan)
+    fir = _firings(np.nan_to_num(X, nan=-np.inf), thr, rearm)
+    first = np.array([tt[f[0]] if f else np.nan for f in fir])
+    L_um, T_s = _units(U)
+    ms = 1e3 * float(T_s) if T_s else None
+    out = {"n_cells": len(first), "frac_reached": w.get("frac_reached"), "intact": w.get("intact")}
+    for k in ("frac_before_cut", "frac_beyond_cut", "n_beyond_cut"):
+        if k in w:
+            out[k] = w[k]
+    if ms is None:
+        out["why"] = "the spec declares no units.time_s: no milliseconds"
+        return out
+    interior = np.ones(len(first), bool)
+    if fit:
+        z = np.load(fit if os.path.isabs(fit) else os.path.join(ROOT, fit))
+        m = np.asarray(z["interior"], bool)
+        if len(m) == len(first):
+            interior = m
+    fired = np.isfinite(first)
+    a = first * ms
+    if (fired & interior).sum() >= 2:
+        out["arrival_spread_ms"] = finite(np.nanmax(a[interior]) - np.nanmin(a[interior]))
+    if fired.sum() >= 2:
+        out["arrival_spread_ms_all"] = finite(np.nanmax(a) - np.nanmin(a))
+    if (fired & interior).sum() >= 10:
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import cardio_delay_wave as CDW
+        with tempfile.TemporaryDirectory() as td:
+            p = os.path.join(td, "model_delay.npz")
+            np.savez(p, delay=np.nan_to_num(a / frame_ms, nan=0.0), interior=interior & fired)
+            x = os.path.join(td, "centroids.npy")
+            np.save(x, np.asarray(c0.x, float))
+            r = CDW.check(p, x)
+        for k, v in r.items():
+            if isinstance(v, (int, float)):
+                out[f"map_{k}"] = finite(v)
+    return out
+
+
+def apd(T, set=None, chan=0, thr=0.5, end=0.1, rearm=None, late=4, dt=None, **_):
+    """APD90 of every activation: from the upstroke through `thr` to the fall below `end` (u is 0 at
+    rest and ~1 at the plateau, so `end` = 0.1 is 90 % repolarised).
+
+    apd_first    median APD of each cell's FIRST activation -- the free pulse, APD0
+    apd_late     median APD of activations number `late` and later -- the vortex after rotations
+    apd_ratio    apd_late / apd_first      (Aliev & Panfilov Fig 5: 0.53 for their model)
+    n_fire_max, n_fire_median   activations per cell over the run
+    """
+    U = _on_set(T, set)
+    rearm = thr / 2.0 if rearm is None else rearm
+    tt = _row_times(U, dt)
+    X, c0, _ = _series(U, chan)
+    rows, n = X.shape
+    armed = np.ones(n, bool); inap = np.zeros(n, bool); t_up = np.full(n, np.nan); k = np.zeros(n, int)
+    recs = []
+    for t in range(rows):
+        u = np.nan_to_num(X[t], nan=-np.inf)
+        fire = armed & (u >= thr)
+        k[fire] += 1; t_up[fire] = tt[t]; inap |= fire; armed &= ~fire
+        down = inap & (u < end)
+        for i in np.flatnonzero(down):
+            recs.append((k[i], tt[t] - t_up[i]))
+        inap &= ~down
+        armed |= u < rearm
+    R = np.asarray(recs, float).reshape(-1, 2)
+    out = {"n_fire_max": int(k.max()) if n else 0, "n_fire_median": finite(np.median(k)) if n else None,
+           "n_apd": int(len(R))}
+    if len(R) and (R[:, 0] == 1).any():
+        out["apd_first"] = finite(np.median(R[R[:, 0] == 1, 1]))
+    if len(R) and (R[:, 0] >= late).any():
+        out["apd_late"] = finite(np.median(R[R[:, 0] >= late, 1]))
+        if out.get("apd_first"):
+            out["apd_ratio"] = finite(out["apd_late"] / out["apd_first"])
+    return out
+
+
 # ============================================================================ the results table's source
 def write_results(root=None):
     """`experiments/specs/exp06/wave.jsonl`: one line per run, the `exp06.wave` numbers the md's derived
@@ -277,3 +392,6 @@ def write_results(root=None):
             fh.write(json.dumps({"spec": run, **v}) + "\n")
     return len(last)
 
+
+register_run("exp06.real", real, None, "the wave on the real Utrecht sheet: arrival spread, delay-map check, cut")
+register_run("exp06.apd", apd, None, "APD90 per activation: free pulse vs vortex")

@@ -9,15 +9,10 @@ numbers already exist in `experiments/specs/exp07/measures.jsonl`, written by `t
 this only renames the keys the md's `results.columns` show, one line per run, the LAST measurement of
 each (run, measure) winning:
 
-    lambda_um         exp07.gradient.lambda_um_last        decay length, micrometres
-    lambda_over_pred  exp07.gradient.lambda_over_pred      over sqrt(D_eff / k)
-    r2                exp07.gradient.r2_last               exponential fit, log space
-    b_p3              exp07.domains.b_nkx22_olig2_h38      p3/pMN boundary at 38 hph, fraction of the length
-    b_p3_60           exp07.domains.b_nkx22_olig2_h60      the same at 60 hph (the mutant's stage)
-    b_pmn             exp07.domains.b_olig2_pax6_h50       pMN/p2 boundary at 50 hph
-    b_p3_last, b_pmn_last                                  both at the last row (90 hph)
-    scaling           exp07.domains.scaling_index_nkx22_olig2
-    induced           exp07.domains.induced_frac_last
+    lambda_um, lambda_over_pred   exp07.gradient: decay length (um), over sqrt(D_eff / k)
+    b_p3, b_pmn, b_p3_60          exp07.domains at the gradient's clock: p3/pMN at 38 hph, pMN/p2 at 50, p3/pMN at 60
+    b_p3_last, scaling            p3/pMN at the last row; the scaling index
+    n18, movie, induced           Nkx2.2 fraction at 18 h (frame 129); the still's smallest band share; induced fraction
 """
 from __future__ import annotations
 
@@ -33,13 +28,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = os.path.join(ROOT, "experiments", "specs", "exp07")
 KEYS = {"lambda_um": ("exp07.gradient", "lambda_um_last"),
         "lambda_over_pred": ("exp07.gradient", "lambda_over_pred"),
-        "r2": ("exp07.gradient", "r2_last"),
-        "b_p3": ("exp07.domains", "b_nkx22_olig2_h38"),
-        "b_p3_60": ("exp07.domains", "b_nkx22_olig2_h60"),
-        "b_pmn": ("exp07.domains", "b_olig2_pax6_h50"),
+        "b_p3": ("exp07.domains", "b_nkx22_olig2_c38"),
+        "b_pmn": ("exp07.domains", "b_olig2_pax6_c50"),
+        "b_p3_60": ("exp07.domains", "b_nkx22_olig2_c60"),
         "b_p3_last": ("exp07.domains", "b_nkx22_olig2_last"),
-        "b_pmn_last": ("exp07.domains", "b_olig2_pax6_last"),
         "scaling": ("exp07.domains", "scaling_index_nkx22_olig2"),
+        "n18": ("exp07.domains", "frac_nkx22_d18"),
+        "movie": ("exp07.movie_bands", "min_band"),
         "induced": ("exp07.domains", "induced_frac_last")}
 
 

@@ -2,6 +2,7 @@
 
     exp09.sorting   the demixing index over the run, its half-time, the inside index, the aggregate's integrity
     exp09.layers    the radial order of the types' median radii at one row (Toda 2018's programmed layers)
+    exp09.architecture  Cerchiari 2015's architecture class I-V of the last row (a seed mean is the paper's frequency)
 
 THE DEMIXING INDEX. Over the touching pairs of live cells (shared edges on a mesh,
 `common.neighbour_pairs`; Delaunay edges no longer than one fixed length on a point set, below), f_same is the fraction of pairs whose two cells have the
@@ -39,6 +40,16 @@ rise, from frame `fit_from` to the first row at 95 % of the plateau; log_slope i
 decade of frames -- a number independent of the time unit, so it compares with the paper's without a
 calibration (log_decades says how many decades the fit spans). Rows are read every `every` frames
 AND at `n_log` log-spaced frames, so the early decades are sampled.
+
+THE SURFACE FRACTION (Phase 2, the talk's number). surface_frac_A = the fraction of the aggregate's
+surface cells that are A -- absolute, not relative to A's share: 0 when A is fully inside, 1 when A
+covers the whole rim. With `surface_series: true` it is read at every row, and t90 is the first row
+at which it has made 90 % of its first-to-last change (t90_hours through the spec's declared
+`general.units.time_s` and `dt`).
+
+VALIDITY ON A MESH. inverted_max = the largest fraction of live cells, over the rows read, whose
+signed area is <= 0 (turned inside out). exp 3's growth auditor is not used for it: it scores a
+tissue that does not grow at 2 ("smooth but no growth"), and these aggregates are not meant to grow.
 
 THE HALF-TIME. t_half is the first recorded frame at which demix reaches demix_first + 0.5 x
 (demix_plateau - demix_first), demix_plateau being the mean over the last 10 % of the rows read; None
@@ -82,9 +93,19 @@ def _rows(T, every, n_log=0):
 def _types(T, t, c, type_block="node_type"):
     """Integer type label of each live cell of `c` (aligned with c.x)."""
     if isinstance(T, CoreTraj):
+        # A MESH RUN RECORDS ITS CELL TYPES AS THE CELL SET'S `node_type` (per row as `node_type_t` when
+        # they change) -- the same two columns a point run records -- read directly, because the static
+        # column is [N], not [T, N], and the block reader indexes it by row. A face block named
+        # `type_block` is the fallback for a run that stores types as state.
+        if type_block == "node_type":
+            for k in (f"{T.c}__node_type_t", f"{T.c}__node_type"):
+                if T.c and k in T.z.files:
+                    a = np.asarray(T.z[k])
+                    a = a[t] if a.ndim == 2 else a
+                    return np.asarray(a, np.int64)[c.slot]
         a = c.block(type_block)
         if a is None:
-            raise KeyError(f"mesh run records no face block {type_block!r}")
+            raise KeyError(f"mesh run records neither {T.c}__node_type nor a face block {type_block!r}")
         return np.rint(a[:, 0]).astype(np.int64)
     k = f"{T.s}__node_type_t" if f"{T.s}__node_type_t" in T.z.files else f"{T.s}__node_type"
     if k not in T.z.files:
@@ -206,6 +227,21 @@ def log_fit(ts, dm, fit_from=1):
     return (1.0 - np.sum(res ** 2) / ss if ss > 0 else None), float(p[0]), float(X.max() - X.min())
 
 
+def inverted_fraction(T, t):
+    """Mesh runs: the fraction of live cells whose signed area (shoelace over its half-edges, in the
+    sheet's xy plane, CCW seen from +z positive) is <= 0 -- a cell turned inside out. None off a mesh."""
+    if not isinstance(T, CoreTraj):
+        return None
+    es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+    P = T.pos(t)
+    nF = T.nF(t)
+    a = np.zeros(nF)
+    np.add.at(a, ef, 0.5 * (P[es, 0] * P[et, 1] - P[et, 0] * P[es, 1]))
+    occ = T.occ(T.c, t) if T.c else None
+    live = np.ones(nF, bool) if occ is None else np.asarray(occ[:nF], bool)
+    return float(np.mean(a[live] <= 0)) if live.any() else None
+
+
 def perfect_gap(phi, D):
     """mean rho_B - mean rho_A for a perfect core of A (fraction phi) in a shell of B, in a uniform D-ball of radius 1."""
     if not 0.0 < phi < 1.0:
@@ -233,7 +269,7 @@ def inside_index(x, typ, A=0, B=1):
 
 
 def sorting(T, every=10, types=(0, 1), cut=2.0, contact=None, sets=None, type_block="node_type",
-            n_log=16, fit_from=1, **_):
+            n_log=16, fit_from=1, surface_series=False, **_):
     """Demixing index, inside index, surface shares, largest-cluster share and compression at every
     `every`-th row, `n_log` log-spaced rows and the last. Touching is one fixed length L (module
     docstring): `contact` (world units) if given, else `cut` x the median Delaunay edge of row 0."""
@@ -246,7 +282,7 @@ def sorting(T, every=10, types=(0, 1), cut=2.0, contact=None, sets=None, type_bl
         L = None
     else:
         L = cut * float(np.median(_delaunay_edges(x0)[1]))
-    dm, ins, big, med = [], [], [], []
+    dm, ins, big, med, sfa, inv = [], [], [], [], [], []
     for t in ts:
         x, typ, c = _frame(T, t, sets, type_block)
         p = touching(T, t, x, c, L)
@@ -255,6 +291,10 @@ def sorting(T, every=10, types=(0, 1), cut=2.0, contact=None, sets=None, type_bl
         big.append(len(k) / max(len(x), 1))
         ins.append(inside_index(x[k], typ[k], A, B))
         med.append(float(np.median(np.linalg.norm(x[p[:, 0]] - x[p[:, 1]], axis=1))) if len(p) else float("nan"))
+        inv.append(inverted_fraction(T, t))
+        if surface_series:
+            _sf = surface_cells(T, t, x[k], c=_Sub(c, k) if c is not None else None, L=L, cut=cut)
+            sfa.append(float(np.mean(typ[k][_sf] == A)) if _sf.any() else float("nan"))
     surf = surface_cells(T, ts[-1], x[k], c=_Sub(c, k) if c is not None else None, L=L, cut=cut)
     sA, sB = surface_share(surf, typ[k], A), surface_share(surf, typ[k], B)
     r2, slope, dec = log_fit(ts, dm, fit_from)
@@ -266,8 +306,19 @@ def sorting(T, every=10, types=(0, 1), cut=2.0, contact=None, sets=None, type_bl
     if np.isfinite(plateau) and np.isfinite(first) and plateau > first:
         hit = np.flatnonzero(dm >= first + 0.5 * (plateau - first))
         t_half = int(ts[hit[0]]) if len(hit) else None
-    nf = ((T.spec or {}).get("general") or {}).get("n_frames") if hasattr(T, "spec") else None
+    gen = ((T.spec or {}).get("general") or {}) if hasattr(T, "spec") else {}
+    nf = gen.get("n_frames")
     fpr = float(nf) / max(T.n_rows() - 1, 1) if nf else None
+    # HOURS FROM THE SPEC'S OWN DECLARED UNITS (`general.units.time_s` per unit of sim time, `dt` per
+    # frame), never assumed; None when the spec declares no time unit.
+    hpf = (float(gen.get("dt", 1.0)) * float((gen.get("units") or {}).get("time_s")) / 3600.0
+           if (gen.get("units") or {}).get("time_s") else None)
+    sf_last = float(np.mean(typ[k][surf] == A)) if surf.any() else None
+    t90 = None
+    if surface_series and len(sfa) > 1 and np.isfinite(sfa[0]) and np.isfinite(sfa[-1]) and abs(sfa[-1] - sfa[0]) > 1e-9:
+        prog = (np.asarray(sfa) - sfa[0]) / (sfa[-1] - sfa[0])
+        hit = np.flatnonzero(prog >= 0.9)
+        t90 = int(ts[hit[0]]) if len(hit) else None
     last_in = finite(ins[-1])
     return {"demix_first": finite(first), "demix_last": finite(dm[-1]), "demix_plateau": finite(plateau),
             "demix_rise": finite(plateau - first), "t_half": t_half,
@@ -276,6 +327,12 @@ def sorting(T, every=10, types=(0, 1), cut=2.0, contact=None, sets=None, type_bl
             "inside_first": finite(ins[0]), "inside_last": last_in,
             "inside": None if last_in is None else ("A" if last_in > 0 else "B"),
             "surface_A_last": finite(sA), "surface_B_last": finite(sB),
+            "surface_frac_A_last": finite(sf_last),
+            "surface_frac_A_series": [finite(v) for v in sfa] if surface_series else None,
+            "t90_row": t90,
+            "t90_hours": None if (t90 is None or fpr is None or hpf is None) else finite(t90 * fpr * hpf),
+            "share_A": finite(np.mean(typ[k] == A)),
+            "inverted_max": finite(max(v for v in inv if v is not None)) if any(v is not None for v in inv) else None,
             "log_r2": finite(r2), "log_slope": finite(slope), "log_decades": finite(dec),
             "largest_cluster_last": finite(big[-1]), "largest_cluster_min": finite(min(big)),
             "contact_length": finite(L) if L is not None else None,
@@ -335,5 +392,49 @@ def layers(T, t=-1, target=None, min_share=0.02, sep_min=0.8, cut=2.0, contact=N
     return out
 
 
+def architecture(T, types=(0, 1), cut=2.0, contact=None, sets=None, type_block="node_type",
+                 mixed_below=0.3, ring=0.75, core=0.25, **_):
+    """Cerchiari et al. 2015's five tissue architectures (Fig. 1D, 3F, 3I), read off the last row.
+
+    With A the tracked type (Cerchiari's MEP) and s its surface fraction (A's share of the aggregate's
+    surface cells, absolute):
+        V    mixed         demix < `mixed_below` (0.3)                  salt and pepper, no layers
+        I    A outside     s >= `ring` (0.75)                           "correct": A rings the other type
+        II   A mostly out  0.5 <= s < `ring`                            A-majority rim, not closed
+        III  A mostly in   `core` < s < 0.5                             the other type's rim, not closed
+        IV   A inside      s <= `core` (0.25)                           "inverted": the other type rings A
+    The thresholds are model choices; the paper classifies by eye from the images. `is_I` .. `is_V`
+    (1 or 0) are returned so that a seed mean IS the paper's frequency of that architecture."""
+    A = int(types[0])
+    t = T.n_rows() - 1
+    x, typ, c = _frame(T, t, sets, type_block)
+    if contact is not None:
+        L = float(contact)
+    elif isinstance(T, CoreTraj):
+        L = None
+    else:
+        L = cut * float(np.median(_delaunay_edges(_frame(T, 0, sets, type_block)[0])[1]))
+    p = touching(T, t, x, c, L)
+    k = largest_cluster(len(x), p)
+    d = demix_index(typ, p)
+    surf = surface_cells(T, t, x[k], c=_Sub(c, k) if c is not None else None, L=L, cut=cut)
+    s = float(np.mean(typ[k][surf] == A)) if surf.any() else float("nan")
+    if not np.isfinite(d) or d < mixed_below:
+        cls = "V"
+    elif s >= ring:
+        cls = "I"
+    elif s >= 0.5:
+        cls = "II"
+    elif s > core:
+        cls = "III"
+    else:
+        cls = "IV"
+    out = {"class": cls, "surface_frac_A": finite(s), "demix": finite(d)}
+    for k_ in ("I", "II", "III", "IV", "V"):
+        out[f"is_{k_}"] = 1.0 if cls == k_ else 0.0
+    return out
+
+
 register_run("exp09.sorting", sorting, None, "demixing index, half-time, inside index, aggregate integrity")
 register_run("exp09.layers", layers, None, "radial layer order of the aggregate, centre outwards")
+register_run("exp09.architecture", architecture, None, "Cerchiari 2015 architecture class I-V of the last row")

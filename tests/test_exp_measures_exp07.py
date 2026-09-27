@@ -369,3 +369,38 @@ def tmp_path_factory_dir(name):
     import tempfile
     from pathlib import Path
     return Path(tempfile.mkdtemp(prefix=f"exp07_{name}_"))
+
+
+def test_movie_bands_reads_the_three_colours(tmp_path):
+    from PIL import Image
+    d = tmp_path / "run"
+    d.mkdir()
+    img = np.zeros((100, 300, 3), np.uint8)
+    img[20:80, 0:100] = (0x30, 0xd0, 0x40)                          # green band
+    img[20:80, 100:200] = (0xff, 0x30, 0x30)                        # red band
+    img[20:80, 200:260] = (0x30, 0x50, 0xff)                        # blue, a smaller band
+    Image.fromarray(img).save(d / "3d.png")
+    np.savez(d / "trajectory.npz", cell__pos=np.zeros((1, 1, 3)), cell__occ=np.ones((1, 1), bool))
+    T = open_run(str(d))
+    r = exp_measures.run_measure("exp07.movie_bands", T)
+    assert abs(r["green"] - 100 / 260) < 0.01 and abs(r["blue"] - 60 / 260) < 0.01 and r["min_band"] == r["blue"]
+    img[20:80, 100:200] = (0x30, 0x50, 0xff)                        # the red band repainted blue: gone
+    Image.fromarray(img).save(d / "3d.png")
+    assert exp_measures.run_measure("exp07.movie_bands", T)["min_band"] == 0.0
+
+
+def test_at_frames_reports_fate_fractions(tmp_path):
+    x = hex_sheet()
+    s = (x[:, 0] - x[:, 0].min()) / np.ptp(x[:, 0])
+    T = write_run(tmp_path, [x], [three_genes(s, 0.2, 0.5)])
+    r = exp_measures.run_measure("exp07.domains", T, **dict(GENES, at_frames={"d18": 0}))
+    assert abs(r["frac_nkx22_d18"] - 0.2) < 0.03 and abs(r["frac_olig2_d18"] - 0.3) < 0.03
+
+
+def test_phase2_tube_pairs_differ_by_their_one_change():
+    if not os.path.exists(os.path.join(ROOT, "config", "tissue", "exp07_tube_cyc.yaml")):
+        pytest.skip("specs not written")
+    assert _spec_diff("exp07_tube_commit", "exp07_tube_commit_pax6ko") == {"operators.[4:cell_chem_react].alpha"}
+    assert _spec_diff("exp07_tube_commit", "exp07_tube_commit_nosource") == {"operators.[3:cell_chem_react].production"}
+    assert _spec_diff("exp07_tube_readout", "exp07_tube_cyc") == {"operators.[4:cell_chem_react].model",
+                                                                   "operators.[4:cell_chem_react].schedule"}

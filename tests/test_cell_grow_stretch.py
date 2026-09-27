@@ -177,3 +177,25 @@ def test_unknown_drive_and_ref_refused():
         Grow3DStretch(dict(BASE, drive="radial"))
     with pytest.raises(ValueError):
         Grow3DStretch(dict(BASE, stretch_ref="global"))
+
+
+def test_a0_readout_is_area_over_target():
+    """readout: a0 -- sigma from A / A0 (a flat sheet's stretch): identity when every cell sits at its
+    target, planted when one is squeezed to 0.8 of it."""
+    import plexus.operators.vertex_ops as VO
+    area = torch.tensor([1.0, 2.0, 0.8, 1.0], dtype=torch.float64)
+    A0 = torch.tensor([1.0, 2.0, 1.0, 1.0], dtype=torch.float64)
+    import pytest as _pt
+    mp = _pt.MonkeyPatch()
+    mp.setattr(VO, "cell_block_t", lambda H, cat, name, nF: area[:nF] if name == "area" else None)
+    try:
+        g = Grow3DStretch(dict(BASE, gain=2.0, readout="a0"))
+        g.cat, g._H, g._drive = "cell", object(), None
+        g._stretch_declared = lambda: False
+        g._v_now = torch.zeros(4, dtype=torch.float64)                 # a flat sheet: no volume
+        s = torch.ones(4, dtype=torch.float64)
+        r = g._rate(s, torch.zeros(4, dtype=torch.float64), {"A0": A0, "V0f": torch.zeros(4, dtype=torch.float64)}, 1.0)
+        d = Grow3D(dict(BASE))._rate(s, torch.zeros(4, dtype=torch.float64), {}, 1.0)
+        assert torch.allclose(r / d, torch.tensor([1.0, 1.0, 0.6, 1.0], dtype=torch.float64))
+    finally:
+        mp.undo()

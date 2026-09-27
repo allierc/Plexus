@@ -4,6 +4,10 @@
                    sits on the fate patch, how round the rest of the shell stays, and the lumen volume
     exp10.mesh_sanity  `tools/mesh_sanity.py` over the run (every cell still a cell of the surface),
                    plus the fractions of COLLAPSED and SLIVER cells, which its lines do not look for
+    exp10.choice   phase 2: whether Notch-Delta lateral inhibition chose, at what cell count, and the Wnt
+                   patch it drew (the population's decision; `crypt`'s `budded` is its outcome)
+    exp10.precrypt phase 2: the organoid inside LSTree's 19-24-cell window -- axis ratio, lumen fraction,
+                   wall thickness over radius; `lstree_precrypt(root)` reads the same off the real data
 
 THE REFERENCE SURFACE IS A SPHERE FITTED TO THE REST OF THE SHELL -- the cells off the declared patch
 when the fate block exists -- NOT THE MEDIAN RADIUS ABOUT THE CENTROID. A crypt of a tenth of the cells drags the plain centroid toward itself and inflates the
@@ -261,6 +265,11 @@ def crypt_row(T, t, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5, n
         g, pr = best
         row.update(pr)
         row["bud_cells"] = int(len(g))
+        if is_mesh and pr.get("neck") is not None:
+            Q = P[np.unique(es[np.isin(ef, c.slot)])]
+            Q = Q - Q.mean(0)
+            ax = np.linalg.eigh(np.cov(Q.T))[1][:, -1]
+            row["neck_over_major"] = float(pr["neck"] / max(np.ptp(Q @ ax), 1e-12))
         Vb = P[np.unique(es[np.isin(ef, c.slot[g])])] if is_mesh else x[g]
         row["Rc_over_Rv"] = lsq_sphere(Vb)[1] / R if len(Vb) >= 4 else None
         if is_mesh and cell_th is not None and rest.any():
@@ -286,7 +295,7 @@ def crypt(T, every=5, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5,
     for k in ("n_buds", "n_in", "depth_rel", "depth", "width", "neck", "depth_over_width",
               "depth_over_neck", "neck_ratio", "on_patch", "patch_in_bud", "rest_rms", "R",
               "bud_cells", "patch_cells", "lumen", "Rc_over_Rv", "hc_over_hv", "lumen_frac", "ecc",
-              "patch_R_over_Rv", "patch_h_mean", "patch_hc_over_hv"):
+              "patch_R_over_Rv", "patch_h_mean", "patch_hc_over_hv", "neck_over_major"):
         v = last.get(k)
         out[f"{k}_last"] = v if isinstance(v, int) or v is None else finite(v)
     out["n_buds_max"] = int(max(r["n_buds"] for r in rows))
@@ -294,6 +303,12 @@ def crypt(T, every=5, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5,
     rr = [r["rest_rms"] for r in rows if r.get("rest_rms") is not None]
     out["rest_rms_max"] = finite(max(rr)) if rr else None
     out["one_crypt_last"] = float(last["n_buds"] == 1)
+    # THE POPULATION READS THESE TWO, one run = one organoid: the seed mean of `budded` is the fraction
+    # of organoids that bud (Serra 2019 Fig. 1g's complement of the enterocysts), and `one_crypt_if_budded`
+    # is None on an organoid that did not bud, so its seed mean -- the scorer drops None -- is the
+    # fraction of BUDDING organoids that grew exactly one crypt.
+    out["budded"] = float(last["n_buds"] >= 1)
+    out["one_crypt_if_budded"] = float(last["n_buds"] == 1) if last["n_buds"] >= 1 else None
     op = last.get("on_patch")
     out["one_crypt_at_patch"] = float(last["n_buds"] == 1 and op is not None and op >= 0.5)
     lum = [r.get("lumen") for r in rows]
@@ -393,6 +408,167 @@ def mesh_sanity(T, every=5, collapse=0.1, sliver=4.0, **_):
             "series_sliver": [finite(v) for v in sl], "rows": ts}
 
 
+# ============================================================================ phase 2: the choice
+def choice(T, chem_block="chem", n_col=0, d_col=1, w_col=3, d_on=0.5, n_off=0.5, w_on=0.5, win_max=0.5,
+           frames_per_row=None, checkpoints=(8, 16, 32, 64), every=1, **_):
+    """Did lateral inhibition choose, when, at what size -- and what patch did its Wnt draw?
+
+    Reads the `cell_chem_react[notch_delta]` columns ([N, D, Y, W] from `n_col`; `d_col` and `w_col`
+    absolute) on every sampled row:
+        winners   cells with Delta above `d_on` AND Notch below `n_off` -- a lateral-inhibition winner
+                  sends Delta and receives none (Collier 1996); the DLL1+ cell of Serra 2019 Fig. 5e
+        patch     cells with Wnt above `w_on`: the region the mechanics reads as the crypt
+    THE DECISION is the first row from which EVERY later row has at least one winner and no more than
+    `win_max` of the cells winning -- a start where every cell's Delta overshoots before Notch catches up
+    is not a choice, and a winner that is later lost is not one either. `decided` is 1 with such a row,
+    else 0; `cells_at_decision` is the live cell count there (Serra Fig. 2f: the fates branch at the 16-32
+    cell stage), `frame_at_decision` the row times `frames_per_row` when given.
+    `winners_at_<k>`: winners on the first row with at least k cells (Serra Fig. 5e counts DLL1+ per
+    organoid at the 8, 16, 32, 64-cell stages). `patch_frac_last`: the patch's share of the cells at the
+    end (Yang 2021's crypt is about a fifth); `patch_parts_last`: its connected pieces (one crypt needs
+    one)."""
+    n = T.n_rows()
+    ts = sorted(set(list(range(0, n, max(1, int(every)))) + [n - 1]))
+    nc, nw, pf, pp = [], [], [], []
+    for t in ts:
+        c = cells(T, t)
+        ch = c.block(chem_block)
+        if ch is None or ch.shape[1] <= max(d_col, w_col, n_col):
+            raise ValueError(f"exp10.choice: needs cell block `{chem_block}` with columns {n_col}, {d_col}, {w_col}")
+        win = (ch[:, d_col] > d_on) & (ch[:, n_col] < n_off)
+        pat = ch[:, w_col] > w_on
+        nc.append(len(c.x)); nw.append(int(win.sum())); pf.append(float(pat.mean()) if len(c.x) else 0.0)
+        pp.append(len(components(len(c.x), neighbour_pairs(T, t, c), pat)) if pat.any() else 0)
+    ok = [1 <= w <= win_max * m for w, m in zip(nw, nc)]
+    i_dec = None
+    for i in range(len(ts) - 1, -1, -1):
+        if not ok[i]:
+            break
+        i_dec = i
+    out = {"rows": ts, "decided": float(i_dec is not None), "cells_first": nc[0], "cells_last": nc[-1],
+           "winners_last": nw[-1], "patch_frac_last": finite(pf[-1]), "patch_parts_last": pp[-1],
+           "series_cells": nc, "series_winners": nw, "series_patch_frac": [finite(v) for v in pf],
+           "series_patch_parts": pp}
+    out["decision_row"] = None if i_dec is None else int(ts[i_dec])
+    out["cells_at_decision"] = None if i_dec is None else int(nc[i_dec])
+    out["winners_at_decision"] = None if i_dec is None else int(nw[i_dec])
+    out["frame_at_decision"] = (None if i_dec is None or frames_per_row is None
+                                else float(ts[i_dec] * frames_per_row))
+    for k in checkpoints:
+        j = next((i for i, m in enumerate(nc) if m >= k), None)
+        out[f"winners_at_{k}"] = None if j is None else int(nw[j])
+    return out
+
+
+def solid_moments(P, es, et, ef, faces):
+    """Volume, centre and covariance of the SOLID a closed ring mesh encloses, exactly: every half-edge
+    fans a tetrahedron (o, c_f, p_s, p_t) as in `enclosed_volume`, and a tetrahedron (0, a, b, c) has
+    integral x x^T dV = V/20 (a a^T + b b^T + c c^T + s s^T), s = a + b + c, first moment V s / 4."""
+    live = np.isin(ef, faces)
+    es, et, ef = es[live], et[live], ef[live]
+    nF = int(ef.max()) + 1
+    cnt = np.bincount(ef, minlength=nF).astype(float)
+    cen = np.zeros((nF, 3))
+    np.add.at(cen, ef, P[es])
+    cen /= np.maximum(cnt, 1)[:, None]
+    o = P[np.unique(es)].mean(0)
+    a, b, cc = cen[ef] - o, P[es] - o, P[et] - o
+    V = np.einsum("ij,ij->i", a, np.cross(b, cc)) / 6.0
+    sgn = 1.0 if V.sum() >= 0 else -1.0
+    V = V * sgn
+    ssum = a + b + cc
+    M1 = (V[:, None] * ssum).sum(0) / 4.0
+    outer = lambda u: u[:, :, None] * u[:, None, :]
+    M2 = ((V / 20.0)[:, None, None] * (outer(a) + outer(b) + outer(cc) + outer(ssum))).sum(0)
+    Vt = V.sum()
+    mu = M1 / Vt
+    return float(Vt), mu + o, M2 / Vt - np.outer(mu, mu)
+
+
+def precrypt_row(T, t):
+    """The pre-crypt organoid's three LSTree numbers on one row: the solid's axis ratio sqrt(l_min / l_max)
+    of its covariance (1 a ball), the lumen's share of the organoid's volume, and the wall thickness over
+    the organoid's radius, 1 - r / R, r and R the radii of balls of the lumen's and the organoid's volume."""
+    c = cells(T, t)
+    es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+    P = T.pos(t)
+    S = T.vertex_block("sep", t)
+    if S is None or S.shape != P.shape:
+        return None
+    va = enclosed_volume(P + S, es, et, ef, c.slot)
+    vb = enclosed_volume(P - S, es, et, ef, c.slot)
+    Vt, _, C = solid_moments(P - S if va <= vb else P + S, es, et, ef, c.slot)
+    Vl = min(va, vb)
+    w = np.linalg.eigvalsh(C)
+    return dict(n_cells=len(c.x), axis_ratio=float(np.sqrt(max(w[0], 0) / w[2])), lumen_frac=float(Vl / Vt),
+                thick_over_R=float(1 - (Vl / Vt) ** (1 / 3)))
+
+
+def precrypt(T, n_lo=19, n_hi=24, **_):
+    """`precrypt_row` averaged over the rows whose live cell count is in [n_lo, n_hi] -- LSTree's
+    002-Budding window, 19-24 cells (`lstree_precrypt`). None when the run never passes through it."""
+    rows = []
+    for t in range(T.n_rows()):
+        m = len(cells(T, t).x)
+        if n_lo <= m <= n_hi:
+            r = precrypt_row(T, t)
+            if r is not None:
+                rows.append(r)
+        elif m > n_hi and rows:
+            break
+    out = {"n_rows": len(rows), "cells_first": len(cells(T, 0).x)}
+    for k in ("axis_ratio", "lumen_frac", "thick_over_R"):
+        out[k] = finite(np.mean([r[k] for r in rows])) if rows else None
+    return out
+
+
+def lstree_precrypt(root):
+    """THE REAL ORGANOID BEFORE ITS CRYPT: LSTree (de Medeiros et al. 2022) example 002-Budding, read from
+    its own files. Per timepoint T: cell count and mean neighbour count (features/T.csv, `cell` rows),
+    lumen and epithelium volumes, and from lumen_segmentation/*T.tif (1 lumen, 2 epithelium; voxel
+    spacing from experiment.json, z first) the organoid mask (label > 0) as a solid: its axis ratio
+    sqrt(l_min / l_max) of the voxel coordinates' covariance, the lumen's share of its volume, and the
+    wall thickness over radius 1 - (V_lumen / V_organoid)^(1/3) -- the quantities `precrypt` reads on a
+    run. The solid, not its boundary voxels: at 2 um z spacing against 0.26 um in-plane the boundary's
+    covariance is dominated by the flat top and bottom slices (0.70 on T0301 against the solid's 0.87)."""
+    import csv
+    import glob
+    import json
+    import os
+    import tifffile
+    sp = np.asarray(json.load(open(os.path.join(root, "experiment.json")))["spacing"], float)
+    per = {}
+    for f in sorted(glob.glob(os.path.join(root, "features", "*.csv"))):
+        T = os.path.basename(f)[:-4]
+        rows = list(csv.DictReader(open(f)))
+        nb = [len(json.loads(r["feature_value"])) for r in rows
+              if r["region"] == "cell" and r["feature_name"] == "neighbors"]
+        n_cells = sum(1 for r in rows if r["region"] == "cell" and r["feature_name"] == "volume")
+        tif = glob.glob(os.path.join(root, "lumen_segmentation", f"*{T}.tif"))
+        if not tif:
+            continue
+        L = tifffile.imread(tif[0])
+        X = np.argwhere(L > 0) * sp
+        w = np.linalg.eigvalsh(np.cov((X - X.mean(0)).T))
+        vox = float(np.prod(sp))
+        Vt, Vl = (L > 0).sum() * vox, (L == 1).sum() * vox
+        per[T] = dict(n_cells=n_cells, neighbours=float(np.mean(nb)) if nb else None, V_organoid=Vt, V_lumen=Vl,
+                      axis_ratio=float(np.sqrt(w[0] / w[2])), lumen_frac=Vl / Vt,
+                      thick_over_R=float(1 - (Vl / Vt) ** (1 / 3)))
+    vals = list(per.values())
+    out = {"per_timepoint": per, "n_timepoints": len(vals)}
+    for k in ("n_cells", "axis_ratio", "lumen_frac", "thick_over_R", "neighbours"):
+        v = [p[k] for p in vals if p[k] is not None]
+        out[f"{k}_mean"] = float(np.mean(v)) if v else None
+        out[f"{k}_min"] = float(np.min(v)) if v else None
+        out[f"{k}_max"] = float(np.max(v)) if v else None
+    return out
+
+
 register_run("exp10.mesh_sanity", mesh_sanity, None, "tools/mesh_sanity.py + the collapsed-cell fraction")
+register_run("exp10.choice", choice, None,
+             "Notch-Delta choice: decided, decision row / cell count, winners per size, the Wnt patch's share and pieces")
+register_run("exp10.precrypt", precrypt, None,
+             "the organoid over LSTree's 19-24-cell window: solid axis ratio, lumen fraction, wall thickness / radius")
 register_run("exp10.crypt", crypt, None,
              "outward buds on a closed shell: count, depth/neck/width, on the patch, rest roughness, lumen")

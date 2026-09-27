@@ -51,7 +51,6 @@ from . import motion_ops            # noqa: F401  drag, glide, velocity_cruise, 
 from . import field_ops             # noqa: F401  the grid field, deposit, diffuse, decay, sense,
 #                                                 chemotax, playback, pacemaker, activation_pulse, signal
 from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, seed_ecm,
-from . import mpm_implicit_viscosity  # noqa: F401  mpm_grid_viscosity -- implicit (unconditionally stable) grid viscosity
 #                                                 anchor, spin, apply_material_map, fenced oracle
 from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die,
 #                                                 edge_flip, topo_record
@@ -95,8 +94,6 @@ from . import rod_ops               # noqa: F401  a cilium as a DISCRETE ELASTIC
 #                                                 direction, and driven -- one moment, three laws).
 #                                                 a rod has no such floor, so this is how the model
 #                                                 gets a cilium that is 0.25 um thick.
-from . import flagellum_ops         # noqa: F401  stator_push -- stator units pushing a rotor's
-#                                                 material tangentially; the bacterial motor's drive
 from . import channel_ops           # noqa: F401  membrane pores and channels: elastic_network, pair_potential,
 #                                                 brownian, tether, radial_drive (the patch frame),
 #                                                 electrolyte_conduction (the current through the open lumen),
@@ -115,4 +112,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "rod_ops", "flagellum_ops", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "rod_ops", "continuous_engine"]

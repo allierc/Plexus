@@ -245,3 +245,16 @@ def test_closed_junctions_reads_pos():
     lvl = LvlPos(chem, pos, chain(n))
     cut = diffuse("closed_junctions", d=[1.0, 0.0], closed={"point": [0.0, 0, 0], "normal": [1.0, 0, 0]}).forward(H(lvl, 0.1))["cell"]
     assert cut[9, 0] == 0 and cut[10, 0] == 0 and cut[8, 0] == 0
+
+
+def test_two_stimulus_sites_each_with_its_own_time():
+    pos = torch.tensor([[float(i), 0.0, 0.0] for i in range(10)])
+    lvl = LvlPos(torch.zeros(10, 2), pos)
+    op = react(**PAPER, stim=[{"times": [0.0], "duration": 0.5, "amp": 5.0, "below": {"axis": 0, "value": 1.5}},
+                              {"times": [4.0], "duration": 0.5, "amp": 7.0, "box": [[6.5, -1.0], [8.5, 1.0]]}])
+    h = H(lvl, 0.1)
+    for frame, s1, s2 in ((2, True, False), (20, False, False), (42, False, True)):
+        h.frame_t.fill_(float(frame))
+        d = op.forward(h)["cell"][:, 0]
+        assert bool((d[:2] == 5.0).all()) is s1 and bool((d[7:9] == 7.0).all()) is s2
+        assert torch.all(d[2:7] == 0) and torch.all(d[9:] == 0)
