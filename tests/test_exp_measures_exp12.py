@@ -297,3 +297,14 @@ def test_cycling_needs_the_growth_gate_open(tmp_path):
     T.spec["operators"] = [{"op": "cell_grow", "a_sw": 0.5, "rho": 0.0}]
     o = exp_measures.run_measure("exp12.spheroid", T, c_starve=1e-3, cycling_age=36)
     assert abs((o["R_um"] - o["rim_um"]) / UM - 6.25) < o["d_um"] / UM
+
+
+def test_growth_kinetics_against_a_reference_by_day(tmp_path):
+    """Balls of radius 5, 6, 7, 8 units on days 0-3 (one row a day, 10 um a unit): R(day 1) ~ 60 um + a
+    half cell; against references 70 / 80 um the mean error is ~10 um minus that half cell."""
+    frames = [ball(R) for R in (5.0, 6.0, 7.0, 8.0)]
+    T = write_run(tmp_path, frames, time_s=86400.0)
+    o = exp_measures.run_measure("exp12.spheroid", T, every=1, R_ref_um={1: 70.0, 2: 80.0})
+    d = o["d_um"]
+    assert abs(o["R_day1_um"] - (60.0 + 0.5 * d)) < 0.6 * d and abs(o["R_day2_um"] - (70.0 + 0.5 * d)) < 0.6 * d
+    assert abs(o["growth_err_um"] - abs(10.0 - 0.5 * d)) < 0.6 * d

@@ -240,9 +240,22 @@ def _rows(T, every):
     return sorted(set(list(range(0, n, max(1, int(every)))) + [n - 1]))
 
 
+def _R_at_row(T, t, dim, plane_axis):
+    c = cells(T, t)
+    if len(c) < 8:
+        return None
+    r = _radii(c.x, dim, plane_axis)
+    return float(np.quantile(r, 0.98) + 0.5 * _diameter(T, t, c))
+
+
 def spheroid(T, dim=3, plane_axis=2, c_starve=None, c_cycle=None, cycling_age=None, block="chem", chan=None,
-             every=20, um_per_unit=None, r_l_ref_um=None, p_cycle_frac=0.1, **_):
-    """The layers at the last row (`<key>`), the radius series, and the growth rate over the run."""
+             every=20, um_per_unit=None, r_l_ref_um=None, p_cycle_frac=0.1, R_ref_um=None, **_):
+    """The layers at the last row (`<key>`), the radius series, and the growth rate over the run.
+
+    GROWTH KINETICS, `R_ref_um: {day: radius_um}`: the spheroid's radius at those days since the run's
+    first row (the row nearest each day, from the spec's `dt`, frames per row and `units.time_s`), as
+    `R_day<d>_um`, and `growth_err_um` = the mean |R(d) - reference(d)| -- Grimes et al. 2014's Fig 4 sizes
+    by day, read in gates.yaml."""
     s = _um(T, um_per_unit)
     ts = _rows(T, every)
     last = _layers(T, ts[-1], dim, plane_axis, c_starve, c_cycle, cycling_age, block, chan, s, r_l_ref_um,
@@ -259,6 +272,16 @@ def spheroid(T, dim=3, plane_axis=2, c_starve=None, c_cycle=None, cycling_age=No
         series.append(finite((np.quantile(r, 0.98) + 0.5 * _diameter(T, t, c)) * s))
     out = {"available": True, **last, "R_um_series": series, "rows": ts}
     days = _row_days(T)
+    if R_ref_um and days:
+        errs = []
+        for d_key, ref in dict(R_ref_um).items():
+            d = float(d_key)
+            row = int(np.clip(round(d / days), 0, T.n_rows() - 1))
+            Rd = _R_at_row(T, row, dim, plane_axis)
+            if Rd is not None:
+                out[f"R_day{d:g}_um"] = finite(Rd * s)
+                errs.append(abs(Rd * s - float(ref)))
+        out["growth_err_um"] = finite(np.mean(errs)) if errs else None
     ok = [(t, v) for t, v in zip(ts, series) if v is not None]
     if days and len(ok) >= 3:
         tt = np.array([t for t, _ in ok], float) * days
