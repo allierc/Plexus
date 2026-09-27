@@ -325,8 +325,11 @@ def celsr(T, a="fz", b="vang", deform_axis=(0, 1, 0), plane_axis=None, drop_boun
     CELSR1 SITS ON BOTH SIDES OF A PCP JUNCTION (it binds homophilically across it), so its intensity on
     cell i's side h is read as I_h = a_h + b_h, the total complex there. Aw quantified "nematic order of
     the integrated fluorescence intensity values of Celsr1 at cell borders" (Results; Aigouy 2010's Q):
-        q_i  = sum_h I_h l_h exp(2 i phi_h) / sum_h I_h l_h        phi_h = angle of side h's midpoint about
-                                                                   the cell's centroid
+        q_i  = sum_h I_h int_{phi_a}^{phi_b} exp(2 i phi) dphi / sum_h I_h (phi_b - phi_a)
+               phi_a, phi_b the angles of side h's two ends about the cell's centroid -- Aigouy's
+               Q = int I(phi) exp(2 i phi) dphi over the ANGLE round the cell, with I constant along
+               a border. A uniform intensity reads exactly 0 on any cell shape: MP is enrichment,
+               not shape (a length weighting would call an elongated, uniformly stained cell polar)
         MP   = | mean over cells of q_i |      "magnitude of average polarity" (Aw Fig. 1B), 0 random, 1 all
                                                cells' complex on one pair of opposite borders
         P_axis_deg = half the angle of mean q_i, the axis of the enriched borders' POSITIONS
@@ -351,13 +354,14 @@ def celsr(T, a="fz", b="vang", deform_axis=(0, 1, 0), plane_axis=None, drop_boun
         nF = T.nF(t)
         cnt = np.maximum(np.bincount(ef, minlength=nF), 1)
         cen = np.zeros((nF, 2)); np.add.at(cen, ef, P[es]); cen /= cnt[:, None]
-        L = np.linalg.norm(P[et] - P[es], axis=1)
-        mid = 0.5 * (P[es] + P[et]) - cen[ef]
-        phi = np.arctan2(mid[:, 1], mid[:, 0])
-        w = (A + B) * L
-        num = np.zeros(nF, complex); np.add.at(num, ef, w * np.exp(2j * phi))
-        den = np.bincount(ef, weights=w, minlength=nF)
-        q = num / np.maximum(den, 1e-30)
+        ra, rb = P[es] - cen[ef], P[et] - cen[ef]
+        pa, pb = np.arctan2(ra[:, 1], ra[:, 0]), np.arctan2(rb[:, 1], rb[:, 0])
+        dphi = (pb - pa + np.pi) % (2 * np.pi) - np.pi              # the signed angle side h subtends
+        pb = pa + dphi
+        I = A + B
+        num = np.zeros(nF, complex); np.add.at(num, ef, I * (np.exp(2j * pb) - np.exp(2j * pa)) / 2j)
+        den = np.bincount(ef, weights=I * dphi, minlength=nF)
+        q = num / np.where(np.abs(den) > 1e-30, den, 1e-30)
         rel = P[es] - cen[ef]
         Sxx = np.bincount(ef, weights=rel[:, 0] ** 2, minlength=nF)
         Syy = np.bincount(ef, weights=rel[:, 1] ** 2, minlength=nF)

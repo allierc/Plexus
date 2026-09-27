@@ -291,9 +291,13 @@ def spheroid(T, dim=3, plane_axis=2, c_starve=None, c_cycle=None, cycling_age=No
     return out
 
 
-def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=20, um_per_unit=None, **_):
+def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=20, um_per_unit=None, body="filled",
+            **_):
     """Clusters of cells more than `beyond_cd` cell diameters outside the body's radius, linked when
     closer than `link` diameters; clusters of at least `min_cells` count as strands.
+
+    A SHELL (`body: shell`) -- the apico-basal spheroid of Phase 2, one cell layer round a lumen -- has
+    every cell at one radius, so its body radius is the median cell radius itself.
 
     THE LINE IS THREE CELLS OUT, NOT ONE. A contained disc's own rim is bumpy: exp12's `v7_r4` has its
     outermost cells 1.4-1.5 cell diameters past the equal-area radius (14-15 um, cells compressed to
@@ -319,9 +323,12 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
             continue
         r = _radii(c.x, dim, plane_axis)
         d = _diameter(T, t, c)
-        area = c.block("area") if dim == 2 else None
-        Rb = (float(np.sqrt(np.nansum(area[:, 0]) / np.pi)) if area is not None
-              else float(np.median(r) / 0.5 ** (1.0 / dim)))
+        area = c.block("area") if (dim == 2 and body != "shell") else None
+        if body == "shell":
+            Rb = float(np.median(r))
+        else:
+            Rb = (float(np.sqrt(np.nansum(area[:, 0]) / np.pi)) if area is not None
+                  else float(np.median(r) / 0.5 ** (1.0 / dim)))
         out_i = np.flatnonzero(r > Rb + beyond_cd * d)
         n = 0
         if len(out_i) >= min_cells:

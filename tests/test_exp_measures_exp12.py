@@ -308,3 +308,15 @@ def test_growth_kinetics_against_a_reference_by_day(tmp_path):
     d = o["d_um"]
     assert abs(o["R_day1_um"] - (60.0 + 0.5 * d)) < 0.6 * d and abs(o["R_day2_um"] - (70.0 + 0.5 * d)) < 0.6 * d
     assert abs(o["growth_err_um"] - abs(10.0 - 0.5 * d)) < 0.6 * d
+
+
+def test_strands_on_a_shell(tmp_path):
+    """A spheroid SHELL of radius 10 (one cell layer) reads 0 strands; an 8-cell finger leaving it reads 1.
+    The filled-body rule would put the body at 10 / 0.79 = 12.6 and miss the finger's base."""
+    v = np.random.default_rng(5).normal(size=(1500, 3))
+    x = 10.0 * v / np.linalg.norm(v, axis=1, keepdims=True) + 20.0
+    T = write_run(tmp_path, [x])
+    assert exp_measures.run_measure("exp12.strands", T, body="shell")["strands_last"] == 0
+    finger = 20.0 + np.outer(np.arange(10.5, 18.5, 1.0), [0, 0, 1])
+    T2 = write_run(tmp_path, [np.concatenate([x, finger])])
+    assert exp_measures.run_measure("exp12.strands", T2, body="shell")["strands_last"] == 1

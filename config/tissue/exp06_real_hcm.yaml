@@ -49,7 +49,7 @@ sets:
 fields:
   cells:
     frame: label_image
-    source: /groups/saalfeld/home/allierc/Graph/Plexus/prototype/cardio_mpm/strain/data_hcm/cells_2560.tif
+    source: cardio/cells_2560_hcm.tif
 operators:
 - op: seed_from_segmentation
   at: mpm_particle
@@ -80,7 +80,7 @@ operators:
     times:
     - 0.0
     duration: 0.5
-    amp: 5.0
+    amp: 20.0
     below:
       axis: 0
       value: 0.215

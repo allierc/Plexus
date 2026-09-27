@@ -324,6 +324,8 @@ def domains(T, genes=None, cols=None, axis=0, side="low", threshold=0.5, nbins=2
         f = fates(_chem(c)[keep][:, cols], threshold)
         for i, n in enumerate(names):
             out[f"b_{n}_{label}"] = finite(boundary(s[keep], f, i))
+        for i, g in enumerate(genes):
+            out[f"frac_{g}_{label}"] = finite(float(np.mean(f == i))) if len(f) else None
         out[f"row_{label}"] = t
     for i, g in enumerate(genes):
         lo = 0.0 if i == 0 else out[f"b_{names[i - 1]}_last"]
@@ -360,5 +362,31 @@ def gradient_clock(T, targets, axis=0, side="low", chan=0, fit_from=0.1, r2_min=
     return out
 
 
+def movie_bands(T, still="3d.png", margin=40, min_value=40, **_):
+    """Is the picture readable? The share of the tissue's pixels in the run's last-frame still drawn in
+    each band's colour: green (Nkx2.2, `#30d040`), red (Olig2, `#ff3030`), blue (Pax6, `#3050ff`) --
+    the readout specs' `plotting.species`, subtractive on white. A pixel belongs to a colour when that
+    channel exceeds both others by `margin` (of 255); tissue pixels are those brighter than `min_value`
+    on the black background. `min_band` is the smallest of the three shares: 0 when a band is missing
+    from the picture (or drowned in another colour), however right the numbers are."""
+    import os
+    from PIL import Image
+    f = os.path.join(T.dir, still)
+    if not os.path.exists(f):
+        return {"available": False, "why": f"{still} missing"}
+    a = np.asarray(Image.open(f).convert("RGB"), float)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    tissue = a.max(axis=2) > min_value
+    n = max(int(tissue.sum()), 1)
+    green = tissue & (g > r + margin) & (g > b + margin)
+    red = tissue & (r > g + margin) & (r > b + margin)
+    blue = tissue & (b > r + margin) & (b > g + margin)
+    out = {"available": True, "tissue_px": int(tissue.sum()),
+           "green": finite(green.sum() / n), "red": finite(red.sum() / n), "blue": finite(blue.sum() / n)}
+    out["min_band"] = finite(min(out["green"], out["red"], out["blue"]))
+    return out
+
+
 register_run("exp07.gradient", gradient, "fraction", "morphogen exponential fit along the source axis")
 register_run("exp07.domains", domains, "fraction", "fate domains: order, boundaries, drift, induced fraction")
+register_run("exp07.movie_bands", movie_bands, "fraction", "share of the still's tissue pixels in each band colour")

@@ -80,7 +80,7 @@ operators:
     times:
     - 0.0
     duration: 0.5
-    amp: 5.0
+    amp: 20.0
     below:
       axis: 0
       value: 0.215

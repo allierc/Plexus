@@ -258,3 +258,102 @@ def test_layers_sees_a_one_cell_middle_ring(tmp_path):
     typ[o[40:62]] = 3                                         # ~22 cells: one ring around the core
     res = exp_measures.run_measure("exp09.layers", write_run(tmp_path, [x], typ), target=[2, 3, 0])
     assert res["order"] == "230" and res["match"] == 1.0
+
+
+# ------------------------------------------------------------------ Phase 2: the vertex aggregate
+def write_mesh_run(tmp_path, typ_rows, n=200, seed=0, name="mesh"):
+    """A planted MESH run: one flat Voronoi disc (plexus' own `build_disc_mesh`), fixed geometry, the
+    cell types per row given; laid out as the engine records a mesh (`vertex__mesh_*`, `cell__*`)."""
+    from plexus.operators.vertex_ops import build_disc_mesh
+    pos, es, et, ef, nF = build_disc_mesh(n, r=1.0, jitter=0.1, seed=seed)
+    T = len(typ_rows)
+    E = len(es)
+    d = tmp_path / name
+    d.mkdir()
+    cen = np.zeros((nF, 3))
+    np.add.at(cen, ef, pos[es])
+    cen /= np.bincount(ef, minlength=nF)[:, None]
+    np.savez(d / "trajectory.npz",
+             vertex__pos=np.repeat(pos[None].astype(np.float32), T, 0),
+             vertex__mesh_nF=np.full(T, nF), vertex__mesh_Nv=np.full(T, len(pos)),
+             vertex__mesh_offsets=np.arange(T + 1) * E, vertex__mesh_face_offsets=np.arange(T + 1) * nF,
+             vertex__mesh_E_srce=np.tile(es, T), vertex__mesh_E_trgt=np.tile(et, T), vertex__mesh_E_face=np.tile(ef, T),
+             cell__occ=np.ones((T, nF), bool), cell__centroid=np.repeat(cen[None].astype(np.float32), T, 0),
+             cell__node_type=np.asarray(typ_rows[-1], np.int64),
+             **({"cell__node_type_t": np.stack(typ_rows).astype(np.int16)} if T > 1 else {}))
+    return open_run(str(d)), cen
+
+
+def _rim_core(cen, core_type, frac=0.5):
+    r = np.linalg.norm(cen[:, :2] - cen[:, :2].mean(0), axis=1)
+    return np.where(r <= np.quantile(r, frac), core_type, 1 - core_type)
+
+
+def test_mesh_types_and_surface_fraction(tmp_path):
+    """On a mesh the rim cells are the faces with a free edge; type 1 (MEP) as the core reads a surface
+    fraction near 0 and architecture IV (inverted); as the rim, near 1 and architecture I (correct)."""
+    from plexus.operators.vertex_ops import build_disc_mesh
+    _, _, _, _, nF = build_disc_mesh(200, r=1.0, jitter=0.1, seed=0)
+    T, cen = write_mesh_run(tmp_path, [np.zeros(nF, int)], name="probe")
+    core = _rim_core(cen, 1)
+    T, _ = write_mesh_run(tmp_path, [core], name="inv")
+    r = exp_measures.run_measure("exp09.sorting", T, types=[1, 0], every=1)
+    assert r["surface_frac_A_last"] < 0.05 and r["demix_last"] > 0.6   # 173 cells: the core-rim interface is long, demix 0.72
+    a = exp_measures.run_measure("exp09.architecture", T, types=[1, 0])
+    assert a["class"] == "IV" and a["is_IV"] == 1.0
+    T, _ = write_mesh_run(tmp_path, [_rim_core(cen, 0)], name="cor")
+    a = exp_measures.run_measure("exp09.architecture", T, types=[1, 0])
+    assert a["class"] == "I" and a["surface_frac_A"] > 0.95
+
+
+def test_mesh_random_mixture_is_class_V(tmp_path):
+    from plexus.operators.vertex_ops import build_disc_mesh
+    _, _, _, _, nF = build_disc_mesh(200, r=1.0, jitter=0.1, seed=0)
+    typ = np.random.default_rng(14).integers(0, 2, nF)
+    T, _ = write_mesh_run(tmp_path, [typ], name="mix")
+    a = exp_measures.run_measure("exp09.architecture", T, types=[1, 0])
+    assert a["class"] == "V" and abs(a["demix"]) < 0.2 and 0.3 < a["surface_frac_A"] < 0.7
+
+
+def test_mesh_surface_series_and_t90_in_declared_hours(tmp_path):
+    """Types switch from random to MEP-core over 11 rows; t90 is read on the surface-fraction series and
+    turned into hours by the spec's own `general.units.time_s` and `dt` (here 600 s x 1 per frame)."""
+    from plexus.operators.vertex_ops import build_disc_mesh
+    _, _, _, _, nF = build_disc_mesh(200, r=1.0, jitter=0.1, seed=0)
+    T0, cen = write_mesh_run(tmp_path, [np.zeros(nF, int)], name="probe2")
+    rng = np.random.default_rng(15)
+    start = rng.integers(0, 2, nF)
+    end = _rim_core(cen, 1)
+    rows = [np.where(rng.random(nF) < k / 10, end, start) for k in range(11)]
+    rows[-1] = end
+    T, _ = write_mesh_run(tmp_path, rows, name="ser")
+    T.spec = {"general": {"n_frames": 100, "dt": 1.0, "units": {"time_s": 600.0}}}
+    r = exp_measures.run_measure("exp09.sorting", T, types=[1, 0], every=1, surface_series=True)
+    s = r["surface_frac_A_series"]
+    assert s[0] > 0.3 and s[-1] < 0.05
+    assert r["t90_row"] is not None and 5 <= r["t90_row"] <= 10
+    assert abs(r["t90_hours"] - r["t90_row"] * 10 * 600 / 3600) < 1e-9     # 10 frames a row, 600 s a frame
+
+
+def test_mesh_bilayer_order(tmp_path):
+    """The layer ruler on a mesh: MEP core inside LEP reads order '10' (type 1 at the centre)."""
+    from plexus.operators.vertex_ops import build_disc_mesh
+    _, _, _, _, nF = build_disc_mesh(200, r=1.0, jitter=0.1, seed=0)
+    _, cen = write_mesh_run(tmp_path, [np.zeros(nF, int)], name="probe3")
+    T, _ = write_mesh_run(tmp_path, [_rim_core(cen, 1)], name="bil")
+    r = exp_measures.run_measure("exp09.layers", T, target=[1, 0])
+    assert r["order"] == "10" and r["match"] == 1.0
+
+
+def test_mesh_inverted_cells(tmp_path):
+    """A planted disc reads 0 inverted cells; mirrored in x (every face now clockwise), all of them."""
+    from plexus.operators.vertex_ops import build_disc_mesh
+    _, _, _, _, nF = build_disc_mesh(200, r=1.0, jitter=0.1, seed=0)
+    T, _ = write_mesh_run(tmp_path, [np.zeros(nF, int), np.ones(nF, int)], name="ok")
+    assert exp_measures.run_measure("exp09.sorting", T, types=[1, 0], every=1)["inverted_max"] == 0.0
+    z = dict(np.load(tmp_path / "ok" / "trajectory.npz"))
+    z["vertex__pos"] = z["vertex__pos"] * np.array([-1.0, 1.0, 1.0], np.float32)
+    (tmp_path / "flip").mkdir()
+    np.savez(tmp_path / "flip" / "trajectory.npz", **z)
+    r = exp_measures.run_measure("exp09.sorting", open_run(str(tmp_path / "flip")), types=[1, 0], every=1)
+    assert r["inverted_max"] == 1.0

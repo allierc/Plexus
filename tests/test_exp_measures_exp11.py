@@ -124,3 +124,85 @@ def test_neighbours_mean_degree_on_real_runs(run, lo, hi):
     p = neighbour_pairs(T, T.n_rows() - 1, c)
     deg = np.bincount(p.ravel(), minlength=len(c))
     assert lo < np.median(deg) <= hi
+
+
+# ============================================================================ Phase 2 rulers
+class MeshTraj(FakeTraj):
+    """A FakeTraj whose rows also carry a closed triangle mesh (each triangle one face)."""
+
+    def __init__(self, frames, tris, spec=None):
+        super().__init__(frames, spec=spec)
+        self.tris = np.asarray(tris, np.int64)
+
+    def half_edges(self, t):
+        a, b, c = self.tris.T
+        f = np.arange(len(self.tris))
+        return (np.concatenate([a, b, c]), np.concatenate([b, c, a]), np.concatenate([f, f, f]))
+
+    def nF(self, t):
+        return len(self.tris)
+
+    def occ(self, s, t):
+        return None
+
+
+def sphere_mesh(n=3000, seed=0):
+    from scipy.spatial import ConvexHull
+    x = sphere(n, seed=seed)
+    return x, ConvexHull(x).simplices
+
+
+SPEC_600S = {"general": {"n_frames": 160, "dt": 1.0, "units": {"time_s": 600.0}}}
+
+
+def test_surface_slice_of_a_unit_sphere_is_its_great_circle():
+    from exp_measures.exp11 import _slice_length
+    x, tri = sphere_mesh()
+    T = MeshTraj([x], tri)
+    es, et, ef = T.half_edges(0)
+    L = _slice_length(x, es, et, ef, len(tri), x.mean(0), np.array([0.0, 1.0, 0.0]))
+    assert abs(L / (2 * np.pi) - 1) < 0.01            # a polyhedral great circle, 3000 vertices
+
+
+def test_surface_reads_wang_fig1h_growth_on_a_linearly_growing_sphere(monkeypatch):
+    # R(t) = 1 + 0.043 t_h: Wang's median rate over 13 glands; the fit is exact on a line, so the ratio
+    # over the 12.5 h window (75 frames at 600 s) is 1 + 0.043 x 12.5 = 1.5375, whatever the normalisation.
+    x, tri = sphere_mesh()
+    frames = [x * (1 + 0.043 * f * 600 / 3600) for f in range(161)]
+    T = MeshTraj(frames, tri, spec=SPEC_600S)
+    monkeypatch.setattr("exp_measures.exp11.cells", lambda T, t: np.zeros(100))
+    r = exp_measures.run_measure("exp11.surface", T)
+    assert abs(r["perim_ratio"] - 1.5375) < 2e-3
+    assert r["perim_r2"] > 0.999
+    assert abs(r["area_ratio"] - 1.5375 ** 2) < 0.02
+    assert abs(r["hours"] - 12.5) < 1e-9
+
+
+def test_surface_window_ignores_growth_after_it(monkeypatch):
+    # growth that starts at frame 80 lies outside Wang's 12.5 h window (frames 0-75): ratio 1
+    x, tri = sphere_mesh()
+    frames = [x * (1 + 0.1 * max(0, f - 80)) for f in range(161)]
+    T = MeshTraj(frames, tri, spec=SPEC_600S)
+    monkeypatch.setattr("exp_measures.exp11.cells", lambda T, t: np.zeros(100))
+    r = exp_measures.run_measure("exp11.surface", T)
+    assert abs(r["perim_ratio"] - 1.0) < 1e-6
+
+
+def test_surface_needs_a_time_scale():
+    x, tri = sphere_mesh()
+    r = exp_measures.run_measure("exp11.surface", MeshTraj([x] * 5, tri, spec={"general": {}}))
+    assert r["available"] is False
+
+
+def test_persist_reads_a_receding_bud():
+    T = FakeTraj([sphere(), budded([0, 0, 1], 0.6), budded([0, 0, 1], 0.3)])
+    r = exp_measures.run_measure("exp11.persist", T, axis=[0, 0, 1], every=1)
+    assert r["grown"] and r["peak_row"] == 1
+    assert 0.35 < r["ratio"] < 0.65                   # half the reach left at the last row
+
+
+def test_persist_is_one_for_a_bud_still_growing_and_for_no_bud():
+    T = FakeTraj([sphere(), budded([0, 0, 1], 0.3), budded([0, 0, 1], 0.6)])
+    assert exp_measures.run_measure("exp11.persist", T, axis=[0, 0, 1], every=1)["ratio"] == 1.0
+    r = exp_measures.run_measure("exp11.persist", FakeTraj([sphere(), sphere(seed=1)]), axis=[0, 0, 1], every=1)
+    assert r["grown"] is False and r["ratio"] == 1.0
