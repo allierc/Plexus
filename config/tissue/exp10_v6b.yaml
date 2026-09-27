@@ -1,0 +1,192 @@
+general:
+  name: exp10_v6b
+  seed: 0
+  n_frames: 300
+  dt: 1.0
+  record_cap: 302
+  boundary: free
+  dim: 3
+  world:
+  - 16.0
+  - 16.0
+  - 16.0
+sets:
+  cell:
+    n: 4096
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      chem:
+        width: 2
+  vertex:
+    n: 16384
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 32768
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  model: apicobasal
+  at: vertex
+  n_cells: 1280
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  h0: 0.8
+  apical: in
+  lattice_rotation: true
+operators:
+- op: cell_geometry
+  at: cell
+- op: seed_cell_chem
+  at: cell
+  model: cones
+  n_spots: 1
+  seed_dir:
+  - 0.0
+  - 0.0
+  - 1.0
+  cone_deg: 53.13
+  seed: 0
+- op: cell_mechanics
+  implementation: apicobasal_region
+  at: vertex
+  k_v: 16.0
+  kappa_s: 0.05
+  gamma: 0.0
+  Lambda: 0.0
+  K_R: 0.0
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+  sigma_a:
+  - 0.15
+  - 0.85
+  sigma_ramp: 150
+  fate_block: chem
+  fate_col: 0
+  sigma_b:
+  - 0.27
+  - 0.15
+  v_swell:
+  - 1.56
+  - 0.77
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- seed_cell_chem
+- cell_mechanics
+- edge_flip
+- topo_record
+plotting:
+  duration_s: 10
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 15.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: false
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spherical cluster of cells that undergoes a significant morphological
+      deformation over time. Initially, the cluster is a perfect sphere with a red cap on the top. As
+      the frames progress, the bottom of the sphere begins to bulge outward, causing the overall shape
+      to become pear-like. By the final frames, the cluster has stabilized into a distinct, asymmetrical
+      bulbous shape while maintaining its red cap.
+    objects: The primary object is a large, multi-cellular cluster composed of many small, white polygonal
+      cells. A distinct subset of cells at the top of the cluster is colored bright red. The cluster is
+      situated within a large, transparent 3D bounding box. A small circular inset in the bottom left
+      corner shows a cross-sectional view of the cluster's internal structure.

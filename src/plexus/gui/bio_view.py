@@ -23,6 +23,7 @@ import io
 import os
 import tempfile
 import threading
+import sys
 import time
 
 import numpy as np
@@ -81,7 +82,21 @@ class View:
         t0 = time.time()
         sim = schema.load(spec_path)
         H = engine.build(sim, device)
-        engine.seed(H, sim, device)
+        self.spec_path = spec_path
+        try:
+            engine.seed(H, sim, device)
+        except Exception as e_:                                  # noqa: BLE001
+            # A RECORDED STEP WHOSE SEED TODAY'S CODE REFUSES. The watcher re-opens specs from the record, and the
+            # engine moves on after them: builder/exp_02_bacterium step 73 names an `origin` for a set contained in
+            # `cell`, which `cloud_seed` has refused since (2026-09-27, "drop `origin`"). The record is not rewritten
+            # to suit the code; the scene starts from the run's OWN first recorded frame instead -- which is what the
+            # 3-D view then replays anyway. Only when there is no recorded run does the error stand.
+            n_ = self._seed_from_record(H)
+            if not n_:
+                raise
+            print(f"[view] this spec's seed no longer runs ({type(e_).__name__}: {str(e_)[:160]}); the scene starts "
+                  f"from the recorded run's first frame instead ({n_} sets)", flush=True)
+            self.seed_note = f"seeded from the recorded run (the spec's own seed fails today: {str(e_)[:120]})"
         self.sim, self.H, self.spec_path = sim, H, spec_path
         self.scene = bio.scene_from(H, sim, spec_path)
         style = dict(sim.plotting or {})
@@ -135,7 +150,8 @@ class View:
                             can_curve=False, render_n=400_000, stills=0, px=int(px),
                             dt=getattr(sim, "dt", None),
                             time_s=(float(u.time_s) if dec else None),
-                            length_um=(float(u.length_um) if dec else None))
+                            length_um=(float(u.length_um) if dec else None),
+                            force_nN=(float(u.force_nN) if (dec and getattr(u, "force_nN", None) is not None) else None))
         self.lm(H, 0)                                            # builds every actor, writes one frame
         if self.lm.failed:
             raise RuntimeError(f"renderer: {self.lm.failed}")
@@ -208,16 +224,56 @@ class View:
             self.lm.p.render()
 
     # ------------------------------------------------------------------ camera and picture
-    def set_camera(self, azim=None, elev=None, zoom=None):
-        return _vtk(self._set_camera, azim, elev, zoom)
+    def set_camera(self, azim=None, elev=None, zoom=None, roll=None):
+        return _vtk(self._set_camera, azim, elev, zoom, roll)
 
-    def _set_camera(self, azim=None, elev=None, zoom=None):
+    # THE SLICE (the human, 2026-09-26: "one button that shows a slice cross section"): the renderer's own
+    # `near_side: far` -- every surface keeps only the half BEHIND a plane through the scene's centre, normal to the
+    # view, so the camera looks into the protein through the cut face (a channel's lumen and the ions in it). One
+    # plane for every part (`near_side_centre` = the focal point), re-cut whenever the view turns (`_set_camera`
+    # calls `near_side_refresh`). Off restores whatever the spec itself asked for.
+    def set_cut(self, on: bool):
+        return _vtk(self._set_cut, bool(on))
+
+    def _set_cut(self, on: bool):
+        lm = self.lm
+        if lm is None:
+            return
+        st = lm.style if lm.style is not None else {}
+        if not hasattr(self, "_cut_saved"):
+            self._cut_saved = {k: st.get(k) for k in ("near_side", "near_side_centre")}
+        if on:
+            st["near_side"] = "far"
+            st["near_side_centre"] = [float(v) for v in self.focal]
+        else:
+            for k, v in self._cut_saved.items():
+                if v is None:
+                    st.pop(k, None)
+                else:
+                    st[k] = v
+        lm.style = st
+        lm._slice_all = on                                          # every surface, whatever its own setting
+        self.cut = on
+        lm.near_side_refresh()
+
+    def _set_camera(self, azim=None, elev=None, zoom=None, roll=None):
         if self.panel is not None:
             return
         with LOCK:
             if azim is not None: self.azim = float(azim)
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
             if zoom is not None: self.zoom = max(0.05, min(60.0, float(zoom)))
+            # ROLL, BECAUSE WHICH END IS UP IS A VIEW CHOICE AND NOTHING ELSE.
+            #
+            # The orbit is built around `up_axis` with the up vector +axis, and `elev` is clamped
+            # to +-89 deg, so there is no way to get from it to a picture of an animal whose long
+            # axis runs the other way -- the Platynereis region has its head at LOW z and its tail
+            # at high z, so z-up draws the larva upside down against every figure in its own
+            # paper. Rolling 180 deg turns the picture over. It is deliberately NOT a flipped
+            # `up_axis`: the up axis also decides where the floor is drawn and which way the scale
+            # bar is lifted, and a scene lit and floored for one up vector and photographed from
+            # the other is a worse picture than an upside-down one.
+            if roll is not None: self.roll = float(roll)
             a, e = np.radians(self.azim), np.radians(self.elev)
             # the orbit is about the spec's `up_axis`: elevation climbs along it, azimuth turns around it
             up = self.up_axis
@@ -231,6 +287,11 @@ class View:
             par = bool(cam.parallel_projection)
             cam.position = tuple(self.focal + d * (self.dist0 if par else self.dist0 / self.zoom))
             cam.up = tuple(U)
+            _roll = float(getattr(self, "roll", 0.0) or 0.0)
+            if _roll:
+                # `camera.roll` is a pyvista PROPERTY, not VTK's `Roll()` method -- calling it
+                # raises TypeError, which the shot route swallowed into a reply with no `path`.
+                cam.roll = cam.roll + _roll
             # THE MOVIE'S CAMERA IS ORTHOGRAPHIC (`parallel_projection`, live_movie.py:547), so
             # zoom is the parallel scale (half the view height in world units), not the distance.
             if bool(cam.parallel_projection):
@@ -277,6 +338,18 @@ class View:
         up = np.zeros(3); up[self.up_axis] = 1.0
         right = np.cross(up, view_dir); right /= max(np.linalg.norm(right), 1e-12)
         vup = np.cross(view_dir, right); vup /= max(np.linalg.norm(vup), 1e-12)
+        # THE ROLL TURNS THE SCREEN, SO IT HAS TO TURN THIS BASIS TOO.
+        #
+        # The bar is a line in WORLD space placed at the bottom-right of the view; its label is a
+        # viewport annotation pinned to the bottom-right of the WINDOW. Those agree only while the
+        # screen basis derived from `up_axis` is the screen's actual basis -- and a rolled camera
+        # breaks that. At the 180 degrees this animal is drawn with (its z runs head to tail, so
+        # z-up shows it upside down) the bar went to the TOP-LEFT and its label stayed at the
+        # bottom-right: a scale bar in one corner and the number it refers to in the other.
+        _roll = float(getattr(self, "roll", 0.0) or 0.0)
+        if _roll:
+            _c, _s = np.cos(np.radians(_roll)), np.sin(np.radians(_roll))
+            right, vup = _c * right + _s * vup, -_s * right + _c * vup
         half_h = float(cam.parallel_scale) if cam.parallel_projection else float(self.dist0 / self.zoom) * np.tan(np.radians(float(cam.view_angle) / 2))
         W, Hh = self.p.window_size
         half_w = half_h * float(W) / float(Hh)
@@ -295,8 +368,12 @@ class View:
                 self.p.remove_actor(nm, render=False)
             except Exception:                                    # noqa: BLE001
                 pass
-        self.p.add_mesh(pv.Line(a, b), color="white", line_width=4.0, lighting=False, name="scale_bar")
-        self.p.add_text(_si_length(len_m), position=(0.80, 0.065), viewport=True, font_size=11, color="white", name="scale_label")
+        # THE BAR'S COLOUR FOLLOWS THE GROUND. The movie renderer sets `_fg` from
+        # `plotting.background` (black on white, white on black); on the white ground of the
+        # cryo-EM figure look a white bar and label were invisible (exp_02 step 0014).
+        _fg = str(getattr(self.lm, "_fg", "white") or "white")
+        self.p.add_mesh(pv.Line(a, b), color=_fg, line_width=4.0, lighting=False, name="scale_bar")
+        self.p.add_text(_si_length(len_m), position=(0.80, 0.065), viewport=True, font_size=11, color=_fg, name="scale_label")
 
     def png(self) -> bytes:
         if self.panel is not None:
@@ -336,7 +413,12 @@ class View:
             e = {}
             # `vel` AND THE SOLVER BUFFERS TOO (F, C, Jp), so a frame replayed under a field colour
             # (`speed`, `deformation`, `pressure`) is that frame's field and not the last one's.
-            for key in ("pos", "sep", "vel"):
+            # AND EVERY OTHER STATE BLOCK. A replay that put back only pos/sep/vel drew each other
+            # block at whatever the level held when the replay ran -- the re-seeded start -- so the
+            # movie's curve panels of a cell's membrane potential and a stator's stretch were flat
+            # lines at frame 0's numbers while the run's own log moved (exp_02 steps 0038, 0040,
+            # 2026-09-23). The other blocks are a few numbers per element and cost nothing to keep.
+            for key in list(getattr(sch, "_slices", {}).keys()) or ("pos", "sep", "vel"):
                 if key in sch:
                     a, b = sch[key]
                     e[key] = lv.state[:, a:b].detach().cpu().clone()
@@ -429,6 +511,40 @@ class View:
             print(f"[view] {d}: cannot read the trajectory header ({type(e).__name__}: {e})", flush=True)
         return 0, 0
 
+    def _seed_from_record(self, H) -> int:
+        """Every set's state blocks from the recorded run's first frame, where the recorded count matches the built
+        one. The number of sets whose positions were set (0 = no run, or nothing matched)."""
+        d = self.run_dir()
+        if d is None or not os.path.exists(os.path.join(d, "trajectory.npz")):
+            return 0
+        import torch
+        n_set = 0
+        with np.load(os.path.join(d, "trajectory.npz")) as z:
+            for n, lv in H.levels.items():
+                k = f"{n}__pos"
+                if k not in z.files:
+                    continue
+                n_el = int(lv.state.shape[0])
+                st = lv.state.clone()
+                for blk, (a, b) in lv.state_schema._slices.items():
+                    kb = f"{n}__{blk}"
+                    if kb not in z.files:
+                        continue
+                    arr = np.asarray(z[kb][0])
+                    arr = arr.reshape(arr.shape[0], -1) if arr.ndim > 1 else arr.reshape(-1, 1)
+                    if arr.shape[0] != n_el or arr.shape[1] != b - a:
+                        continue
+                    st[:, a:b] = torch.as_tensor(arr, dtype=st.dtype, device=st.device)
+                    if blk == "pos":
+                        n_set += 1
+                lv.state = st
+                ko = f"{n}__occ"
+                if ko in z.files and getattr(lv, "occ", None) is not None:
+                    o = np.asarray(z[ko][0]).reshape(-1)
+                    if o.shape[0] == n_el:
+                        lv.occ = torch.as_tensor(o, dtype=lv.occ.dtype, device=lv.occ.device)
+        return n_set
+
     def load_run_frames(self, max_frames: int = 300):
         """THE RUN'S OWN DATA, not its movie: the recorded trajectory read back into the same
         per-frame level states a live run keeps, so PLAY replays the real frames through the
@@ -467,6 +583,19 @@ class View:
                     for j in range(len(rows)):
                         snaps[j].setdefault(n, {})["occ"] = torch.as_tensor(np.ascontiguousarray(a[j]), dtype=torch.float32)
                     del a
+                # THE SMALL SETS' RECORDED BLOCKS TOO (a cell's counts, its current, its gate): a replayed frame put
+                # the particles back but left `nK_in`, `q_in`, `w_open` at the seed's values, so the 3-D view's panels
+                # read nothing while the slider moved through the run (2026-09-26). Only sets of <= 16 elements.
+                if self.H.level(n).state.shape[0] <= 16:
+                    for blk in self.H.level(n).state_schema._slices:
+                        if blk in ("pos", "sep"):
+                            continue
+                        k = f"{n}__{blk}"
+                        if k in z.files:
+                            a = z[k][rows]
+                            for j in range(len(rows)):
+                                snaps[j].setdefault(n, {})[blk] = torch.as_tensor(np.ascontiguousarray(a[j]), dtype=torch.float32)
+                            del a
                 # THE MESH TABLE PER FRAME, ragged: row t is `E_srce[off[t]:off[t+1]]`, and the
                 # per-face columns ride their own offsets (a face is not a half-edge).
                 if f"{n}__mesh_offsets" in z.files:
@@ -498,6 +627,18 @@ class View:
         self._keep_every = step
         self.RUN.update(n_frames=T - 1, frames_kept=len(snaps), keep_every=step, frame=T - 1, running=False)
         self.lm.n_frames = int(T - 1)                            # the overlay's denominator is the run's
+        # A RECORD IS MANY FRAMES: the panels' time axis is per simulation frame (`curve_time.per_frame_s`), and a row
+        # here is a record -- 0-0.47 ns for a 47 ns run, as the trajectory replay had it (exp04 step 0050)
+        _nf = getattr(self.sim, "n_frames", None)
+        if _nf and T > 1 and getattr(self.lm, "_curve_xs", None):
+            _fpr = float(_nf) / float(T - 1)
+            self.lm._curve_xs = float(self.lm._curve_xs) / float(getattr(self.lm, "_frames_per_row", 1.0)) * _fpr
+            self.lm._frames_per_row = _fpr
+            for _cv in getattr(self.lm, "_curves", []) or []:
+                try:
+                    _cv["ch"].x_axis.range = [0.0, float(_cv["S"].shape[0] - 1) * self.lm._curve_xs]
+                except Exception:                                # noqa: BLE001
+                    pass
         self.lm.t0 = time.perf_counter()
         # THE FIELD'S COLOUR RANGE FROM THE WHOLE RUN, now that its frames are here: deformation,
         # stress or speed measured over a sample of them rather than settled on one frame. A field
@@ -540,8 +681,10 @@ class View:
                     continue
                 lv = H.level(name)
                 dev = lv.state.device
-                for key in ("pos", "sep", "vel"):
-                    if key in e and key in lv.state_schema:
+                for key in e:
+                    if key in ("occ", "node_type", "parent", "F", "C", "Jp", "mesh"):
+                        continue
+                    if key in lv.state_schema:
                         a, b = lv.state_schema[key]
                         lv.state[:, a:b] = e[key].to(dev)
                 for key in ("occ", "node_type", "parent", "F", "C", "Jp"):
@@ -593,6 +736,10 @@ class View:
 
     def _grab(self):
         with LOCK:
+            try:                                                 # the near plane fitted to every actor (see live_movie)
+                self.p.renderer.ResetCameraClippingRange()
+            except Exception:                                    # noqa: BLE001
+                pass
             self.p.render()                                      # screenshot() alone returns the stale frame
             return np.asarray(self.p.screenshot(return_img=True)).copy()
 
@@ -992,7 +1139,22 @@ class View:
         def _go():
             _VTK_THREAD["ident"] = threading.get_ident()
             from plexus import pipeline
+            from plexus.gui import studio
+            # THE ENGINE'S OWN OUTPUT, KEPT -- WITHOUT TOUCHING sys.stdout. The first version of
+            # this wrapped `generate` in `contextlib.redirect_stdout/stderr`, and that hung the
+            # run at frame 0 with no error and no log file: those helpers swap the PROCESS-WIDE
+            # streams, and this runs on the VTK worker while the HTTP threads are printing to the
+            # same ones. A per-thread capture is what was wanted and is not what they do.
+            #
+            # So the engine keeps printing to the terminal as it always did, and a COPY is taken
+            # afterwards from the run directory the pipeline itself writes. Less immediate, and it
+            # cannot deadlock anything.
+            log_path = ""
             try:
+                log_path = os.path.join(studio.REPO, "log", "gui_runs",
+                                        f"{os.path.splitext(os.path.basename(self.spec_path))[0]}.log")
+                os.makedirs(os.path.dirname(log_path), exist_ok=True)
+                self.RUN["log"] = log_path
                 r = pipeline.generate(self.spec_path, device=dev, force=True, describe=False, on_frame=_on_frame)
                 self.RUN["out_dir"] = r.get("data_dir")
                 self.RUN["stopped"] = bool(r.get("stopped"))
@@ -1012,10 +1174,47 @@ class View:
                     pass
                 print(f"[view] run failed: {self.RUN['error']}", flush=True)
             finally:
+                # WHAT THE RUN LEFT ON DISK, summarised into the log this session reads. The
+                # engine's console output is not captured (see above); what IS durable is the run
+                # directory, so the log records where it is and what is in it.
+                try:
+                    _d = self.RUN.get("out_dir") or ""
+                    with open(log_path or os.path.join(os.path.expanduser("~"), "plexus_run.log"),
+                              "w") as _fh:
+                        _fh.write(f"spec      {self.spec_path}\n")
+                        _fh.write(f"device    {dev}\n")
+                        _fh.write(f"frames    {self.RUN.get('frame')}/{n}\n")
+                        _fh.write(f"seconds   {round(time.time() - self.RUN['started'], 1)}\n")
+                        _fh.write(f"ms/frame  {self.RUN.get('ms_per_frame')}\n")
+                        _fh.write(f"stopped   {self.RUN.get('stopped')}\n")
+                        _fh.write(f"error     {self.RUN.get('error')}\n")
+                        _fh.write(f"out_dir   {_d}\n")
+                        if _d and os.path.isdir(_d):
+                            for nm in sorted(os.listdir(_d)):
+                                _p = os.path.join(_d, nm)
+                                _sz = os.path.getsize(_p) if os.path.isfile(_p) else 0
+                                _fh.write(f"  {nm}  {_sz:,} B\n")
+                except Exception:                                    # noqa: BLE001
+                    pass
                 self.RUN["running"] = False
                 self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
                 _drain()
-        _EXEC.submit(_go)
+        # THE FUTURE IS READ. `submit` hands back a Future, and an exception that escapes the
+        # task is stored in it and re-raised only when someone asks -- so an unread Future is a
+        # traceback thrown away. This callback asks. It costs one function call per run and it is
+        # the difference between "the run failed with X" and a scene that sits at frame 0 for
+        # three minutes with the GPU at 0% and nothing in any log.
+        def _done(fut):
+            exc = fut.exception()
+            if exc is None:
+                return
+            self.RUN["error"] = f"{type(exc).__name__}: {exc}"[:600]
+            self.RUN["running"] = False
+            import traceback
+            print(f"[view] run task died: {self.RUN['error']}", flush=True)
+            traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+        _EXEC.submit(_go).add_done_callback(_done)
         return {"started": True, "frames": n, "device": dev}
 
     def stop(self) -> dict:

@@ -1,0 +1,115 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+general:
+  boundary: wall
+  dim: 3
+  dt: 5.0e-06
+  n_frames: 330
+  name: iv_dt5u
+  record_cap: 330
+  save_data: null
+  seed: 0
+  units:
+    length_um: 50.0
+    time_s: 1.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: water_particle
+  implementation: warp
+  op: mpm_strain
+- a_max: 200.0
+  at: water_particle
+  drag: 0.0
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  to: mpm_grid
+- at: mpm_grid
+  op: mpm_grid_update
+  wall_damp: 1.0
+  wall_friction: 0.0
+- at: water_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_damp: 1.0
+- at: mpm_grid
+  cg_iters: 40
+  eta: 400000.0
+  op: mpm_grid_viscosity
+  rho: 1000.0
+plotting:
+  background: black
+  box_frame: true
+  color_field: speed
+  color_range:
+  - 0.0
+  - 0.5
+  cutaway:
+    at: 0.5
+    axis: view
+  dot_shading: true
+  dot_size: 1.6
+  field_cmap: inferno
+  fps: 41.25
+  keep_stills: true
+  max_frames: 200
+  real_time: false
+  renderer: vtk_points
+  stills: 6
+  subject: water_particle
+  up_axis: 2
+schedule:
+- steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_grid_viscosity
+  - mpm_gather
+  substep_dt: 5.0e-06
+seed:
+- amplitude: 0.5
+  at: water_particle
+  axis: 2
+  block: vel
+  direction:
+  - 1.0
+  - 0.0
+  - 0.0
+  k: 1.0
+  op: seed_state
+  pattern: wave
+sets:
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+        bulk_modulus: 100000.0
+        count: 1
+        density: 1000.0
+        eta: 1600.0
+        material: liquid
+  water_particle:
+    density: 1000.0
+    entity: mpm_particle
+    eta: 1600.0
+    parent: water
+    per_parent: 155374
+    radius: 0.5

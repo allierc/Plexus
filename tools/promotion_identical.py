@@ -177,7 +177,7 @@ PAIRS = [
     # ---- G: EVERY LIFTED GATE, AS A TWIN RUN. The gates grade the CORE against thresholds; that
     # says the core is right about the numbers a human wrote down, and it does NOT say the core and
     # okuda agree. These rows are the missing half: the same gate spec through `run_one.py` and
-    # through `Plexus_Main.py`, both fresh, both on gpu_l4, compared array by array. A gate is only
+    # through `Plexus_Main.py`, both fresh, both on ${CLUSTER_QUEUE_PREFIX}l4, compared array by array. A gate is only
     # promoted when both are true.
     ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda@0da57dd0", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
     ("G", "gates/gate_01_nosync",       None, 0.0, "okuda@0da57dd0", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
@@ -546,7 +546,7 @@ def _abspath_operator_files(cfg):
 
     AND THE ABSOLUTE PATH MUST BE THE CLUSTER'S, NOT THIS CONTAINER'S. The first version wrote
     `/workspace/Plexus/log/gates/_tissue/gate_04_tissue.npz`, which does not exist on a compute node:
-    the same tree is `/groups/saalfeld/home/allierc/Graph/Plexus/...` there. `cluster.cpath` is the
+    the same tree is `${CLUSTER_HOME}/Graph/Plexus/...` there. `cluster.cpath` is the
     one translation, and it is the same one every `bsub` line already goes through -- so the two
     were disagreeing about where the repository is, which is a thing that can only fail on the
     cluster and always after the GPU has been granted.

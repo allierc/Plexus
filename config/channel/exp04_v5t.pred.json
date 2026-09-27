@@ -1,0 +1,13 @@
+{
+ "box_nm": 21,
+ "protomers": 8,
+ "beads_each": 252,
+ "rim_beads": 46,
+ "interface_pairs_within_cutoff": 82,
+ "heptamer_ring_radius_nm": 3.06,
+ "seeded_radius_nm": 4.06,
+ "dt_ps": 0.23886805456126772,
+ "n_frames": 4000,
+ "sim_time_ns": 0.955472218245071,
+ "lipids": 842
+}

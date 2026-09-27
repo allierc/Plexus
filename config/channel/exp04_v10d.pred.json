@@ -1,0 +1,31 @@
+{
+ "channel": "mscl",
+ "shape": "mscl_o",
+ "state": "open (Wang 2014 model)",
+ "box_nm": 15,
+ "core_half_nm_opm": 1.81,
+ "ion_paths": 1,
+ "narrowest_R_in_core_nm": [
+  0.768
+ ],
+ "dry_plug_on_path": [
+  false
+ ],
+ "charges": {
+  "tips": 80,
+  "net_tips": 10.0,
+  "lumen_carbonyl_atoms": 31
+ },
+ "ions": {
+  "K": 104,
+  "Cl": 104
+ },
+ "lipids": 515,
+ "psi_mV": -100.0,
+ "conc_mM": 150.0,
+ "dt_ps": 0.1564712576812154,
+ "n_frames": 300000,
+ "sim_time_ns": 46.94137730436463,
+ "born_K_kT": 98.9,
+ "born_Cl_kT": 75.4
+}

@@ -28,6 +28,8 @@ import torch
 from PIL import Image
 from transformers import AutoProcessor, AutoModelForMultimodalLM
 
+from vlm_client import post, server_url
+
 _SPEC_MARKER = "# --- auto: video descriptions (gemma-4-12B) ---"
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,7 +70,7 @@ def _pick_device():
 
 DEV = os.environ.get("PLEXUS_VLM_DEVICE") or _pick_device()
 DEFAULT_ROOT = os.environ.get(
-    "PLEXUS_OUTPUT_ROOT", os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
+    "PLEXUS_OUTPUT_ROOT", os.environ["GNN_OUTPUT_ROOT"]
 ) + "/graphs_data"
 
 PROMPT = (
@@ -130,14 +132,24 @@ def describe_one(proc, model, video, n_frames, layout=None):
         "THE FRAME IS A MULTI-PANEL FIGURE. Read the panels as views OF ONE SPECIMEN, not as "
         "separate objects, and never describe a panel boundary or an inset frame as a feature of "
         "the sample.\n" + layout.strip() + "\n\n" + PROMPT)
-    content = [{"type": "image", "image": f} for f in frames] + [{"type": "text", "text": text}]
+    return ask(proc, model, frames, text, max_new_tokens=400)
+
+
+def ask(proc, model, images, text, max_new_tokens=400):
+    """One prompt over a list of images (PIL images or file paths); the model's answer.
+
+    THE ONE GENERATION PATH. The caption above and the judge's score (`tools/judge.py`, through
+    `vlm_server.py`) both come through here, so a score and a caption are produced by the same
+    template, decoding and parsing -- not by two copies that drift."""
+    images = [Image.open(f).convert("RGB") if isinstance(f, str) else f for f in images]
+    content = [{"type": "image", "image": f} for f in images] + [{"type": "text", "text": text}]
     msgs = [{"role": "system", "content": "You are a precise scientific assistant."},
             {"role": "user", "content": content}]
     inputs = proc.apply_chat_template(msgs, add_generation_prompt=True, tokenize=True,
                                       return_dict=True, return_tensors="pt",
                                       enable_thinking=False).to(model.device)
     with torch.inference_mode():
-        out = model.generate(**inputs, max_new_tokens=400, do_sample=False)
+        out = model.generate(**inputs, max_new_tokens=int(max_new_tokens), do_sample=False)
     resp = proc.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=False)
     parsed = (proc.parse_response(resp) if hasattr(proc, "parse_response") else resp)
     if isinstance(parsed, dict):
@@ -171,34 +183,9 @@ def _video_name(path, root):
     return os.path.splitext(os.path.basename(ap))[0]
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("videos", nargs="*", help="explicit video paths (else use --root)")
-    ap.add_argument("--root", default=None, help="recurse for *.mp4 under this dir")
-    ap.add_argument("--out", default=None, help="aggregate text file (default <root>/video_descriptions.txt)")
-    ap.add_argument("--frames", type=int, default=8)
-    ap.add_argument("--device", default=None,
-                    help="cuda:N or cpu; default = the card with the most free memory")
-    ap.add_argument("--append", action="store_true", help="append to --out instead of truncating it")
-    ap.add_argument("--config-root", default=os.path.join(_REPO, "config"),
-                    help="also write each description into the repo spec config/<type>/<name>.yaml")
-    args = ap.parse_args()
-
-    if args.videos:
-        videos = sorted(args.videos)
-        root = args.root or os.path.commonpath([os.path.dirname(os.path.abspath(v)) for v in videos])
-    else:
-        root = args.root or DEFAULT_ROOT
-        videos = sorted(glob.glob(os.path.join(root, "**", "*.mp4"), recursive=True))
-    out_file = args.out or os.path.join(root, "video_descriptions.txt")
-    assert videos, f"no videos found (root={root})"
-    assert os.path.isdir(GEMMA), (
-        f"gemma weights not found: {GEMMA}\n"
-        f"    They are expected beside this checkout, at <repo>/VLLM/gemma-4-12B-it.\n"
-        f"    Set GEMMA_DIR to point elsewhere, or run VLLM/download_gemma.py to fetch them.")
-    print(f"[describe] {len(videos)} videos -> {out_file}", flush=True)
-
-    dev = args.device or DEV
+def _load(dev):
+    """(processor, model) on `dev`, or SystemExit(1) with the reason. Only reached when no
+    persistent server (`vlm_server.py`) is running."""
     if dev.startswith("cuda"):
         i = int(dev.split(":")[1]) if ":" in dev else 0
         gb = _free_gb(i)
@@ -235,6 +222,51 @@ def main():
                   "instead:\n"
                   "    python VLLM/describe_video.py --root <graphs_data> --append", flush=True)
         raise SystemExit(1)
+    return proc, model, dev
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("videos", nargs="*", help="explicit video paths (else use --root)")
+    ap.add_argument("--root", default=None, help="recurse for *.mp4 under this dir")
+    ap.add_argument("--out", default=None, help="aggregate text file (default <root>/video_descriptions.txt)")
+    ap.add_argument("--frames", type=int, default=8)
+    ap.add_argument("--device", default=None,
+                    help="cuda:N or cpu; default = the card with the most free memory")
+    ap.add_argument("--append", action="store_true", help="append to --out instead of truncating it")
+    ap.add_argument("--config-root", default=os.path.join(_REPO, "config"),
+                    help="also write each description into the repo spec config/<type>/<name>.yaml")
+    args = ap.parse_args()
+
+    if args.videos:
+        videos = sorted(args.videos)
+        root = args.root or os.path.commonpath([os.path.dirname(os.path.abspath(v)) for v in videos])
+    else:
+        root = args.root or DEFAULT_ROOT
+        videos = sorted(glob.glob(os.path.join(root, "**", "*.mp4"), recursive=True))
+    out_file = args.out or os.path.join(root, "video_descriptions.txt")
+    assert videos, f"no videos found (root={root})"
+    assert os.path.isdir(GEMMA), (
+        f"gemma weights not found: {GEMMA}\n"
+        f"    They are expected beside this checkout, at <repo>/VLLM/gemma-4-12B-it.\n"
+        f"    Set GEMMA_DIR to point elsewhere, or run VLLM/download_gemma.py to fetch them.")
+    print(f"[describe] {len(videos)} videos -> {out_file}", flush=True)
+
+    # A PERSISTENT SERVER, IF ONE IS UP, INSTEAD OF A ~70 s LOAD. `vlm_server.py` holds the model
+    # for a whole session and captions through the same `describe_one`; without it this loads its
+    # own copy, exactly as before.
+    url = server_url()
+    if url:
+        print(f"[describe] using the persistent VLM at {url} -- no load", flush=True)
+
+        def caption(video):
+            return post(url, "/caption", {"video": os.path.abspath(video),
+                                          "frames": args.frames})["text"]
+    else:
+        proc, model, dev = _load(args.device or DEV)
+
+        def caption(video):
+            return describe_one(proc, model, video, args.frames)
 
     records = []
     spec_updates: dict[str, dict] = {}                             # spec.yaml -> {movie_stem: {...}}
@@ -243,7 +275,7 @@ def main():
     for k, video in enumerate(videos, 1):
         name = _video_name(video, root)
         print(f"[{k}/{len(videos)}] {name}", flush=True)
-        text = describe_one(proc, model, video, args.frames)
+        text = caption(video)
         if text is None:
             print(f"  (skip: unreadable) {video}", flush=True); continue
         desc, objs = _split_sections(text)

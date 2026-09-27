@@ -99,14 +99,17 @@ def generate(config_name: str, *, device: str = "cuda:0", force: bool = False, v
                                "dt": getattr(sim, "dt", None),
                                "time_s": (_units.time_s if _declared else None),
                                "real_time": real_time,
-                               "length_um": (_units.length_um if _declared else None)}
+                               "length_um": (_units.length_um if _declared else None),
+                               "force_nN": (getattr(_units, "force_nN", None) if _declared else None)}
     stopped = False
     frame_ms = None
+    replayed = False
     try:
         data_dir, out = data_generate(sim, pre_folder, device=device, erase=force, save=True,
                                       live_every_frac=(None if not viz else 0.05),
                                       live_movie=lm, on_frame=on_frame)
         frame_ms = out.get("frame_ms") if isinstance(out, dict) else None
+        replayed = bool(out.get("replayed")) if isinstance(out, dict) else False
     except StopRun:
         # THE RUN WAS ENDED ON PURPOSE. The movie was closed by `data_generate`'s own finally; the
         # trajectory and the markers are not written, because there is no complete run to mark.
@@ -118,8 +121,10 @@ def generate(config_name: str, *, device: str = "cuda:0", force: bool = False, v
         shutil.copy2(yaml_file, os.path.join(data_dir, "spec.yaml"))   # co-locate the spec with its data
         _mark(run_log_dir, "_completed_generate", data_dir)
 
-    # render movies if plotting was asked OR describing (the captioner needs the mp4s)
-    if viz and not stopped and (plot or describe):
+    # render movies if plotting was asked OR describing (the captioner needs the mp4s) -- but not
+    # for the captioner alone when `data_generate` has just replayed the trajectory into movie.mp4
+    # (the `plotting.curve` re-render): that is the movie this pass would write, rendered twice.
+    if viz and not stopped and (plot or (describe and not replayed)):
         from plexus.plot import plot_dataset
         data_dir = plot_dataset(sim, pre_folder, movie=(movie or describe))
         if plot:

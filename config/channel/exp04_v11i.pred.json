@@ -1,0 +1,32 @@
+{
+ "channel": "kcsa",
+ "shape": "kcsa_c",
+ "state": "closed",
+ "box_nm": 11,
+ "core_half_nm_opm": 1.5,
+ "ion_paths": 1,
+ "narrowest_R_in_core_nm": [
+  0.077
+ ],
+ "dry_plug_on_path": [
+  true
+ ],
+ "charges": {
+  "tips": 48,
+  "net_tips": 8.0,
+  "lumen_carbonyl_atoms": 64
+ },
+ "ions": {
+  "K": 431,
+  "Cl": 431
+ },
+ "lipids": 482,
+ "cation": "K",
+ "psi_mV": -200.0,
+ "conc_mM": 1000.0,
+ "dt_ps": 0.1564712576812154,
+ "n_frames": 300000,
+ "sim_time_ns": 46.94137730436462,
+ "born_cation_kT": 98.9,
+ "born_Cl_kT": 75.4
+}

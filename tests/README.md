@@ -18,7 +18,7 @@ Add `--quick` working points if the change touches a tissue operator (3 short re
 
 or on the cluster:
 
-    bsub -q gpu_l4 -gpu 'num=1' -n 8 -W 4:00 -J plexus_regression \
+    bsub -q ${CLUSTER_QUEUE_PREFIX}l4 -gpu 'num=1' -n 8 -W 4:00 -J plexus_regression \
          -o jobs/logs/regression_%J.out -e jobs/logs/regression_%J.err bash jobs/regression_nightly.sh
 
 Runs the seed table, the invariants, the scaling tests and every registered working point, and

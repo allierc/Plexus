@@ -49,7 +49,7 @@ sys.path.insert(0, HERE)
 import data as D                                                    # noqa: E402
 
 SPLIT = os.path.join(HERE, "_data", "split.json")
-SOURCE_ROOT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+SOURCE_ROOT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 
 # Every file on disk that could carry the diseased specimen, whatever it is called. The seal is by
 # content; this list only says where to look when computing the fingerprints.

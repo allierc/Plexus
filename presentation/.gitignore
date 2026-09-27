@@ -1,0 +1,9 @@
+Movies/
+icons/
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.synctex.gz

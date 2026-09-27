@@ -1,4 +1,6 @@
 general:
+
+  title: "Gray-Scott chemistry on a disc of 4,000 cells"
   name: turing2d_gs_eta
   seed: 0
   n_frames: 6000
@@ -56,3 +58,4 @@ plotting:
   renderer: mpl2d
   background: black
   dot_fill: 0.9
+  duration_s: 10

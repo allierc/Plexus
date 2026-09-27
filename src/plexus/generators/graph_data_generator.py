@@ -327,6 +327,21 @@ def data_generate(
             print(f"[render] plotting.curve declared but `color_field: {_cf}` cannot be recomputed "
                   f"from a trajectory -- keeping the movie this run just made, panels and all "
                   f"omitted. Use `color_field: speed` if the panels matter more.", flush=True)
+    elif save and (sim.plotting or {}).get("curve") and live_movie is not None \
+            and not (sim.plotting or {}).get("replay_curves", True):
+        # `plotting.replay_curves: false` -- KEEP THE LIVE MOVIE. A replay rebuilds the scene from
+        # trajectory.npz, which holds the sets but no grid FIELD, so a movie whose picture includes
+        # a `field_slice` (the electrolyte's current through a channel, experiments/exp04) lost it
+        # in the re-render. The live pass already drew the panels when every curve declares
+        # `ymin`/`ymax`, so nothing is gained by replaying and the field is kept.
+        print("[render] plotting.replay_curves: false -- keeping the live movie (its panels were drawn live "
+              "on declared axes; a replay would drop the grid fields)", flush=True)
+        # AND SAY SO TO THE CALLER, exactly as the replay branch below does: the pipeline's caption pass
+        # re-renders the movie from trajectory.npz unless `replayed` is set, and did -- over the live
+        # movie, dropping the current field and re-ranging every panel (exp04 round 3, found by the
+        # channel judge, 2026-09-25).
+        if isinstance(out, dict):
+            out["replayed"] = True
     elif save and (sim.plotting or {}).get("curve") and live_movie is not None:
         try:
             from plexus import live_movie as _lm, render_vtk as _rv
@@ -339,12 +354,21 @@ def data_generate(
                 # live path's still -- so the folder held a movie with the curve panels and
                 # a 3d.png without them, which is the file a browser previews.
                 _lm.replay(data_dir, sim, name=sim.name, stills=10)
+                # SAID TO THE CALLER, so the pipeline's caption pass does not replay it a SECOND
+                # time: it calls `plot_dataset` only to be sure an mp4 exists, and for
+                # `vtk_points` that is this same replay again -- ~30 s for a movie already on disk.
+                if isinstance(out, dict):
+                    out["replayed"] = True
         except Exception as e:                              # noqa: BLE001
             print(f"[render] curve re-render unavailable ({type(e).__name__}: {e})", flush=True)
     if save and _want == "vtk_mesh" and live_movie is None:
         try:
             from plexus import render_vtk
             if render_vtk.available():
+                # THE LIVE `plotting:` BLOCK, as `plot.plot_dataset` installs it: without it the
+                # renderer's face colouring (`mesh_color_by`, `mesh_color`) never saw the spec on
+                # this path and a generate run drew a grey body where `-o plot` drew the colours.
+                render_vtk.use_plotting(sim.plotting or {})
                 render_vtk.still(data_dir, style="flat",
                                  out=os.path.join(data_dir, "3d.png"), name=sim.name)
                 render_vtk.render_all(data_dir, seq=int((sim.plotting or {}).get("vtk_seq", 2)),

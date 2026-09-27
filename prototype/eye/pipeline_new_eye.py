@@ -110,7 +110,7 @@ def _wait_jobs(name, poll=45, timeout_s=5400):
     """Block until every LSF job named `eye_<name>_*` has drained -- SCOPED to this eye,
     not `eye_cluster.wait()`'s blanket `eye_*` (another session's eye_G jobs are routinely
     running concurrently on this partition; waiting on those too would be wrong)."""
-    ssh = os.environ.get("PG_SSH", "$CLUSTER_SSH")
+    ssh = (os.environ.get("PG_SSH") or os.environ["CLUSTER_SSH"])
     t0 = time.time()
     while True:
         r = subprocess.run(

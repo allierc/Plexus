@@ -31,7 +31,7 @@ that once made a membrane 24x too thick and a modulus a pressure.
     python tools/run_gates.py --gate 00_spheroid              run it, measure it, grade it
     python tools/run_gates.py --gate 00_spheroid --measure-only     grade what is already on disk
     python tools/run_gates.py --gate 00_spheroid --freeze-reference
-    python tools/run_gates.py --all --cluster                 submit each gate to gpu_l4
+    python tools/run_gates.py --all --cluster                 submit each gate to ${CLUSTER_QUEUE_PREFIX}l4
 
 EXIT CODES.  0 all rows pass  |  1 a row failed  |  2 a row is blocked and none failed
              3 preflight or infrastructure  |  4 a known-red row turned green
@@ -139,7 +139,7 @@ def data_dir_of(name):
 
 
 def submit_cluster(path, cfg, force=False, pre_folder="gates"):
-    """Submit the gate to gpu_l4 and return the job name. Same node type, same environment and the
+    """Submit the gate to ${CLUSTER_QUEUE_PREFIX}l4 and return the job name. Same node type, same environment and the
     same `PLEXUS_STRICT_DETERMINISM=1` as the twin-run harness, so a gate and a twin row are
     comparable rather than merely both green."""
     sys.path.insert(0, os.path.join(ROOT, "discovery_okuda"))
@@ -431,7 +431,7 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--cluster", action="store_true",
-                    help="submit to gpu_l4 instead of running here, then exit; grade later with "
+                    help="submit to the L4 queue (${CLUSTER_QUEUE_PREFIX}l4) instead of running here, then exit; grade later with "
                          "--measure-only")
     a = ap.parse_args()
 

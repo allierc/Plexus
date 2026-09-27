@@ -90,7 +90,10 @@ class ScalarField(Field):
         return tuple(out)
 
 
-@register_operator("deposit", family="fields", set="cell", kind="exchange")
+@register_operator("deposit", family="fields", set="cell", kind="exchange",
+                   equation=r"""$$c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) \;\leftarrow\;
+\min\!\Big(1,\; c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) + a\,\Delta t\Big),
+\qquad s=\text{type}(i)$$""")
 class Deposit(Exchange):
     """Deposition: each element adds to the field at the voxel it stands on. The write half
     of stigmergy -- an ant laying pheromone, a slime mould laying trail.
@@ -161,7 +164,9 @@ class Deposit(Exchange):
 
 
 @register_operator("diffuse", family="fields", set="field", kind="field",
-                   implementation="finite_difference")
+                   implementation="finite_difference",
+                   equation=r"""$$c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
+\qquad w=\operatorname{sat}(\text{rate}\cdot\Delta t)$$""")
 class Diffuse(FieldUpdate):
     """Diffusion: the field spreads down its own gradient. One step of the heat equation.
 
@@ -275,7 +280,8 @@ class DiffuseSpectral(FieldUpdate):
         return {}
 
 
-@register_operator("decay", family="fields", set="field", kind="field")
+@register_operator("decay", family="fields", set="field", kind="field",
+                   equation=r"""$$c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)$$""")
 class Decay(FieldUpdate):
     """Evaporation: the field loses a fixed amount everywhere, floored at zero. What stops a
     deposited trail from being permanent, and so what sets how long the past is remembered.
@@ -382,7 +388,11 @@ def _read(fld, centers, weights, ssz):
     return (contrib * inwin[:, None, :].float()).sum(-1)                   # [N, S]
 
 
-@register_operator("sense", family="signalling", set="cell", kind="exchange")
+@register_operator("sense", family="signalling", set="cell", kind="exchange",
+                   equation=r"""$$S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
+\quad k\in\{C\}\cup\text{fan};
+\qquad
+\hat{\mathbf h}_i \leftarrow \mathrm{normalize}\big(\hat{\mathbf h}_i + \omega\,\mathbf r_{k^\star}\big)$$""")
 class Sense(Exchange):
     """Trail following: read the field on a fan of sensors around the heading and turn toward
     the strongest. The read half of stigmergy, and the steering rule of the Physarum model.
@@ -483,7 +493,8 @@ class Sense(Exchange):
         return {}
 
 
-@register_operator("chemotax", family="fields", set="particle", kind="exchange")
+@register_operator("chemotax", family="fields", set="particle", kind="exchange",
+                   equation=r"""$$\dot{\mathbf x}_i=\chi\,\nabla c(\mathbf x_i)+\eta\,\boldsymbol\xi_i$$""")
 class Chemotax(Exchange):
     """Chemotaxis: move along a chemical gradient, up it or down it. The continuum-sensing
     counterpart of `sense`, which samples the field at discrete points instead.
@@ -593,7 +604,8 @@ class PrescribedField(Field):
         return gx, gy
 
 
-@register_operator("playback", family="harness", set="field", kind="field")
+@register_operator("playback", family="harness", set="field", kind="field",
+                   equation=r"""$$\phi(\cdot,\,t) \;=\; V\big[\,t \bmod N_{\text{frames}}\,\big]$$""")
 class Playback(FieldUpdate):
     """Advance a prescribed field to this tick's frame, looping when the video runs out.
 
@@ -626,7 +638,13 @@ class Playback(FieldUpdate):
         return {}
 
 
-@register_operator("pacemaker", family="fields", set="field", kind="field")
+@register_operator("pacemaker", family="fields", set="field", kind="field",
+                   equation=r"""$$p(t) \;=\;
+\begin{cases}
+\sin\!\big(\pi\, s/\tau_d\big) & s<\tau_d\\[2pt]
+0 & \text{otherwise}
+\end{cases},
+\qquad s=(t+\varphi)\bmod T$$""")
 class Pacemaker(FieldUpdate):
     """A clock: one periodic scalar p(t), shared by every operator that reads it. Not a field
     over space -- a single number per tick, published under `name` for others to consume.
@@ -673,7 +691,8 @@ class Pacemaker(FieldUpdate):
         return {}
 
 
-@register_operator("activation_pulse", family="fields", set="field", kind="field")
+@register_operator("activation_pulse", family="fields", set="field", kind="field",
+                   equation=r"""$$a(\mathbf x,t)=p(t)\,e^{-\lVert\mathbf x-\mathbf x_0\rVert^2/2\sigma^2}$$""")
 class ActivationPulse(FieldUpdate):
     """Paint a clocked activation field: where a stimulus is, and when it arrives there. One
     operator with two timing modes, chosen by whether a delay map is given.
@@ -777,7 +796,8 @@ _ACT = {
 }
 
 
-@register_operator("signal", family="signalling", set="neuron", kind="lateral")
+@register_operator("signal", family="signalling", set="neuron", kind="lateral",
+                   equation=r"""$$\frac{dv_i}{dt}=\frac{1}{\tau}\Big(-v_i+b+\!\!\sum_{e\,:\,\mathrm{post}(e)=i}\!\! W_e\,\phi\big(v_{\mathrm{pre}(e)}\big)\Big)$$""")
 class Signal(Lateral):
     """Passive connectome signalling: a neuron relaxes toward the summed input arriving along
     its incoming synapses. A firing-rate network, with no spikes and no channel dynamics.

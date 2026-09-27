@@ -1,0 +1,19 @@
+general: {name: m5_six, duration_s: 8.0, dt: 0.0166666666666667, channels: 1}
+stimulus: {process: band_limited_noise, f_max_hz: 2.0, amplitude: 1.0}
+splits:
+  train: {n_per_cond: 512, seed0: 0}
+  val: {n_per_cond: 32, seed0: 5000000}
+  test: {n_per_cond: 64, seed0: 9000000}
+teachers:
+- {name: integrate, law: integrate}
+- {name: delay, law: delay, seconds: 0.1}
+- {name: lowpass, law: lti, family: butter, band: lowpass, order: 4, cutoff_hz: 1.0}
+- {name: highpass, law: lti, family: butter, band: highpass, order: 4, cutoff_hz: 1.0}
+- name: resonator
+  law: laplace
+  num: [39.4784]
+  den: [1.0, 5.0265, 39.4784]
+- name: differentiate
+  law: laplace
+  num: [1.0, 0.0]
+  den: [0.15, 1.0]

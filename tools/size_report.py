@@ -40,6 +40,26 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 
+class LazyNpz:
+    """An `np.load` whose arrays are decompressed ONCE. `NpzFile[key]` decompresses the whole array
+    on every access, so `z["cell__cell_id"][t]` inside a loop over 1,601 frames decompressed that
+    array 1,601 times -- scoring went quadratic in the run length (exp 3, 2026-09-25). Same
+    interface as the NpzFile for what the rulers use: `files`, `[key]`."""
+
+    def __init__(self, path):
+        self._z = np.load(path)
+        self.files = self._z.files
+        self._c = {}
+
+    def __getitem__(self, k):
+        if k not in self._c:
+            self._c[k] = self._z[k]
+        return self._c[k]
+
+    def __contains__(self, k):
+        return k in self.files
+
+
 def _traj(name, group):
     from plexus.paths import graphs_data_path
     p = os.path.join(graphs_data_path(), group, name, "trajectory.npz")
@@ -55,7 +75,16 @@ def _convention(traj):
 
 
 def _volumes(z, t, convention="wedge"):
-    """Cell volumes in the run's own convention (see `_convention`)."""
+    """Cell volumes in the run's own convention (see `_convention`).
+
+    READ, NOT REBUILT, when the run recorded them: `cell_geometry` writes a `volume` block in this
+    same convention (the polyhedron whenever `sep` exists, the wedge otherwise) when the spec
+    declares one, and the cell set's rows are the mesh's faces in order. Rebuilding every cell's
+    polyhedron at every frame is what made scoring take minutes per run (exp 3, 2026-09-25).
+    """
+    if "cell__volume" in z.files:
+        nF = int(z["vertex__mesh_nF"][t])
+        return np.asarray(z["cell__volume"][t], np.float64)[:nF, 0]
     import torch
     from plexus.operators.vertex_ops import apicobasal_geometry_3d, face_geometry_3d
     off = z["vertex__mesh_offsets"]

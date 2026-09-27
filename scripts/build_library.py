@@ -671,8 +671,13 @@ def render_operator_page(name: str, cls) -> str:
     out.append("")
     out.append(clean_prose(body) if body else "_See source below._")
     out.append("")
-    if e.get("equation"):
-        out.append(e["equation"])
+    # THE EQUATION COMES FROM THE OPERATOR ITSELF when it declares one. `equation=` on
+    # `@register_operator(...)` is stamped as `cls.EQUATION`, and that is the single source the
+    # slides (tools/spec_summary.py) also read; the ENRICH entry is the older home and is used
+    # only for an operator that has not been given one, so the two can never show different maths.
+    equation = getattr(cls, "EQUATION", "") or e.get("equation")
+    if equation:
+        out.append(equation)
         out.append("")
 
     # Parameters

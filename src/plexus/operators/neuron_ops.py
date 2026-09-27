@@ -123,7 +123,8 @@ def _type_params(lvl, params) -> torch.Tensor:
 #  phi -- the local update
 # --------------------------------------------------------------------------- #
 @register_operator("neuron_update", family="signalling", set="neuron", kind="lateral",
-                   model="leaky_tanh")
+                   model="leaky_tanh",
+                   equation=r"""$$\frac{dx_i}{dt}\mathrel{+}=-a_i x_i+b_i+s_i\tanh(x_i)+\eta_i$$""")
 class NeuronUpdate(Lateral):
     """phi, the local update: a neuron's own dynamics, with no reference to any other neuron.
     A leaky integrator plus a self-coupling term.
@@ -358,7 +359,8 @@ class _NeuronSignal(Lateral):
 
 
 @register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
-                   model="shared")
+                   model="shared",
+                   equation=r"""$$\psi(x_j)=\phi(x_j)$$""")
 class NeuronSignalShared(_NeuronSignal):
     """One transfer function for every connection in the network:
 
@@ -367,6 +369,10 @@ class NeuronSignalShared(_NeuronSignal):
     The claim is that neurons differ in how they integrate but speak a common language. This is
     the reference's first experiment, and the NeuralGraph PDE_N2 generator, whose message is
     W @ phi(u) with no per-type term inside phi.
+
+    Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+    the activity of neural assemblies -- the first experiment, one transfer function for the
+    whole network (the NeuralGraph PDE_N2 generator).
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -383,6 +389,9 @@ class NeuronSignalTypePre(_NeuronSignal):
     h_j and w_j are the threshold and width from the SENDING neuron's type row, both in the
     units of x. The claim is about the presynaptic terminal: how a neuron's state is converted
     into a signal is a property of the neuron sending it. The NeuralGraph PDE_N4 generator.
+
+    Reference: Allier, C. et al., as above -- the presynaptic-terminal variant, where the scale and
+    threshold belong to the neuron sending the signal (the NeuralGraph PDE_N4 generator).
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -405,6 +414,9 @@ class NeuronSignalTypePairwise(_NeuronSignal):
     The asymmetry is deliberate and IS the model: w off the post-synaptic row, h and log w off
     the pre-synaptic one. Making both pre would silently turn this into `type_pre` with an
     extra term.
+
+    Reference: Allier, C. et al., eqn. (simulation3) -- the pairwise variant, and the form under
+    which the transfer functions were recovered (the NeuralGraph PDE_N5 generator).
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -415,7 +427,8 @@ class NeuronSignalTypePairwise(_NeuronSignal):
 # --------------------------------------------------------------------------- #
 #  Omega -- the external field, onto the neurons
 # --------------------------------------------------------------------------- #
-@register_operator("neuron_field_input", family="signalling", set="neuron", kind="exchange")
+@register_operator("neuron_field_input", family="signalling", set="neuron", kind="exchange",
+                   equation=r"""$$\Omega_i=\text{gain}\cdot F(\mathbf x_i)+\text{offset}$$""")
 class NeuronFieldInput(Exchange):
     """Omega, the external modulation: sample a field at each neuron's position and write the
     value into a state block, for `neuron_signal` to multiply its message by.
@@ -491,7 +504,8 @@ class NeuronFieldInput(Exchange):
 # --------------------------------------------------------------------------- #
 #  the seed -- x_0 from a frozen connectome region
 # --------------------------------------------------------------------------- #
-@register_operator("neuron_drive", family="signalling", set="neuron", kind="exchange")
+@register_operator("neuron_drive", family="signalling", set="neuron", kind="exchange",
+                   equation=r"""$$\frac{dx_i}{dt}\mathrel{+}=\text{gain}\cdot\Omega(\mathbf x_i)+\text{offset}$$""")
 class NeuronDrive(Exchange):
     """An external CURRENT into the neurons it is applied to, read off a field at their positions.
 
@@ -500,6 +514,9 @@ class NeuronDrive(Exchange):
     where `neuron_field_input` is the multiplicative modulation Omega of the reference CTRNN. Which
     neurons receive it is the `at:` selector's business (`at: neuron[type=AF5]`), as for every
     operator; the masked neurons get nothing, not a zero written over their state.
+
+    Reference: Plexus (this work); an injected current, the experimental counterpart of a current
+    clamp rather than a mechanism the tissue owns.
     """
 
     EMIT = "velocity"
@@ -532,7 +549,8 @@ class NeuronDrive(Exchange):
         return {self.at: dx}
 
 
-@register_operator("neural_seed", family="seed", set="neuron", kind="seed")
+@register_operator("neural_seed", family="seed", set="neuron", kind="seed",
+                   equation=r"""$$\mathbf x_i=\mathbf o+\text{scale}\,\frac{\mathbf X_i-\mathbf X_{\mathrm{lo}}}{\text{side}},\qquad v_i=\bar v_0+\sigma_{v_0} z_i,\ \ z_i\sim\mathcal N(0,1)$$""")
 class NeuralSeed(Seed):
     """Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at
     their real positions, rather than points scattered in a box.
@@ -540,7 +558,8 @@ class NeuralSeed(Seed):
     neuron -> neuron: reads a file, writes pos, voltage and neurite_dir, once, at the opening
     of the trajectory.
 
-        x_i = (xyz_i - bounds_lo) / side          the cube becomes the unit box
+        x_i = offset + scale * (xyz_i - bounds_lo) / side     the cube becomes the unit box,
+                                                              placed where the spec asks
         v_i = v0_mean + v0_sd z_i,  z_i ~ N(0, 1)
 
     xyz_i is the soma position in NANOMETRES and side the cube's edge in the same units; the
@@ -583,7 +602,8 @@ class NeuralSeed(Seed):
     REQUIRES_PARAMS = ["region"]
     MECHANISM_TAGS = ["connectome", "anatomy", "initial_condition", "neuprint"]
     PARAM_ROLES = {"region": "frozen_region_manifest_dir", "v0_sd": "initial_voltage_spread",
-                   "v0_mean": "initial_voltage_mean"}
+                   "v0_mean": "initial_voltage_mean", "offset": "region_origin_in_world_units",
+                   "scale": "fraction_of_the_world_the_region_cube_fills"}
     REFERENCE = ("Region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain "
                  "connectome from Scheffer, L. K. et al. (2020). A connectome and analysis of "
                  "the adult Drosophila central brain. eLife 9:e57443.")
@@ -594,6 +614,8 @@ class NeuralSeed(Seed):
         self.region = params["region"]
         self.v0_mean = float(params.get("v0_mean", 0.0))
         self.v0_sd = float(params.get("v0_sd", 0.5))   # a spread, so v = 0 is not a fixed point
+        self.offset = params.get("offset")             # where the region sits, in world units
+        self.scale = float(params.get("scale", 1.0))   # how much of the world the cube fills
 
     def _load(self):
         # `region_path` owns the convention -- a bare name resolves to
@@ -626,6 +648,23 @@ class NeuralSeed(Seed):
                 f"a different circuit than the one the manifest and the connectome describe.")
         D = H.dim
         unit = (xyz - lo) / side                                   # the cube -> the unit box
+        # WHERE THE REGION SITS IN THE WORLD, in world units, added after the affine.
+        #
+        # The mapping above fills the unit box by construction, which is right when the world IS
+        # the region and wrong the moment the region has to share the world with anything else --
+        # a floor to fall onto, a volume of water to swim through, a second animal. Those need a
+        # world larger than the cube and the region placed somewhere in it, and there was no way
+        # to say so: an animal seeded into a 1 x 1 x 3 box still spanned z = 0 to 0.95 and was
+        # already resting on the floor.
+        #
+        # It is a TRANSLATION and nothing else. No scale, no rotation: every distance ratio the
+        # affine preserved is still preserved, and `length_um` still means what it meant, so the
+        # units check below is untouched. `scale` is offered for the same reason and defaults to
+        # 1, so a spec that declares neither gets exactly the old behaviour.
+        if self.scale != 1.0:
+            unit = unit * self.scale
+        if self.offset is not None:
+            unit = unit + np.asarray(self.offset, np.float64)[None, :unit.shape[1]]
         dev = lvl.state.device
         st = lvl.state.clone()                                     # clone-and-reassign: autograd-safe
         px0, px1 = lvl.state_schema["pos"]
@@ -776,9 +815,55 @@ class MorphologySeed(Seed):
         u[over], v[over] = 1.0 - u[over], 1.0 - v[over]
         return a[k] + (b[k] - a[k]) * u[:, None] + (c[k] - a[k]) * v[:, None]
 
-    def _points_for(self, path, n, rng):
+    def _pack(self, root):
+        """The region's skeletons as ONE binary file, built on first use and reused after.
+
+        WHY. `_swc` parses a text file per cell, and a region of 4,000 traced cells is 3.2 million
+        numbers in 4,000 files: 18 s per seed, measured, and paid again on every BUILD. It is not
+        the parser -- `np.fromstring` measured the same 18 s -- it is parsing text at all. The
+        `.swc` files stay, because they are the interchange format and what a person inspects;
+        this is a cache beside them, rebuilt whenever it is older than the directory.
+
+            xyz [N,3] float32, rad [N] float32, par [N] int32, off [C+1] int64
+
+        `off` is indexed by the row order of `morphology_index.json`'s keys, so cell k owns
+        rows off[k]:off[k+1]; `ids` records which body id each slot is, because a region whose
+        body ids are not 0..C-1 must still find its own.
+        """
+        import time as _t
+        cache = os.path.join(root, "skeletons_packed.npz")
+        sk = os.path.join(root, "skeletons")
+        if os.path.exists(cache) and os.path.exists(sk) and \
+                os.path.getmtime(cache) >= os.path.getmtime(sk):
+            z = np.load(cache, allow_pickle=True)
+            # MATERIALISE THE ARRAYS ONCE, then slice them. Indexing `z["xyz"][a:b]` inside the
+            # comprehension re-reads and re-decompresses the WHOLE array on every one of the 4,000
+            # cells: it turned a 28 s seed into 315 s, which is worse than the text files this
+            # cache exists to replace. Four reads, then pure views.
+            xyz, rad, par = np.asarray(z["xyz"]), np.asarray(z["rad"]), np.asarray(z["par"])
+            off, ids = np.asarray(z["off"]), np.asarray(z["ids"])
+            return {int(b): (xyz[off[i]:off[i + 1]], rad[off[i]:off[i + 1]], par[off[i]:off[i + 1]])
+                    for i, b in enumerate(ids)}
+        table = json.load(open(os.path.join(root, "morphology_index.json"))).get("skeletons") or {}
+        if not table:
+            return {}
+        t0 = _t.perf_counter()
+        ids, X, R, P, off = [], [], [], [], [0]
+        for b, f in table.items():
+            xyz, rad, par = self._swc(os.path.join(root, f))
+            ids.append(int(b)); X.append(xyz.astype(np.float32))
+            R.append(rad.astype(np.float32)); P.append(par.astype(np.int32))
+            off.append(off[-1] + len(xyz))
+        np.savez(cache, xyz=np.vstack(X), rad=np.concatenate(R), par=np.concatenate(P),
+                 off=np.asarray(off, np.int64), ids=np.asarray(ids, np.int64))
+        print(f"[morphology_seed] packed {len(ids):,} skeletons ({off[-1]:,} nodes) into "
+              f"{os.path.basename(cache)} in {_t.perf_counter() - t0:.1f}s -- built once",
+              flush=True)
+        return {int(b): (X[i], R[i], P[i]) for i, b in enumerate(ids)}
+
+    def _points_for(self, path, n, rng, swc=None):
         """`n` points along a skeleton's segments, off-centreline by the local radius."""
-        xyz, rad, par = self._swc(path)
+        xyz, rad, par = swc if swc is not None else self._swc(path)
         ok = par >= 0
         if not ok.any() or n <= 0:
             return np.tile(xyz[:1] if len(xyz) else np.zeros((1, 3)), (max(n, 0), 1))
@@ -823,6 +908,7 @@ class MorphologySeed(Seed):
         # declares `region.voxel_size_nm`; it is applied here, once.
         _vox = float((man.get("region") or {}).get("voxel_size_nm", 1.0) or 1.0)
         rng = np.random.default_rng(self.seed)
+        packed = self._pack(root) if self.kind in ("skeleton", "soma_skeleton") else {}
         st = lvl.state.clone()
         px0, px1 = lvl.state_schema["pos"]
         out = np.zeros((lvl.n, 3))
@@ -851,9 +937,10 @@ class MorphologySeed(Seed):
                       else side * 0.004) / _vox
                 u = rng.normal(size=(n_s, 3)); u /= np.linalg.norm(u, axis=1, keepdims=True).clip(1e-12)
                 soma = ctr + u * (rr * rng.random((n_s, 1)) ** (1.0 / 3.0))
-                pts = np.concatenate([soma, self._points_for(_f, len(rows) - n_s, rng)], 0)
+                pts = np.concatenate([soma, self._points_for(_f, len(rows) - n_s, rng,
+                                                             packed.get(int(bids[p])))], 0)
             else:
-                pts = self._points_for(_f, len(rows), rng)
+                pts = self._points_for(_f, len(rows), rng, packed.get(int(bids[p])))
             out[rows] = (pts * _vox - lo) / side
         st[:, px0:px1] = torch.as_tensor(out[:, :H.dim], dtype=st.dtype, device=lvl.state.device)
         # PAINTED BEFORE ANYTHING RUNS, with the parent's CELL TYPE. A morphology seeded and not
@@ -875,7 +962,8 @@ class MorphologySeed(Seed):
         return {}
 
 
-@register_operator("paint_children", family="observation", set="points", kind="aggregate")
+@register_operator("paint_children", family="observation", set="points", kind="aggregate",
+                   equation=r"""$$\text{paint}_i=x_{\pi(i, title="Sum the children onto their parent")}$$""")
 class PaintChildren(Exchange):
     """Copy a parent's scalar onto every point that draws it, each frame.
 
@@ -887,6 +975,8 @@ class PaintChildren(Exchange):
     changes is its voltage, and a morphology render is worth its 400,000 points only if those
     points carry it. This is an OBSERVATION -- it moves nothing and no dynamics reads `paint` --
     which is why it is a copy and not a coupling.
+
+    Reference: none -- this copies a value for the renderer to draw; it is not a mechanism. Plexus (this work).
     """
 
     EMIT = None

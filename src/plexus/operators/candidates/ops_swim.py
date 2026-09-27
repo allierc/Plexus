@@ -53,7 +53,7 @@ class SquirmerFlowOperator(Exchange):
         return {}
 
 
-@register_operator("slip", set="surface_node", kind="broadcast", family="boundary")
+@register_operator("slip", set="surface_node", kind="broadcast", family="boundary", title="Hand the parent's value to its children")
 class SlipOperator(Broadcast):
     """Broadcast organism pose to its surface nodes: position each node on the
     sphere surface and set its tangential slip vector (the 'wavy surface velocity',

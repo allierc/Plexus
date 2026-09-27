@@ -1,0 +1,407 @@
+general:
+  name: exp04_vk8t
+  seed: 0
+  n_frames: 150000
+  dt: 3.56620536048939e-07
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  record_cap: 3001
+  field_record_cap: 2
+  units: {length_um: 0.017, time_s: 3.9762931834486873e-07, force_nN: 0.00024176470588235292}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      psi: {width: 1, integration: first_order, unit: voltage, title: membrane potential}
+      j_channel: {width: 1, integration: none, unit: current, title: channel current}
+      n_filter: {width: 1, integration: none, unit: count, title: ions in the filter}
+      n_crossed: {width: 1, integration: none, unit: count, title: ions that crossed}
+    title: the cell's interior (the voltage-clamped compartment)
+  Kv12_1:
+    n: 257
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: Kv1.2, chain 1
+  Kv12_2:
+    n: 257
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: Kv1.2, chain 2
+  Kv12_3:
+    n: 257
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: Kv1.2, chain 3
+  Kv12_4:
+    n: 257
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: Kv1.2, chain 4
+  filter_O:
+    n: 20
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: carbonyl oxygens of the selectivity filter
+  filter_C:
+    n: 20
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: carbonyl carbons of the selectivity filter
+  lipid:
+    n: 278
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: membrane lipids
+  K:
+    n: 255
+    start:
+    - [0.5, 0.5, 0.528141]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: potassium ions (K+)
+fields:
+  elec: {frame: grid, res: 128, components: 2, title: electric potential in the electrolyte}
+  kden: {frame: grid, res: 128, components: 1, title: potassium density (time-averaged)}
+seed:
+- op: cloud_seed
+  at: Kv12_1
+  cloud: exp04_kv12/c0
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: Kv12_2
+  cloud: exp04_kv12/c1
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: Kv12_3
+  cloud: exp04_kv12/c2
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: Kv12_4
+  cloud: exp04_kv12/c3
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: filter_O
+  cloud: exp04_kv12/filter_O
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: filter_C
+  cloud: exp04_kv12/filter_C
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: lipid
+  cloud: exp04_kv12/lipid
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+- op: cloud_seed
+  at: K
+  cloud: exp04_kv12/K
+  origin: [0.5, 0.5, 0.528141]
+  scale: 58823529.4117647
+operators:
+- op: membrane_potential
+  at: cell
+  capacitance: 1000000000000.0
+  pump_max: 0.0
+  pump_rev: 1.0
+  leak: 0.0
+  psi0: 5.847359978102189
+  h0: [0.0, 0.0]
+  flux: j_channel
+- op: electrolyte_conduction
+  at: cell
+  field: elec
+  insulators:
+  - {set: Kv12_1, radius: 0.029411764705882353}
+  - {set: Kv12_2, radius: 0.029411764705882353}
+  - {set: Kv12_3, radius: 0.029411764705882353}
+  - {set: Kv12_4, radius: 0.029411764705882353}
+  - {set: lipid, radius: 0.03235294117647059}
+  sigma: 1.9
+  volt_per_sim: 0.025652602296033736
+  dx_m: 1.328125e-10
+  sim_current_per_A: 2481806998721.1455
+  slab: [0.410493906806497, 0.6457880244535559]
+  cell: cell
+  axis_sets: [Kv12_1, Kv12_2, Kv12_3, Kv12_4]
+  lumen_core:
+    radius: 0.011764705882352941
+    z: [0.38108214210061464, 0.6751997891594382]
+  lumen_radius: 0.058823529411764705
+  every: 200000
+  iters: 300
+  iters_first: 60000
+  omega: 1.0
+- op: pair_potential
+  at: K
+  law: coulomb
+  k_c: 0.041176470588235294
+  debye: 0.04617203675478646
+  cutoff: 0.14705882352941177
+  slab:
+    z: [0.410493906806497, 0.6457880244535559]
+    eps_ratio: 8.0
+  f_max: 1834.9716446124758
+  charge: 1.0
+  mobility: 2.696724788774888
+- op: pair_potential
+  at: K
+  with: filter_O
+  law: coulomb
+  k_c: 0.041176470588235294
+  debye: 0.04617203675478646
+  cutoff: 0.14705882352941177
+  slab:
+    z: [0.410493906806497, 0.6457880244535559]
+    eps_ratio: 8.0
+  f_max: 1834.9716446124758
+  charge: 1.0
+  charge_with: -0.5
+  mobility: 2.696724788774888
+  react: true
+  mobility_with: 1.0
+- op: pair_potential
+  at: K
+  with: filter_C
+  law: coulomb
+  k_c: 0.041176470588235294
+  debye: 0.04617203675478646
+  cutoff: 0.14705882352941177
+  slab:
+    z: [0.410493906806497, 0.6457880244535559]
+    eps_ratio: 8.0
+  f_max: 1834.9716446124758
+  charge: 1.0
+  charge_with: 0.5
+  mobility: 2.696724788774888
+  react: true
+  mobility_with: 1.0
+- {op: pair_potential, at: K, law: wca, sigma: 0.015294117647058824, epsilon: 1.0, mobility: 2.696724788774888,
+  f_max: 12233.144297416506}
+- {op: pair_potential, at: K, with: filter_O, law: wca, sigma: 0.013529411764705884, epsilon: 1.0, mobility: 2.696724788774888,
+  react: true, mobility_with: 1.0, f_max: 12233.144297416506}
+- op: pair_potential
+  at: K
+  with_sets: [Kv12_1, Kv12_2, Kv12_3, Kv12_4]
+  law: wca
+  sigma: 0.01764705882352941
+  epsilon: 1.0
+  mobility: 2.696724788774888
+  react: false
+  f_max: 12233.144297416506
+- {op: pair_potential, at: K, with: lipid, law: wca, sigma: 0.026470588235294117, epsilon: 1.0, mobility: 2.696724788774888,
+  react: false, f_max: 12233.144297416506}
+- {op: field_force, at: K, field: elec, channel: 0, charge: 1.0, mobility: 2.696724788774888, volt_per_sim: 0.025652602296033736}
+- {op: brownian, at: K, kT: 1.0, mobility: 2.696724788774888, seed: 3}
+- op: tether
+  at: filter_O
+  k: 150121.87746920128
+  axes: [0, 1, 2]
+  mobility: 1.0
+- op: tether
+  at: filter_C
+  k: 195030.13141297945
+  axes: [0, 1, 2]
+  mobility: 1.0
+- {op: brownian, at: filter_O, kT: 1.0, mobility: 1.0, seed: 4}
+- {op: brownian, at: filter_C, kT: 1.0, mobility: 1.0, seed: 5}
+- op: slab_barrier
+  at: K
+  height: 98.86458044862918
+  z0: 0.528141
+  half_thickness: 0.08235294117647059
+  edge: 0.01764705882352941
+  pore_radius: 0.058823529411764705
+  pore_edge: 0.011764705882352941
+  axis_xy: [0.5, 0.5]
+  mobility: 2.696724788774888
+  pore_profile:
+  - [0.422259, 0.058824]
+  - [0.4252, 0.058824]
+  - [0.428141, 0.058824]
+  - [0.431082, 0.058824]
+  - [0.434023, 0.058824]
+  - [0.436964, 0.058824]
+  - [0.439906, 0.058824]
+  - [0.442847, 0.058824]
+  - [0.445788, 0.058824]
+  - [0.448729, 0.058824]
+  - [0.45167, 0.058824]
+  - [0.454612, 0.058824]
+  - [0.457553, 0.058824]
+  - [0.460494, 0.058824]
+  - [0.463435, 0.058824]
+  - [0.466376, 0.058824]
+  - [0.469317, 0.058824]
+  - [0.472259, 0.058824]
+  - [0.4752, 0.058824]
+  - [0.478141, 0.058824]
+  - [0.481082, 0.058824]
+  - [0.484023, 0.058824]
+  - [0.486964, 0.058824]
+  - [0.489906, 0.058824]
+  - [0.492847, 0.058824]
+  - [0.495788, 0.058824]
+  - [0.498729, 0.058824]
+  - [0.50167, 0.058824]
+  - [0.504612, 0.058824]
+  - [0.507553, 0.058824]
+  - [0.510494, 0.058824]
+  - [0.513435, 0.058824]
+  - [0.516376, 0.058824]
+  - [0.519317, 0.058824]
+  - [0.522259, 0.058824]
+  - [0.5252, 0.058824]
+  - [0.528141, 0.058824]
+  - [0.531082, 0.058824]
+  - [0.534023, 0.020588]
+  - [0.536964, 0.020588]
+  - [0.539906, 0.020588]
+  - [0.542847, 0.020588]
+  - [0.545788, 0.020588]
+  - [0.548729, 0.020588]
+  - [0.55167, 0.020588]
+  - [0.554612, 0.020588]
+  - [0.557553, 0.020588]
+  - [0.560494, 0.020588]
+  - [0.563435, 0.020588]
+  - [0.566376, 0.020588]
+  - [0.569317, 0.020588]
+  - [0.572259, 0.020588]
+  - [0.5752, 0.020588]
+  - [0.578141, 0.020588]
+  - [0.581082, 0.020588]
+  - [0.584023, 0.020588]
+  - [0.586964, 0.020588]
+  - [0.589906, 0.020588]
+  - [0.592847, 0.020588]
+  - [0.595788, 0.020588]
+  - [0.598729, 0.020588]
+  - [0.60167, 0.020588]
+  - [0.604612, 0.020588]
+  - [0.607553, 0.020588]
+  - [0.610494, 0.020588]
+  - [0.613435, 0.020588]
+  - [0.616376, 0.020588]
+  - [0.619317, 0.020588]
+  - [0.622259, 0.020588]
+  - [0.6252, 0.058824]
+  - [0.628141, 0.058824]
+  - [0.631082, 0.058824]
+  - [0.634023, 0.058824]
+- op: flux_counter
+  at: K
+  z_m: 0.528141
+  radius: 0.058823529411764705
+  window: 200000.0
+  charge: 1.0
+  cell: cell
+  block: j_channel
+  wrap: true
+  sign: -1.0
+  filter_z: [0.5329704158446368, 0.62257238556357]
+  occupancy_block: n_filter
+  axis_xy: [0.5, 0.5]
+- op: density_field
+  at: K
+  field: kden
+  s: 0.007058823529411764
+  every: 20
+  window: 20000.0
+  within: [0.38235294117647056, 0.6176470588235294, 0.38235294117647056, 0.6176470588235294, 0.3516703773947323,
+    0.7046115538653206]
+schedule: [membrane_potential, electrolyte_conduction, pair_potential, pair_potential, pair_potential, pair_potential,
+  pair_potential, pair_potential, pair_potential, field_force, brownian, tether, tether, brownian, brownian, slab_barrier,
+  flux_counter, density_field]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [Kv12_1, Kv12_4, lipid]
+  hide_sets: [cell, filter_O, filter_C, Kv12_3, Kv12_2]
+  surface:
+    Kv12_1: {render: surface, spacing: 0.017647, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    Kv12_2: {render: surface, spacing: 0.017647, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    Kv12_3: {render: surface, spacing: 0.017647, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    Kv12_4: {render: surface, spacing: 0.017647, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    lipid: {render: surface, spacing: 0.023529, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, near_side: far}
+  surface_min_points: 30
+  near_side_centre: [0.5, 0.5, 0.528141]
+  opacity: {Kv12_1: 0.45, Kv12_2: 0.45, Kv12_3: 0.45, Kv12_4: 0.45, lipid: 0.45}
+  colors:
+    Kv12_1: [0.36, 0.58, 0.8]
+    Kv12_2: [0.9, 0.62, 0.36]
+    Kv12_3: [0.47, 0.72, 0.52]
+    Kv12_4: [0.84, 0.47, 0.47]
+    lipid: [0.82, 0.82, 0.84]
+  spheres:
+    set: K
+    radius: 0.011765
+    color: '#b388ff'
+    specular: 0.0
+    ambient: 0.35
+    diffuse: 0.75
+    within:
+      centre: [0.5, 0.5, 0.528141]
+      radius: 0.08823529411764706
+      half_height: 0.20588235294117646
+  field_iso:
+    field: kden
+    channel: 0
+    levels: [1331.374, 2662.748]
+    colors: ['#9a6bff', '#e3d4ff']
+    opacity: [0.25, 0.7]
+    smooth: 10
+  camera: {elev: 15.0, azim: 30.0}
+  zoom: 1.7
+  curve:
+  - {quantity: 'block:cell:j_channel', unit: current_pA, ymin: -2.0, ymax: 12.0, ylabel: current at +150 mV, font_size: 21,
+    tick_font_size: 16}
+  - {quantity: 'block:cell:n_filter', ymin: 0.0, ymax: 4.0, ylabel: K+ in the filter, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:n_crossed', ymin: 0.0, ymax: 10.0, ylabel: K+ across, font_size: 21, tick_font_size: 16}
+  subject: Kv12_1
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  replay_curves: false
+  curve_time: {per_frame_s: 1.418027806569213e-13, unit: ns}

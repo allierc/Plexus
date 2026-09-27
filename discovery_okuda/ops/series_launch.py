@@ -1,4 +1,4 @@
-"""Submit 69-75 to gpu_l4, one job each. Same machinery as race_launch."""
+"""Submit 69-75 to ${CLUSTER_QUEUE_PREFIX}l4, one job each. Same machinery as race_launch."""
 import os
 import sys
 
@@ -38,7 +38,7 @@ def main():
                 f"export PYTHONPATH={cluster.cpath('/workspace/Plexus/src')}:"
                 f"{cluster.cpath('/workspace/Plexus/discovery_okuda/ops')}:{cluster.cpath(HERE)}",
                 "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
-                "export GNN_OUTPUT_ROOT=/groups/saalfeld/home/allierc/GraphData",
+                f"export GNN_OUTPUT_ROOT={os.environ['GNN_OUTPUT_ROOT']}",
                 # corset runs are two-stage and live in their own script; dispatch by name so one
                 # launcher serves both rather than duplicating the bsub plumbing
                 f"conda run -n {cluster.ENV} python "

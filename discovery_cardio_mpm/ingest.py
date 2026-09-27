@@ -50,7 +50,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # The one recording this project fits. Named once, here, and nowhere else.
-SOURCE_ROOT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+SOURCE_ROOT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 HEALTHY_DERIV = os.path.join(SOURCE_ROOT, "Cardio_1",
                              "0_B_15kPa_1_MMStack_Pos0.ome.tif.derivatives.npy")
 DT_HEALTHY = 0.04166

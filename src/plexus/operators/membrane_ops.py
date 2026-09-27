@@ -104,7 +104,8 @@ class BasementMembraneNode:
         lvl.register_buffer("alive", torch.zeros(n, dtype=torch.bool, device=device))
 
 
-@register_operator("bm_seed", family="seed", set="particle", kind="seed")
+@register_operator("bm_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_i=\mathbf c+\mathbf u_i\big(S\,R(\theta_i,\phi_i)+\text{offset}\big)$$""")
 class BasementMembraneSeed(Structural):
     """Lay the membrane down once, as a shell just OUTSIDE the epithelium's surface.
 
@@ -366,7 +367,256 @@ class BasementMembraneSeed(Structural):
         return {}
 
 
-@register_operator("bm_bond", family="mechanics", set="particle", kind="lateral")
+# ---- the membrane against the LIVE tissue (exp05 / exp11; roadmap M1, in its smallest form) ------
+#
+# `bm_seed` / `bm_contact` above read the epithelium as a RECORDED radius map; the `live`
+# implementations below read the apico-basal tissue's BASAL surface (`pos - sep`; the mid-surface
+# `pos` of a tissue without a separation) at the frame they run, and the contact returns its reaction
+# to that surface (the load helpers in contact_ops, the relaxation in vertex_ops).
+#
+# THE CONTACT FINDS EACH NODE'S NEAREST POINT ON THE SURFACE, NOT THE SURFACE ON ITS RAY.
+# `mesh_contact` rays from the tissue centroid and takes the outermost face, which assumes a
+# star-shaped surface (FUSED_09.md, open defect 2). Measured on the first live hole run (60 cells
+# grown to 700): once a bud grew, the deepest membrane node read 1.4 units "inside" the tissue, more
+# than a whole cell thickness (0.88), because a node beside the bud's neck had its ray hit the bud
+# wall; with the nearest-point lookup the deepest reads 0.26. A membrane is a sheet lying ON the
+# surface, so the question is local: which face is nearest, and on which side of it the node sits.
+
+def _basal_lookup():
+    """A `mesh_contact[model: spatial_hash]` instance used ONLY for its surface index. Building one
+    registers it as the contact `mesh_inside` counts against (`_LIVE`); that is put back."""
+    from plexus.operators.contact_ops import MeshContactHash, _LIVE
+    prev = _LIVE.get("contact")
+    geo = MeshContactHash({"surface": "_lookup_only_", "verbose": False})
+    geo._said_hash = True
+    if prev is None:
+        _LIVE.pop("contact", None)
+    else:
+        _LIVE["contact"] = prev
+    return geo
+
+
+def _live_basal(H, surface, sep_block, geo, dev, dt_):
+    """(mesh table, centroid c, lookup M) of the tissue's basal surface `pos - sep` this frame,
+    about its own centroid -- or None before the tissue is seeded."""
+    tl = H.level(surface)
+    m = getattr(tl, "_mesh", None)
+    if m is None or not int(m.get("Nv", 0)):
+        return None
+    nv = int(m["Nv"])
+    B = tl.get("pos")[:nv].to(device=dev, dtype=dt_)
+    # A MID-SURFACE TISSUE (the default `cell_mechanics` shape energy) HAS NO SEPARATION: its one
+    # surface is the one the membrane rests on, and the standoff stands for half the cell thickness.
+    if sep_block in tl.state_schema:
+        B = B - tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
+    c = B.mean(0)
+    V = B - c
+    M = geo._build_from(V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev),
+                        torch.zeros_like(V), dev, dt_)
+    return m, c, M
+
+
+def _closest_point_barycentric(P, A, B, C):
+    """Barycentric (b0, b1, b2) of the point of triangle ABC nearest P, batched over [..., 3].
+
+    Ericson, C. (2005). Real-Time Collision Detection, sec. 5.1.5 (ClosestPtPointTriangle): the
+    Voronoi regions of the three vertices, three edges and the face, the earlier region winning."""
+    ab, ac, ap = B - A, C - A, P - A
+    d1, d2 = (ab * ap).sum(-1), (ac * ap).sum(-1)
+    bp = P - B
+    d3, d4 = (ab * bp).sum(-1), (ac * bp).sum(-1)
+    cp = P - C
+    d5, d6 = (ab * cp).sum(-1), (ac * cp).sum(-1)
+    va, vb, vc = d3 * d6 - d5 * d4, d5 * d2 - d1 * d6, d1 * d4 - d3 * d2
+
+    def safe(x):
+        return torch.where(x.abs() < 1e-30, torch.full_like(x, 1e-30), x)
+    den = safe(va + vb + vc)
+    v, w = vb / den, vc / den
+    b = torch.stack([1.0 - v - w, v, w], -1)                                   # the face interior
+    z, o = torch.zeros_like(d1), torch.ones_like(d1)
+    regions = []
+    t = (d4 - d3) / safe((d4 - d3) + (d5 - d6))
+    regions.append(((va <= 0) & ((d4 - d3) >= 0) & ((d5 - d6) >= 0), torch.stack([z, 1 - t, t], -1)))
+    t = d2 / safe(d2 - d6)
+    regions.append(((vb <= 0) & (d2 >= 0) & (d6 <= 0), torch.stack([1 - t, z, t], -1)))
+    regions.append(((d6 >= 0) & (d5 <= d6), torch.stack([z, z, o], -1)))
+    t = d1 / safe(d1 - d3)
+    regions.append(((vc <= 0) & (d1 >= 0) & (d3 <= 0), torch.stack([1 - t, t, z], -1)))
+    regions.append(((d3 >= 0) & (d4 <= d3), torch.stack([z, o, z], -1)))
+    regions.append(((d1 <= 0) & (d2 <= 0), torch.stack([o, z, z], -1)))
+    for cond, val in regions:                          # later in the list = earlier in Ericson
+        b = torch.where(cond[..., None], val, b)
+    return b
+
+
+def _nearest_faces(M, c, y):
+    """For points y [n, 3] (world coordinates), the nearest fan triangle of the surface in M (built
+    about the centroid c): (found [n], tri [n], w [n, 3], n_hat [n, 3] outward, gap [n] the height
+    of y above the triangle along n_hat).
+
+    OUTWARD BY THE MESH'S OWN WINDING, one sign for the whole surface -- the majority sign of
+    n . (triangle centre), area-weighted -- so a face on a bud's side wall or under an overhang keeps
+    its true outward side instead of the one its position from the centroid suggests."""
+    dev, dt_ = y.device, y.dtype
+    n = y.shape[0]
+    found = torch.zeros(n, dtype=torch.bool, device=dev)
+    tri = torch.zeros(n, dtype=torch.long, device=dev)
+    w = torch.zeros(n, 3, device=dev, dtype=dt_)
+    nh = torch.zeros(n, 3, device=dev, dtype=dt_)
+    gap = torch.zeros(n, device=dev, dtype=dt_)
+    if n == 0:
+        return found, tri, w, nh, gap
+    A, B, C = M["A"], M["B"], M["C"]
+    if "nrm_wind" not in M:
+        raw = torch.cross(B - A, C - A, dim=1)
+        sgn = torch.sign((raw * (A + B + C)).sum())
+        sgn = sgn if float(sgn) != 0.0 else torch.ones_like(sgn)
+        M["nrm_wind"] = sgn * raw / raw.norm(dim=1).clamp_min(1e-20)[:, None]
+    x = y - c
+    nx, ny, nz = M["hdims"]
+    h, lo = M["h"], M["lo"]
+    cc = ((x - lo) / h).long()
+    cc[:, 0].clamp_(0, nx - 1); cc[:, 1].clamp_(0, ny - 1); cc[:, 2].clamp_(0, nz - 1)
+    o = torch.tensor([-1, 0, 1], device=dev)
+    off = torch.stack(torch.meshgrid(o, o, o, indexing="ij"), -1).reshape(-1, 3)
+    nb = cc[:, None, :] + off[None]
+    nb[..., 0].clamp_(0, nx - 1); nb[..., 1].clamp_(0, ny - 1); nb[..., 2].clamp_(0, nz - 1)
+    bi = (nb[..., 0] * ny + nb[..., 1]) * nz + nb[..., 2]
+    sel = torch.nonzero(M["hcounts"][bi].sum(1) > 0).squeeze(1)
+    for s0 in range(0, sel.numel(), 4096):
+        ss = sel[s0:s0 + 4096]
+        cand = M["htable"][bi[ss]].reshape(ss.numel(), -1)
+        ok = cand >= 0
+        ci = cand.clamp_min(0)
+        P = x[ss][:, None, :].expand(-1, ci.shape[1], -1)
+        bary = _closest_point_barycentric(P, A[ci], B[ci], C[ci])
+        Q = bary[..., 0:1] * A[ci] + bary[..., 1:2] * B[ci] + bary[..., 2:3] * C[ci]
+        d2 = torch.where(ok, ((P - Q) ** 2).sum(-1), torch.full_like(ok, float("inf"), dtype=dt_))
+        best = d2.argmin(1)
+        ar = torch.arange(ss.numel(), device=dev)
+        t_ = ci[ar, best]
+        found[ss] = torch.isfinite(d2[ar, best])
+        tri[ss] = t_
+        w[ss] = bary[ar, best]
+        nh[ss] = M["nrm_wind"][t_]
+        gap[ss] = ((x[ss] - Q[ar, best]) * M["nrm_wind"][t_]).sum(1)
+    return found, tri, w, nh, gap
+
+
+def _relaxed_directions(n, seed, iters, dev):
+    """n blue-noise unit directions: `bm_seed`'s `relaxed` sampling (a uniform random sample whose
+    points repel their seven nearest neighbours, renormalised to the sphere each step)."""
+    gg = torch.Generator().manual_seed(int(seed))
+    u = torch.randn(n, 3, generator=gg)
+    u = (u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)).to(dev)
+    sp = math.sqrt(4.0 * math.pi / max(n, 1))
+    for _ in range(int(iters)):
+        push = torch.zeros_like(u)
+        for a0 in range(0, n, 2048):
+            b0 = min(n, a0 + 2048)
+            dd = 1.0 - (u[a0:b0] @ u.T).clamp(-1, 1)
+            dd[torch.arange(b0 - a0, device=dev), torch.arange(a0, b0, device=dev)] = 1e9
+            nb = torch.topk(-dd, 7, dim=1).indices
+            diff = u[a0:b0, None, :] - u[nb]
+            dist = diff.norm(dim=-1).clamp_min(1e-9)
+            wgt = (sp - dist).clamp_min(0.0) / sp
+            push[a0:b0] = (diff / dist[..., None] * wgt[..., None]).sum(1)
+        u = u + push * (0.35 * sp)
+        u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+    return u
+
+
+@register_operator("bm_seed", implementation="live", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_i=\mathbf c+\mathbf u_i\big(t(\mathbf u_i)+\text{offset}\big),\qquad \text{alive}_i=[\mathbf u_i\cdot\mathbf a<\cos\alpha]$$""")
+class BasementMembraneSeedLive(BasementMembraneSeed):
+    """Lay the membrane on the LIVE tissue's basal surface, with an optional declared hole.
+
+    basement_membrane_node -> basement_membrane_node: writes every position once, at the opening.
+
+        x_i     = c + u_i (t(u_i) + offset)
+        alive_i = [u_i . a < cos(alpha)]            (every node when no hole is declared)
+
+    u_i are blue-noise directions, c the centroid of the basal surface `pos - sep`, t(u) that
+    surface's radius along u (the contact's ray cast -- at frame 0 the tissue is a sphere), and
+    `offset` the standoff in world units. `hole: {axis: [x, y, z], half_angle_deg: alpha}` leaves
+    out every node within alpha of the axis a: parked at c, not alive and unoccupied, so no
+    crosslink forms to it (`bm_bond` bonds live nodes only) and no contact acts through it.
+
+    THE HOLE IS DECLARED, NOT DEGRADED. The archive opened its hole with a protease network
+    (BUDDING_08.md step 1); exp11 Part A declares it, so the arms differ by where the membrane is
+    missing and by nothing else. Moving the hole is changing `axis`.
+
+    WHY NOT THE PARENT'S `surface:` MAP. That map is a recorded epithelium; seeded from it the sheet
+    starts where a different run's tissue was. Seeded from the live set it starts on the tissue it
+    will hold, at the declared standoff, every bond at rest.
+
+    Reference: Harunaga, J. S., Doyle, A. D. & Yamada, K. M. (2014). Dev. Biol. 394:197-205
+    (perforations in the basement membrane at the tips of branching salivary-gland buds).
+    """
+    REQUIRES_PARAMS = ["tissue"]
+    PARAM_ROLES = {"offset": "standoff_outside_the_basal_surface", "hole": "declared_hole",
+                   "tissue": "the_live_vertex_set"}
+
+    def __init__(self, params, device="cpu"):
+        Structural.__init__(self, params, device)
+        self.at = params.get("_at", "bm_node")
+        self.tissue = str(params["tissue"])
+        self.sep_block = str(params.get("sep_block", "sep"))
+        self.offset = float(params.get("offset", 0.0))
+        self.relax_iters = int(params.get("relax_iters", 24))
+        self.seed = int(params.get("seed", 0))
+        hole = params.get("hole", None)
+        self.hole = None
+        if hole:
+            a = torch.tensor([float(v) for v in hole["axis"]], dtype=torch.float32)
+            if float(a.norm()) <= 0:
+                raise ValueError("bm_seed[live]: hole.axis must be a non-zero vector")
+            self.hole = (a / a.norm(), float(hole["half_angle_deg"]))
+        self._geo = _basal_lookup()
+        self._done = False
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        n = pos.shape[0]
+        dev, dt_ = pos.device, pos.dtype
+        got = _live_basal(H, self.tissue, self.sep_block, self._geo, dev, dt_)
+        if got is None:
+            raise RuntimeError(f"bm_seed[live]: the tissue set {self.tissue!r} has no mesh yet. List "
+                               f"its `seed_mesh` BEFORE `bm_seed` in `seed:`.")
+        m, c, M = got
+        u = _relaxed_directions(n, self.seed, self.relax_iters, dev).to(dt_)
+        from plexus.operators.contact_ops import MeshContact
+        hit, tri, t, w = MeshContact._query(self._geo, M, u, u, torch.ones(n, device=dev, dtype=dt_))
+        if not bool(hit.any()):
+            raise RuntimeError("bm_seed[live]: no direction hit the tissue surface -- is it closed?")
+        t = torch.where(hit, t, t[hit].median())
+        P = c + u * (t + self.offset)[:, None]
+        alive = torch.ones(n, dtype=torch.bool, device=dev)
+        if self.hole is not None:
+            a, half = self.hole
+            alive = (u @ a.to(dev, dt_)) < math.cos(math.radians(half))
+            P[~alive] = c
+        lvl.get("pos")[:] = P
+        oc = getattr(lvl, "occ", None)
+        if oc is not None:
+            oc[~alive] = 0.0
+        H.membrane_alive = alive
+        H.membrane_u0 = u.clone()
+        self._done = True
+        hs = ("no hole" if self.hole is None else
+              f"hole of half-angle {self.hole[1]:g} deg about {[round(float(v), 3) for v in self.hole[0]]}")
+        print(f"[bm_seed/live] {n} nodes on the live basal surface of `{self.tissue}` + {self.offset:g} "
+              f"(radius {float(t.median()):.4g} about its centroid); {hs}: {int(alive.sum())} laid "
+              f"down, {n - int(alive.sum())} left out", flush=True)
+        return {}
+
+
+@register_operator("bm_bond", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$L_e=\lVert\mathbf x_j-\mathbf x_i\rVert,\qquad \mathbf f_e=k\,(L_e-L_e^{0})\,\frac{\mathbf x_j-\mathbf x_i}{L_e}$$""")
 class BasementMembraneBond(Lateral):
     """Crosslinks: springs between neighbouring membrane particles, built once and thereafter
     breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.
@@ -833,7 +1083,8 @@ class BasementMembraneBondBreak(Structural):
         return float(torch.bincount(lab).max().item() / max(denom or n, 1))
 
 
-@register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral")
+@register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i=k\,(\mathbf x^{\mathrm{anchor}}_i-\mathbf x_i)-\text{damp}\,\mathbf v_i$$""")
 class IntegrinAdhesion(Lateral):
     """Anchor the basement membrane to the epithelium, the way integrins do: each particle is
     pulled back toward the angular position it was seeded on, on a surface that is growing.
@@ -1052,7 +1303,8 @@ class IntegrinAdhesion(Lateral):
         return {lvl.name: acc}
 
 
-@register_operator("bm_remodel", family="population", set="particle", kind="lateral")
+@register_operator("bm_remodel", family="population", set="particle", kind="lateral",
+                   equation=r"""$$L_e^{0}\leftarrow L_e^{0}+\big(L_e-L_e^{0}\big)\frac{\Delta t}{\tau}$$""")
 class BasementMembraneRemodel(Lateral):
     """Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW
     rather than only stretch.
@@ -1168,7 +1420,8 @@ class BasementMembraneRemodel(Lateral):
 
 
 
-@register_operator("bm_contact", family="boundary", set="particle", kind="lateral")
+@register_operator("bm_contact", family="boundary", set="particle", kind="lateral",
+                   equation=r"""$$d_i=S\,R(\theta_i,\phi_i)+\text{standoff}-\lVert\mathbf x_i-\mathbf c\rVert,\qquad \mathbf a_i=k\,d_i\,\mathbf u_i$$""")
 class BasementMembraneContact(Lateral):
     """Non-penetration between the sheet and the epithelium, imposed as a FORCE on each particle
     rather than as a boundary condition on the grid.
@@ -1274,6 +1527,150 @@ class BasementMembraneContact(Lateral):
 
 
 
+@register_operator("bm_contact", implementation="live", family="boundary", set="particle",
+                   kind="lateral",
+                   equation=r"""$$p_i=\max\!\big(0,\ \text{offset}-(\mathbf x_i-\mathbf x^{s}_i)\cdot\mathbf n\big),\qquad \mathbf F_i=k\,p_i\,\mathbf n,\qquad \dot{\mathbf x}_i=\mathbf F_i/\gamma,\qquad \mathbf f_v=-\textstyle\sum_i w_{iv}\mathbf F_i$$""")
+class BasementMembraneContactLive(Lateral):
+    """Non-penetration between the membrane and the LIVE tissue's basal surface, both ways.
+
+    basement_membrane_node -> the tissue mesh: builds the frame's contact list; the forces are
+    evaluated inside `cell_mechanics[implementation: apicobasal_contact]` (the design note above `_basal_lookup` in membrane_ops and above `basal_load` in contact_ops).
+
+        x^s_i = the point of the basal surface nearest node i (a fan triangle, weights w_i)
+        p_i   = max(0, offset - (x_i - x^s_i) . n)      how far inside the standoff node i is
+        F_i   = k p_i n                                 on the node, along the outward normal
+        dx_i/dt = F_i / gamma                           overdamped: no inertia at Re ~ 1e-10
+        f_v   = - sum_i w_iv F_i                        on the tissue's vertices
+
+    k is a force per unit penetration per node, gamma the node's drag -- `bm_bond`'s own
+    `overdamped_gamma`, since bond and contact are one balance on one node -- `offset` the standoff,
+    `margin_contact` how far outside the standoff a node may sit and still enter the list (a node
+    further out cannot be reached within one frame's relaxation). Scheduled BEFORE `cell_mechanics`,
+    so the list is built on the very mesh that relaxation walks; its own delta is zero.
+
+    NORMAL ONLY, NO FRICTION: the tissue slides freely inside its membrane (the follicle rotates
+    inside its basement membrane, Haigo & Bilder 2011).
+
+    THE TETHER, `k_adh` (default 0 = none): cell-matrix adhesion, the variable Wang et al. 2021
+    change with integrin knockdown and activation (Fig 7B, 7F). A node that sits outside its
+    standoff but within the ligand reach `band` of the basal surface is pulled toward it, and the
+    tissue toward the node, by k_adh (g_i - offset) along the normal -- equal and opposite, booked in
+    the same ledger -- and the tether snaps when the gap exceeds the reach, as a bond does. It acts
+    on the SHEAR-FREE normal gap only, like the repulsion. With k_adh 0 the operator is unchanged.
+
+    IT ALSO PUBLISHES WHAT THE TISSUE SENSES: per cell, the membrane nodes within `band` of its
+    basal surface per unit basal area (`m["bm_ligand"]`), which `bm_sense[live]` turns into the
+    deficit that gates growth -- counted from the same lookup, so the membrane a cell senses is the
+    one holding it.
+
+    Reference: Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the
+    particle-to-surface contact and its barycentric reaction); Yurchenco, P. D. (2011). Cold Spring
+    Harb. Perspect. Biol. 3:a004911 (the membrane sits on the basal cell surface).
+    """
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["basement_membrane", "contact", "non_penetration", "two_way_coupling",
+                      "anchorage_sensing"]
+    PARAM_ROLES = {"k": "contact_stiffness_per_node", "offset": "standoff_the_sheet_is_held_at",
+                   "band": "ligand_reach", "surface": "the_live_vertex_set",
+                   "k_adh": "cell_matrix_tether_stiffness"}
+    REFERENCE = ("Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Comput. Methods Appl. Mech. Engrg. "
+                 "293:1-19; Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "bm_node")
+        self.surface = str(params["surface"])
+        self.sep_block = str(params.get("sep_block", "sep"))
+        self.k = float(params.get("k", 0.5))
+        _g = params.get("overdamped_gamma", None)
+        self.gamma = None if _g is None else float(_g)
+        self.offset = float(params.get("offset", 0.0))
+        self.band = float(params.get("band", 0.3))
+        self.margin_contact = float(params.get("margin_contact", 0.5))
+        self.k_adh = float(params.get("k_adh", 0.0))
+        if self.k_adh > 0 and self.band > self.margin_contact:
+            raise ValueError("bm_contact[live]: the tether's reach `band` must lie inside "
+                             "`margin_contact`, or a tethered node could miss the frame's list")
+        self._geo = _basal_lookup()
+        self._said = False
+
+    def _node_gamma(self, H):
+        bb = H.__dict__.get("_bm_bond_op", None)
+        g_b = float(getattr(bb, "gamma", 0.0) or 0.0) if bb is not None else 0.0
+        if self.gamma is None:
+            if g_b <= 0:
+                raise ValueError("bm_contact[live]: no node drag -- give `overdamped_gamma`, or "
+                                 "schedule an overdamped `bm_bond` BEFORE this operator")
+            self.gamma = g_b
+        elif g_b > 0 and abs(g_b - self.gamma) > 1e-12 * max(g_b, 1.0):
+            raise ValueError(f"bm_contact[live]: overdamped_gamma {self.gamma:g} differs from "
+                             f"bm_bond's {g_b:g}; one node has one drag")
+        return self.gamma
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        f = getattr(H, "frame", None)
+        f = -1 if f is None else int(f)
+        vel = torch.zeros_like(pos)
+        got = _live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_)
+        if got is None:
+            return {self.at: vel}
+        m, c, M = got
+        nv, nF = M["nv"], int(M["nF"])
+        gamma = self._node_gamma(H)
+        alive = getattr(H, "membrane_alive", None)
+        alive = (torch.ones(pos.shape[0], dtype=torch.bool, device=dev) if alive is None
+                 else alive.to(dev))
+        if mask is not None:
+            alive = alive & (mask > 0)
+        idx = alive.nonzero(as_tuple=True)[0]
+        lig = torch.zeros(nF, device=dev, dtype=dt_)
+        f64 = torch.float64
+        C = dict(frame=f, set=self.at, gamma=gamma, k=self.k, offset=self.offset, nv=nv, nF=nF,
+                 k_adh=self.k_adh, band_adh=self.band,
+                 es=M["es"], ef=M["ef"], cnt=M["cnt"], node=idx[:0],
+                 src=M["es"][:0], trgt=M["et"][:0], face=M["ef"][:0],
+                 w=torch.zeros(0, 3, dtype=f64, device=dev), n=torch.zeros(0, 3, dtype=f64, device=dev),
+                 y=torch.zeros(0, 3, dtype=f64, device=dev))
+        pmax, n_list = 0.0, 0
+        if idx.numel():
+            hit, tri, w, n_hat, gap = _nearest_faces(M, c, pos[idx])
+            idx, tri, w, n_hat, gap = idx[hit], tri[hit], w[hit], n_hat[hit], gap[hit]
+            bound = gap <= (self.offset + self.band)
+            lig.index_add_(0, M["ef"][tri][bound], torch.ones_like(gap[bound]))
+            if gap.numel():
+                pmax = float((self.offset - gap).clamp_min(0.0).max())
+            keep = gap <= (self.offset + self.margin_contact)
+            idx, tri, w, n_hat = idx[keep], tri[keep], w[keep], n_hat[keep]
+            w64 = w.to(f64)
+            w64 = torch.cat([1.0 - w64[:, 1:2] - w64[:, 2:3], w64[:, 1:3]], 1)
+            C.update(node=idx, src=M["es"][tri], trgt=M["et"][tri], face=M["ef"][tri], w=w64,
+                     n=n_hat.to(f64), y=pos[idx].detach().to(f64))
+            n_list = int(idx.numel())
+        bc = m.get("basal_contacts")
+        if not isinstance(bc, dict):
+            bc = m["basal_contacts"] = {}
+        bc[self.at] = C
+        # THE LIGAND DENSITY: bound nodes per unit BASAL area of each cell, so a big cell is not
+        # read as a well-anchored one.
+        area = 0.5 * torch.cross(M["B"] - M["A"], M["C"] - M["A"], dim=1).norm(dim=1)
+        farea = torch.zeros(nF, device=dev, dtype=dt_).index_add_(0, M["ef"], area)
+        m["bm_ligand"] = lig / farea.clamp_min(1e-12)
+        m["bm_ligand_frame"] = f
+        CONTACT_TRACE.append((f, pmax, float(n_list)))
+        if not self._said:
+            self._said = True
+            print(f"[bm_contact/live] membrane `{self.at}` against the basal surface of "
+                  f"`{self.surface}`: k={self.k:g}, k_adh={self.k_adh:g}, gamma={gamma:g}, "
+                  f"offset={self.offset:g}, band={self.band:g}; frame {f}: {n_list} nodes in the contact list, deepest "
+                  f"{pmax:.3g} inside the standoff", flush=True)
+        return {self.at: vel}
+
+
 # ---------------------------------------------------------------------------------------------------
 # HEMIDESMOSOMES AS ENTITIES, not as a boolean field on the membrane.
 #
@@ -1289,7 +1686,8 @@ class BasementMembraneContact(Lateral):
 # is the force, `adhesion_turnover` is the rewire that breaks and re-forms.
 # ---------------------------------------------------------------------------------------------------
 
-@register_operator("adhesion_seed", family="seed", set="particle", kind="seed")
+@register_operator("adhesion_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_a=\mathbf c+u_a\,S\,R(\theta_a,\phi_a),\qquad \mathrm{bound}(a)=\arg\min_i\lVert\mathbf x_i-\mathbf x_a\rVert$$""")
 class AdhesionSeed(Structural):
     """Place hemidesmosomes on the basal surface and bind each to the nearest membrane particle,
     once, at the opening of the trajectory.
@@ -1363,7 +1761,8 @@ class AdhesionSeed(Structural):
         return {}
 
 
-@register_operator("adhesion_pull", family="mechanics", set="particle", kind="exchange")
+@register_operator("adhesion_pull", family="mechanics", set="particle", kind="exchange",
+                   equation=r"""$$\dot{\mathbf x}_i=\frac{k}{\gamma}\,(\mathbf x_a-\mathbf x_i)$$""")
 class AdhesionPull(Lateral):
     """The force a hemidesmosome exerts on the membrane patch it binds.
 
@@ -1513,7 +1912,8 @@ class AdhesionTurnover(Rewire):
         return {}
 
 
-@register_operator("bm_repel", family="boundary", set="particle", kind="lateral")
+@register_operator("bm_repel", family="boundary", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_i=k_{\mathrm{rep}}\sum_j\big(\ell^{*}-L_{ij}\big)\frac{\mathbf x_i-\mathbf x_j}{L_{ij}}$$""")
 class BasementMembraneRepel(Lateral):
     """Excluded volume between membrane nodes: push apart anything closer than a target spacing,
     and never pull.
@@ -2057,7 +2457,8 @@ def _radius(M, u):
              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
 
 
-@register_operator("integrin_fibre_seed", family="seed", set="particle", kind="seed")
+@register_operator("integrin_fibre_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\mathbf x_{a,l}=\mathbf c+\mathbf u_a\left(S\,R(\theta_a,\phi_a)+l\,\frac{\text{length}}{\text{layers}}\right),\qquad l=0\ldots\text{layers}-1$$""")
 class IntegrinSeed(Structural):
     """Lay the integrin fibres down once: `layers` particles per fibre, running outward from the
     epithelial surface.
@@ -2135,7 +2536,8 @@ class IntegrinSeed(Structural):
         return {}
 
 
-@register_operator("integrin_fibre_track", family="mechanics", set="particle", kind="structural")
+@register_operator("integrin_fibre_track", family="mechanics", set="particle", kind="structural",
+                   equation=r"""$$\mathbf x_{a,0}=\mathbf c+\mathbf u_a\,S\,R(\theta_a,\phi_a,t),\qquad \mathbf v_{a,0}=\frac{\mathbf x_{a,0}(t)-\mathbf x_{a,0}(t-1)}{\Delta t}$$""")
 class IntegrinTrack(Structural):
     """Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row
     of particles, rather than on the grid.
@@ -2215,7 +2617,8 @@ class IntegrinTrack(Structural):
         return {}
 
 
-@register_operator("integrin_fibre_pull", family="mechanics", set="particle", kind="lateral")
+@register_operator("integrin_fibre_pull", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf f=k\,(\mathbf x_{\mathrm{tip}}-\mathbf x_{\mathrm{membrane}})$$""")
 class IntegrinPull(Lateral):
     """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and
     opposite reaction on the fibre.

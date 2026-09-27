@@ -1,0 +1,231 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+general:
+  boundary: wall
+  dim: 3
+  dt: 1.0e-05
+  n_frames: 150000
+  name: iv_swim_c03r
+  record_cap: 300
+  save_data: null
+  seed: 0
+  units:
+    force_nN: 6.25e-09
+    length_um: 50.0
+    time_s: 1.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: rod_node
+  emit: velocity
+  k_bend: 4150.0
+  k_stretch: 30000.0
+  op: rod_elastic
+  zeta_bend: 0.0
+  zeta_stretch: 0.0
+- anchor: cell
+  at: rod_node
+  clamp: 64.4
+  clamp_zeta: 0.0
+  emit: velocity
+  moment: 0.0
+  n_body: 1
+  omega: 6.283185
+  omega_n: 100.0
+  op: rod_base
+  waveform: sine
+  zeta: 0.0
+  zeta_body: 301600.0
+  zeta_node: 47940.0
+- amplitude: 10.0
+  at: rod_node
+  emit: velocity
+  k_motor: 4150.0
+  omega: 62.83185
+  op: rod_motor
+  phase_jitter: true
+  phase_seed: 2
+  ramp: 0.1
+  wavelength: 0.4
+- at: water_particle
+  implementation: warp
+  op: mpm_strain
+- a_max: 200.0
+  at: water_particle
+  drag: 0.0
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  to: mpm_grid
+- at: mpm_grid
+  op: mpm_grid_update
+  wall_damp: 0.9
+  wall_friction: 0.3
+- at: water_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_damp: 0.9
+- along: chain
+  at: rod_node
+  coupling: 0.3
+  emit: velocity
+  field: mpm_grid
+  k: 0.0
+  op: drag
+  ratio: 2.0
+  react: true
+  react_set: water_particle
+  zeta: 47940.0
+- at: cell
+  coupling: 0.3
+  emit: velocity
+  field: mpm_grid
+  k: 0.0
+  op: drag
+  react: true
+  react_set: water_particle
+  zeta: 301600.0
+- at: mpm_grid
+  cg_iters: 40
+  eta: 1450000.0
+  op: mpm_grid_viscosity
+  rho: 1000.0
+plotting:
+  background: black
+  box_frame: true
+  chain:
+    color: '#ffffff'
+    set: rod_node
+    width: 7
+  color_field: radial
+  colors:
+    cell:
+    - 1.0
+    - 0.85
+    - 0.2
+  cutaway:
+    at: 0.5
+    axis: y
+    thickness: 0.3
+  dot_shading: true
+  dot_size: 5.0
+  duration_s: 10.0
+  field_cmap: bwr
+  field_log: false
+  keep_stills: true
+  max_frames: 300
+  real_time: false
+  renderer: vtk_points
+  slow_motion: 1.0
+  spheres:
+    color: '#f2d24e'
+    radius: 0.04
+    set: cell
+  stills: 8
+  subject: water_particle
+  up_axis: 2
+schedule:
+- rod_elastic
+- rod_base
+- rod_motor
+- drag
+- drag
+- steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_grid_viscosity
+  - mpm_gather
+  substep_dt: 1.0e-05
+seed:
+- at: rod_node
+  base:
+  - 0.5
+  - 0.5
+  - 0.28
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  cap_deg: 30.0
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  length: 0.4
+  n_rod: 5
+  op: rod_seed
+  sphere_radius: 0.04
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.28
+    state:
+      pos:
+        boundary: free
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        boundary: free
+        integration: second_order_rate
+        role: rate
+        width: 3
+  rod_node:
+    mesh: rod_segment
+    n: 40
+    start:
+    - - 0.5
+      - 0.5
+      - 0.3
+    state:
+      pos:
+        boundary: free
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        boundary: free
+        integration: second_order_rate
+        role: rate
+        width: 3
+  rod_segment:
+    maps:
+      srce: rod_node
+      trgt: rod_node
+    n: 35
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        block:
+        - 0.08
+        - 0.08
+        - 0.08
+        - 0.92
+        - 0.92
+        - 0.92
+        bulk_modulus: 100000.0
+        count: 1
+        density: 1000.0
+        eta: 1600.0
+        material: liquid
+  water_particle:
+    density: 1000.0
+    entity: mpm_particle
+    parent: water
+    per_parent: 155374
+    radius: 0.5

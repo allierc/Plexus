@@ -149,7 +149,13 @@ tabInit();
 // FOLLOW THE SERVER'S SESSION: whoever drives the API (a person, or Claude) is seen here.
 let seen={{version:-1,cam_version:-1}};
 async function poll(){{try{{const st=await (await fetch('/api/scene/state')).json();
- if(st.name&&st.version!==seen.version){{seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/scene/spec?name='+encodeURIComponent(st.name)+'&tab='+TAB)).json();if(j.raw)$('yamltext').value=j.raw;if(j.form){{fillForm(j.form);FORM_SPEC=st.name;}}else{{FORM_SPEC=null;}}await reseed();}}
+ // NEVER RESEED WHILE A RUN IS IN FLIGHT. Following the session is what this loop is for, but
+ // `reseed()` rebuilds the scene through `open_view`, which STOPS the running engine -- so a page
+ // left open on this tab truncated every run the driver started (measured: frame 81 of 201, no
+ // movie written). The spec text and the form are updated either way, because those only read;
+ // `seen.version` is advanced ONLY when the reseed actually happens, so the next poll after the
+ // run ends picks the scene up and the viewer catches up 1.5 s late instead of not at all.
+ if(st.name&&st.version!==seen.version){{specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/scene/spec?name='+encodeURIComponent(st.name)+'&tab='+TAB)).json();if(j.raw)$('yamltext').value=j.raw;if(j.form){{fillForm(j.form);FORM_SPEC=st.name;}}else{{FORM_SPEC=null;}}if(!st.running){{seen.version=st.version;await reseed();}}}}
  if(st.cam_version!==seen.cam_version){{seen.cam_version=st.cam_version;CAM.azim=st.azim;CAM.elev=st.elev;CAM.zoom=st.zoom;if(st.pick){{const j=await (await fetch('/api/scene/info?pick='+encodeURIComponent(st.pick))).json();if(!j.error)showInfo(j);}}render();}}
  if(st.message)$('rstat').textContent=st.message;}}catch(e){{}}finally{{setTimeout(poll,1500);}}}}
 poll();

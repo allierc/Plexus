@@ -1,0 +1,114 @@
+general:
+  title: "One cell as a FACE of a mesh: the same entity, a different representation"
+  name: b1_one_cell_sheet
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  save_data: true
+  boundary: free
+  dim: 3
+  world:
+  - 4.0
+  - 4.0
+  - 4.0
+sets:
+  cell:
+    n: 16
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+  vertex:
+    n: 64
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 128
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  model: apicobasal
+  at: vertex
+  shape: hexagon
+  n_cells: 1
+  jitter: 0.0
+  p0: 3.5
+  seed: 0
+  h0: 1.0
+  radius: 1.0
+operators:
+- op: cell_geometry
+  at: cell
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- topo_record
+
+plotting:
+  renderer: vtk_mesh
+  camera:
+    elev: 22.0
+    azim: 35.0
+  background: black
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  duration_s: 10
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    walls: 48

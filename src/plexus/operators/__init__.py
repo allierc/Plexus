@@ -51,6 +51,7 @@ from . import motion_ops            # noqa: F401  drag, glide, velocity_cruise, 
 from . import field_ops             # noqa: F401  the grid field, deposit, diffuse, decay, sense,
 #                                                 chemotax, playback, pacemaker, activation_pulse, signal
 from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, seed_ecm,
+from . import mpm_implicit_viscosity  # noqa: F401  mpm_grid_viscosity -- implicit (unconditionally stable) grid viscosity
 #                                                 anchor, spin, apply_material_map, fenced oracle
 from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die,
 #                                                 edge_flip, topo_record
@@ -62,7 +63,7 @@ from . import protein_ops           # noqa: F401  protein_seed / _project / _exp
 #                                                 cell_geometry, cell_grow, cell_chem_from_shape,
 #                                                 cell_shape_probe, interface_tension/push
 from . import junction_ops          # noqa: F401  junction_myosin (default|two_pool), junction_sync,
-#                                                 medioapical_myosin, cytokinetic_ring
+#                                                 medioapical_myosin, cytokinetic_ring, junction_pcp
 from . import ecm_ops               # noqa: F401  ecm_stress/from_cell, cell_exclude,
 #                                                 block_seed/stress
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
@@ -80,6 +81,26 @@ from . import relation_ops          # noqa: F401  project -- one set's state acr
 #                                                 onto another set's block (W_in, W_out, and
 #                                                 circuit -> circuit are all this one operator)
 from . import neuron_ops            # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
+# `cilia_ops` WAS HERE AND IS DELETED. It held the MPM cilium -- cilium_seed, cilium_pose_map,
+# cilium_kinematics, cilium_torque, cilium_anchor and the seeds that placed them -- and the whole
+# construction has a floor it cannot clear: MLS-MPM carries one velocity per grid node, so a body
+# thinner than a grid cell is advected rather than swum, and a Platynereis cilium is 0.25 um
+# against a 4.08 um cell. Every attempt widened the cilium until the grid could hold it and none
+# of them was a cilium. `rod_ops` below is the replacement and not a refinement: a filament whose
+# thickness is a drag coefficient has no such floor. Its one operator that was never ciliary,
+# polar_active_stress[driven], moved to `cell_ops` beside the class it subclasses.
+from . import rod_ops               # noqa: F401  a cilium as a DISCRETE ELASTIC ROD: rod_seed,
+#                                                 rod_elastic (stretch + bend, momentum-exact) and
+#                                                 rod_base (the base held in place, held in
+#                                                 direction, and driven -- one moment, three laws).
+#                                                 a rod has no such floor, so this is how the model
+#                                                 gets a cilium that is 0.25 um thick.
+from . import flagellum_ops         # noqa: F401  stator_push -- stator units pushing a rotor's
+#                                                 material tangentially; the bacterial motor's drive
+from . import channel_ops           # noqa: F401  membrane pores and channels: elastic_network, pair_potential,
+#                                                 brownian, tether, radial_drive (the patch frame),
+#                                                 electrolyte_conduction (the current through the open lumen),
+#                                                 pore_probe -- experiments/exp04_membrane_channels
 from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
                                     #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
 #                                                 (psi: shared | type_pre | type_pairwise),
@@ -94,4 +115,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "relation_ops", "neuron_ops", "rod_ops", "flagellum_ops", "continuous_engine"]

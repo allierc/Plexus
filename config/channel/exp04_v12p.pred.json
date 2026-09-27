@@ -1,0 +1,32 @@
+{
+ "channel": "navab",
+ "shape": "navab_o",
+ "state": "open",
+ "box_nm": 18,
+ "core_half_nm_opm": 1.57,
+ "ion_paths": 1,
+ "narrowest_R_in_core_nm": [
+  0.275
+ ],
+ "dry_plug_on_path": [
+  false
+ ],
+ "charges": {
+  "tips": 104,
+  "net_tips": 8.0,
+  "lumen_carbonyl_atoms": 36
+ },
+ "ions": {
+  "Na": 1008,
+  "Cl": 1008
+ },
+ "lipids": 1140,
+ "cation": "Na",
+ "psi_mV": -200.0,
+ "conc_mM": 1000.0,
+ "dt_ps": 0.08548240731544661,
+ "n_frames": 300000,
+ "sim_time_ns": 25.64472219463398,
+ "born_cation_kT": 133.8,
+ "born_Cl_kT": 75.4
+}

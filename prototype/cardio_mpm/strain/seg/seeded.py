@@ -24,6 +24,7 @@ from a different pair of beats. A difference that does not reproduce is noise dr
 """
 from __future__ import annotations
 
+import os
 import numpy as np
 from scipy import ndimage as ndi
 
@@ -31,7 +32,7 @@ import beat as B
 import validate as V
 import segment as S
 
-RT = ("/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/"
+RT = (f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data/"
       "Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif.derivatives.npy")
 
 

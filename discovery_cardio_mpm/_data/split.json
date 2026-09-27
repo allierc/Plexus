@@ -95,7 +95,7 @@
    {
     "bytes": 269372816,
     "content_id": "93ae8a7a7f07c6b861db1cbcbb3ae8a3aafe5d1861b5881774f66f6c69e45caf",
-    "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy",
+    "path": "$GNN_OUTPUT_ROOT/graphs_data/cardiomyocytes_real_data/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy",
     "signature": [
      -0.09710978116537858,
      -0.03348003952113897,
@@ -222,7 +222,7 @@
    {
     "bytes": 269372816,
     "content_id": "77951a6f7e48dee6398bdc270362824fd75376985347eae2168416f8212727ae",
-    "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_0/derivatives.npy",
+    "path": "$GNN_OUTPUT_ROOT/graphs_data/cardiomyocytes_real_data/Cardio_0/derivatives.npy",
     "signature": [
      -0.09710977799690619,
      -0.03348002578908771,
@@ -349,7 +349,7 @@
    {
     "bytes": 12288128,
     "content_id": "d958058b37c364b7cb59b31e81d1cba921d23b7324bd8033d6c18920ed43f0f0",
-    "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/diseased.npy",
+    "path": "$GNN_OUTPUT_ROOT/graphs_data/cardiomyocytes_real_data/diseased.npy",
     "signature": [
      -0.08019057437911711,
      -0.05215347942693359,

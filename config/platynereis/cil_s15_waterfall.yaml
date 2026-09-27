@@ -1,0 +1,106 @@
+general:
+  name: cil_s15_waterfall
+  seed: 0
+  n_frames: 60
+  dt: 0.001
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: wall
+  save_data: true
+  record_cap: 61
+  units:
+    length_um: 50.0
+    time_s: 1.0
+sets:
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        count: 1
+        material: liquid
+        bulk_modulus: 100000.0
+        density: 1000.0
+        eta: 1600.0
+        block:
+        - 0.08
+        - 0.08
+        - 0.08
+        - 0.92
+        - 0.92
+        - 0.92
+  water_particle:
+    parent: water
+    per_parent: 155374
+    entity: mpm_particle
+    density: 1000.0
+    radius: 0.5
+seed: []
+operators:
+- op: mpm_strain
+  at: water_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: water_particle
+  eta: 1600.0
+- op: mpm_scatter
+  at: water_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  wall_friction: 0.3
+- op: mpm_gather
+  at: water_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+- op: gravity
+  at: water_particle
+  g: 9.81
+  gy: 0.0
+  gz: -9.81
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+schedule:
+- gravity
+- substep_dt: 8.333333333333333e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  subject: water_particle
+  dot_size: 1.6
+  dot_shading: true
+  max_frames: 60
+  stills: 6
+  keep_stills: true
+  fps: 20.0
+  color_field: speed
+  field_cmap: inferno
+  color_range:
+  - 0.0
+  - 0.5
+  cutaway:
+    axis: view
+    at: 0.5

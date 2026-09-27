@@ -108,6 +108,7 @@ schedule:
 - topo_record
 
 plotting:
+  duration_s: 10
   renderer: vtk_points
   background: black
   up_axis: 2

@@ -17,7 +17,7 @@ objects are the interpretable fields: stiffness + direction (+ phase-delay tau w
   python cardio_mpm_loop.py 10                 # 10 batches; RESUMES saved state
   python cardio_mpm_loop.py 10 --fresh         # restart from START
   python cardio_mpm_loop.py 4 --local          # run on local GPUs (testing)
-  CARDIO_QUEUE=gpu_h100 CLAUDE_TIMEOUT_MIN=40 python cardio_mpm_loop.py 10
+  CARDIO_QUEUE=${CLUSTER_QUEUE_PREFIX}h100 CLAUDE_TIMEOUT_MIN=40 python cardio_mpm_loop.py 10
 """
 import os, sys, re, json, time, shlex, shutil, threading, subprocess, datetime
 
@@ -28,10 +28,11 @@ PYBIN = os.environ.get("CARDIO_PYBIN", "/home/allierc@hhmi.org/miniforge3/envs/n
 CONDA_ENV = os.environ.get("CARDIO_CONDA_ENV", "neural-graph")     # conda env ON THE CLUSTER NODE
 SRC = os.environ.get("CARDIO_SRC", os.path.abspath(os.path.join(HERE, "..", "..", "src")))
 CLAUDE = os.environ.get("CLAUDE_BIN", "claude")
-CLUSTER_SSH = os.environ.get("CARDIO_CLUSTER_SSH", "$CLUSTER_SSH")
-LSF_PROFILE = os.environ.get("CARDIO_LSF_PROFILE", "/dev/null")
+# ssh target and queue-name prefix are LOCAL settings (CLUSTER_SSH, CLUSTER_QUEUE_PREFIX in the
+# environment), never written here: this repo is public. CARDIO_* still override.
+CLUSTER_SSH = os.environ.get("CARDIO_CLUSTER_SSH", os.environ.get("CLUSTER_SSH", ""))
 NODE = os.environ.get("CARDIO_NODE", "a100")
-QUEUE = os.environ.get("CARDIO_QUEUE", f"gpu_{NODE}")
+QUEUE = os.environ.get("CARDIO_QUEUE", os.environ.get("CLUSTER_QUEUE_PREFIX", "") + NODE)
 NCPUS = os.environ.get("CARDIO_NCPUS", "8")
 WALL_MIN = int(os.environ.get("CARDIO_WALL_MIN", "600"))
 POLL_SEC = int(os.environ.get("CARDIO_POLL_SEC", "300"))          # status every 5 min
@@ -46,12 +47,13 @@ PLAN = "cardio_mpm_plan.json"
 INSTR, LEDGER, ANALYSIS, USERIN = "instruction_cardio_mpm.md", "knowledge_cardio_mpm.md", "analysis_cardio_mpm.md", "user_input.md"
 LOGDIR = "loop_logs"
 
-# The devcontainer mounts the shared NFS export /groups/saalfeld/home/allierc/Graph at
+# The devcontainer mounts the shared NFS export $CLUSTER_HOME/Graph at
 # /workspace, so the SAME files are /workspace/... here but /groups/.../Graph/... on the
 # cluster. The driver (run_claude / file writes) uses the local /workspace path; every
 # CLUSTER-SIDE path (bsub cd, job script, -o/-e logs, PYTHONPATH) is translated. When the
 # loop is run FROM a submit host where HERE is already cluster-visible, this is a no-op.
-_MAP = os.environ.get("CARDIO_CLUSTER_ROOT_MAP", "/workspace:/groups/saalfeld/home/allierc/Graph").split(":")
+_MAP = os.environ.get("CARDIO_CLUSTER_ROOT_MAP",
+                      "/workspace:" + os.environ.get("CLUSTER_HOME", "") + "/Graph").split(":")
 
 
 def _cpath(p):
@@ -115,6 +117,9 @@ def _write_manifest(job):
 
 
 def _ssh(remote_cmd, retries=1):
+    if not CLUSTER_SSH or not os.environ.get("CLUSTER_HOME") and "CARDIO_CLUSTER_ROOT_MAP" not in os.environ:
+        raise RuntimeError("cluster mode needs CLUSTER_SSH and CLUSTER_HOME -- local settings, "
+                           "deliberately not in the repo (or run with --local)")
     # ServerAlive* + a hard subprocess timeout so an ESTABLISHED-but-wedged session cannot
     # block the driver forever (ConnectTimeout only covers connection setup). A single hung
     # bjobs ssh once froze wait_cluster for >80 min; this bounds every ssh to ~SSH_TIMEOUT.
@@ -173,7 +178,7 @@ RUNNING_STATES = ("PEND", "RUN", "PROV", "WAIT")
 def _bjobs_states(jids):
     if not jids:
         return {}
-    res = _ssh(f"source {LSF_PROFILE} && bjobs -a " + " ".join(jids), retries=6)
+    res = _ssh("bjobs -a " + " ".join(jids), retries=6)
     states = {}
     for line in (res.stdout if res else "").splitlines():
         p = line.split()
@@ -370,10 +375,10 @@ def _preflight(local):
         return
     if not shutil.which("ssh"):
         sys.exit("[loop] ERROR: 'ssh' not found; cannot reach the LSF submit host. Use --local.")
-    probe = _ssh(f"source {LSF_PROFILE} && command -v bsub", retries=2)
+    probe = _ssh("command -v bsub", retries=2)
     if not (probe and "bsub" in (probe.stdout or "")):
-        sys.exit(f"[loop] ERROR: cannot reach bsub on {CLUSTER_SSH} via SSH (check passwordless SSH + "
-                 f"{LSF_PROFILE}); or use --local.")
+        sys.exit(f"[loop] ERROR: cannot reach bsub on {CLUSTER_SSH} via SSH (check passwordless SSH); "
+                 f"or use --local.")
     envck = _ssh(f"conda run -n {CONDA_ENV} python -c 'import torch'", retries=2)
     if not envck or envck.returncode != 0:
         sys.exit(f"[loop] ERROR: conda env '{CONDA_ENV}' not usable on the cluster (import torch failed). "

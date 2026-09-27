@@ -1,0 +1,560 @@
+general:
+  name: mnemiopsis_ao_circuit
+  seed: 0
+  n_frames: 600
+  dt: 0.05
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  record_cap: 601
+  units:
+    length_um: 39.9
+    time_s: 1.0
+sets:
+  brain:
+    n: 1
+  assembly:
+    parent: brain
+    per_parent: 1
+  neuron:
+    parent: assembly
+    per_parent: 271
+    types:
+      SSN__Q12:
+        count: 1
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      SSN__Q34:
+        count: 1
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      SSN__Qall:
+        count: 1
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      SNN__Qnone:
+        count: 1
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      bridge__Q12:
+        count: 14
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      bridge__Q34:
+        count: 11
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      balancer__Q1:
+        count: 15
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      balancer__Q2:
+        count: 16
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      balancer__Q3:
+        count: 15
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      balancer__Q4:
+        count: 13
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      lithocyte__Q4:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      Cgroove__Q1:
+        count: 4
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      Cgroove__Q2:
+        count: 3
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      Cgroove__Q3:
+        count: 2
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      Cgroove__Q4:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      dome__Qnone:
+        count: 3
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Q1:
+        count: 9
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Q12:
+        count: 4
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Q2:
+        count: 15
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Q3:
+        count: 5
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Q34:
+        count: 8
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Q4:
+        count: 4
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      monociliated__Qall:
+        count: 6
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      biciliated__Q1:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      biciliated__Q3:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      biciliated__Qnone:
+        count: 4
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      intra-multi-ciliated__Q1:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Q1:
+        count: 10
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Q12:
+        count: 15
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Q2:
+        count: 6
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Q3:
+        count: 12
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Q34:
+        count: 9
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Q4:
+        count: 6
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      nonciliated__Qall:
+        count: 16
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      epithelial_floor__Q1:
+        count: 3
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      epithelial_floor__Q12:
+        count: 10
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      epithelial_floor__Q2:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      epithelial_floor__Q3:
+        count: 2
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      epithelial_floor__Q34:
+        count: 3
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      epithelial_floor__Q4:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      dense_vesicle__Qnone:
+        count: 7
+        p:
+        - 0.5
+        - 0.0
+        - 1.2
+        - 0.5
+        - 1.0
+        - 0.0
+      outside__Qnone:
+        count: 5
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      unassigned__Q1:
+        count: 3
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      unassigned__Q12:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+      unassigned__Q4:
+        count: 1
+        p:
+        - 2.0
+        - 0.0
+        - 1.2
+        - 0.5
+        - 0.5
+        - 0.0
+    type_layout: ordered
+  synapse:
+    parent: brain
+    edge_set: true
+    entity: connection
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/mnemiopsis_ao_271/connectome.npz
+fields: {}
+operators:
+- op: neuron_update
+  at: neuron
+  model: leaky_tanh
+  noise: 0.01
+- op: neuron_signal
+  at: neuron
+  model: type_pairwise
+  edge_set: synapse
+  activation: tanh
+schedule:
+- neuron_update
+- neuron_signal
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  dot_size: 9.0
+  dot_shading: true
+  max_frames: 300
+  stills: 10
+  keep_stills: true
+  dot_radius:
+    SSN__Q12: 0.0401
+    SSN__Q34: 0.0401
+    SSN__Qall: 0.0401
+    SNN__Qnone: 0.030075
+    bridge__Q12: 0.025063
+    bridge__Q34: 0.025063
+    balancer__Q1: 0.025063
+    balancer__Q2: 0.025063
+    balancer__Q3: 0.025063
+    balancer__Q4: 0.025063
+    lithocyte__Q4: 0.045113
+    Cgroove__Q1: 0.025063
+    Cgroove__Q2: 0.025063
+    Cgroove__Q3: 0.025063
+    Cgroove__Q4: 0.025063
+    dome__Qnone: 0.025063
+    monociliated__Q1: 0.02005
+    monociliated__Q12: 0.02005
+    monociliated__Q2: 0.02005
+    monociliated__Q3: 0.02005
+    monociliated__Q34: 0.02005
+    monociliated__Q4: 0.02005
+    monociliated__Qall: 0.02005
+    biciliated__Q1: 0.02005
+    biciliated__Q3: 0.02005
+    biciliated__Qnone: 0.02005
+    intra-multi-ciliated__Q1: 0.02005
+    nonciliated__Q1: 0.017544
+    nonciliated__Q12: 0.017544
+    nonciliated__Q2: 0.017544
+    nonciliated__Q3: 0.017544
+    nonciliated__Q34: 0.017544
+    nonciliated__Q4: 0.017544
+    nonciliated__Qall: 0.017544
+    epithelial_floor__Q1: 0.017544
+    epithelial_floor__Q12: 0.017544
+    epithelial_floor__Q2: 0.017544
+    epithelial_floor__Q3: 0.017544
+    epithelial_floor__Q34: 0.017544
+    epithelial_floor__Q4: 0.017544
+    dense_vesicle__Qnone: 0.022556
+    outside__Qnone: 0.012531
+    unassigned__Q1: 0.015038
+    unassigned__Q12: 0.015038
+    unassigned__Q4: 0.015038
+  colors:
+    SSN__Q12: '#ff4d6d'
+    SSN__Q34: '#ff4d6d'
+    SSN__Qall: '#ff4d6d'
+    SNN__Qnone: '#ff8fb0'
+    bridge__Q12: '#c44ad9'
+    bridge__Q34: '#c44ad9'
+    balancer__Q1: '#4a90d9'
+    balancer__Q2: '#4a90d9'
+    balancer__Q3: '#4a90d9'
+    balancer__Q4: '#4a90d9'
+    lithocyte__Q4: '#f2e750'
+    Cgroove__Q1: '#d9974a'
+    Cgroove__Q2: '#d9974a'
+    Cgroove__Q3: '#d9974a'
+    Cgroove__Q4: '#d9974a'
+    dome__Qnone: '#7fd4e8'
+    monociliated__Q1: '#7fb069'
+    monociliated__Q12: '#7fb069'
+    monociliated__Q2: '#7fb069'
+    monociliated__Q3: '#7fb069'
+    monociliated__Q34: '#7fb069'
+    monociliated__Q4: '#7fb069'
+    monociliated__Qall: '#7fb069'
+    biciliated__Q1: '#5f9e5a'
+    biciliated__Q3: '#5f9e5a'
+    biciliated__Qnone: '#5f9e5a'
+    intra-multi-ciliated__Q1: '#2f5d3a'
+    nonciliated__Q1: '#9aa4ae'
+    nonciliated__Q12: '#9aa4ae'
+    nonciliated__Q2: '#9aa4ae'
+    nonciliated__Q3: '#9aa4ae'
+    nonciliated__Q34: '#9aa4ae'
+    nonciliated__Q4: '#9aa4ae'
+    nonciliated__Qall: '#9aa4ae'
+    epithelial_floor__Q1: '#6b7480'
+    epithelial_floor__Q12: '#6b7480'
+    epithelial_floor__Q2: '#6b7480'
+    epithelial_floor__Q3: '#6b7480'
+    epithelial_floor__Q34: '#6b7480'
+    epithelial_floor__Q4: '#6b7480'
+    dense_vesicle__Qnone: '#e8a0ff'
+    outside__Qnone: '#2a2f36'
+    unassigned__Q1: '#404850'
+    unassigned__Q12: '#404850'
+    unassigned__Q4: '#404850'
+seed:
+- op: neural_seed
+  at: neuron
+  region: mnemiopsis_ao_271
+  v0_mean: 0.0
+  v0_sd: 0.5

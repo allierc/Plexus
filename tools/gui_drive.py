@@ -1,0 +1,387 @@
+#!/usr/bin/env python
+"""Drive the Plexus page over its own HTTP API, so a session can test it without a person.
+
+The page is a browser UI, and everything it does it does through routes that anything can call.
+This is those calls, wrapped so one command builds a scene, looks at it, runs it, waits, collects
+what the run wrote and reads the engine's own output back. The point is a loop that closes: the
+picture and the log come back here, so a fault is seen rather than reported.
+
+    python tools/gui_drive.py shot   --tab platynereis --form '{"render":"somata"}'
+    python tools/gui_drive.py run    --tab platynereis --form '{...}' --device cuda:0
+    python tools/gui_drive.py status
+    python tools/gui_drive.py log    [--tail 60]
+    python tools/gui_drive.py caption --mp4 <path>
+
+Every call prints JSON on stdout, and `shot` prints the PATH of a PNG this session can read.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.parse
+import urllib.request
+
+BASE = os.environ.get("PLEXUS_GUI", "http://127.0.0.1:8799")
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# THE HISTORY. Every picture is kept with the SPEC that produced it and the REASON it was taken,
+# because a picture alone does not say what was built and a spec alone does not say why. One
+# SUBFOLDER PER KIND OF OUTPUT, and the step number is the filename, so a step is read across the
+# folders and a kind is read down one:
+#
+#   builder/png/0007.png        what the scene looked like
+#   builder/spec/0007.yaml      the spec that made it -- the whole thing, not a diff
+#   builder/why/0007.txt        the time, and in plain words what this step was for
+#   builder/mp4/0007.mp4        the movie, when the step ran one
+#
+# The mp4 is COPIED, not linked: the run folder is rewritten by the next run of the same spec, and
+# a history whose oldest entries quietly change is not a history. Nothing here is ever deleted.
+# `tools/watch.py` walks it.
+# WHICH EXPERIMENT'S RECORD THIS IS. The builder used to be one flat pile at `builder/`, which
+# works until a second line of work starts and its steps interleave with the first -- the record
+# then reads as one story told by two people. `PLEXUS_BUILDER` names the folder, so a new
+# experiment is a new directory rather than a new numbering scheme, and the watcher and the writer
+# read the SAME variable so they cannot drift apart.
+HISTORY = os.environ.get("PLEXUS_BUILDER") or os.path.join(REPO, "builder", "exp_01_memiopsis")
+# THE JOURNAL LIVES INSIDE THE RECORD, so it is per-experiment by construction. It was a fixed
+# path under log/gui_runs/, which two sessions running at once both appended to -- the watcher on
+# 8826 then showed the cilium campaign's lines interleaved with the bacterium's, and neither
+# session could tell which line was its own. One folder per experiment already isolates the four
+# step files; the journal is the fifth thing that has to be there.
+JOURNAL = os.path.join(HISTORY, "journal.txt")
+# THE CAPTION IS THE FIFTH FILE OF A STEP. It was computed on every cycle and written into ONE shared
+# `log/gui_runs/captions.txt`, truncated by the next caption, so nothing tied a description to the
+# step it described and the watcher could not show it at all -- the VLM's reading of a movie, the
+# one reader that can say "the body never moves" without being told what to look for, was the part
+# of each step nobody could see afterwards. It lives beside the other four now, by step number.
+KINDS = {"png": ".png", "spec": ".yaml", "why": ".txt", "mp4": ".mp4", "caption": ".txt"}
+
+
+def _path(kind: str, i: int) -> str:
+    """Where step `i` keeps its `kind` of output. Makes the folder, so a new kind costs one line."""
+    d = os.path.join(HISTORY, kind)
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, f"{i:04d}{KINDS[kind]}")
+
+
+def note(msg: str) -> None:
+    """One line about what this session just did, for `tools/watch.py` to show.
+
+    A person watching a read-only mirror can see the newest picture but not what produced it, and
+    a picture without its cause is not much use -- "8 bodies, glassy" and "run started, 800
+    frames" are what make the image legible. Appended, never rewritten, so the order is the order
+    things happened.
+    """
+    os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
+    with open(JOURNAL, "a") as f:
+        f.write(f"{time.strftime('%H:%M:%S')}  {msg}\n")
+
+
+def _get(_route, **q):
+    # `_route` and not `path`: the open route takes a query parameter CALLED `path`, and a plain
+    # `path` here collided with it -- `_get("/api/scene/open", path=p)` raised "got multiple
+    # values for argument 'path'". A leading underscore keeps the whole query namespace free.
+    url = f"{BASE}{_route}" + ("?" + urllib.parse.urlencode(q) if q else "")
+    with urllib.request.urlopen(url, timeout=1800) as r:
+        body = r.read()
+    try:
+        return json.loads(body)
+    except Exception:                                                # noqa: BLE001
+        return {"raw": body[:400].decode("utf8", "replace")}
+
+
+def _post(path, payload):
+    req = urllib.request.Request(f"{BASE}{path}", data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=1800) as r:
+        return json.loads(r.read())
+
+
+def build(tab: str, form: dict, seed: bool = True) -> dict:
+    """Write the tab's spec and seed the scene, which is BUILD + SEED on the page."""
+    note(f"build  tab={tab}  name={form.get('name', '?')}  "
+         + "  ".join(f"{k}={v}" for k, v in form.items()
+                     if k not in ("name", "bodies") and not isinstance(v, (list, dict)))
+         + (f"  bodies={len(form['bodies'])}" if isinstance(form.get("bodies"), list) else ""))
+    t0 = time.perf_counter()
+    r = _post(f"/api/tab/{tab}/build", form)
+    if "error" in r:
+        note(f"  build FAILED: {str(r.get('error'))[:120]}")
+        return {"step": "build", **r}
+    out = {"built": r.get("name"), "build_s": round(time.perf_counter() - t0, 2)}
+    if seed:
+        t1 = time.perf_counter()
+        s = _get("/api/scene/seed", name=r.get("name"))
+        out["seed_s"] = round(time.perf_counter() - t1, 2)
+        if "error" in s:
+            out["error"] = s["error"]
+            note(f"  seed FAILED: {str(s['error'])[:120]}")
+        else:
+            out["sets"] = {k: v.get("n_live") for k, v in (s.get("sets") or {}).items()}
+            note(f"  seeded in {out['seed_s']}s: "
+                 + ", ".join(f"{k} {v:,}" for k, v in out["sets"].items() if v))
+    return out
+
+
+def open_spec(path: str, seed: bool = True) -> dict:
+    """Open a spec WRITTEN BY HAND and seed it -- the path for anything a tab's form cannot say.
+
+    The tabs are form-writers; a form that knows a ball and a block cannot express 4,117 somata at
+    their measured positions, and it should not be bent until it can. `/api/scene/open` imports
+    the file and opens it exactly as written, which is also what `Plexus_Main.py -o generate` runs.
+    """
+    p = path if os.path.isabs(path) else os.path.join(REPO, path)
+    note(f"open   {os.path.relpath(p, REPO)}")
+    t0 = time.perf_counter()
+    r = _get("/api/scene/open", path=p)
+    if "error" in r:
+        note(f"  open FAILED: {str(r['error'])[:160]}")
+        return {"step": "open", **r}
+    out = {"opened": r.get("name"), "open_s": round(time.perf_counter() - t0, 2)}
+    if seed:
+        t1 = time.perf_counter()
+        sres = _get("/api/scene/seed", name=r.get("name"))
+        out["seed_s"] = round(time.perf_counter() - t1, 2)
+        if "error" in sres:
+            out["error"] = sres["error"]
+            note(f"  seed FAILED: {str(sres['error'])[:160]}")
+        else:
+            out["sets"] = {k: v.get("n_live") for k, v in (sres.get("sets") or {}).items()}
+            note(f"  seeded in {out['seed_s']}s: "
+                 + ", ".join(f"{k} {v:,}" for k, v in out["sets"].items() if v))
+    return out
+
+
+def _next_index() -> int:
+    """One past the highest step number ANY folder holds -- a step that produced no movie must not
+    let the next step reuse its number."""
+    ns = [0]
+    for k in KINDS:
+        d = os.path.join(HISTORY, k)
+        if os.path.isdir(d):
+            ns += [int(f[:4]) for f in os.listdir(d) if f[:4].isdigit()]
+    return max(ns) + 1
+
+
+def shot(why: str = "", mp4: str | None = None, **cam) -> dict:
+    """The scene as a FILE, kept beside the spec that made it and the reason it was taken.
+
+    `/api/scene/render` streams bytes a curl-only caller cannot look at; `/api/scene/shot` writes
+    the same picture and returns its path. This adds the other two thirds of the record.
+    """
+    t0 = time.perf_counter()
+    r = _get("/api/scene/shot", **cam)
+    r["shot_s"] = round(time.perf_counter() - t0, 2)
+
+    i = _next_index()
+    try:
+        import shutil
+        shutil.copy(r["path"], _path("png", i))
+        st = _get("/api/scene/state")
+        name = st.get("name", "")
+        sp = _get("/api/scene/spec", name=name) if name else {}
+        raw = sp.get("raw") or sp.get("yaml") or ""
+        if raw:
+            with open(_path("spec", i), "w") as f:
+                f.write(raw)
+        with open(_path("why", i), "w") as f:
+            f.write(f"time   {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"spec   {name}\n")
+            f.write(f"camera azim={cam.get('azim')} elev={cam.get('elev')} zoom={cam.get('zoom')}\n")
+            if mp4 and os.path.exists(mp4):
+                f.write(f"movie  mp4/{i:04d}.mp4  ({os.path.getsize(mp4) / 1e6:.1f} MB, "
+                        f"copied from {mp4})\n")
+            f.write(f"why    {why or '(not stated)'}\n")
+        if mp4 and os.path.exists(mp4):
+            shutil.copy(mp4, _path("mp4", i))
+            r["history_mp4"] = _path("mp4", i)
+        r["history"] = os.path.join(HISTORY, f"*/{i:04d}.*")
+        r["index"] = i
+    except Exception as e:                                           # noqa: BLE001
+        r["history_error"] = f"{type(e).__name__}: {e}"
+
+    note(f"  shot {i:04d}  azim={cam.get('azim')} elev={cam.get('elev')} zoom={cam.get('zoom')}"
+         f"  {r.get('shot_s')}s" + (f"  -- {why}" if why else ""))
+    return r
+
+
+def _mp4_path(art: dict) -> str | None:
+    """The movie the run wrote, as a PATH ON DISK.
+
+    The artefacts route answers with browser URLs -- `/media?path=<abs>&t=<mtime>` -- under the
+    key `mp4`. An earlier version of this read a key named `video`, which the route has never
+    returned, so every cycle silently collected no movie and said nothing about it. Two ways in,
+    and the run directory is tried first because it needs no URL to be parsed at all.
+    """
+    d = art.get("dir") or ""
+    if d and os.path.exists(os.path.join(d, "movie.mp4")):
+        return os.path.join(d, "movie.mp4")
+    u = art.get("mp4") or ""
+    if u.startswith("/media?path="):
+        return urllib.parse.unquote(u[len("/media?path="):].split("&")[0])
+    return None
+
+
+def status() -> dict:
+    return _get("/api/scene/run")
+
+
+def wait(poll: float = 5.0, timeout: float = 3600.0) -> dict:
+    """Block until the run stops, reporting progress. Returns the final status."""
+    t0 = time.time()
+    last = -1
+    while time.time() - t0 < timeout:
+        s = status()
+        if not s.get("running"):
+            return s
+        f = s.get("frame", 0)
+        if f != last:
+            print(f"  frame {f}/{s.get('n_frames')}  {s.get('seconds')}s", file=sys.stderr, flush=True)
+            note(f"  running  frame {f}/{s.get('n_frames')}")
+            last = f
+        time.sleep(poll)
+    return {"error": f"still running after {timeout}s", **status()}
+
+
+def artefacts(name: str) -> dict:
+    return _get("/api/scene/artefacts", name=name)
+
+
+def engine_log(name: str, tail: int = 80) -> dict:
+    """The engine's own output for the last run of `name` -- the tee added in bio_view.run."""
+    p = os.path.join(REPO, "log", "gui_runs", f"{name}.log")
+    if not os.path.exists(p):
+        return {"error": f"no log at {p}"}
+    with open(p, errors="replace") as f:
+        lines = f.read().splitlines()
+    return {"log": p, "lines": len(lines), "tail": lines[-tail:]}
+
+
+def caption(mp4: str, frames: int = 8, index: int | None = None) -> dict:
+    """Ask the local Gemma VLLM what the movie shows. It is the only reader here that can say
+    'the body never moves' without being told what to look for.
+
+    With `index`, the caption is written as that step's `caption/NNNN.txt` -- once, here -- and
+    the watcher reads it from there. `describe_video.py --out` truncates its file on every call, so
+    the step's file holds exactly this movie's description and nothing left over from another."""
+    script = os.path.join(REPO, "VLLM", "describe_video.py")
+    if not os.path.exists(script):
+        return {"error": f"no {script}"}
+    out = (_path("caption", index) if index is not None
+           else os.path.join(REPO, "log", "gui_runs", "captions.txt"))
+    r = subprocess.run([sys.executable, script, mp4, "--out", out, "--frames", str(frames)],
+                       capture_output=True, text=True, timeout=3600)
+    if r.returncode != 0:
+        return {"error": r.stderr[-400:]}
+    txt = open(out, errors="replace").read() if os.path.exists(out) else ""
+    # AN EMPTY CAPTION IS A FAILURE, NOT A SUCCESS. `describe_video.py` skips a video it cannot read
+    # -- exp_01's step 0604 is a 762-byte mp4 with no stream in it -- writes `"records": []` and
+    # exits 0, so this returned an empty caption as if the VLM had looked and found nothing to say.
+    # Said out loud instead, with the one fact that usually explains it.
+    if not txt.strip():
+        sz = os.path.getsize(mp4) if os.path.exists(mp4) else 0
+        return {"error": f"no caption produced for {mp4} ({sz:,} bytes) -- the video could not be "
+                         f"read, or the model returned nothing", "out": out}
+    return {"out": out, "caption": txt[-1200:]}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["build", "open", "shot", "run", "status", "wait", "artefacts",
+                                    "log", "caption", "cycle", "opencycle"])
+    ap.add_argument("--spec", default=None, help="path of a hand-written spec, for open/opencycle")
+    ap.add_argument("--tab", default="platynereis")
+    ap.add_argument("--form", default="{}")
+    # A FORM IS OFTEN TOO BIG FOR A COMMAND LINE. The material tab's form carries one entry per
+    # body -- twenty-seven of them in the default scene, each with a block, a colour and a
+    # material -- which is kilobytes of JSON and a shell-quoting hazard. `--form-file` takes the
+    # same object from a file instead.
+    ap.add_argument("--form-file", default=None)
+    ap.add_argument("--name", default=None)
+    ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--mp4", default=None)
+    ap.add_argument("--tail", type=int, default=80)
+    ap.add_argument("--azim", type=float, default=35.0)
+    ap.add_argument("--elev", type=float, default=12.0)
+    ap.add_argument("--zoom", type=float, default=1.3)
+    # WHICH END OF THE ANIMAL IS UP, in degrees of camera roll. The Platynereis region runs
+    # head (low z) to tail (high z), so a z-up camera draws it upside down against its own paper;
+    # `--roll 180` turns the picture over without touching the data or the lighting.
+    ap.add_argument("--roll", type=float, default=0.0)
+    ap.add_argument("--no-caption", action="store_true")
+    # `--no-before`: NO STILL BEFORE THE RUN. The before-shot is the anatomy check; on a series of
+    # runs of one validated anatomy it is the same picture every time and the human called it
+    # useless in the record (exp_02 steps 0039, 0042, 2026-09-23). The after-shot and the movie stay.
+    ap.add_argument("--no-before", action="store_true")
+    # WHY THIS STEP EXISTS, in the session's own words. It is the third file of the record and the
+    # only one that cannot be reconstructed from the others.
+    ap.add_argument("--why", default="")
+    a = ap.parse_args()
+    form = json.load(open(a.form_file)) if a.form_file else json.loads(a.form)
+
+    if a.cmd == "build":
+        print(json.dumps(build(a.tab, form), indent=1))
+    elif a.cmd == "open":
+        print(json.dumps(open_spec(a.spec), indent=1))
+    elif a.cmd == "shot":
+        print(json.dumps(shot(a.why, a.mp4, azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll), indent=1))
+    elif a.cmd == "status":
+        print(json.dumps(status(), indent=1))
+    elif a.cmd == "wait":
+        print(json.dumps(wait(), indent=1))
+    elif a.cmd == "artefacts":
+        print(json.dumps(artefacts(a.name or form.get("name", "")), indent=1))
+    elif a.cmd == "log":
+        print(json.dumps(engine_log(a.name or form.get("name", ""), a.tail), indent=1))
+    elif a.cmd == "caption":
+        print(json.dumps(caption(a.mp4, ), indent=1))
+    elif a.cmd == "run":
+        note(f"run  device={a.device}")
+        print(json.dumps(_post("/api/scene/run", {"device": a.device}), indent=1))
+    elif a.cmd == "opencycle":
+        # THE SAME LOOP AS `cycle`, STARTING FROM A FILE instead of from a tab's form.
+        rep = {"open": open_spec(a.spec)}
+        if rep["open"].get("error"):
+            print(json.dumps(rep, indent=1)); return
+        if not a.no_before:
+            rep["shot_before"] = shot(f"{a.why} (before the run)".strip(),
+                                      azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        note(f"run  device={a.device}")
+        rep["started"] = _post("/api/scene/run", {"device": a.device})
+        rep["final"] = wait()
+        nm = rep["open"]["opened"]
+        rep["artefacts"] = artefacts(nm)
+        rep["engine_log"] = engine_log(nm, a.tail)
+        rep["mp4"] = mp4 = _mp4_path(rep["artefacts"])
+        rep["shot_after"] = shot(f"{a.why} (after the run)".strip(), mp4,
+                                 azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        if mp4 and not a.no_caption and os.path.exists(mp4):
+            rep["caption"] = caption(mp4, index=rep["shot_after"].get("index"))
+        print(json.dumps(rep, indent=1))
+    elif a.cmd == "cycle":
+        # THE WHOLE LOOP, which is the reason this file exists: build, look, run, wait, collect,
+        # read the engine's own words, and ask the VLLM what the movie shows.
+        rep = {"build": build(a.tab, form)}
+        if rep["build"].get("error"):
+            print(json.dumps(rep, indent=1)); return
+        rep["shot_before"] = shot(f"{a.why} (before the run)".strip(),
+                                  azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        note(f"run  device={a.device}")
+        rep["started"] = _post("/api/scene/run", {"device": a.device})
+        rep["final"] = wait()
+        nm = rep["build"]["built"]
+        rep["artefacts"] = artefacts(nm)
+        rep["engine_log"] = engine_log(nm, a.tail)
+        rep["mp4"] = mp4 = _mp4_path(rep["artefacts"])
+        rep["shot_after"] = shot(f"{a.why} (after the run)".strip(), mp4,
+                                 azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        if mp4 and not a.no_caption and os.path.exists(mp4):
+            rep["caption"] = caption(mp4, index=rep["shot_after"].get("index"))
+        print(json.dumps(rep, indent=1))
+
+
+if __name__ == "__main__":
+    main()

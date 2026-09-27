@@ -144,7 +144,7 @@ def archive(cfg, T, tag):
                         "-o", "generate_plot", "slime_gd8d", "--movie", "--force", "--device", "cpu"],
                        cwd=os.path.join(_HERE, "..", ".."), timeout=600,
                        env={**os.environ, "PYTHONPATH": os.path.join(_HERE, "..", "..", "src")})
-        src = "/groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gd8d/movie_cell.mp4"
+        src = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/slime/slime_gd8d/movie_cell.mp4"
         if os.path.exists(src):
             shutil.copy(src, os.path.join(adir, "movie_cell.mp4"))
     except Exception as e:

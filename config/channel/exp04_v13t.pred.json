@@ -1,0 +1,46 @@
+{
+ "channel": "ompf",
+ "shape": "ompf",
+ "state": "open trimer",
+ "box_nm": 14,
+ "core_half_nm_opm": 1.26,
+ "ion_paths": 3,
+ "narrowest_R_in_core_nm": [
+  0.36,
+  0.355,
+  0.361
+ ],
+ "path_passable": [
+  true,
+  true,
+  true
+ ],
+ "path_free_radius_min_nm": [
+  0.322,
+  0.317,
+  0.323
+ ],
+ "dry_plug_on_path": [
+  false,
+  false,
+  false
+ ],
+ "charges": {
+  "tips": 210,
+  "net_tips": -36.0,
+  "lumen_carbonyl_atoms": 72
+ },
+ "ions": {
+  "K": 748,
+  "Cl": 748
+ },
+ "lipids": 669,
+ "cation": "K",
+ "psi_mV": -200.0,
+ "conc_mM": 1000.0,
+ "dt_ps": 0.15647125768121545,
+ "n_frames": 300000,
+ "sim_time_ns": 46.941377304364636,
+ "born_cation_kT": 98.9,
+ "born_Cl_kT": 75.4
+}

@@ -63,7 +63,8 @@ PRESSURE_HISTORY: list = []
 
 # --------------------------------------------------------------------------- the coupling
 @register_operator("ecm_from_cell", family="mechanics", set="particle", kind="lateral",
-                   implementation="sphere")
+                   implementation="sphere",
+                   equation=r"""$$r(t)=\min(r_0+vt,\;r_{\max}),\qquad d_i=r(t)-\lVert\mathbf x_i-\mathbf c\rVert,\qquad \mathbf a_i=k\,d_i\,\frac{\mathbf x_i-\mathbf c}{\lVert\mathbf x_i-\mathbf c\rVert}-c_d\,\mathbf v_i$$""")
 class CellToECMSphere(Lateral):
     """The growing cell ball as a moving boundary the matrix feels, with the ball prescribed
     rather than simulated: a sphere of radius r(t).
@@ -165,7 +166,8 @@ class CellToECMSphere(Lateral):
 
 
 # --------------------------------------------------------------------------- what you can see
-@register_operator("ecm_stress", family="hierarchy", set="particle", kind="lateral")
+@register_operator("ecm_stress", family="hierarchy", set="particle", kind="lateral", probe=True,
+                   equation=r"""$$s_i=\lvert\det\mathbf F_i-1\rvert,\qquad \mathrm{band}_i=\left\lfloor K\min(s_i/S,1)\right\rfloor$$""")
 class ECMStress(Lateral):
     """A measurement, as an operator: colour the matrix by how hard it is being squeezed, so the
     stress front is the thing a movie shows rather than the positions.
@@ -394,7 +396,8 @@ class CellToECMReplay(Lateral):
         return {self.at: acc * lvl.occ[:, None].float()}
 
 
-@register_operator("cell_exclude", family="boundary", set="particle", kind="structural")
+@register_operator("cell_exclude", family="boundary", set="particle", kind="structural",
+                   equation=r"""$$R_i=S\,R(\theta_i,\phi_i)(1+\text{skin}),\qquad \mathbf x_i\leftarrow\mathbf c+R_i\,\mathbf u_i$$""")
 class CellExclude3D(Structural):
     """A hard non-penetration backstop: no matrix particle may end a frame inside the tissue.
 
@@ -528,7 +531,8 @@ class MPMBlock:
     provision = MPMParticle.provision
 
 
-@register_operator("block_seed", family="seed", set="particle", kind="seed")
+@register_operator("block_seed", family="seed", set="particle", kind="seed",
+                   equation=r"""$$\text{occupied}=\{\mathbf x:\ \lvert x_a-c_a\rvert>g\}$$""")
 class BlockSeed(Structural):
     """Fill the two slabs beyond a free gap with particles, once, at frame 0: the rigid walls the
     matrix and the tissue are confined between.
@@ -622,7 +626,8 @@ class BlockSeed(Structural):
         return {}
 
 
-@register_operator("block_stress", family="hierarchy", set="particle", kind="lateral")
+@register_operator("block_stress", family="hierarchy", set="particle", kind="lateral", probe=True,
+                   equation=r"""$$s_i=\lvert\det\mathbf F_i-1\rvert,\qquad \mathrm{band}_i=\left\lfloor K\min(s_i/S,1)\right\rfloor$$""")
 class BlockStress(Lateral):
     """The block's own local volume change, banded, so its deformation is visible at its own
     scale rather than at the matrix's.

@@ -1,4 +1,6 @@
 general:
+
+  title: "A waterfall of 5,000,000 material points"
   name: si_waterfall_5m
   seed: 0
   n_frames: 2400

@@ -191,6 +191,13 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
         set_name = cand[0]
     if cell_set is None:
         cc = [k[:-len("__chem")] for k in z.files if k.endswith("__chem")]
+        # A SHEET WITH NO CHEMISTRY STILL HAS CELLS. Finding the cell set only by its `chem` block
+        # left `age`, `ndiv` and `apop_flag` unread on every chemistry-free run, so the mother and
+        # the dying cell were never drawn -- only the daughter, which needs no per-cell state. The
+        # set that carries `age` and has no `pos` of its own is the mesh's face set.
+        if not cc:
+            cc = [k[:-len("__age")] for k in z.files
+                  if k.endswith("__age") and f"{k[:-len('__age')]}__pos" not in z.files]
         cell_set = cc[0] if cc else None
     # EVERY ARRAY IS READ ONCE. `np.load` returns an NpzFile whose `z[key]` DECOMPRESSES THE WHOLE
     # ARRAY on every access, so reading one row inside a loop over N rows re-reads the entire
@@ -397,6 +404,13 @@ def box_of(run_dir, fr):
     becomes the one thing it cannot show.
     """
     import json
+    # A DECLARED BOX WINS. `plotting.camera_lbox` is the half-width of the view, in world units,
+    # for a SERIES of runs that must be read against one another -- a presentation ladder where each
+    # slide adds one operator to the last. Fitted per run, a sheet that later grows makes every
+    # earlier slide's identical first frame come out at a different scale.
+    _L = (_PLOT_OVERRIDE or {}).get("camera_lbox")
+    if _L:
+        return float(_L)
     dj = os.path.join(run_dir, "diag.json")
     if os.path.exists(dj):
         try:
@@ -482,7 +496,7 @@ def _marks(mt, idx, nF, prev_nF=None):
 
 def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=None, lut=None,
             cutaway=None,
-            blend=None):
+            blend=None, vmax=None):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
     from plexus.models.topology import rings_from_flat_3d
@@ -545,7 +559,11 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
     rgb = x = None
     if chem is not None and lut and not flat:
         from plexus.live import chem_rgb
-        _cols, _ = chem_rgb(np.asarray(chem, float)[:nF][idx], lut=lut, blend=blend)
+        # `vmax` IS `plotting.chem_max`, THE SPEC'S FIXED COLOUR SCALE, which the live renderer has always
+        # honoured and this replay path dropped: a column whose values are all ~1e-9 (a knocked-out gene)
+        # was normalised by its own maximum and drawn at full colour (exp 7, the Pax6-/- movies). None,
+        # the default, keeps the per-frame law and every existing picture unchanged.
+        _cols, _ = chem_rgb(np.asarray(chem, float)[:nF][idx], lut=lut, blend=blend, vmax=vmax)
         if _cols is not None:
             rgb = (np.clip(_cols, 0, 1) * 255).astype(np.uint8)
             # `x` is what the suppression tint weighs itself by, so it still has to be the
@@ -554,7 +572,13 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
             _hi = float(np.nanmax(_a)) if hi is None else hi
             x = np.clip((_a - _lo) / (_hi - _lo + 1e-9), 0, 1)
     if rgb is None and (act is None or flat):
-        rgb = np.full((len(idx), 3), BODY_GREY, np.uint8)
+        # `plotting.mesh_color` OVERRIDES THE GREY, which is the live movie's key for the same
+        # thing. Grey stays the default for the reason given at `BODY_GREY`; a spec that asks for
+        # white faces has decided the marks read against white.
+        _body = (_PLOT_OVERRIDE or {}).get("mesh_color")
+        from matplotlib.colors import to_rgb as _to_rgb
+        _bc = BODY_GREY if not _body else tuple(int(round(255 * c)) for c in _to_rgb(_body))
+        rgb = np.full((len(idx), 3), _bc, np.uint8)
         x = np.zeros(len(idx))
     if rgb is None and act is not None and not flat:
         a = np.asarray(act, float)[:nF][idx]
@@ -567,6 +591,21 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
         x = np.clip((a - _lo) / (_hi - _lo + 1e-9), 0, 1)
         rgb = (np.asarray(_cmap()(x))[:, :3] * 255).astype(np.uint8)
         rgb[~ok] = (255, 26, 217)                 # magenta: not a cell any more
+    # `plotting.mesh_color_by: <label block>` -- A CATEGORY PER CELL (exp 14): `clone`, the founder a
+    # cell descends from, paints the mosaic of lineages; `mutant` the two populations. The same rule
+    # as `live_movie._mesh_face_rgb`: `label_colors` colours values 0, 1, ... in order, any other
+    # value takes a hue hashed from its number (not stepped by the golden ratio: the seed's Fibonacci
+    # sphere puts indices a Fibonacci number apart side by side, and those step to near-equal hues),
+    # so a clone keeps its colour in every frame. It replaces the body colour; the division and death marks still draw over it.
+    _lab = str((_PLOT_OVERRIDE or {}).get("mesh_color_by", "") or "")
+    if _lab and _lab.lower() not in ("phase", "cycle_progress") and mt.get(_lab) is not None:
+        from plexus.measures import label_rgb
+        _q = np.rint(np.asarray(mt[_lab], float)[:nF][idx]).astype(np.int64)
+        _pal = (_PLOT_OVERRIDE or {}).get("label_colors") or []
+        _c = np.empty((len(idx), 3))
+        for k in np.unique(_q):
+            _c[_q == k] = label_rgb(int(k), _pal)
+        rgb = (_c * 255).astype(np.uint8)
     mother, daughter, kills, sup = _marks(mt, idx, nF, prev_nF)
     # ORDER MATTERS, and it changed with the division pair. Suppression is the background; the
     # DIVISION PAIR comes next; DEATH is last and wins outright. Death last because a cell sentenced
@@ -739,7 +778,7 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     name = label or os.path.basename(run_dir.rstrip("/"))
     pos, mt, act, _chem = fr[-1]
     m = mesh_of(pos, mt, act, show_div=False, chem=_chem, lut=_lut, blend=_blend,
-                cutaway=_cut)
+                cutaway=_cut, vmax=_pl.get("chem_max"))
     n = int(KB_SECONDS * FPS)
     p = _plotter(); add(p, m, style)
     p.add_text(f"{name}  {style}", position="upper_left", font_size=11, color="white")
@@ -800,7 +839,7 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     for t, (pos, mt, act, _chem) in enumerate(fr):
         back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
         m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh" and _div), prev_nF=back,
-                    chem=_chem, lut=_lut, blend=_blend, cutaway=_cut)
+                    chem=_chem, lut=_lut, blend=_blend, cutaway=_cut, vmax=_pl.get("chem_max"))
         if m is None:
             continue
         if actor is not None:
@@ -842,7 +881,7 @@ def still(run_dir, style="flat", out=None, fill=1.0, frame=-1, label=True, traj=
     pos, mt, act, _chem = fr[frame][:4]
     m = mesh_of(pos, mt, act, show_div=(style == "mesh"), chem=_chem,
                 lut=style_of(run_dir)[0], blend=style_of(run_dir)[1],
-                cutaway=style_of(run_dir)[2])
+                cutaway=style_of(run_dir)[2], vmax=plot_style(run_dir).get("chem_max"))
     p = _plotter()
     add(p, m, style)
     if label:

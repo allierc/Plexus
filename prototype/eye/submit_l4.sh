@@ -2,7 +2,7 @@
 # Submit the eye characterisation to an L4 cluster.
 #
 # The repo is on the shared filesystem, so a cluster node sees this prototype at
-#   /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye
+#   ${CLUSTER_HOME}/Graph/Plexus/prototype/eye
 # (inside the devcontainer the same path is /workspace/Plexus/prototype/eye).
 # Nothing here writes outside the archive, and every run is independent, so the
 # 112 runs of the protocol shard by run with no communication.
@@ -12,7 +12,7 @@
 #
 # One job per GPU; ask for more slots than muscles and they simply queue.
 set -euo pipefail
-ROOT=/groups/saalfeld/home/allierc/Graph/Plexus
+ROOT=${CLUSTER_HOME}/Graph/Plexus
 EYE=$ROOT/prototype/eye
 PY=/workspace/.conda_envs/neural-graph-linux/bin/python      # adjust for the cluster image
 WHAT=${1:-derisk}
@@ -21,7 +21,7 @@ MODEL=${2:-F}
 submit () {                       # submit <name> <command...>
   local name=$1; shift
   # bsub keeps RELATIVE paths (the cluster's cwd differs from the devcontainer's)
-  bsub -J "eye_${name}" -n 4 -gpu "num=1" -q gpu_l4 \
+  bsub -J "eye_${name}" -n 4 -gpu "num=1" -q ${CLUSTER_QUEUE_PREFIX}l4 \
        -o "$EYE/archive/logs/${name}.out" -e "$EYE/archive/logs/${name}.err" \
        "cd $EYE && $*"
 }

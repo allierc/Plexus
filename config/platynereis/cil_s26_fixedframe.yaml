@@ -1,0 +1,198 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+general:
+  boundary: wall
+  dim: 3
+  dt: 3.0e-05
+  n_frames: 10000
+  name: cil_s26_fixedframe
+  record_cap: 301
+  save_data: null
+  seed: 0
+  units:
+    length_um: 50.0
+    time_s: 1.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: rod_node
+  k_bend: 602900.0
+  k_stretch: 455900000.0
+  op: rod_elastic
+  zeta_bend: 0.05
+  zeta_stretch: 0.3
+- anchor: fixed
+  at: rod_node
+  clamp: 776.5
+  clamp_zeta: 1.0
+  moment: 0.0
+  omega: 6.283185
+  omega_n: 10000.0
+  op: rod_base
+  waveform: sine
+  zeta: 1.0
+- at: water_particle
+  implementation: warp
+  op: mpm_strain
+- at: water_particle
+  eta: 1600.0
+  op: mpm_viscosity
+- a_max: 200.0
+  at: water_particle
+  drag: 0.0
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  to: mpm_grid
+- at: mpm_grid
+  op: mpm_grid_update
+  wall_damp: 0.9
+  wall_friction: 0.3
+- at: water_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_damp: 0.9
+- along: chain
+  at: rod_node
+  field: mpm_grid
+  k: 12.0
+  op: drag
+  ratio: 2.0
+  react: true
+  react_set: water_particle
+- amplitude: 10.0
+  at: rod_node
+  k_motor: 602900.0
+  omega: 62.83185
+  op: rod_motor
+  wavelength: 0.4
+  frame: fixed
+plotting:
+  background: black
+  box_frame: true
+  chain:
+    color: '#ffffff'
+    per: 12
+    set: rod_node
+    width: 7
+  color_field: radial
+  color_range:
+  - -5.48e-05
+  - 5.48e-05
+  cutaway:
+    at: 0.5
+    axis: y
+    thickness: 0.08
+  dot_shading: true
+  dot_size: 5.0
+  field_cmap: bwr
+  field_log: false
+  fps: 20.0
+  keep_stills: true
+  max_frames: 300
+  renderer: vtk_points
+  slow_motion: 26.67
+  stills: 8
+  subject: water_particle
+  up_axis: 2
+schedule:
+- rod_elastic
+- rod_base
+- rod_motor
+- drag
+- steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 3.0e-05
+seed:
+- at: rod_node
+  base:
+  - 0.5
+  - 0.5
+  - 0.3
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  length: 0.4
+  n_rod: 1
+  op: rod_seed
+sets:
+  rod_node:
+    density: 1100.0
+    entity: mpm_particle
+    mesh: rod_segment
+    n: 12
+    radius: 0.01
+    start:
+    - - 0.5
+      - 0.5
+      - 0.3
+    state:
+      pos:
+        boundary: free
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        boundary: free
+        integration: second_order_rate
+        role: rate
+        width: 3
+    types:
+      cilium:
+        block:
+        - 0.49
+        - 0.49
+        - 0.3
+        - 0.51
+        - 0.51
+        - 0.7
+        density: 1100.0
+        fraction: 1.0
+        material: elastic
+        youngs: 1.0
+  rod_segment:
+    maps:
+      srce: rod_node
+      trgt: rod_node
+    n: 11
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        block:
+        - 0.08
+        - 0.08
+        - 0.08
+        - 0.92
+        - 0.92
+        - 0.92
+        bulk_modulus: 100000.0
+        count: 1
+        density: 1000.0
+        eta: 1600.0
+        material: liquid
+  water_particle:
+    density: 1000.0
+    entity: mpm_particle
+    parent: water
+    per_parent: 155374
+    radius: 0.5

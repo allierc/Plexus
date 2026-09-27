@@ -1,0 +1,9 @@
+general: {name: m2_integrate_ctx, duration_s: 8.0, dt: 0.0166666666666667, channels: 1}
+stimulus: {process: band_limited_noise, f_max_hz: 2.0, amplitude: 1.0}
+splits:
+  train: {n_per_cond: 256, seed0: 0}
+  val: {n_per_cond: 16, seed0: 5000000}
+  test: {n_per_cond: 32, seed0: 9000000}
+teachers:
+- {name: integrate_a, law: integrate}
+- {name: integrate_b, law: integrate}

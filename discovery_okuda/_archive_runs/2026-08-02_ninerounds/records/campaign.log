@@ -164,7 +164,7 @@ ROUND 6   mode=recon   campaign=okuda_growth_driven
 ================================================================================================
 [cluster] fired 12 bsub(s) DETACHED on $CLUSTER_SSH: pg_r006n_00_cfl_c001p300_d, pg_r006n_01_cfl_c000p080_d, pg_r006n_02_cfl_c000p010_d, pg_r006n_03_cfl_c000p020_d, pg_r006n_04_cfl_c001p300_d, pg_r006n_05_cfl_c001p300_d, pg_r006n_06_wk_tension_pos, pg_r006n_07_wk_curvature_p, pg_r006n_08_wk_apical_area, pg_r006n_09_wk_pressure_po, pg_r006n_10_wk_curvature_n, pg_r006n_11_wk_pressure_ne
   the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
-  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  verify: python cluster.py --status   (remote submit log: $CLUSTER_HOME/Graph/Plexus/log/okuda/_cluster/_submit.log)
     [+00:36] ◌ 12 job(s) on the cluster; waiting. Check with `bjobs`.
   [16:59] run/pend=12 done=0 exit=0 of 12
   [17:00] run/pend=11 done=0 exit=1 of 12
@@ -212,7 +212,7 @@ Wrote `proposal.json` — 12 slots (control + 11 single-op edits). No `user_inpu
 ================================================================================================
 [cluster] fired 7 bsub(s) DETACHED on $CLUSTER_SSH: pg_r007c_00_dcf832, pg_r007c_01_7c70bc, pg_r007c_02_174e76, pg_r007c_03_4fac94, pg_r007c_04_6d3c06, pg_r007c_05_d5e094, pg_r007c_06_cf0164
   the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
-  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  verify: python cluster.py --status   (remote submit log: $CLUSTER_HOME/Graph/Plexus/log/okuda/_cluster/_submit.log)
     [+04:01] ◌ 7 job(s) on the cluster; waiting. Check with `bjobs`.
   [17:05] run/pend=7 done=0 exit=0 of 7
   [17:06] run/pend=7 done=0 exit=0 of 7
@@ -449,7 +449,7 @@ Batch rationale: memory says the sphere ceiling is exhausted and the frontier is
 ================================================================================================
 [cluster] fired 8 bsub(s) DETACHED on $CLUSTER_SSH: pg_r008c_00_d5e094, pg_r008c_01_79b047, pg_r008c_02_cbbdfe, pg_r008c_03_b00f85, pg_r008c_04_90f34f, pg_r008c_05_3c4f00, pg_r008c_06_dffde3, pg_r008c_07_af9b95
   the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
-  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  verify: python cluster.py --status   (remote submit log: $CLUSTER_HOME/Graph/Plexus/log/okuda/_cluster/_submit.log)
     [+02:27] ◌ 8 job(s) on the cluster; waiting. Check with `bjobs`.
   [17:54] run/pend=8 done=0 exit=0 of 8
   [17:55] run/pend=8 done=0 exit=0 of 8
@@ -699,7 +699,7 @@ proposal.json written — 12 slots, control + 11 single-edit experiments.
 ================================================================================================
 [cluster] fired 8 bsub(s) DETACHED on $CLUSTER_SSH: pg_r009c_00_cbbdfe, pg_r009c_01_6de516, pg_r009c_02_3242f3, pg_r009c_03_1fdee5, pg_r009c_04_a4940b, pg_r009c_05_bad47f, pg_r009c_06_db6608, pg_r009c_07_6c1727
   the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
-  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  verify: python cluster.py --status   (remote submit log: $CLUSTER_HOME/Graph/Plexus/log/okuda/_cluster/_submit.log)
     [+05:44] ◌ 8 job(s) on the cluster; waiting. Check with `bjobs`.
   [18:54] run/pend=8 done=0 exit=0 of 8
   [18:55] run/pend=8 done=0 exit=0 of 8
@@ -956,7 +956,7 @@ Written. `proposal.json` — 12 slots, explore mode.
 ================================================================================================
 [cluster] fired 9 bsub(s) DETACHED on $CLUSTER_SSH: pg_r010c_00_1fdee5, pg_r010c_01_d4197d, pg_r010c_02_4ba933, pg_r010c_03_3281fd, pg_r010c_04_6de516, pg_r010c_05_1dc508, pg_r010c_06_66fd9f, pg_r010c_07_a5afdb, pg_r010c_08_e2be59
   the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
-  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  verify: python cluster.py --status   (remote submit log: $CLUSTER_HOME/Graph/Plexus/log/okuda/_cluster/_submit.log)
     [+03:51] ◌ 9 job(s) on the cluster; waiting. Check with `bjobs`.
   [19:46] run/pend=9 done=0 exit=0 of 9
   [19:47] run/pend=9 done=0 exit=0 of 9

@@ -432,7 +432,10 @@ class MPMWrites:
         p.C.copy_(new_C)
 
 
-@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
+@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange", title="Particle to grid",
+                   equation=r"""$$\boldsymbol\sigma = 2\mu(\mathbf F-\mathbf R)\mathbf F^{\!\top} + \lambda(J-1)J\,\mathbf I,
+\qquad
+\mathbf Q = -\frac{4\,\Delta t}{\Delta x^{2}}\,V\,\boldsymbol\sigma + m\,\mathbf C$$""")
 class MPMScatter(MPMWrites, Exchange):                
     """Particle to grid: the first step of the MLS-MPM cycle. Every particle deposits its mass,
     its momentum, and the impulse of its own internal stress onto the grid nodes around it.
@@ -627,6 +630,8 @@ class MPMScatter(MPMWrites, Exchange):
         # existing 2D field-driven operator is untouched.
         act = getattr(p, "act_stress", None)
         _gact = getattr(H, "active_stress", None)
+        if _gact is not None and _gact.shape[0] != p.n:
+            _gact = None                        # the global slot is another set's; see below
         if _gact is not None:
             act = _gact if act is None else act + _gact
         if act is not None:
@@ -635,7 +640,12 @@ class MPMScatter(MPMWrites, Exchange):
         # stress written by an operator upstream in the substep -- today the Newtonian viscous
         # stress from `mpm_viscosity`. Kept separate from `active_stress` so the two compose
         # rather than clobber, and so a spec that reads `active_stress` back means what it says.
-        xtr = getattr(H, "extra_stress", None)
+        xtr = getattr(p, "extra_stress", None)
+        if xtr is None:
+            _gx = getattr(H, "extra_stress", None)
+            # A GLOBAL SLOT IS ONLY MEANINGFUL FOR THE SET WHOSE SHAPE IT HAS. With two particle
+            # sets on one grid it belongs to whichever ran last, so it is taken only when it fits.
+            xtr = _gx if (_gx is not None and _gx.shape[0] == p.n) else None
         if xtr is not None:
             stress = stress + xtr
         # TURGOR / OSMOTIC PRESSURE (optional, default OFF): an isotropic OUTWARD pressure carried
@@ -723,7 +733,12 @@ class MPMScatter(MPMWrites, Exchange):
             gc.index_add_(0, flat, lw)
 
 
-@register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
+@register_operator("mpm_grid_update", family="mpm", set="field", kind="field", title="Grid solve",
+                   equation=r"""$$\mathbf v_g = \frac{\mathbf p_g}{m_g},
+\qquad
+\mathbf v_g \mathrel{+}= \Delta t\,\mathbf f^{\,\text{CSF}}_g,
+\qquad
+\mathbf v_g \leftarrow \mathrm{BC}(\mathbf v_g)$$""")
 class MPMGridUpdate(MPMWrites, FieldUpdate):
     """The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system
     is coupled. Momentum becomes velocity, body forces are added, and the walls are imposed.
@@ -1344,7 +1359,7 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
 # first update before the second, exactly as the in-place version does.
 # ==========================================================================================================
 @register_operator("mpm_grid_update", implementation="nosync", family="mpm",
-                   set="field", kind="field")
+                   set="field", kind="field", title="Grid solve")
 class MPMGridUpdateNoSync(MPMGridUpdate):
     """The grid solve with a sync-free 2D wall boundary condition: the same physics, with the
     host synchronisation that the default 2D path incurs removed. Identical in 3D, where the
@@ -1380,7 +1395,12 @@ class MPMGridUpdateNoSync(MPMGridUpdate):
         return torch.stack([vx, vy], dim=-1).view(nx * ny, 2)
 
 
-@register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
+@register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange", title="Grid to particle",
+                   equation=r"""$$\mathbf v_i = \sum_g w_{ig}\,\mathbf v_g,
+\qquad
+\mathbf C_i = \frac{4}{\Delta x^{2}}\sum_g w_{ig}\,\mathbf v_g\,(\mathbf x_g-\mathbf x_i)^{\!\top},
+\qquad
+\mathbf x_i \mathrel{+}= \Delta t\,\mathbf v_i$$""")
 class MPMGather(MPMWrites, Exchange):                 
     """Grid to particle: the third step of the MLS-MPM cycle. Each particle reads back a
     velocity and a velocity GRADIENT from the nodes around it, and is advected.
@@ -1538,7 +1558,9 @@ class MPMGather(MPMWrites, Exchange):
         return {}
 
 
-@register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
+@register_operator("mpm_strain", family="mpm", set="particle", kind="lateral", title="Material update",
+                   equation=r"""$$\mathbf F \;\leftarrow\; (\mathbf I + \Delta t\,\mathbf C)\,\mathbf F
+\qquad\text{(liquid: } \mathbf F\leftarrow J^{1/d}\mathbf I,\ J=\det\mathbf F\text{)}$$""")
 class MPMStrain(MPMWrites, Lateral):
     """The material update: the fourth step of the MLS-MPM cycle. Each particle advances its own
     deformation gradient from the velocity gradient it just gathered, then applies its material law.
@@ -1676,7 +1698,8 @@ class MPMStrain(MPMWrites, Lateral):
 # ==========================================================================================================
 # mpm_turgor -- the isotropic outward pressure a cell's interior holds against its cortex.
 # ==========================================================================================================
-@register_operator("mpm_turgor", "osmotic_pressure", family="mpm", set="particle", kind="lateral")
+@register_operator("mpm_turgor", "osmotic_pressure", family="mpm", set="particle", kind="lateral",
+                   equation=r"""$$P=\frac{2\gamma}{R},\qquad P\simeq\lambda\,\epsilon\ \ \text{for a volume strain }\epsilon$$""")
 class MPMTurgor(Lateral):
     """Give a set an isotropic OUTWARD pressure -- turgor / excess osmotic pressure -- by writing a
     per-particle `turgor` buffer that `mpm_scatter` subtracts from the Kirchhoff stress.
@@ -1761,15 +1784,22 @@ class MPMTurgor(Lateral):
 # ==========================================================================================================
 # mpm_viscosity -- the Newtonian viscous stress a liquid in this MPM does not otherwise have.
 # ==========================================================================================================
-@register_operator("mpm_viscosity", family="mpm", set="particle", kind="lateral")
+@register_operator("mpm_viscosity", family="mpm", set="particle", kind="lateral", title="Shear viscosity",
+                   equation=r"""$$\boldsymbol\tau_p=\eta\big(\mathbf C_p+\mathbf C_p^{\mathsf T}\big)$$""")
 class MPMViscosity(Lateral):
     """Shear dissipation for a liquid, which the constitutive law does not otherwise provide.
 
     particle -> particle: reads the affine velocity gradient C, emits an external acceleration.
 
-        a_p = -nu * C_p (x_p - x_cell)      applied only to liquid particles
+        tau_p = eta (C_p + C_p^T)           applied only to liquid particles
 
-    nu is the kinematic viscosity in world units squared per unit time.
+    `eta` IS THE DYNAMIC VISCOSITY, not the kinematic one, and this line used to say the opposite
+    while the code beneath it said `self.eta = float(params["eta"])  # DYNAMIC viscosity mu_dyn`.
+    The formula settles it: tau = 2 mu D with D = (C + C^T)/2 is the Newtonian deviatoric stress,
+    so the constant multiplying it is mu, in pascal-seconds against a density in kg/m^3. Which one
+    it is decides a Reynolds number by a factor of the density -- on the Platynereis larva,
+    Re = rho U L / eta came to 14,721 where reading it as kinematic would have given 14.4, and the
+    whole question of whether that model is in a cilium's regime turns on it.
 
     `material: liquid` sets mu = 0, so the deviatoric stress is IDENTICALLY zero and nothing in
     the constitutive model resists or dissipates shear. The only sinks in the whole scheme are then
@@ -1782,7 +1812,7 @@ class MPMViscosity(Lateral):
     Reference: the Navier-Stokes viscous term; Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
     """
 
-    EMIT = None                 # writes H.extra_stress, consumed by mpm_scatter in the same substep
+    EMIT = None                 # writes `p.extra_stress`, consumed by mpm_scatter in the substep
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["eta"]
     MECHANISM_TAGS = ["viscous_stress", "momentum_diffusion", "dissipation"]
@@ -1823,15 +1853,29 @@ class MPMViscosity(Lateral):
             tau = tau * (occ > 0).to(tau.dtype)[:, None, None]
         if mask is not None:
             tau = tau * mask.to(tau.dtype)[:, None, None]
-        prev = getattr(H, "extra_stress", None)
+        # ON THE SET, NOT ON THE HIERARCHY. `H.extra_stress` is one slot shared by every particle
+        # set in the model, which is right while there is one cloud and wrong the moment there are
+        # two: an animal of 98,808 points and a pool of 140,000 both scatter into one grid, and the
+        # water's viscous stress was added to the ANIMAL's -- "the size of tensor a (98808) must
+        # match the size of tensor b (140000)". The same flaw `active_stress` carries, and
+        # `polar_active_stress` already avoids by writing `p.act_stress`.
+        #
+        # The global is still written when this is the only set using it, because specs and
+        # prototypes read it back, and a reader of `H.extra_stress` on a one-cloud model must keep
+        # meaning what it meant. `mpm_scatter` prefers the per-set buffer and falls back.
+        prev = getattr(p, "extra_stress", None)
         if prev is None or prev.shape != tau.shape:
-            H.extra_stress = tau
+            p.register_buffer("extra_stress", tau.detach().clone())
         else:
             prev.copy_(tau)                     # persistent buffer -> safe inside a captured graph
+        _g = getattr(H, "extra_stress", None)
+        if _g is None or _g.shape == tau.shape:
+            H.extra_stress = p.extra_stress
         return {}
 
 
-@register_operator("mpm_anchor", family="mechanics", set="particle", kind="lateral")
+@register_operator("mpm_anchor", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_p=k\,(\mathbf x^{\mathrm{rest}}_p-\mathbf x_p, title="Spring to a rest position")$$""")
 class MPMAnchor(Lateral):
     """A spring to a rest position: what holds a body that must not drift, without pinning it
     rigidly.
@@ -1925,7 +1969,8 @@ class MPMAnchor(Lateral):
         return {self.at: acc}
 
 
-@register_operator("mpm_spin", family="mechanics", set="particle", kind="lateral")
+@register_operator("mpm_spin", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf v^{\mathrm{target}}_p=\omega\,\big(\hat{\mathbf a}\times(\mathbf x_p-\mathbf c)\big),\qquad \mathbf a_p=k_{\mathrm{spin}}\big(\mathbf v^{\mathrm{target}}_p-\mathbf v_p\big)$$""")
 class MPMSpin(Lateral):
     """Drive a body toward slow solid-body rotation: a controller, not a constraint, so the body
     is free to deform while it turns.
@@ -2081,7 +2126,9 @@ class VectorGrid(Field):
         self.register_buffer("grid", vt)                       # [2, nx, ny]
 
 
-@register_operator("apply_material_map", family="mpm", set="particle", kind="exchange")
+@register_operator("apply_material_map", family="mpm", set="particle", kind="exchange",
+                   equation=r"""$$E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
+\qquad (\mu_i,\lambda_i) = \mathrm{Lam\acute e}(E_i)$$""")
 class ApplyMaterialMap(Exchange):
     """Paint a material parameter onto the particles from an image: the map says what each
     region is made of, so heterogeneity is measured rather than declared per type.
@@ -2674,7 +2721,7 @@ if HAVE_WARP:
 
 
 @register_operator("mpm_scatter", implementation="warp", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Particle to grid")
 class MPMScatterWarp(MPMScatter):
     """The scatter as one Warp kernel with global atomics: the same physics, one launch instead
     of a batched gather-scatter over the 3^D stencil.
@@ -2754,6 +2801,10 @@ class MPMScatterWarp(MPMScatter):
         _has_turg = _turg is not None
         _turg = _turg.contiguous() if _has_turg else _z
         _act = getattr(H, "active_stress", None)
+        # SAME GUARD AS `extra_stress` BELOW: the global slot belongs to whichever set wrote it
+        # last, so it is taken only when its shape is this set's.
+        if _act is not None and _act.shape[0] != p.n:
+            _act = None
         _lact = getattr(p, "act_stress", None)          # per-set active stress; see the torch path
         if _lact is not None:
             _act = _lact if _act is None else (_act + _lact)
@@ -2762,7 +2813,10 @@ class MPMScatterWarp(MPMScatter):
         # given separate inputs -- they enter the momentum identically and the kernel cannot tell
         # them apart. Summing in torch also keeps the kernel signature (and its cached compile)
         # unchanged, which is why `mpm_viscosity` needs no warp kernel of its own.
-        _xtr = getattr(H, "extra_stress", None)
+        _xtr = getattr(p, "extra_stress", None)
+        if _xtr is None:
+            _gx = getattr(H, "extra_stress", None)
+            _xtr = _gx if (_gx is not None and _gx.shape[0] == p.n) else None
         if _xtr is not None:
             _act = _xtr if _act is None else (_act + _xtr)
         _has_act = _act is not None
@@ -2898,7 +2952,7 @@ if HAVE_WARP:
 
 
 @register_operator("mpm_gather", implementation="warp", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Grid to particle")
 class MPMGatherWarp(MPMGather):
     """The gather as one Warp kernel. Pure reads: no atomics, no sort, nothing shared between
     threads, which is why this is the easiest of the four steps to make fast.
@@ -3043,7 +3097,7 @@ if HAVE_WARP:
 
 
 @register_operator("mpm_strain", implementation="warp", family="mpm",
-                   set="particle", kind="lateral")
+                   set="particle", kind="lateral", title="Material update")
 class MPMStrainWarp(MPMStrain):
     """The deformation-gradient update and material response as one Warp kernel, elastic and
     liquid branches both.
@@ -3319,7 +3373,7 @@ if HAVE_WARP:
 
 
 @register_operator("mpm_grid_update", implementation="warp", family="mpm",
-                   set="field", kind="field")
+                   set="field", kind="field", title="Grid solve")
 class MPMGridUpdateWarp(MPMGridUpdate):
     """The 3D grid solve -- mass normalisation, the continuum surface force, box walls, obstacles
     and buoyancy -- as two Warp kernels rather than several dozen whole-grid torch operations.
@@ -3568,7 +3622,7 @@ if HAVE_TRITON:
 
 
 @register_operator("mpm_scatter", implementation="triton", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Particle to grid")
 class MPMScatterTriton(MPMScatter):
     """The scatter as one fused Triton kernel. Subclasses the default, so every knob, contract
     and default it declares stays exactly as it is -- what changes is how the delta is computed,
@@ -3749,7 +3803,7 @@ if HAVE_TRITON:
 
 
 @register_operator("mpm_scatter", implementation="triton_colour", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Particle to grid")
 class MPMScatterTritonColour(MPMScatterTriton):
     """The scatter with no atomics at all, by partitioning the grid into 27 colours: cells of one
     colour cannot share a stencil node, so each colour's particles can be scattered in parallel
@@ -3825,7 +3879,7 @@ class MPMScatterTritonColour(MPMScatterTriton):
 # THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE -- see the Warp section for why.
 # ==========================================================================================================
 @register_operator("mpm_gather", implementation="torch_loop27", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Grid to particle")
 class MPMGatherLoop27(MPMGather):
     """The gather as 27 sequential passes over the stencil instead of one batched reduction.
 
@@ -3947,7 +4001,12 @@ class MPMGatherLoop27(MPMGather):
 # consumes -- a body acceleration (`active_force`) or an active stress (`active_stress`) -- and
 # `mpm_scatter` is the only reader of what either emits.
 # ----------------------------------------------------------------------------------------------
-@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange")
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange",
+                   equation=r"""$$\mathbf F_i \;=\;
+\begin{cases}
+\pm\,\text{amplitude}\,\nabla a(\mathbf x_i) & \text{gradient mode (inward / outward)}\\[4pt]
+\text{amplitude}\,a(\mathbf x_i)\,\mathbf d(\mathbf x_i) & \text{directional mode}
+\end{cases}$$""")
 class ActiveForce(Exchange):                    
     """Active contraction as a BODY FORCE: an activation field becomes a per-particle
     acceleration pointing along the field's own gradient.
@@ -4057,7 +4116,10 @@ class ActiveForceDirectional(ActiveForce):
         return self.amplitude * a[:, None] * d
 
 
-@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
+@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange",
+                   equation=r"""$$\boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
+-\,A\,a(\mathbf x)\,\mathbf n(\mathbf x)\,\mathbf n(\mathbf x)^{\!\top},
+\qquad \lVert\mathbf n\rVert=1$$""")
 class ActiveStress(Exchange):                   
     """Active contraction as a STRESS: an activation field becomes a per-particle active stress
     tensor along a prescribed contraction axis, which the grid solve then transmits.
@@ -4185,7 +4247,8 @@ class LabelImageField(Field):
         return self.grid[0][gx, gy]
 
 
-@register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
+@register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed",
+                   equation=r"""$$E_j=y_{\mathrm{lo}}+f_j\,(y_{\mathrm{hi}}-y_{\mathrm{lo}})$$""")
 class SeedFromSegmentation(Seed):
     """Build a hierarchy from a measured instance segmentation: the cells are the ones in the
     image, not a lattice, and each carries its own material.
@@ -4353,7 +4416,8 @@ class SeedFromSegmentation(Seed):
 
 
 # --------------------------------------------------------------------------- material, re-stated
-@register_operator("set_material", family="mpm", set="particle", kind="seed")
+@register_operator("set_material", family="mpm", set="particle", kind="seed",
+                   equation=r"""$$\mu=\frac{E}{2(1+\nu)},\qquad \lambda=\frac{E\nu}{(1+\nu)(1-2\nu)}$$""")
 class SetMaterial(Seed):
     """Re-state what a body is MADE OF, once, at x_0 -- after a load, before the dynamics.
 
@@ -4462,7 +4526,8 @@ class SetMaterial(Seed):
         return {}
 
 
-@register_operator("mpm_density_pressure", family="mpm", set="particle", kind="lateral")
+@register_operator("mpm_density_pressure", family="mpm", set="particle", kind="lateral",
+                   equation=r"""$$P=k\,\max\!\left(\frac{\rho}{\rho_0}-1,\,0\right)$$""")
 class MPMDensityPressure(Lateral):
     """Pressure from the LOCAL DENSITY on the grid, so that material added anywhere has to make room.
 
@@ -4639,7 +4704,7 @@ class MPMDensityPressure(Lateral):
 
 
 @register_operator("mpm_scatter", "p2g", implementation="differentiable", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Particle to grid")
 class MPMScatterDiff(MPMScatter):
     """P2G with a grid that is REBUILT rather than zeroed and re-accumulated.
 
@@ -4671,7 +4736,7 @@ class MPMScatterDiff(MPMScatter):
 
 
 @register_operator("mpm_grid_update", implementation="differentiable", family="mpm", set="field",
-                   kind="field")
+                   kind="field", title="Grid solve")
 class MPMGridUpdateDiff(MPMGridUpdate):
     """The grid solve, with the wall written as a stack rather than into a view.
 
@@ -4697,7 +4762,7 @@ class MPMGridUpdateDiff(MPMGridUpdate):
 
 
 @register_operator("mpm_strain", implementation="differentiable", family="mpm", set="particle",
-                   kind="lateral")
+                   kind="lateral", title="Material update")
 class MPMStrainDiff(MPMStrain):
     """The material update with F rebound rather than written in place.
 
@@ -4722,7 +4787,7 @@ class MPMStrainDiff(MPMStrain):
 
 
 @register_operator("mpm_gather", "g2p", implementation="differentiable", family="mpm",
-                   set="particle", kind="exchange")
+                   set="particle", kind="exchange", title="Grid to particle")
 class MPMGatherDiff(MPMGather):
     """G2P writing a fresh state table instead of advecting in place.
 

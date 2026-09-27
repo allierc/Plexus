@@ -47,7 +47,7 @@ sys.path.insert(0, HERE)
 import data as D                                                    # noqa: E402
 import descriptors as DS                                            # noqa: E402
 
-SOURCE_ROOT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data"
+SOURCE_ROOT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/cardiomyocytes_real_data"
 SECOND_TRACKING = os.path.join(SOURCE_ROOT, "healthy.npy")
 SIDE = 137                                                          # the main lattice is 137 x 137
 PITCH_PX = 15.0

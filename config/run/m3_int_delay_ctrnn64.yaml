@@ -1,0 +1,5 @@
+name: m3_int_delay_ctrnn64
+task: m3_int_delay
+circuit: {hidden: 64, tau0: 0.5, w_init: zeros}
+training: {epochs: 200, n_trials: 1024, n_val: 64, n_test: 128, lr: 0.01, batch: 32, seed: 0, curriculum: true,
+  snapshot_every: 25, rollout_frames: 960, rollout_trials: 4, test_task: ''}

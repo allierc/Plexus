@@ -185,7 +185,7 @@ above. The three base scales and "no automatic conversion of state buffers" are 
 
 `config/` is swept for specs that declare `units:` but state a scale the checker can now contradict,
 and for the specs this campaign has touched. **Not all of them are re-run** — a subset goes to
-`gpu_l4` through `tools/submit_specs.py`, chosen to cover: one mid-surface tissue, one apico-basal
+`${CLUSTER_QUEUE_PREFIX}l4` through `tools/submit_specs.py`, chosen to cover: one mid-surface tissue, one apico-basal
 tissue, one MPM spec (the two `mesh_mpm_nominal_*` at `dt: 0.0032`, since those are the only live
 specs where `dt ≠ 1` and S3 rescaled `rate`), one `cell` spec and one dimensionless spec with no
 `units:` block at all. The last is the important one: it proves the checker stays quiet.

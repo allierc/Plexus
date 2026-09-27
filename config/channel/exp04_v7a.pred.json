@@ -1,0 +1,16 @@
+{
+ "box_nm": 23,
+ "protomers": 7,
+ "beads_each": 293,
+ "stem_beads": 41,
+ "lipids": 649,
+ "lipids_inside_the_ring": 28,
+ "frame_beads": 288,
+ "heptamer_ring_radius_nm": 2.6,
+ "seeded_radius_nm": 3.4,
+ "dt_ps": 0.10176627176574722,
+ "n_frames": 400000,
+ "sim_time_ns": 40.706508706298884,
+ "G_open_hille_nS": 0.4795139310768663,
+ "I_open_pA": -19.180557243074652
+}

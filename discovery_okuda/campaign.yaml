@@ -21,7 +21,7 @@
 
 # ---------------------------------------------------------------- the round
 round:
-  frames: 900               # simulated frames per run. ~1.5 h on gpu_l4 at 2000 cells
+  frames: 900               # simulated frames per run. ~1.5 h on ${CLUSTER_QUEUE_PREFIX}l4 at 2000 cells
   slots: 12                 # per round, INCLUDING slot 0 -- the control
   control_slot: 0           # the parent unchanged. Without it a difference cannot be separated
                             # from seed noise, so it is a position and not an option
@@ -34,7 +34,7 @@ round:
   # parent instead of on a range that no working recipe respects.
   grid_factors: [0.5, 2.0]
 
-  parallel: 12              # jobs submitted at once. The gpu_l4 partition has many nodes; the old 8
+  parallel: 12              # jobs submitted at once. The ${CLUSTER_QUEUE_PREFIX}l4 partition has many nodes; the old 8
                             # was one card's slot count and cost a full simulation duration per round
 
 # ---------------------------------------------------------------- where a campaign starts

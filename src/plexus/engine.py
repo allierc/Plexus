@@ -446,7 +446,7 @@ def _entity_meta(sname: str, dim: int = 2, entity: str | None = None) -> tuple[S
     return schema, render, depth
 
 
-def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
+def _resolve_schema(s: dict, D: int, sname: str | None = None, spatial: bool = False) -> StateSchema:
     """The set's StateSchema (the fifth primitive), in precedence order:
 
         1. the set's own `state:` block          -- the spec always wins;
@@ -464,7 +464,21 @@ def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
     legacy 2D dict now declare `spatial_schema`, which returns precisely what step 3 would
     have -- so no existing spec moves a byte (`promotion_identical.py --phase A`)."""
     if "state" in s:
-        return schema_from_spec(s["state"])
+        declared = schema_from_spec(s["state"])
+        # A DECLARED STATE EXTENDS A SPATIAL SET, IT DOES NOT AMPUTATE IT. `spatial` is True when a
+        # `seed_positions` places this set -- and that operator refuses any set without a `pos`
+        # block, so such a set is spatial by definition. Declaring `state: {chem: 2}` on it meant
+        # "these cells ALSO carry a morphogen", and it used to mean "these cells carry ONLY a
+        # morphogen": the declared block replaced the default wholesale, so a spec had to restate
+        # position and velocity by hand to keep them, and the demo ladder's cells quietly lost
+        # their velocity while the seed promised "positions, velocities". Now the spatial default
+        # leads and the declared blocks follow. A spec that DOES declare `pos` keeps full control --
+        # an overdamped set with a first-order `pos` and no rate, or a fixed `integration: none`
+        # geometry, means exactly what it says -- and no spec that runs today can change, because
+        # every one this applies to would have raised in `seed_positions`.
+        if spatial and "pos" not in declared:
+            return StateSchema(list(spatial_schema(D).blocks) + list(declared.blocks))
+        return declared
     # STEP 1b: A SET THAT IS A RELATION CARRIES NO POSITION, AND MUST NOT BE GIVEN ONE.
     #
     # A set declaring `maps:` is a relation -- a half-edge is a pairing of two vertices with a face,
@@ -592,20 +606,27 @@ def _link_mesh_maps(H, sim) -> None:
                 f"set {sname!r} declares `mesh: {hs}` but {hs!r} has no `maps:`. The half-edge set "
                 f"is what states the topology: `srce`/`trgt` into the vertex set, `face` into the "
                 f"cell set.")
-        lvl.mesh_cell_set = maps["face"]
+        # `face` IS OPTIONAL, AND ITS ABSENCE IS THE 1D CASE. A mesh set declaring only `srce` and
+        # `trgt` is a CURVE -- a filament, a chain, an axoneme -- rather than a closed surface, so
+        # there is no cell set to resolve and nothing to serve from one. `mesh_cell_set` stays None,
+        # which is what every consumer already sees before `_resolve_mesh_sets` has run, and `nF`
+        # stays at the 0 `_build_mesh` allocated. See schema.py for why this is a relaxation rather
+        # than a second mesh kind.
         lvl.mesh_vertex_set = maps["srce"]
-        # PER-CELL STATE THE CELL SET DECLARES IS SERVED FROM THERE, not stored on the mesh table.
-        # Only the names the spec actually declares are bound, so a spec that has not moved yet
-        # keeps its columns and runs exactly as before -- which is what lets the twelve arrays
-        # migrate one writer-group at a time instead of in one unbisectable commit.
-        cl = H.levels.get(maps["face"]) if hasattr(H.levels, "get") else (
-            H.levels[maps["face"]] if maps["face"] in H.levels else None)
-        m = getattr(lvl, "mesh", None)
-        if cl is not None and m is not None and hasattr(m, "bind_cell_state"):
-            bound = m.bind_cell_state(cl, MESH_CELL_STATE)
-            if bound:
-                print(f"[build] {sname}: {len(bound)} per-cell block(s) served from "
-                      f"{maps['face']!r}: {', '.join(bound)}", flush=True)
+        lvl.mesh_cell_set = maps.get("face")
+        if lvl.mesh_cell_set is not None:
+            # PER-CELL STATE THE CELL SET DECLARES IS SERVED FROM THERE, not stored on the mesh
+            # table. Only the names the spec actually declares are bound, so a spec that has not
+            # moved yet keeps its columns and runs exactly as before -- which is what lets the
+            # twelve arrays migrate one writer-group at a time instead of in one unbisectable commit.
+            cl = H.levels.get(maps["face"]) if hasattr(H.levels, "get") else (
+                H.levels[maps["face"]] if maps["face"] in H.levels else None)
+            m = getattr(lvl, "mesh", None)
+            if cl is not None and m is not None and hasattr(m, "bind_cell_state"):
+                bound = m.bind_cell_state(cl, MESH_CELL_STATE)
+                if bound:
+                    print(f"[build] {sname}: {len(bound)} per-cell block(s) served from "
+                          f"{maps['face']!r}: {', '.join(bound)}", flush=True)
         if maps["srce"] != sname or maps["trgt"] != sname:
             raise ValueError(
                 f"set {hs!r} is {sname!r}'s mesh, so its `srce`/`trgt` maps must land in {sname!r}, "
@@ -1081,6 +1102,10 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     # a spec should not have to say twice that it contains a divider. It is read-only and built once.
     H.scheduled_ops = frozenset(o.op for o in (getattr(sim, "operators", None) or [])
                                 if getattr(o, "op", None))
+    # WHICH SETS A SEED PLACES IN SPACE -- see `_resolve_schema(spatial=)`. Read from the seed
+    # section (and the legacy seed-in-operators spelling), by the set each line acts `at:`.
+    _spatial = {o.on.set for o in list(getattr(sim, "seed_ops", None) or []) + list(sim.operators or [])
+                if getattr(o, "op", None) == "seed_positions"}
 
     # pass 1: top-level sets (no parent) -- positions seeded across the domain.
     for sname, s in sim.sets.items():
@@ -1091,7 +1116,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
         _, render, depth = _entity_meta(sname, D, s.get("entity"))   # render + depth from the registry
-        schema = _resolve_schema(s, D, sname)          # StateSchema: `state:` block, else the entity's, else pos/vel
+        schema = _resolve_schema(s, D, sname, spatial=sname in _spatial)          # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         state = torch.zeros(buffer, dim, device=device)
         has_pos = "pos" in schema                      # spatial sets place positions; a non-spatial set (voltage,...) does not
@@ -1239,7 +1264,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         reserve = _default_reserve(s, sname, per) if per is not None else int(s.get("grow_reserve", 0))
         per_tot = None if per is None else per + reserve
         _, render, depth = _entity_meta(sname, H.dim, s.get("entity"))  # render + depth from the registry
-        schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
+        schema = _resolve_schema(s, H.dim, sname, spatial=sname in _spatial)      # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
         if per_vec is None:
@@ -1411,7 +1436,9 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     for fname, f in sim.fields.items():
         cls = get_field(f.get("frame", "grid"))
         couples = f.get("couples_to")
-        fcfg = {k: v for k, v in f.items() if k != "frame"}    # passes couples_to/source/res/... by name
+        # passes couples_to/source/res/... by name; `title` is the field's plain-English name for a reader (the
+        # watcher's plexus pane), never a constructor argument
+        fcfg = {k: v for k, v in f.items() if k not in ("frame", "title")}
         # a channel-per-type grid field defaults its components to the coupled set's
         # type count; a prescribed field (e.g. `video`, carries `source`) defines its own.
         if "components" not in fcfg and "source" not in fcfg:
@@ -2156,6 +2183,45 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     for _i, (_nm, *_rest) in enumerate(inst):
         _by_token_all.setdefault(_nm, []).append(_i)
     _by_token = _tokens_live(0)
+
+    # AN OPERATOR THE SCHEDULE NEVER NAMES ENOUGH TIMES IS A SET LEFT OUT OF THE PHYSICS.
+    #
+    # The binding above is positional: the i-th OCCURRENCE of a token takes the i-th INSTANCE. So
+    # a model with four material sets declares four `mpm_scatter`, and a schedule naming the token
+    # three times runs three of them -- the fourth set never scatters into the grid, never gathers
+    # from it, and simply has no dynamics. Nothing raises: three scatters is a legal schedule, and
+    # a set that does not move is a legal set.
+    #
+    # It cost a full debugging session on the Platynereis cilia. The shafts had exactly 0.00000
+    # momentum at every frame; the torque driving them was correct, its invariant was verified to
+    # 1e-8 in the running process, the command reaching them was a clean +-0.05 -- and they were
+    # not in the schedule. Widening them from 1.2 um to 6 um changed nothing, because the width
+    # was never the problem.
+    #
+    # A warning and not an error: naming a token fewer times than it is declared is legitimate
+    # when the extra instances are gated off by a window (the `_n < len(_all)` case below), and
+    # refusing it would break those specs. But it should never be SILENT.
+    try:
+        from collections import Counter as _C
+        _named = _C()
+        for _st in (sim.schedule or []):
+            if isinstance(_st, dict):
+                for _t in (_st.get("steps") or []):
+                    _named[_t] += 1
+            else:
+                _named[str(_st)] += 1
+        for _tok, _all_i in _by_token_all.items():
+            _n_named = _named.get(_tok, 0)
+            if _n_named < len(_all_i):
+                _sets = ", ".join(str(inst[_j][0]) if not isinstance(inst[_j][0], str)
+                                  else str(getattr(inst[_j][1], "at", "?"))
+                                  for _j in _all_i[_n_named:])
+                warn(f"[warn] schedule names {_tok!r} {_n_named} time(s) but {len(_all_i)} are "
+                      f"declared: {len(_all_i) - _n_named} instance(s) will never run"
+                      + (f" (at: {_sets})" if _sets else "")
+                      + ". If those are not gated by a window, that set is out of the physics.")
+    except Exception:                                                # noqa: BLE001
+        pass
 
     # STATIC STORAGE FOR THE SUBSTEP'S DELTA SNAPSHOT.
     #

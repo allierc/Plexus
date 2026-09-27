@@ -190,7 +190,7 @@ def main():
     src = os.path.join(B.LOG, SRC)
     spec = yaml.safe_load(open(os.path.join(src, "spec_run.yaml")))
     op = next(o for o in spec["operators"] if o["op"] == "mesh_contact")
-    mf = np.asarray(np.load(op["tissue"].replace("/groups/saalfeld/home/allierc/Graph", "/workspace"),
+    mf = np.asarray(np.load(op["tissue"].replace(f"{os.environ['CLUSTER_HOME']}/Graph", "/workspace"),
                             mmap_mode="r")["mesh_frames"])
     panel = BMPanel(os.path.join(d, "bm_frames.npz"), mf, int(op.get("mesh_stride", 1)), mode="lam",
                     name=os.path.basename(d))

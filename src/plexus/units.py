@@ -268,7 +268,32 @@ NAMED = {
     "mobility": Dim(L=1, T=-1, F=-1),    # 1/gamma
     "amount": AMOUNT,
     "concentration": Dim(L=-3, A=1),
+    # ELECTRICITY WITHOUT A FOURTH SCALE. Charge is COUNTED, in elementary charges (a proton is
+    # one), so a voltage is an energy per elementary charge -- F L, converted through the constant
+    # e -- and a current is a count per time -- 1/T, converted through e into amperes. Both are
+    # derived from the three scales the contract already has, and neither may be declared as a
+    # scale of its own: a second declaration is a second chance to disagree (this file's rule).
+    # Added for the proton economy of the flagellar motor (builder/exp_02_bacterium, 2026-09-23).
+    "voltage": Dim(L=1, F=1),            # e psi: the energy one elementary charge gains
+    "current": Dim(T=-1),                # elementary charges per unit time
+    # THE SAME THREE DIMENSIONS AT THE SCALE A SINGLE CHANNEL LIVES AT (experiments/exp04, 2026-09-25):
+    # a channel passes tens of pA -- 30,000 on an fA axis -- its pore is a nanometre across -- 0.0013
+    # on a um axis -- and the membrane tension that gates it is quoted in mN/m everywhere in the
+    # literature, which is the nN/um the three scales give, relabelled. Same dimensions, same
+    # declared scales; only the reporting factor and the label differ (ELECTRIC below).
+    "current_pA": Dim(T=-1),
+    "length_nm": LENGTH,
+    "tension_mN_m": Dim(L=-1, F=1),
 }
+
+E_CHARGE_C = 1.602176634e-19            # coulomb per elementary charge (exact, SI 2019)
+# name -> (factor applied AFTER the three scales, label): sim energy in nN um is 1e-15 J, over e
+# is volts, times 1e3 is millivolts; a count per second times e is amperes, times 1e15 is fA.
+ELECTRIC = {"voltage": (1e-15 / E_CHARGE_C * 1e3, "mV"),
+            "current": (E_CHARGE_C * 1e15, "fA"),
+            "current_pA": (E_CHARGE_C * 1e12, "pA"),
+            "length_nm": (1e3, "nm"),                # um -> nm
+            "tension_mN_m": (1.0, "mN/m")}           # nN/um IS mN/m
 
 # THE ABSENCE OF A CLAIM, and deliberately not a `Dim`. `DIMENSIONLESS` is a claim -- this number is
 # a pure ratio. `UNKNOWN` is "nobody has said what this is yet". A checker that read undeclared as
@@ -294,6 +319,8 @@ def parse_dim(s):
     t = _desup(str(s).strip())
     if not t:
         return UNKNOWN
+    if t in NAMED:                       # exact first: `current_pA`, `tension_mN_m` keep their case
+        return NAMED[t]
     if t.lower() in NAMED:
         return NAMED[t.lower()]
     try:
@@ -417,6 +444,9 @@ def to_physical(value, dim, units):
         if s is None:
             return None                  # an undeclared scale is not a scale of 1
         scale *= float(s) ** exp
+    _name = str(dim).strip().split("[")[0] if isinstance(dim, str) else None
+    if _name in ELECTRIC:                # through the elementary charge: mV, fA
+        scale *= ELECTRIC[_name][0]
     return value * scale
 
 
@@ -431,6 +461,11 @@ def unit_label(dim, units):
     d = dim if isinstance(dim, Dim) else parse_dim(dim)
     if d is UNKNOWN or d == DIMENSIONLESS or units is None or not getattr(units, "declared", False):
         return None
+    _name = str(dim).strip().split("[")[0] if isinstance(dim, str) else None
+    if _name in ELECTRIC:
+        if (d.L and units.length_um is None) or (d.F and units.force_nN is None) or (d.T and units.time_s is None):
+            return None
+        return ELECTRIC[_name][1]
     num, den = [], []
     for exp, s, sym in ((d.L, units.length_um, "µm"), (d.T, units.time_s, "s"),
                         (d.F, units.force_nN, "nN")):

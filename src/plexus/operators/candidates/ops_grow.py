@@ -27,7 +27,7 @@ from plexus.models.registry import register_operator
 EPS = 1e-6
 
 
-@register_operator("cohere", set="particle", kind="broadcast", family="interaction")
+@register_operator("cohere", set="particle", kind="broadcast", family="interaction", title="Hand the parent's value to its children")
 class Cohere(Broadcast):
     """Pull each particle toward the centroid of its containing set, so that set
     stays round and together. With no `role`, the set is the whole cell (cytosol
@@ -156,7 +156,7 @@ class Skin(Operator):
         return {}
 
 
-@register_operator("shell", set="particle", kind="broadcast", family="boundary")
+@register_operator("shell", set="particle", kind="broadcast", family="boundary", title="Hand the parent's value to its children")
 class Shell(Broadcast):
     """Confine a role's particles to a uniform SHELL at the cell surface: a radial
     spring pulls each `role` particle to target radius R from the cell centroid,

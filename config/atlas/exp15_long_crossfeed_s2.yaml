@@ -1,0 +1,40 @@
+general:
+  name: exp15_long_crossfeed_s2
+  seed: 0
+  n_frames: 500000
+  record_cap: 2500
+  dt: 1.0
+  dim: 2
+  boundary: free
+  world: [98.8, 98.8]
+sets:
+  cell:
+    n: 16000
+    state:
+      pos: {width: 2, integration: none, boundary: free}
+      chem: {width: 2, integration: none, boundary: free}
+fields: {}
+seed:
+- {op: seed_positions, at: cell, mode: sunflower, radius: 38.0, seed: 0}
+- {op: seed_colony, at: cell, radius: 5.0, fill: 0.5, ratio: 0.5, seed: 2}
+operators:
+- op: colony_grow
+  at: cell
+  model: fitness
+  r0: [0.00025, 0.00025]
+  r_cross: [0.00215, 0.00215]
+  chi: 0.8
+  l: 3
+  n: 2
+  seed: 2
+schedule: [colony_grow]
+plotting:
+  renderer: mpl2d
+  background: black
+  dot_fill: 0.9
+  dot_size: 4
+  blend: additive
+  species: ['#ff0000', '#00ff00']
+  duration_s: 10
+  curve:
+  - {quantity: 'species:cell', ylabel: cells per strain, ymin: 0.0, ymax: 16000.0}

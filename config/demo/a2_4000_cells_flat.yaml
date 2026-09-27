@@ -1,0 +1,34 @@
+general:
+  title: 4,000 cells on a disc, and the relation that says who neighbours whom
+  name: a2_4000_cells_flat
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  save_data: true
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+sets:
+  cell:
+    n: 4000
+    types:
+      cell:
+        fraction: 1.0
+fields: {}
+seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
+operators: []
+schedule: []
+plotting:
+  renderer: mpl2d
+  background: black
+  dot_fill: 0.9
+  duration_s: 10
+  colors:
+    cell: '#ffffff'

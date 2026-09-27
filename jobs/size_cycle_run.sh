@@ -3,11 +3,11 @@
 # so every rung of notes/size_cycle/SIZE_CYCLE_PLAN.md keeps its own archives.
 #     bash jobs/size_cycle_run.sh <spec> <rung>
 spec="$1"; rung="$2"
-cd /groups/saalfeld/home/allierc/Graph/Plexus
-export PYTHONPATH=/groups/saalfeld/home/allierc/Graph/Plexus/src
+cd ${CLUSTER_HOME}/Graph/Plexus
+export PYTHONPATH=${CLUSTER_HOME}/Graph/Plexus/src
 # rung "default" renders into the repo's own graphs_data (the milestone specs live there)
 if [ "$rung" != "default" ]; then
-  export GNN_OUTPUT_ROOT=/groups/saalfeld/home/allierc/Graph/Plexus/log/size_cycle/$rung
+  export GNN_OUTPUT_ROOT=${CLUSTER_HOME}/Graph/Plexus/log/size_cycle/$rung
 fi
 export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8
 export MPLBACKEND=Agg

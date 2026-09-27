@@ -151,3 +151,26 @@ papers/morph_models/
 
 # transient specs written by tools/regression_lib.run_cut for the duration of one rerun
 config/*/_regression_*.yaml
+
+# THE BUILD RECORD (builder/<experiment>/): specs, whys and the journal are tracked; the
+# binaries are not. A step's mp4 runs 5-20 MB and there is one per run, a still is 0.5-2 MB
+# and there is one per step, the papers are 20 MB each and a cryo-EM map is 100-500 MB; over
+# a long session that is gigabytes in a repo whose whole history is 40 MB. The spec/why of
+# each step is what makes the record readable, and those are text. Pictures and papers are
+# re-made or re-fetched from the record's specs, whys and accession numbers.
+builder/mp4/
+builder/png/
+builder/*/mp4/
+builder/*/png/
+builder/*/papers/
+builder/*/data/
+
+# Local working records and run output -- not versioned (2026-09-26): builder/ (builder records),
+# experiments/, and cluster job logs (bsub -o/-e output names compute nodes, the submitting user
+# and cluster paths; this repo is public).
+builder/
+experiments/
+jobs/logs/
+prototype/eye/archive/_cluster/
+bsub_*.out
+bsub_*.err

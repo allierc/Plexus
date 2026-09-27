@@ -20,7 +20,7 @@ import subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 FFMPEG = "/workspace/.conda_envs/neural-graph-linux/bin/ffmpeg"
-GD = "/groups/saalfeld/home/allierc/GraphData/graphs_data"
+GD = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data"
 OUT = "gallery"
 
 # family -> [(name, source video (gif/mp4), spec.yaml, caption)]

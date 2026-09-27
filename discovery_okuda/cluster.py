@@ -44,27 +44,33 @@ POLL_S = int(os.environ.get("OKUDA_POLL_S", 300))   # where each run writes its 
 
 # the devcontainer mounts the NFS export at /workspace; the cluster mounts the SAME export here,
 # so files are shared live -- only the PATH is translated.
-MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
-SSH = os.environ.get("PG_SSH", "$CLUSTER_SSH")
+# WHERE THE CLUSTER IS, AND AS WHOM, IS A LOCAL SETTING. This repo is public, so the ssh target
+# (user@login-node), the cluster-side home and the queue-name prefix come from the environment --
+# CLUSTER_SSH, CLUSTER_HOME, CLUSTER_QUEUE_PREFIX, set in the devcontainer's containerEnv -- and
+# are never written here. The PG_* variables still override. Nothing is checked at import;
+# the first ssh refuses to run until they are set.
+MAP = ("/workspace", os.environ.get("CLUSTER_HOME", "") + "/Graph")
+SSH = os.environ.get("PG_SSH", os.environ.get("CLUSTER_SSH", ""))
 ENV = os.environ.get("PG_ENV", "connectome-gnn")
-QUEUE = os.environ.get("PG_QUEUE", "gpu_l4")
-NCPUS = os.environ.get("PG_NCPUS", "8")          # gpu_l4 is 8 slots/GPU; >8 with 1 GPU delays
+QUEUE = os.environ.get("PG_QUEUE", os.environ.get("CLUSTER_QUEUE_PREFIX", "") + "l4")
+NCPUS = os.environ.get("PG_NCPUS", "8")          # ${CLUSTER_QUEUE_PREFIX}l4 is 8 slots/GPU; >8 with 1 GPU delays
 WALL = os.environ.get("PG_WALL", "240")          # minutes
-GPU = os.environ.get("PG_GPU", "1")              # gpu_l4 REJECTS jobs without -gpu num=1
+GPU = os.environ.get("PG_GPU", "1")              # ${CLUSTER_QUEUE_PREFIX}l4 REJECTS jobs without -gpu num=1
 # 12, NOT 8. Cedric, 5 August: "we can run 12 jobs in parallel on the l4 cluster there are many
-# nodes." The old 8 came from the slot count of a SINGLE gpu_l4 card, which is the wrong unit -- the
+# nodes." The old 8 came from the slot count of a SINGLE ${CLUSTER_QUEUE_PREFIX}l4 card, which is the wrong unit -- the
 # partition has many nodes, so the limit was self-imposed. It cost a full simulation duration per
 # round: a 12-slot batch submitted as 8 + 3 and `run_batch` waits for the first wave to drain, so
 # every round took ~3 h of wall-clock instead of ~1.5 h. A courtesy limit that doubles the campaign's
 # latency is not a courtesy.
 PARALLEL = int(os.environ.get("PG_PARALLEL", "12"))
 PREFIX = "pg_"                                   # job-name prefix; all queue ops filter on it
-# Comma-separated hosts to keep jobs off. See the note in `_bsub_cmd`; empty is the normal state.
+# Comma-separated hosts to keep jobs off, from PG_EXCLUDE_HOSTS -- a local setting, so compute-node
+# names stay out of the repo. See the note in `_bsub_cmd`; empty is the normal state.
 # <node> ADDED 2026-08-23. Every job that has wedged in this promotion wedged there, and only
 # there: two sanity runs stalled at frame 60 for four hours, and a BISECT run wrote one live frame
 # and nothing for four more. They stay in RUN, produce no heartbeat, and hold the slot until the
 # wall clock. A node that accepts work and does not do it is worse than one that refuses.
-EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "<node>,<node>").split(",")
+EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "").split(",")
                  if h.strip()]
 
 
@@ -73,7 +79,7 @@ EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "<node>,<
 #
 #   LOCAL (devcontainer)   every LLM agent (Claude CLI), the VLM captioner, the Grounder's PDF
 #                          reading, all orchestration, ranking, ledgers and artefacts.
-#   CLUSTER (gpu_l4)       ONLY the simulation jobs: engine + render + mechanics.
+#   CLUSTER (${CLUSTER_QUEUE_PREFIX}l4)       ONLY the simulation jobs: engine + render + mechanics.
 #
 # This is not a preference, it is what the environments actually support. Audited:
 #
@@ -133,8 +139,20 @@ def cpath(p):
     return MAP[1] + ap[len(MAP[0]):] if ap.startswith(MAP[0]) else ap
 
 
+def _require_local_settings():
+    missing = [what for what, ok in (("CLUSTER_SSH (or PG_SSH)", SSH),
+                                     ("CLUSTER_HOME", os.environ.get("CLUSTER_HOME")),
+                                     ("CLUSTER_QUEUE_PREFIX (or PG_QUEUE)",
+                                      "PG_QUEUE" in os.environ or os.environ.get("CLUSTER_QUEUE_PREFIX")))
+               if not ok]
+    if missing:
+        raise RuntimeError("cluster access needs " + ", ".join(missing) +
+                           " -- local settings, deliberately not in the repo")
+
+
 # --------------------------------------------------------------------------- ssh, hardened
 def _ssh(cmd, timeout=90):
+    _require_local_settings()
     try:
         return subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", SSH, cmd],
                               capture_output=True, text=True, timeout=timeout)

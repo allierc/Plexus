@@ -1,0 +1,604 @@
+general:
+  name: exp04_v10g
+  seed: 0
+  n_frames: 300000
+  dt: 4.442363090250839e-07
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  record_cap: 3001
+  field_record_cap: 2
+  units: {length_um: 0.016, time_s: 3.52225278533863e-07, force_nN: 0.00025687499999999994}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      psi: {width: 1, integration: first_order, unit: voltage, title: membrane potential}
+      j_channel: {width: 1, integration: none, unit: current, title: channel current}
+      g_channel: {width: 1, integration: none, unit: '1', title: channel conductance}
+      nK_in: {width: 1, integration: none, unit: count, title: K+ inside the cell}
+      nCl_in: {width: 1, integration: none, unit: count, title: Cl- inside the cell}
+      q_in: {width: 1, integration: none, unit: count, title: charge moved into the cell}
+      I_in: {width: 1, integration: none, unit: current, title: current into the cell}
+    title: the cell's interior (the voltage-clamped compartment)
+  alphah_1:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 1
+  alphah_2:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 2
+  alphah_3:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 3
+  alphah_4:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 4
+  alphah_5:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 5
+  alphah_6:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 6
+  alphah_7:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: alpha-hemolysin, chain 7
+  lipid:
+    n: 674
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: membrane lipids
+  qsite:
+    n: 504
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      q: {width: 1, integration: none, unit: '1', title: charge}
+    title: charged residues (one charge per ionisable side chain)
+  K:
+    n: 241
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: potassium ions (K+)
+  Cl:
+    n: 241
+    start:
+    - [0.5, 0.5, 0.325459]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: chloride ions (Cl-)
+fields:
+  elec: {frame: grid, res: 96, components: 2, title: electric potential in the electrolyte}
+seed:
+- op: cloud_seed
+  at: alphah_1
+  cloud: exp04r_ahl_pre_v10g/c0
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: alphah_2
+  cloud: exp04r_ahl_pre_v10g/c1
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: alphah_3
+  cloud: exp04r_ahl_pre_v10g/c2
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: alphah_4
+  cloud: exp04r_ahl_pre_v10g/c3
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: alphah_5
+  cloud: exp04r_ahl_pre_v10g/c4
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: alphah_6
+  cloud: exp04r_ahl_pre_v10g/c5
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: alphah_7
+  cloud: exp04r_ahl_pre_v10g/c6
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: lipid
+  cloud: exp04r_ahl_pre_v10g/lipid
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: K
+  cloud: exp04r_ahl_pre_v10g/K
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: Cl
+  cloud: exp04r_ahl_pre_v10g/Cl
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: cloud_seed
+  at: qsite
+  cloud: exp04r_ahl_pre_v10g/qsite
+  origin: [0.5, 0.5, 0.325459]
+  scale: 62499999.99999999
+- op: seed_state_from_file
+  at: qsite
+  file: shapes/exp04r_ahl_pre_v10g/blocks.npz
+  blocks: {q: qsite_q}
+operators:
+- op: membrane_potential
+  at: cell
+  capacitance: 1000000000000.0
+  pump_max: 0.0
+  pump_rev: 1.0
+  leak: 0.0
+  psi0: -3.8982399854014598
+  h0: [0.0, 0.0]
+  flux: j_channel
+- op: electrolyte_conduction
+  at: cell
+  field: elec
+  insulators:
+  - {set: alphah_1, radius: 0.01875}
+  - {set: alphah_2, radius: 0.01875}
+  - {set: alphah_3, radius: 0.01875}
+  - {set: alphah_4, radius: 0.01875}
+  - {set: alphah_5, radius: 0.01875}
+  - {set: alphah_6, radius: 0.01875}
+  - {set: alphah_7, radius: 0.01875}
+  - {set: lipid, radius: 0.034375}
+  sigma: 2.2510957493411428
+  volt_per_sim: 0.025652602296033736
+  dx_m: 1.6666666666666669e-10
+  sim_current_per_A: 2198417272223.5757
+  slab: [0.25170930683612824, 0.3992093068361282]
+  cell: cell
+  probe_radius: 0.0083125
+  lumens:
+  - profile:
+    - [0.0754593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0817093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0879593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0942093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1004593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1067093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1129593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1192093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1254593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1317093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1379593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1442093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1504593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1567093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1629593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1692093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1754593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1817093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1879593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1942093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2004593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2067093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2129593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2192093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2254593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2317093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2379593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2442093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2504593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2567093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2629593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2692093, 0.0, 0.0889375, 0.0, 0.5, 0.5]
+    - [0.2754593, 0.0, 0.0825, 0.0, 0.5, 0.5]
+    - [0.2817093, 0.0, 0.079625, 0.0, 0.5, 0.5]
+    - [0.2879593, 0.0, 0.077125, 0.0, 0.5, 0.5]
+    - [0.2942093, 0.0, 0.070625, 0.0, 0.5, 0.5]
+    - [0.3004593, 0.05475, 0.063375, 0.0, 0.5, 0.5]
+    - [0.3067093, 0.0506875, 0.0593125, 0.0, 0.5, 0.5]
+    - [0.3129593, 0.0469375, 0.0555625, 0.0, 0.5, 0.5]
+    - [0.3192093, 0.0435625, 0.0521875, 0.0, 0.5, 0.5]
+    - [0.3254593, 0.04075, 0.049375, 0.0, 0.5, 0.5]
+    - [0.3317093, 0.0384375, 0.0470625, 0.0, 0.5, 0.5]
+    - [0.3379593, 0.0366875, 0.0453125, 0.0, 0.5, 0.5]
+    - [0.3442093, 0.0356875, 0.0443125, 0.0, 0.5, 0.5]
+    - [0.3504593, 0.035375, 0.044, 0.0, 0.5, 0.5]
+    - [0.3567093, 0.03575, 0.044375, 0.0, 0.5, 0.5]
+    - [0.3629593, 0.036875, 0.0455, 0.0, 0.5, 0.5]
+    - [0.3692093, 0.0383125, 0.0469375, 0.0, 0.5, 0.5]
+    - [0.3754593, 0.0388125, 0.0474375, 0.0, 0.5, 0.5]
+    - [0.3817093, 0.04, 0.048625, 0.0, 0.5, 0.5]
+    - [0.3879593, 0.0418125, 0.0504375, 0.0, 0.5, 0.5]
+    - [0.3942093, 0.0441875, 0.0528125, 0.0, 0.5, 0.5]
+    - [0.4004593, 0.04575, 0.054375, 0.0, 0.5, 0.5]
+    - [0.4067093, 0.04525, 0.053875, 0.0, 0.5, 0.5]
+    - [0.4129593, 0.0449375, 0.0535625, 0.0, 0.5, 0.5]
+    - [0.4192093, 0.04525, 0.053875, 0.0, 0.5, 0.5]
+    - [0.4254593, 0.046125, 0.05475, 0.0, 0.5, 0.5]
+    - [0.4317093, 0.0458125, 0.0544375, 0.0, 0.5, 0.5]
+    - [0.4379593, 0.0453125, 0.0539375, 0.0, 0.5, 0.5]
+    - [0.4442093, 0.0431875, 0.0518125, 0.0, 0.5, 0.5]
+    - [0.4504593, 0.0396875, 0.0483125, 0.0, 0.5, 0.5]
+    - [0.4567093, 0.03675, 0.045375, 0.0, 0.5, 0.5]
+    - [0.4629593, 0.034375, 0.043, 0.0, 0.5, 0.5]
+    - [0.4692093, 0.032625, 0.04125, 0.0, 0.5, 0.5]
+    - [0.4754593, 0.0315625, 0.0401875, 0.0, 0.5, 0.5]
+    - [0.4817093, 0.0313125, 0.0399375, 0.0, 0.5, 0.5]
+    - [0.4879593, 0.03175, 0.040375, 0.0, 0.5, 0.5]
+    - [0.4942093, 0.033, 0.041625, 0.0, 0.5, 0.5]
+    - [0.5004593, 0.0346875, 0.0433125, 0.0, 0.5, 0.5]
+    - [0.5067093, 0.0336875, 0.0423125, 0.0, 0.5, 0.5]
+    - [0.5129593, 0.033375, 0.042, 0.0, 0.5, 0.5]
+    - [0.5192093, 0.033875, 0.0425, 0.0, 0.5, 0.5]
+    - [0.5254593, 0.0350625, 0.0436875, 0.0, 0.5, 0.5]
+    - [0.5317093, 0.0369375, 0.0455625, 0.0, 0.5, 0.5]
+    - [0.5379593, 0.037, 0.045625, 0.0, 0.5, 0.5]
+    - [0.5442093, 0.0374375, 0.0460625, 0.0, 0.5, 0.5]
+    - [0.5504593, 0.038625, 0.04725, 0.0, 0.5, 0.5]
+    - [0.5567093, 0.0404375, 0.0490625, 0.0, 0.5, 0.5]
+    - [0.5629593, 0.0428125, 0.0514375, 0.0, 0.5, 0.5]
+    - [0.5692093, 0.04575, 0.054375, 0.0, 0.5, 0.5]
+    - [0.5754593, 0.049125, 0.05775, 0.0, 0.5, 0.5]
+  every: 1000000000
+  iters: 300
+  iters_first: 30000
+  omega: 1.0
+- op: pair_potential
+  at: K
+  sets: [K, Cl]
+  law: [coulomb, wca]
+  k_c: 0.04375
+  debye: 0.0
+  cutoff: 0.125
+  charge: {K: 1.0, Cl: -1.0}
+  sigma: {K: 0.015367483296213808, Cl: 0.020155902004454343}
+  epsilon: 1.0
+  mobility: {K: 2.696724788774888, Cl: 2.793036388373991}
+  step_max: {coulomb: 0.003125, wca: 0.0125}
+- op: pair_potential
+  at: K
+  sets: [K, Cl]
+  with: lipid
+  law: wca
+  sigma: 0.028125
+  epsilon: 1.0
+  mobility: {K: 2.696724788774888, Cl: 2.793036388373991}
+  react: false
+  step_max: 0.0125
+- op: pair_potential
+  at: K
+  sets: [K, Cl]
+  with_sets: [alphah_1, alphah_2, alphah_3, alphah_4, alphah_5, alphah_6, alphah_7]
+  law: wca
+  sigma: {K: 0.023385300668151445, Cl: 0.028173719376391983, alphah_1: 0.015367483296213808, alphah_2: 0.015367483296213808,
+    alphah_3: 0.015367483296213808, alphah_4: 0.015367483296213808, alphah_5: 0.015367483296213808, alphah_6: 0.015367483296213808,
+    alphah_7: 0.015367483296213808}
+  epsilon: 1.0
+  mobility: {K: 2.696724788774888, Cl: 2.793036388373991}
+  react: false
+  step_max: 0.0125
+- op: pair_potential
+  at: K
+  sets: [K, Cl]
+  with: qsite
+  law: [coulomb, wca]
+  k_c: 0.04375
+  debye: 0.0
+  cutoff: 0.125
+  charge: {K: 1.0, Cl: -1.0}
+  charge_with: q
+  sigma: {K: 0.015367483296213808, Cl: 0.020155902004454343, qsite: 0.015590200445434299}
+  epsilon: 1.0
+  mobility: {K: 2.696724788774888, Cl: 2.793036388373991}
+  react: false
+  step_max: {coulomb: 0.003125, wca: 0.0125}
+- {op: field_force, at: K, field: elec, channel: 0, charge: 1.0, mobility: 2.696724788774888, volt_per_sim: 0.025652602296033736}
+- op: slab_barrier
+  at: K
+  height: 98.86458044862918
+  z0: 0.325459
+  half_thickness: 0.07375
+  edge: 0.01875
+  pore_edge: 0.00625
+  mobility: 2.696724788774888
+  pores:
+  - profile:
+    - [0.0754593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0817093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0879593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0942093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1004593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1067093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1129593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1192093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1254593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1317093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1379593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1442093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1504593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1567093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1629593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1692093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1754593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1817093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1879593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1942093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2004593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2067093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2129593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2192093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2254593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2317093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2379593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2442093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2504593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2567093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2629593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2692093, 0.0, 0.0889375, 0.0, 0.5, 0.5]
+    - [0.2754593, 0.0, 0.0825, 0.0, 0.5, 0.5]
+    - [0.2817093, 0.0, 0.079625, 0.0, 0.5, 0.5]
+    - [0.2879593, 0.0, 0.077125, 0.0, 0.5, 0.5]
+    - [0.2942093, 0.0, 0.070625, 0.0, 0.5, 0.5]
+    - [0.3004593, 0.05475, 0.063375, 0.0, 0.5, 0.5]
+    - [0.3067093, 0.0506875, 0.0593125, 0.0, 0.5, 0.5]
+    - [0.3129593, 0.0469375, 0.0555625, 0.0, 0.5, 0.5]
+    - [0.3192093, 0.0435625, 0.0521875, 0.0, 0.5, 0.5]
+    - [0.3254593, 0.04075, 0.049375, 0.0, 0.5, 0.5]
+    - [0.3317093, 0.0384375, 0.0470625, 0.0, 0.5, 0.5]
+    - [0.3379593, 0.0366875, 0.0453125, 0.0, 0.5, 0.5]
+    - [0.3442093, 0.0356875, 0.0443125, 0.0, 0.5, 0.5]
+    - [0.3504593, 0.035375, 0.044, 0.0, 0.5, 0.5]
+    - [0.3567093, 0.03575, 0.044375, 0.0, 0.5, 0.5]
+    - [0.3629593, 0.036875, 0.0455, 0.0, 0.5, 0.5]
+    - [0.3692093, 0.0383125, 0.0469375, 0.0, 0.5, 0.5]
+    - [0.3754593, 0.0388125, 0.0474375, 0.0, 0.5, 0.5]
+    - [0.3817093, 0.04, 0.048625, 0.0, 0.5, 0.5]
+    - [0.3879593, 0.0418125, 0.0504375, 0.0, 0.5, 0.5]
+    - [0.3942093, 0.0441875, 0.0528125, 0.0, 0.5, 0.5]
+    - [0.4004593, 0.04575, 0.054375, 0.0, 0.5, 0.5]
+    - [0.4067093, 0.04525, 0.053875, 0.0, 0.5, 0.5]
+    - [0.4129593, 0.0449375, 0.0535625, 0.0, 0.5, 0.5]
+    - [0.4192093, 0.04525, 0.053875, 0.0, 0.5, 0.5]
+    - [0.4254593, 0.046125, 0.05475, 0.0, 0.5, 0.5]
+    - [0.4317093, 0.0458125, 0.0544375, 0.0, 0.5, 0.5]
+    - [0.4379593, 0.0453125, 0.0539375, 0.0, 0.5, 0.5]
+    - [0.4442093, 0.0431875, 0.0518125, 0.0, 0.5, 0.5]
+    - [0.4504593, 0.0396875, 0.0483125, 0.0, 0.5, 0.5]
+    - [0.4567093, 0.03675, 0.045375, 0.0, 0.5, 0.5]
+    - [0.4629593, 0.034375, 0.043, 0.0, 0.5, 0.5]
+    - [0.4692093, 0.032625, 0.04125, 0.0, 0.5, 0.5]
+    - [0.4754593, 0.0315625, 0.0401875, 0.0, 0.5, 0.5]
+    - [0.4817093, 0.0313125, 0.0399375, 0.0, 0.5, 0.5]
+    - [0.4879593, 0.03175, 0.040375, 0.0, 0.5, 0.5]
+    - [0.4942093, 0.033, 0.041625, 0.0, 0.5, 0.5]
+    - [0.5004593, 0.0346875, 0.0433125, 0.0, 0.5, 0.5]
+    - [0.5067093, 0.0336875, 0.0423125, 0.0, 0.5, 0.5]
+    - [0.5129593, 0.033375, 0.042, 0.0, 0.5, 0.5]
+    - [0.5192093, 0.033875, 0.0425, 0.0, 0.5, 0.5]
+    - [0.5254593, 0.0350625, 0.0436875, 0.0, 0.5, 0.5]
+    - [0.5317093, 0.0369375, 0.0455625, 0.0, 0.5, 0.5]
+    - [0.5379593, 0.037, 0.045625, 0.0, 0.5, 0.5]
+    - [0.5442093, 0.0374375, 0.0460625, 0.0, 0.5, 0.5]
+    - [0.5504593, 0.038625, 0.04725, 0.0, 0.5, 0.5]
+    - [0.5567093, 0.0404375, 0.0490625, 0.0, 0.5, 0.5]
+    - [0.5629593, 0.0428125, 0.0514375, 0.0, 0.5, 0.5]
+    - [0.5692093, 0.04575, 0.054375, 0.0, 0.5, 0.5]
+    - [0.5754593, 0.049125, 0.05775, 0.0, 0.5, 0.5]
+  plug_margin: 0.0125
+- {op: brownian, at: K, kT: 1.0, mobility: 2.696724788774888, seed: 3}
+- {op: field_force, at: Cl, field: elec, channel: 0, charge: -1.0, mobility: 2.793036388373991, volt_per_sim: 0.025652602296033736}
+- op: slab_barrier
+  at: Cl
+  height: 75.37741492768414
+  z0: 0.325459
+  half_thickness: 0.07375
+  edge: 0.01875
+  pore_edge: 0.00625
+  mobility: 2.793036388373991
+  pores:
+  - profile:
+    - [0.0754593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0817093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0879593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.0942093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1004593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1067093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1129593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1192093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1254593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1317093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1379593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1442093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1504593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1567093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1629593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1692093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1754593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1817093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1879593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.1942093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2004593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2067093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2129593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2192093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2254593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2317093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2379593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2442093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2504593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2567093, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2629593, 0.0, 0.0, 0.0, 0.5, 0.5]
+    - [0.2692093, 0.0, 0.0889375, 0.0, 0.5, 0.5]
+    - [0.2754593, 0.0, 0.0825, 0.0, 0.5, 0.5]
+    - [0.2817093, 0.0, 0.079625, 0.0, 0.5, 0.5]
+    - [0.2879593, 0.0, 0.077125, 0.0, 0.5, 0.5]
+    - [0.2942093, 0.0, 0.070625, 0.0, 0.5, 0.5]
+    - [0.3004593, 0.0520625, 0.063375, 0.0, 0.5, 0.5]
+    - [0.3067093, 0.048, 0.0593125, 0.0, 0.5, 0.5]
+    - [0.3129593, 0.04425, 0.0555625, 0.0, 0.5, 0.5]
+    - [0.3192093, 0.040875, 0.0521875, 0.0, 0.5, 0.5]
+    - [0.3254593, 0.0380625, 0.049375, 0.0, 0.5, 0.5]
+    - [0.3317093, 0.03575, 0.0470625, 0.0, 0.5, 0.5]
+    - [0.3379593, 0.034, 0.0453125, 0.0, 0.5, 0.5]
+    - [0.3442093, 0.033, 0.0443125, 0.0, 0.5, 0.5]
+    - [0.3504593, 0.0326875, 0.044, 0.0, 0.5, 0.5]
+    - [0.3567093, 0.0330625, 0.044375, 0.0, 0.5, 0.5]
+    - [0.3629593, 0.0341875, 0.0455, 0.0, 0.5, 0.5]
+    - [0.3692093, 0.035625, 0.0469375, 0.0, 0.5, 0.5]
+    - [0.3754593, 0.036125, 0.0474375, 0.0, 0.5, 0.5]
+    - [0.3817093, 0.0373125, 0.048625, 0.0, 0.5, 0.5]
+    - [0.3879593, 0.039125, 0.0504375, 0.0, 0.5, 0.5]
+    - [0.3942093, 0.0415, 0.0528125, 0.0, 0.5, 0.5]
+    - [0.4004593, 0.0430625, 0.054375, 0.0, 0.5, 0.5]
+    - [0.4067093, 0.0425625, 0.053875, 0.0, 0.5, 0.5]
+    - [0.4129593, 0.04225, 0.0535625, 0.0, 0.5, 0.5]
+    - [0.4192093, 0.0425625, 0.053875, 0.0, 0.5, 0.5]
+    - [0.4254593, 0.0434375, 0.05475, 0.0, 0.5, 0.5]
+    - [0.4317093, 0.043125, 0.0544375, 0.0, 0.5, 0.5]
+    - [0.4379593, 0.042625, 0.0539375, 0.0, 0.5, 0.5]
+    - [0.4442093, 0.0405, 0.0518125, 0.0, 0.5, 0.5]
+    - [0.4504593, 0.037, 0.0483125, 0.0, 0.5, 0.5]
+    - [0.4567093, 0.0340625, 0.045375, 0.0, 0.5, 0.5]
+    - [0.4629593, 0.0316875, 0.043, 0.0, 0.5, 0.5]
+    - [0.4692093, 0.0299375, 0.04125, 0.0, 0.5, 0.5]
+    - [0.4754593, 0.028875, 0.0401875, 0.0, 0.5, 0.5]
+    - [0.4817093, 0.028625, 0.0399375, 0.0, 0.5, 0.5]
+    - [0.4879593, 0.0290625, 0.040375, 0.0, 0.5, 0.5]
+    - [0.4942093, 0.0303125, 0.041625, 0.0, 0.5, 0.5]
+    - [0.5004593, 0.032, 0.0433125, 0.0, 0.5, 0.5]
+    - [0.5067093, 0.031, 0.0423125, 0.0, 0.5, 0.5]
+    - [0.5129593, 0.0306875, 0.042, 0.0, 0.5, 0.5]
+    - [0.5192093, 0.0311875, 0.0425, 0.0, 0.5, 0.5]
+    - [0.5254593, 0.032375, 0.0436875, 0.0, 0.5, 0.5]
+    - [0.5317093, 0.03425, 0.0455625, 0.0, 0.5, 0.5]
+    - [0.5379593, 0.0343125, 0.045625, 0.0, 0.5, 0.5]
+    - [0.5442093, 0.03475, 0.0460625, 0.0, 0.5, 0.5]
+    - [0.5504593, 0.0359375, 0.04725, 0.0, 0.5, 0.5]
+    - [0.5567093, 0.03775, 0.0490625, 0.0, 0.5, 0.5]
+    - [0.5629593, 0.040125, 0.0514375, 0.0, 0.5, 0.5]
+    - [0.5692093, 0.0430625, 0.054375, 0.0, 0.5, 0.5]
+    - [0.5754593, 0.0464375, 0.05775, 0.0, 0.5, 0.5]
+  plug_margin: 0.0125
+- {op: brownian, at: Cl, kT: 1.0, mobility: 2.793036388373991, seed: 4}
+- op: compartment_count
+  at: cell
+  z_m: 0.325459
+  cell: cell
+  sets: [K, Cl]
+  charges: [1.0, -1.0]
+  blocks_in: [nK_in, nCl_in]
+  block_charge: q_in
+  block_current: I_in
+  window: 20000.0
+schedule: [membrane_potential, electrolyte_conduction, pair_potential, pair_potential, pair_potential, pair_potential,
+  field_force, slab_barrier, brownian, field_force, slab_barrier, brownian, compartment_count]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [alphah_1, alphah_2, alphah_3, alphah_4, alphah_5, alphah_6, alphah_7, lipid, K, Cl]
+  hide_sets: [cell, qsite]
+  surface:
+    alphah_1: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    alphah_2: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    alphah_3: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    alphah_4: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    alphah_5: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    alphah_6: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    alphah_7: {render: surface, spacing: 0.01875, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    lipid: {render: surface, spacing: 0.025, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    K: {render: dots, point_size: 4.0}
+    Cl: {render: dots, point_size: 4.0}
+  surface_min_points: 30
+  opacity: {alphah_1: 1.0, alphah_2: 1.0, alphah_3: 1.0, alphah_4: 1.0, alphah_5: 1.0, alphah_6: 1.0, alphah_7: 1.0,
+    lipid: 0.45, K: 1.0, Cl: 1.0}
+  colors:
+    alphah_1: [0.36, 0.58, 0.8]
+    alphah_2: [0.9, 0.62, 0.36]
+    alphah_3: [0.47, 0.72, 0.52]
+    alphah_4: [0.84, 0.47, 0.47]
+    alphah_5: [0.66, 0.56, 0.79]
+    alphah_6: [0.62, 0.5, 0.42]
+    alphah_7: [0.86, 0.6, 0.74]
+    lipid: [0.82, 0.82, 0.84]
+    K: [0.7, 0.53, 1.0]
+    Cl: [0.35, 0.85, 0.45]
+  camera: {elev: 40.0, azim: 30.0}
+  zoom: 1.0
+  curve:
+  - {quantity: 'block:cell:nK_in', ymin: 0.0, ymax: 122.0, ylabel: K+ inside, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:nCl_in', ymin: 0.0, ymax: 122.0, ylabel: Cl- inside, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:q_in', ymin: -10.0, ymax: 30.0, ylabel: charge moved in at -100 mV, font_size: 21, tick_font_size: 16}
+  subject: alphah_1
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  replay_curves: false
+  curve_time: {per_frame_s: 1.564712576812154e-13, unit: ns}
+descriptions:
+  movie: {description: 'The simulation shows a cluster of multi-colored organic shapes evolving within a 3D bounding
+      box. Over time, the number of K+ and Cl- ions remains relatively stable at approximately 60 and 60 respectively.
+      The charge monopole value at 100 mV shows a distinct pulse between 10 and 20 nanoseconds. Towards the end
+      of the sequence, the charge monopole value experiences a sharp step increase to a value of 2.0.', objects: 'A
+      central cluster of large, blob-like shapes is composed of various colors including green, red, purple, orange,
+      blue, and pink. These shapes are clustered together in the center of the frame, appearing to be connected
+      or overlapping. Numerous small, point-like particles in green and blue are scattered throughout the 3D space.
+      A large, grey, undulating surface structure sits at the base of the central cluster, spanning much of the
+      lower half of the box.'}

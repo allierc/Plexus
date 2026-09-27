@@ -1,0 +1,144 @@
+general:
+  title: Sixteen kinds of cell, each obeying the three boids rules its own way
+  name: a5_boids_16_types
+  seed: 0
+  n_frames: 4000
+  dt: 0.5
+  save_data: true
+  dim: 2
+  boundary: periodic
+  world:
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 4000
+    vel_init: 0.0004
+    types:
+      t00:
+        cohesion: 27.600000381469727
+        alignment: 92.5
+        separation: 48.20000076293945
+        count: 250
+      t01:
+        cohesion: 32.0
+        alignment: 51.79999923706055
+        separation: 29.799999237060547
+        count: 250
+      t02:
+        cohesion: 23.600000381469727
+        alignment: 35.0
+        separation: 13.5
+        count: 250
+      t03:
+        cohesion: 3.299999952316284
+        alignment: 76.4000015258789
+        separation: 13.0
+        count: 250
+      t04:
+        cohesion: 94.0
+        alignment: 78.69999694824219
+        separation: 30.799999237060547
+        count: 250
+      t05:
+        cohesion: 81.4000015258789
+        alignment: 34.599998474121094
+        separation: 2.200000047683716
+        count: 250
+      t06:
+        cohesion: 3.0999999046325684
+        alignment: 40.5
+        separation: 17.0
+        count: 250
+      t07:
+        cohesion: 88.80000305175781
+        alignment: 7.199999809265137
+        separation: 29.799999237060547
+        count: 250
+      t08:
+        cohesion: 32.70000076293945
+        alignment: 76.80000305175781
+        separation: 26.100000381469727
+        count: 250
+      t09:
+        cohesion: 14.5
+        alignment: 56.79999923706055
+        separation: 27.600000381469727
+        count: 250
+      t10:
+        cohesion: 63.29999923706055
+        alignment: 99.9000015258789
+        separation: 13.899999618530273
+        count: 250
+      t11:
+        cohesion: 32.5
+        alignment: 25.200000762939453
+        separation: 24.399999618530273
+        count: 250
+      t12:
+        cohesion: 97.5999984741211
+        alignment: 56.5
+        separation: 12.100000381469727
+        count: 250
+      t13:
+        cohesion: 62.20000076293945
+        alignment: 9.100000381469727
+        separation: 28.299999237060547
+        count: 250
+      t14:
+        cohesion: 76.4000015258789
+        alignment: 52.900001525878906
+        separation: 32.0
+        count: 250
+      t15:
+        cohesion: 48.099998474121094
+        alignment: 54.400001525878906
+        separation: 30.700000762939453
+        count: 250
+fields: {}
+seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 0.3846
+  seed: 0
+operators:
+- op: radius_graph
+  at: cell
+  radius: 0.04
+  min_radius: 0.001
+- op: cohesion
+  at: cell
+- op: velocity_align
+  at: cell
+  per_type: true
+- op: separation
+  at: cell
+schedule:
+- radius_graph
+- cohesion
+- velocity_align
+- separation
+plotting:
+  renderer: mpl2d
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  duration_s: 10
+  colors:
+    t00: '#FF0010'
+    t01: '#FFA405'
+    t02: '#FFE100'
+    t03: '#9DCC00'
+    t04: '#2BCE48'
+    t05: '#00998F'
+    t06: '#5EF1F2'
+    t07: '#0075DC'
+    t08: '#740AFF'
+    t09: '#C20088'
+    t10: '#FFA8BB'
+    t11: '#F0A3FF'
+    t12: '#94FFB5'
+    t13: '#FFCC99'
+    t14: '#8F7C00'
+    t15: '#BFBFBF'

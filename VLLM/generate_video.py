@@ -30,7 +30,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LTX = os.environ.get("LTX_DIR", os.path.join(_REPO, "VLLM", "LTX-Video"))
 DEV = "cuda:0"
 DEFAULT_ROOT = os.environ.get(
-    "PLEXUS_OUTPUT_ROOT", os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
+    "PLEXUS_OUTPUT_ROOT", os.environ["GNN_OUTPUT_ROOT"]
 ) + "/graphs_data"
 NEG = "blurry, distorted, low quality, jpeg artifacts, watermark, text"
 

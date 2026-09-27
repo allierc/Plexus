@@ -134,7 +134,11 @@ class CircuitRNN(nn.Module):
         agree is working in its linear regime, one whose do not is relying on saturation.
         """
         with torch.no_grad():
-            A = torch.diag(1.0 / self.log_tau.exp()) @ (-torch.eye(self.hidden) + self.W)
+            # ON THE MODEL'S OWN DEVICE. `torch.eye` defaults to CPU, so this raised only
+            # when the fit ran on a GPU -- every local run was CPU and never hit it, and
+            # the cluster's whole control column died in `test` after training fine.
+            eye = torch.eye(self.hidden, device=self.W.device, dtype=self.W.dtype)
+            A = torch.diag(1.0 / self.log_tau.exp()) @ (-eye + self.W)
             return np.linalg.eigvals(A.cpu().numpy())
 
 

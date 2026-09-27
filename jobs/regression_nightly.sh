@@ -2,7 +2,7 @@
 # The regression series overnight, on the cluster or on a local card.
 #
 #   cluster (from the repo root, relative paths as every job here):
-#     bsub -q gpu_l4 -gpu 'num=1' -n 8 -W 4:00 -J plexus_regression \
+#     bsub -q ${CLUSTER_QUEUE_PREFIX}l4 -gpu 'num=1' -n 8 -W 4:00 -J plexus_regression \
 #          -o jobs/logs/regression_%J.out -e jobs/logs/regression_%J.err bash jobs/regression_nightly.sh
 #   local:
 #     nohup bash jobs/regression_nightly.sh cuda:1 > log/regression/nightly.log 2>&1 &

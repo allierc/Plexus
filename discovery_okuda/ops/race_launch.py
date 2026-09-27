@@ -1,4 +1,4 @@
-"""Submit the secretion/growth race to gpu_l4, one job per rate.
+"""Submit the secretion/growth race to ${CLUSTER_QUEUE_PREFIX}l4, one job per rate.
 
 REUSES `discovery_okuda/cluster.py` rather than reimplementing bsub. Everything that is hard about
 this -- the ssh hardening, the detached submission, the queue polling, the /workspace <-> /groups path
@@ -6,7 +6,7 @@ translation -- is solved there and was solved by being burnt by it. What is loca
 the job script: which python, which arguments, which folder.
 
 WHY THE CLUSTER AND NOT THE TWO LOCAL CARDS. Ten 402-frame runs is about two hours of wall clock on two
-A6000s sharing SMs; gpu_l4 takes twelve at once. The runs are independent by construction -- one rate
+A6000s sharing SMs; ${CLUSTER_QUEUE_PREFIX}l4 takes twelve at once. The runs are independent by construction -- one rate
 each, no shared state -- so this is the one part of the work that parallelises perfectly.
 """
 import os
@@ -39,7 +39,7 @@ def job_script(rate, kb):
             f"export PYTHONPATH={cluster.cpath('/workspace/Plexus/src')}:"
             f"{cluster.cpath('/workspace/Plexus/discovery_okuda/ops')}:{cluster.cpath(HERE)}",
             "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
-            "export GNN_OUTPUT_ROOT=/groups/saalfeld/home/allierc/GraphData",
+            f"export GNN_OUTPUT_ROOT={os.environ['GNN_OUTPUT_ROOT']}",
             f"conda run -n {cluster.ENV} python race_one.py {rate:g} cuda:0 {kb:g}",
         ]) + "\n")
     os.chmod(path, 0o755)

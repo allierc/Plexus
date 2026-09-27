@@ -65,14 +65,14 @@ def main():
     os.makedirs(dst, exist_ok=True)
     spec = yaml.safe_load(open(os.path.join(src, "spec.yaml")))
     # A RUN SUBMITTED TO THE CLUSTER RECORDS CLUSTER PATHS. `/workspace` here is
-    # `/groups/saalfeld/home/allierc/Graph` there -- the same NFS export under two names -- so a spec
+    # `$CLUSTER_HOME/Graph` there -- the same NFS export under two names -- so a spec
     # written by the A100 job names a tissue cache this side cannot open, under its other name.
     # `cluster.MAP` is the one place that mapping lives; it is read, not restated.
     try:
         sys.path.insert(0, os.path.join(_ROOT, "discovery_okuda"))
         from cluster import MAP as _MAP
     except Exception:
-        _MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
+        _MAP = ("/workspace", f"{os.environ['CLUSTER_HOME']}/Graph")
     for _o in spec.get("operators", []):
         for _k in ("tissue", "surface", "load", "gate", "map"):
             v = _o.get(_k)

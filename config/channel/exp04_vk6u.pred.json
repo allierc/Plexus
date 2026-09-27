@@ -1,0 +1,29 @@
+{
+ "box_nm": 17,
+ "grid_dx_nm": 0.133,
+ "chains": 4,
+ "ions": 255,
+ "lipids": 278,
+ "filter_rings_z_nm": [
+  0.18,
+  0.51,
+  0.81,
+  1.23,
+  1.51
+ ],
+ "sites_z_nm": [
+  0.34,
+  0.66,
+  1.02,
+  1.37
+ ],
+ "mu_K": 2.697,
+ "debye_nm": 0.785,
+ "dt_ps": 0.14180278065692128,
+ "n_frames": 150000,
+ "sim_time_ns": 21.270417098538193,
+ "events_expected_at_20pS": 0.39827850401427456,
+ "born_barrier_kT": 98.9,
+ "k_O_kT_nm2": 519.5,
+ "k_C_kT_nm2": 674.8
+}

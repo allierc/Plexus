@@ -1,0 +1,192 @@
+general:
+  name: exp04_vpyO
+  seed: 0
+  n_frames: 40000
+  dt: 1.137244951104215e-06
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  record_cap: 3001
+  field_record_cap: 2
+  units: {length_um: 0.01, time_s: 1.3758799942729024e-07, force_nN: 0.00041099999999999996}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.5]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      psi: {width: 1, integration: first_order, unit: voltage, title: membrane potential}
+      j_channel: {width: 1, integration: none, unit: current, title: channel current}
+      g_channel: {width: 1, integration: none, unit: '1', title: channel conductance}
+      nK_in: {width: 1, integration: none, unit: count, title: K+ inside the cell}
+      nCl_in: {width: 1, integration: none, unit: count, title: Cl- inside the cell}
+      q_in: {width: 1, integration: none, unit: count, title: charge moved into the cell}
+      I_in: {width: 1, integration: none, unit: current, title: current into the cell}
+    title: the cell's interior (the voltage-clamped compartment)
+  lipid:
+    n: 272
+    start:
+    - [0.5, 0.5, 0.5]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: membrane lipids
+  K:
+    n: 52
+    start:
+    - [0.5, 0.5, 0.5]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: potassium ions (K+)
+  Cl:
+    n: 52
+    start:
+    - [0.5, 0.5, 0.5]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: chloride ions (Cl-)
+fields:
+  elec: {frame: grid, res: 96, components: 2, title: electric potential in the electrolyte}
+seed:
+- op: cloud_seed
+  at: lipid
+  cloud: exp04_hole_vpyO/lipid
+  origin: [0.5, 0.5, 0.5]
+  scale: 100000000.0
+- op: cloud_seed
+  at: K
+  cloud: exp04_hole_vpyO/K
+  origin: [0.5, 0.5, 0.5]
+  scale: 100000000.0
+- op: cloud_seed
+  at: Cl
+  cloud: exp04_hole_vpyO/Cl
+  origin: [0.5, 0.5, 0.5]
+  scale: 100000000.0
+operators:
+- op: membrane_potential
+  at: cell
+  capacitance: 1000000000000.0
+  pump_max: 0.0
+  pump_rev: 1.0
+  leak: 0.0
+  psi0: -9.745599963503649
+  h0: [0.0, 0.0]
+  flux: j_channel
+- op: electrolyte_conduction
+  at: cell
+  field: elec
+  insulators:
+  - {set: lipid, radius: 0.05500000000000001}
+  sigma: 2.2510957493411428
+  volt_per_sim: 0.025652602296033736
+  dx_m: 1.0416666666666667e-10
+  sim_current_per_A: 858756746962.3344
+  slab: [0.36, 0.64]
+  cell: cell
+  lumen_radius: 0.12
+  axis_sets: [lipid]
+  every: 1000000000
+  iters: 300
+  iters_first: 30000
+  omega: 1.0
+- op: pair_potential
+  at: K
+  sets: [K, Cl]
+  law: [coulomb, wca]
+  k_c: 0.06999999999999999
+  debye: 0.0
+  cutoff: 0.2
+  charge: {K: 1.0, Cl: -1.0}
+  sigma: {K: 0.024587973273942094, Cl: 0.03224944320712695}
+  epsilon: 1.0
+  mobility: {K: 2.696724788774888, Cl: 2.793036388373991}
+  step_max: {coulomb: 0.005, wca: 0.02}
+- op: pair_potential
+  at: K
+  sets: [K, Cl]
+  with: lipid
+  law: wca
+  sigma: 0.045
+  epsilon: 1.0
+  mobility: {K: 2.696724788774888, Cl: 2.793036388373991}
+  react: false
+  step_max: 0.02
+- {op: field_force, at: K, field: elec, channel: 0, charge: 1.0, mobility: 2.696724788774888, volt_per_sim: 0.025652602296033736}
+- op: slab_barrier
+  at: K
+  height: 98.86458044862918
+  z0: 0.5
+  half_thickness: 0.13999999999999999
+  edge: 0.03
+  pore_radius: 0.12
+  pore_edge: 0.02
+  axis_xy: [0.5, 0.5]
+  mobility: 2.696724788774888
+- {op: brownian, at: K, kT: 1.0, mobility: 2.696724788774888, seed: 3}
+- {op: field_force, at: Cl, field: elec, channel: 0, charge: -1.0, mobility: 2.793036388373991, volt_per_sim: 0.025652602296033736}
+- op: slab_barrier
+  at: Cl
+  height: 75.37741492768414
+  z0: 0.5
+  half_thickness: 0.13999999999999999
+  edge: 0.03
+  pore_radius: 0.12
+  pore_edge: 0.02
+  axis_xy: [0.5, 0.5]
+  mobility: 2.793036388373991
+- {op: brownian, at: Cl, kT: 1.0, mobility: 2.793036388373991, seed: 4}
+- op: compartment_count
+  at: cell
+  z_m: 0.5
+  cell: cell
+  sets: [K, Cl]
+  charges: [1.0, -1.0]
+  blocks_in: [nK_in, nCl_in]
+  block_charge: q_in
+  block_current: I_in
+  window: 20000.0
+schedule: [membrane_potential, electrolyte_conduction, pair_potential, pair_potential, field_force, slab_barrier,
+  brownian, field_force, slab_barrier, brownian, compartment_count]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [lipid, K, Cl]
+  hide_sets: [cell]
+  surface:
+    lipid: {render: surface, spacing: 0.04, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    K: {render: dots, point_size: 4.0}
+    Cl: {render: dots, point_size: 4.0}
+  surface_min_points: 30
+  opacity: {lipid: 0.45, K: 1.0, Cl: 1.0}
+  colors:
+    lipid: [0.82, 0.82, 0.84]
+    K: [0.7, 0.53, 1.0]
+    Cl: [0.35, 0.85, 0.45]
+  camera: {elev: 40.0, azim: 30.0}
+  zoom: 1.0
+  curve:
+  - {quantity: 'block:cell:nK_in', ymin: 0.0, ymax: 54.0, ylabel: K+ inside, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:nCl_in', ymin: 0.0, ymax: 54.0, ylabel: Cl- inside, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:q_in', ymin: -2.0, ymax: 47.45755973760835, ylabel: charge moved in at -250 mV, font_size: 21,
+    tick_font_size: 16}
+  subject: lipid
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  replay_curves: false
+  curve_time: {per_frame_s: 1.5647125768121543e-13, unit: ns}

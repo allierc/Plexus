@@ -1,0 +1,290 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 32
+general:
+  boundary: wall
+  dim: 3
+  dt: 1.0e-05
+  n_frames: 15000
+  name: p3s_twocells
+  record_cap: 301
+  save_data: true
+  seed: 0
+  units:
+    force_nN: 6.25e-09
+    length_um: 50.0
+    time_s: 1.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: rod_a
+  emit: velocity
+  k_bend: 4150.0
+  k_stretch: 30000.0
+  op: rod_elastic
+  zeta_bend: 0.0
+  zeta_stretch: 0.0
+- anchor: cell_a
+  at: rod_a
+  clamp: 64.4
+  clamp_zeta: 0.0
+  emit: velocity
+  moment: 0.0
+  n_body: 1
+  omega: 6.283185
+  omega_n: 100.0
+  op: rod_base
+  waveform: sine
+  zeta: 0.0
+- amplitude: 10.0
+  at: rod_a
+  emit: velocity
+  k_motor: 4150.0
+  omega: 56.548667764616276
+  op: rod_motor
+  wavelength: 0.4
+  phase_jitter: true
+  phase_seed: 1
+- at: rod_a
+  coupling: 0.1
+  emit: velocity
+  field: mpm_grid
+  k: 0.0
+  op: drag
+  react: true
+  react_set: water_particle
+  zeta: 47940.0
+- at: rod_b
+  emit: velocity
+  k_bend: 4150.0
+  k_stretch: 30000.0
+  op: rod_elastic
+  zeta_bend: 0.0
+  zeta_stretch: 0.0
+- anchor: cell_b
+  at: rod_b
+  clamp: 64.4
+  clamp_zeta: 0.0
+  emit: velocity
+  moment: 0.0
+  n_body: 1
+  omega: 6.283185
+  omega_n: 100.0
+  op: rod_base
+  waveform: sine
+  zeta: 0.0
+- amplitude: 10.0
+  at: rod_b
+  emit: velocity
+  k_motor: 4150.0
+  omega: 69.11503837897544
+  op: rod_motor
+  wavelength: 0.4
+  phase_jitter: true
+  phase_seed: 2
+- at: rod_b
+  coupling: 0.1
+  emit: velocity
+  field: mpm_grid
+  k: 0.0
+  op: drag
+  react: true
+  react_set: water_particle
+  zeta: 47940.0
+- at: water_particle
+  implementation: warp
+  op: mpm_strain
+- at: water_particle
+  eta: 1600.0
+  op: mpm_viscosity
+- a_max: 200.0
+  at: water_particle
+  drag: 0.0
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  to: mpm_grid
+- at: mpm_grid
+  op: mpm_grid_update
+  wall_damp: 0.9
+  wall_friction: 0.3
+- at: water_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_damp: 0.9
+plotting:
+  background: black
+  box_frame: true
+  chain:
+    set:
+    - rod_a
+    - rod_b
+    width: 7
+    color: '#ffffff'
+  color_field: radial
+  colors:
+    cell:
+    - 1.0
+    - 0.85
+    - 0.2
+  cutaway:
+    axis: y
+    at: 0.5
+    thickness: 0.3
+  dot_shading: true
+  dot_size: 5.0
+  field_cmap: bwr
+  field_log: false
+  fps: 20.0
+  keep_stills: true
+  max_frames: 300
+  renderer: vtk_points
+  slow_motion: 26.67
+  spheres:
+    set:
+    - cell_a
+    - cell_b
+    radius: 0.04
+    color: '#f2d24e'
+  stills: 8
+  subject: water_particle
+  up_axis: 2
+schedule:
+- rod_elastic
+- rod_base
+- rod_motor
+- drag
+- rod_elastic
+- rod_base
+- rod_motor
+- drag
+- steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 1.0e-05
+seed:
+- at: rod_a
+  base:
+  - 0.44
+  - 0.5
+  - 0.28
+  beat_axis: &id001
+  - 0.0
+  - 1.0
+  - 0.0
+  cap_deg: 30.0
+  direction: &id002
+  - 0.0
+  - 0.0
+  - 1.0
+  length: 0.4
+  n_rod: 5
+  op: rod_seed
+  sphere_radius: 0.04
+- at: rod_b
+  base:
+  - 0.56
+  - 0.5
+  - 0.28
+  beat_axis: *id001
+  cap_deg: 30.0
+  direction: *id002
+  length: 0.4
+  n_rod: 5
+  op: rod_seed
+  sphere_radius: 0.04
+sets:
+  cell_a:
+    n: 1
+    start:
+    - - 0.44
+      - 0.5
+      - 0.28
+    state: &id003
+      pos:
+        boundary: free
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        boundary: free
+        integration: second_order_rate
+        role: rate
+        width: 3
+  rod_a:
+    n: 40
+    mesh: seg_a
+    start:
+    - - 0.44
+      - 0.5
+      - 0.28
+    state: &id004
+      pos:
+        boundary: free
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        boundary: free
+        integration: second_order_rate
+        role: rate
+        width: 3
+  seg_a:
+    n: 35
+    maps:
+      srce: rod_a
+      trgt: rod_a
+  cell_b:
+    n: 1
+    start:
+    - - 0.56
+      - 0.5
+      - 0.28
+    state: *id003
+  rod_b:
+    n: 40
+    mesh: seg_b
+    start:
+    - - 0.56
+      - 0.5
+      - 0.28
+    state: *id004
+  seg_b:
+    n: 35
+    maps:
+      srce: rod_b
+      trgt: rod_b
+  water:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types:
+      seawater:
+        block:
+        - 0.08
+        - 0.08
+        - 0.08
+        - 0.92
+        - 0.92
+        - 0.92
+        bulk_modulus: 100000.0
+        count: 1
+        density: 1000.0
+        eta: 1600.0
+        material: liquid
+  water_particle:
+    density: 1000.0
+    entity: mpm_particle
+    parent: water
+    per_parent: 155374
+    radius: 0.5

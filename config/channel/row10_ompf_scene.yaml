@@ -1,0 +1,113 @@
+general:
+  name: row10_ompf_scene
+  seed: 0
+  n_frames: 2
+  dt: 5.802270158694975e-07
+  boundary: wall
+  dim: 3
+  world: [10.0, 1.0, 1.0]
+  record_cap: 3
+  units: {length_um: 0.014, time_s: 2.6967247887748886e-07, force_nN: 0.0002935714285714285}
+sets:
+  channel:
+    n: 10
+    start:
+    - [0.660714, 0.5, 0.453101]
+    - [1.625, 0.5, 0.453101]
+    - [2.589286, 0.5, 0.453101]
+    - [3.553571, 0.5, 0.453101]
+    - [4.517857, 0.5, 0.453101]
+    - [5.482143, 0.5, 0.453101]
+    - [6.446429, 0.5, 0.453101]
+    - [7.410714, 0.5, 0.453101]
+    - [8.375, 0.5, 0.453101]
+    - [9.339286, 0.5, 0.453101]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  OmpF_1:
+    parent: channel
+    per_parent: 340
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  OmpF_2:
+    parent: channel
+    per_parent: 340
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  OmpF_3:
+    parent: channel
+    per_parent: 340
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  lipid:
+    parent: channel
+    per_parent: 669
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  K:
+    parent: channel
+    per_parent: 748
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+  Cl:
+    parent: channel
+    per_parent: 748
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+seed:
+- {op: cloud_seed, at: OmpF_1, cloud: exp04r_ompf_v11t/c0, scale: 71428571.42857142}
+- {op: cloud_seed, at: OmpF_2, cloud: exp04r_ompf_v11t/c1, scale: 71428571.42857142}
+- {op: cloud_seed, at: OmpF_3, cloud: exp04r_ompf_v11t/c2, scale: 71428571.42857142}
+- {op: cloud_seed, at: lipid, cloud: exp04r_ompf_v11t/lipid, scale: 71428571.42857142}
+- {op: cloud_seed, at: K, cloud: exp04r_ompf_v11t/K, scale: 71428571.42857142}
+- {op: cloud_seed, at: Cl, cloud: exp04r_ompf_v11t/Cl, scale: 71428571.42857142}
+fields: {}
+operators: []
+schedule: []
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [OmpF_1, OmpF_2, OmpF_3, lipid, K, Cl]
+  hide_sets: [channel, K, Cl]
+  surface:
+    OmpF_1: {render: surface, spacing: 0.021429, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    OmpF_2: {render: surface, spacing: 0.021429, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    OmpF_3: {render: surface, spacing: 0.021429, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    lipid: {render: surface, spacing: 0.028571, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+  opacity: {OmpF_1: 1.0, OmpF_2: 1.0, OmpF_3: 1.0, lipid: 0.45, K: 1.0, Cl: 1.0}
+  colors:
+    OmpF_1: [0.36, 0.58, 0.8]
+    OmpF_2: [0.9, 0.62, 0.36]
+    OmpF_3: [0.47, 0.72, 0.52]
+    lipid: [0.82, 0.82, 0.84]
+    K: [0.7, 0.53, 1.0]
+    Cl: [0.35, 0.85, 0.45]
+  camera: {elev: 55.0, azim: -90.0}
+  zoom: 1.35
+  subject: OmpF_1
+  max_frames: 3
+  real_time: false
+  duration_s: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a static arrangement of particles within a rectangular bounding
+      box. There is no visible movement or evolution of the particles between the provided keyframes.
+      The scene remains constant throughout the entire sequence. The particles maintain their fixed positions
+      and relative orientations.
+    objects: The scene contains a linear array of approximately ten distinct particle clusters. Each cluster
+      consists of a central orange-red core surrounded by a blue-tinted outer shell. These clusters are
+      arranged in a horizontal row, spaced evenly across the center of the frame. The particles are very
+      small, occupying a tiny fraction of the overall black background.

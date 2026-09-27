@@ -11,7 +11,7 @@ import tifffile
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/material"
+MAT = f"{os.environ['GNN_OUTPUT_ROOT']}/graphs_data/material"
 CFG = os.path.join(REPO, "config", "material")
 N = 128
 

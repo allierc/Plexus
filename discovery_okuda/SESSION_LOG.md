@@ -336,7 +336,7 @@ Built around the rule the Tyssue notes paid for: *an action's reported outcome i
 world's state is the fact.* Submissions are fired **detached** (the ssh returns in <1 s), and the
 only ground truth is `bjobs`. `status()` returns `None` — not `{}` — when the queue is
 unreachable, so `wait()` can never mistake a dead link for "all jobs finished". Waves of 8
-(`gpu_l4` gives 8 slots per GPU); `-gpu num=1` always, since the queue rejects jobs without it.
+(`${CLUSTER_QUEUE_PREFIX}l4` gives 8 slots per GPU); `-gpu num=1` always, since the queue rejects jobs without it.
 
 **17:45** **End-to-end cluster verification.** Submitted `ref_uniform_inflation` (130 frames) →
 `bjobs` shows `RUN pg_ref_uniform_inflation`. The full remote path works: config → job script →
@@ -384,7 +384,7 @@ The success criteria are authored **before** the search and are falsifiable:
 
 **18:40** ✅ **FULL STACK VERIFIED ON THE L4 PARTITION.**
 
-`pg_ref_uniform_inflation` ran on `gpu_l4`, host `8*<node>`, `cuda:0`, 130 frames, 63.5 s wall /
+`pg_ref_uniform_inflation` ran on `${CLUSTER_QUEUE_PREFIX}l4`, host `8*<node>`, `cuda:0`, 130 frames, 63.5 s wall /
 107 s CPU, 1336 MB peak:
 
 ```

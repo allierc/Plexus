@@ -1,0 +1,83 @@
+general:
+  name: exp08_flow_e005_s2
+  seed: 2
+  n_frames: 2000
+  dt: 0.0015
+  record_cap: 200
+  boundary: free
+  dim: 3
+  world: [64.0, 64.0, 64.0]
+sets:
+  cell:
+    n: 2400
+    state:
+      area: {width: 1}
+      centroid: {width: 3}
+      A0: {width: 1, record: false}
+      P0: {width: 1, record: false}
+      V0f: {width: 1, record: false}
+      alive: {width: 1, record: false}
+      age: {width: 1, record: false}
+      ndiv: {width: 1, record: false}
+      Vbirth: {width: 1, record: false}
+      divjit: {width: 1, record: false}
+      mg_scale: {width: 1, record: false}
+      A0_init: {width: 1, record: false}
+      P0_init: {width: 1, record: false}
+      V0f_init: {width: 1, record: false}
+      apop_flag: {width: 1, record: false}
+      inhib_frac: {width: 1, record: false}
+      chem: {width: 3}
+      mutant: {width: 1}
+      pcp_vec: {width: 3}
+  vertex:
+    n: 6400
+    mesh: half_edge
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+  half_edge:
+    n: 19200
+    maps: {srce: vertex, trgt: vertex, face: cell}
+fields: {}
+seed:
+- {op: seed_mesh, at: vertex, shape: disc, n_cells: 2000, radius: 23.5, jitter: 0.15, p0: 3.5, seed: 2,
+  vseed_cv: 0.15}
+operators:
+- {op: cell_geometry, at: cell}
+- {op: surface_drive, model: affine, at: vertex, strain: 0.4, rotate_deg: -14.0, extend_axis: 0, extend_deg: -42.0,
+  plane_axis: 2, hold: 600, over: 800}
+- op: junction_pcp
+  at: vertex
+  k_on: 1.0
+  k_off: 1.0
+  g: 3.0
+  beta: 0.1
+  K_b: 5.0
+  K_p: 2.0
+  spread: 1.0
+  fz_total: 1.0
+  vang_total: 1.0
+  cue_m1: 0.9
+  cue_until: 600
+  cue_axis: [1.0, 0.0, 0.0]
+  cue_cos: 0.5
+  plane_axis: 2
+  init_bound: 0.5
+  init_noise: 0.5
+  noise: 0.0
+  seed: 2
+  dt: 0.05
+  substeps: 4
+  color_block: chem
+  elong: 0.15
+schedule: [surface_drive, cell_geometry, junction_pcp]
+plotting:
+  duration_s: 10
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: false
+  show_division: false
+  species: ['#ff3030', '#3399ff', '#33dd55']
+  blend: additive
+  camera: {elev: 90.0, azim: 0.0}

@@ -105,6 +105,12 @@ def rollout(sim, u, drive_set, drive_block, read_set, read_block, device="cpu", 
     to the engine and no edit to the spec.
     """
     batch = int(u.shape[0]) if u.dim() == 3 else 1
+    # A SINGLETON TRIAL AXIS IS DROPPED, because the engine runs UNBATCHED at B = 1: its state is
+    # [N, W] with no leading axis, so a drive still carrying [1, T, C] cannot be broadcast into it.
+    # A caller asking for exactly one trial -- the montage does, one panel per function -- hit
+    # this and nothing else did, because every other path asks for four.
+    if u.dim() == 3 and batch == 1:
+        u = u[0]
     trace = []
 
     def hook(H, frame):
@@ -148,6 +154,12 @@ def _pole_max(tp) -> str:
     """
     pr = list(tp.get("poles_real") or [])
     return f"{max(pr):+.4f}" if pr else "     n/a"
+
+
+def _cell_names_of(task):
+    """The per-cell names the task spec declared, from `teacher.pt`."""
+    t = torch.load(os.path.join(task_dir(task), "teacher.pt"), weights_only=False)
+    return list(t.get("names") or ["all"])
 
 
 def units(run):
@@ -370,6 +382,18 @@ def test(run, root=None, device="cpu"):
     var_settled = float((yl ** 2).mean())
     res = {"name": run["name"], "spec": run["spec"], "task": run["task"], "split": split,
            "n_trials": n, "mse": float(np.mean(per)), "mse_per_trial": per,
+           # PER CONDITION CELL, AND NORMALISED BY THAT CELL'S OWN VARIANCE. A pooled number
+           # cannot answer the question a multi-function fit is asked: whether ONE circuit holds
+           # several laws, or holds four and drops two. Worse, the pooled NORMALISED figure moves
+           # the wrong way -- adding a louder law raises the denominator, so six functions can
+           # read as easier than one. Each cell against its own target is the only honest ratio.
+           "mse_per_cell": {str(c): float(np.mean([per[i] for i in range(n) if cond[i] == c]))
+                            for c in sorted(set(cond[:n].tolist()))},
+           "normalised_per_cell": {
+               str(c): float(np.mean([per[i] for i in range(n) if cond[i] == c])
+                             / max(float((Y[:n][cond[:n] == c, :, 0] ** 2).mean()), 1e-30))
+               for c in sorted(set(cond[:n].tolist()))},
+           "cell_names": _cell_names_of(run["task"]),
            "mae": float(np.abs(err).mean()), "rmse": float(np.sqrt(np.mean(per))),
            "unit": (run.get("io") or {}).get("unit"),
            "target_variance": var, "normalised_mse": float(np.mean(per)) / var,

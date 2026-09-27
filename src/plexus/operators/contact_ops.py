@@ -40,6 +40,118 @@ PRESSURE_MAP: list = []             # per frame: that reaction as a pressure on 
 INSIDE_HISTORY: list = []           # per frame: how many particles ended up behind the surface
 _LIVE: dict = {}                    # the live contact operator, so the counter can share its bins
 
+# ---- the tissue's side of every contact: ONE load buffer, ONE ledger (exp05 / exp11) -----------
+#
+# WHY THE TISSUE IS IMPLICIT AND THE MEMBRANE EXPLICIT. About fifteen membrane nodes press on each
+# tissue vertex, so the contact stiffness per vertex is ~15 k, while one frame's relaxation of the
+# tissue (30 iterations x eta 0.08 x mu 1) moves a free mode by up to 2.4 force-units: a load
+# computed at the frame's start and held through the relaxation feeds back with a gain of ~36 k and
+# is unstable above k ~ 0.05 -- a membrane softer than the cells it is meant to hold. So
+# `bm_contact[live]` (membrane_ops) freezes WHICH node presses on WHICH fan triangle (weights,
+# normal, the node's position) and `cell_mechanics[apicobasal_contact]` / `[shape_contact]`
+# (vertex_ops) re-evaluate the penetration at every iteration (`linear_contact_forces`); the tissue
+# settles where its energy balances the contact at the positions it reaches. Each node then moves by
+# F_i / gamma for the force the tissue settled against, an explicit overdamped step whose gain
+# k / gamma is small.
+#
+# WHY A LEDGER. "The bodies push each other and create no force" is a number: per interface and
+# frame, |sum of the forces on the other body + sum of the reactions on the tissue| in float64, over
+# that interface's largest single contact force. Two per-row mesh scalars carry it,
+# `interface_force_sum` and `interface_force_max` (recorded by `MeshTable.SCALAR_RECORD`), read by
+# `tools/exp_measures/exp11.balance`.
+
+def basal_load(m, frame, nv, dev):
+    """This frame's float64 [nv, 3] load on the tissue's basal points, stored on the mesh `m`, and
+    the frame's ledger -- zeroed together the first time any contact asks in a new frame."""
+    buf = m.get("f_basal")
+    if (m.get("f_basal_frame") != frame or not torch.is_tensor(buf) or buf.shape[0] != int(nv)
+            or buf.device != torch.device(dev)):
+        buf = torch.zeros(int(nv), 3, dtype=torch.float64, device=dev)
+        m["f_basal"] = buf
+        m["f_basal_frame"] = frame
+        m["_iface_ratio"] = 0.0
+        m["interface_force_max"] = 0.0
+        m["interface_force_sum"] = 0.0
+    return buf
+
+
+def record_interface(m, f_other, f_tissue):
+    """Book one interface's pair into the frame's ledger (open it with `basal_load` first).
+
+    f_other   [k, 3] float64, the contact forces on the other body's points
+    f_tissue  [nv, 3] float64, the reactions put on the tissue's vertices
+
+    The frame keeps the LARGEST |sum f_other + sum f_tissue| / max_i |f_other_i| over interfaces
+    and substeps, and writes `interface_force_sum` as that ratio times `interface_force_max`, so the
+    ruler's sum / max is the worst interface's own ratio."""
+    if f_other.shape[0] == 0:
+        return
+    fmax = float(f_other.norm(dim=1).max())
+    if fmax <= 0.0:
+        return
+    net = float((f_other.sum(0) + f_tissue.sum(0)).norm())
+    m["_iface_ratio"] = max(float(m.get("_iface_ratio", 0.0)), net / fmax)
+    m["interface_force_max"] = max(float(m.get("interface_force_max", 0.0)), fmax)
+    m["interface_force_sum"] = m["_iface_ratio"] * m["interface_force_max"]
+
+
+def barycentric_reaction(M, tri, w, F, nv):
+    """The reaction -F of contacts on fan triangles `tri` (weights `w`) as a float64 [nv, 3] force
+    on the surface's vertices; the fan's virtual centroid hands its share to the face's vertices in
+    equal parts, `mesh_contact`'s rule. w0 is recomputed as 1 - w1 - w2 IN FLOAT64, so the shares
+    sum to the force to double round-off and the ledger measures the coupling, not the weights."""
+    dev = F.device
+    Fd = F.to(torch.float64)
+    w1 = w[:, 1:2].to(torch.float64)
+    w2 = w[:, 2:3].to(torch.float64)
+    w0 = 1.0 - w1 - w2
+    fv = torch.zeros(int(nv), 3, dtype=torch.float64, device=dev)
+    fv.index_add_(0, M["es"][tri], -w1 * Fd)
+    fv.index_add_(0, M["et"][tri], -w2 * Fd)
+    fface = torch.zeros(int(M["nF"]), 3, dtype=torch.float64, device=dev)
+    fface.index_add_(0, M["ef"][tri], -w0 * Fd)
+    fv.index_add_(0, M["es"], fface[M["ef"]] / M["cnt"][M["ef"], None].to(torch.float64))
+    return fv
+
+
+def linear_contact_forces(C, x, s, nF):
+    """The forces of a frozen contact list at the tissue's CURRENT positions -- the implicit half.
+
+    With the basal points b = x - s and the face centroids c_f = mean of the face's b,
+
+        xs_i = w0 c_f + w1 b_src + w2 b_trgt       the contact point, moving with the tissue
+        g_i  = (y_i - xs_i) . n_i                   y_i the node, frozen for the frame
+        p_i  = max(0, offset - g_i)                 penetration of the standoff
+        a_i  = g_i - offset  if 0 < g_i - offset <= band_adh, else 0     the stretched tether
+        F_i  = (k p_i - k_adh a_i) n_i              on the node
+        f_v  = - sum_i w_iv F_i                     on the tissue
+
+    Returns (F [K, 3], f_v [Nv, 3]), both float64. With k_adh 0 (a list without the key) the
+    tether term is absent and the forces are the repulsion alone."""
+    b = (x - s).to(torch.float64)
+    es, ef = C["es"], C["ef"]
+    cnt = C["cnt"].to(torch.float64)
+    cent = torch.zeros(int(nF), 3, dtype=torch.float64, device=b.device).index_add_(0, ef, b[es])
+    cent = cent / cnt[:, None].clamp_min(1.0)
+    w = C["w"]
+    xs = w[:, 0:1] * cent[C["face"]] + w[:, 1:2] * b[C["src"]] + w[:, 2:3] * b[C["trgt"]]
+    g = ((C["y"] - xs) * C["n"]).sum(1)
+    p = (C["offset"] - g).clamp_min(0.0)
+    F = (C["k"] * p)[:, None] * C["n"]
+    ka = float(C.get("k_adh", 0.0) or 0.0)
+    if ka > 0.0:
+        a = g - C["offset"]
+        a = torch.where((a > 0) & (a <= C["band_adh"]), a, torch.zeros_like(a))
+        F = F - (ka * a)[:, None] * C["n"]
+    fv = torch.zeros(b.shape[0], 3, dtype=torch.float64, device=b.device)
+    fv.index_add_(0, C["src"], -w[:, 1:2] * F)
+    fv.index_add_(0, C["trgt"], -w[:, 2:3] * F)
+    fface = torch.zeros(int(nF), 3, dtype=torch.float64, device=b.device)
+    fface.index_add_(0, C["face"], -w[:, 0:1] * F)
+    fv.index_add_(0, es, fface[ef] / cnt[ef, None].clamp_min(1.0))
+    return F, fv
+
+
 
 def _grid(nrow, dev):
     """A REDUCED grid: rows uniform in theta, and each row given as many phi bins as it can hold
@@ -84,7 +196,8 @@ def _neighbours(it, ph, G):
     return torch.stack(out, 2).reshape(it.shape[0], 9)                # [n,9]
 
 
-@register_operator("mesh_contact", family="boundary", set="particle", kind="lateral")
+@register_operator("mesh_contact", family="boundary", set="particle", kind="lateral", title="Contact with a live surface",
+                   equation=r"""$$\mathbf a_n=k\,d_i\,\mathbf n,\qquad \mathbf v_t=(\mathbf v_i-\mathbf v_{\mathrm{face}})-\big((\mathbf v_i-\mathbf v_{\mathrm{face}})\cdot\mathbf n\big)\mathbf n,\qquad \mathbf a_t=-\mu\lVert\mathbf a_n\rVert\frac{\mathbf v_t}{\lVert\mathbf v_t\rVert+\varepsilon_v}$$""")
 class MeshContact(Lateral):
     """Particle-to-surface contact against a LIVE triangulated surface: the surface pushes
     material points out of itself, drags on them, and feels the equal and opposite reaction.
@@ -607,7 +720,7 @@ class MeshContact(Lateral):
                                                                         torch.float32).numpy()
 
 
-@register_operator("mesh_inside", family="hierarchy", set="particle", kind="lateral")
+@register_operator("mesh_inside", family="hierarchy", set="particle", kind="lateral", title="How much matrix lies inside the surface", probe=True)
 class MeshInsideCount(Lateral):
     """A measurement, as an operator: how many matrix particles are behind the surface, and how
     deep. It counts and does not correct, which is the whole point of it.
@@ -774,7 +887,8 @@ def selftest(surface="sphere", dev="cuda:0", n=40000, n_brute=400, **kw):
 SENSE_TRACE: list = []
 
 
-@register_operator("bm_sense", family="signalling", set="vertex", kind="structural")
+@register_operator("bm_sense", family="signalling", set="vertex", kind="structural",
+                   equation=r"""$$\mathbf u_f=\frac{\mathbf c_f-\mathbf c}{\lVert\mathbf c_f-\mathbf c\rVert},\qquad \mathrm{def}_f=\mathrm{clamp}\!\left(1-\frac{L_f}{p_{\mathrm{ref}}},0,1\right)^{\text{sharp}}$$""")
 class BMSense3D(Structural):
     """The epithelium reads the membrane it is resting on: each cell senses how much basement
     membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act
@@ -878,10 +992,183 @@ class BMSense3D(Structural):
         return {}
 
 
+@register_operator("bm_sense", implementation="live", family="signalling", set="vertex",
+                   kind="structural",
+                   equation=r"""$$\mathrm{def}_f=\mathrm{clamp}\!\left(1-\frac{\rho_f}{p_{\mathrm{ref}}\,\mathrm{median}_g\,\rho_g},0,1\right)^{\text{sharp}}$$""")
+class BMSenseLive(BMSense3D):
+    """`bm_sense` reading the LIVE membrane instead of a recorded map.
+
+    vertex -> cell: reads the per-cell ligand density `bm_contact[implementation: live]` publishes
+    (`m["bm_ligand"]`), writes the deficit into one channel of the cell set's `chem`.
+
+        def_f = clamp(1 - R rho_f / (p_ref * median_g rho_g), 0, 1)^sharp
+
+    R, `receptor` (default 1), is the cells' integrin level: the fraction of the bound membrane a
+    cell can actually read. It is how cell-matrix adhesion enters the growth law -- the archive's
+    brake is integrin LIGATION (BUDDING_08.md step 3) -- and a knockdown is R < 1. The membrane's
+    own density sets the median, the cells' receptors scale their reading, so a knockdown below
+    p_ref leaves no cell able to read its anchorage: every brake is released, growth is uniform, and
+    the hole no longer singles out a site -- the model's form of Wang et al. 2021 Fig 7B, where
+    beta1-integrin knockdown in the membrane-touching cells abolishes budding (21.1 -> 1.35 buds).
+
+    RELATIVE TO THE MEDIAN CELL, as the archive's map was ("normalised per frame by its own median",
+    BUDDING_08.md step 2): a membrane that thins uniformly as the tissue grows is not a hole, and an
+    absolute reference would read the whole tissue's growth as a deficit. Under a declared hole a
+    cell reads 0 nodes and a deficit of 1; under intact membrane about the median and 0.
+
+    A density is used on the frame it was published or the next one; a stale or mis-sized one
+    writes no deficit and says so once.
+
+    Reference: Streuli, C. H. (2009). Curr. Opin. Cell Biol. 21:194-198 (anchorage and the cell
+    cycle); the archive's chain, discovery_okuda/BUDDING_08.md.
+    """
+    REQUIRES_PARAMS = []
+    PARAM_ROLES = {"p_ref": "fraction_of_median_density_counted_as_anchored",
+                   "sharp": "deficit_sharpness", "chan": "chem_channel_written",
+                   "receptor": "integrin_level_fraction_of_normal"}
+
+    def __init__(self, params, device="cpu"):
+        Structural.__init__(self, params, device)
+        self.at = params.get("_at", "vertex")
+        self.cat = params.get("cell_set", "cell")
+        self.p_ref = float(params.get("p_ref", 0.5))
+        self.sharp = float(params.get("sharp", 1.0))
+        self.chan = int(params.get("chan", 0))
+        self.receptor = float(params.get("receptor", 1.0))
+        self._said = False
+        self._warned = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        clvl = H.level(self.cat)
+        if m is None or clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+            return {}
+        nF = int(m["nF"])
+        f = getattr(H, "frame", None)
+        f = -1 if f is None else int(f)
+        rho, fr = m.get("bm_ligand"), m.get("bm_ligand_frame")
+        if not torch.is_tensor(rho) or fr is None or f - int(fr) not in (0, 1) or rho.shape[0] != nF:
+            if not self._warned and f > 1:
+                self._warned = True
+                print(f"[bm_sense/live] no current ligand density on the tissue mesh at frame {f} "
+                      f"(published frame {fr}); no deficit written. Schedule "
+                      f"`bm_contact[implementation: live]` every frame.", flush=True)
+            return {}
+        rho = rho.to(clvl.state.dtype)
+        med = rho.median().clamp_min(1e-12)
+        def_ = (1.0 - self.receptor * rho / (self.p_ref * med)).clamp(0.0, 1.0) ** self.sharp
+        ci, _ = clvl.state_schema["chem"]
+        clvl.state[:nF, ci + self.chan] = def_.to(clvl.state.dtype)
+        SENSE_TRACE.append((int((def_ > 0.5).sum()), float(def_.max()), float(def_.mean())))
+        if not self._said:
+            self._said = True
+            print(f"[bm_sense/live] membrane deficit into {self.cat}.chem[:, {self.chan}] from the "
+                  f"live contact's ligand density (receptor {self.receptor:g}, p_ref {self.p_ref} of the median "
+                  f"{float(med):.4g}, sharp {self.sharp}); frame {f}: "
+                  f"{int((def_ > 0.5).sum())} of {nF} cells above 0.5", flush=True)
+        return {}
+
+
+
+# contact_retype -- a juxtacrine type switch (experiment 9, Toda et al. 2018's synNotch circuits).
+from plexus.operators.channel_ops import _type_index  # noqa: E402  the type-name lookup pair_potential[typed] uses
+
+
+@register_operator("contact_retype", family="signalling", set="particle", kind="structural",
+                   title="Contact-dependent type switch (juxtacrine signal)",
+                   equation=r"""$$\dot s_i=\mathbb 1\big[n_i^{\mathrm{by}}\ge m\big],\qquad s_i\ge T\;\Rightarrow\;\tau_i\leftarrow\tau^{\mathrm{to}}$$""")
+class ContactRetype(Structural):
+    """A cell of one type that touches cells of a sender type for long enough changes its type --
+    synNotch's contact-dependent induction (Toda et al. 2018), in the one form a type table reads.
+
+    particle -> particle: reads pos and node_type, rewrites node_type (through `engine.retype`, so
+    every per-type buffer follows). For each rule `{from: B, by: A, to: C, after: T}`:
+
+        ds_i/dt = 1 while cell i (of type `from`) touches at least `min_contacts` cells of type `by`
+        s_i >= T  =>  cell i becomes type `to`
+
+    s_i is the signal the cell has accumulated, in sim time; "touch" is a centre distance below
+    `contact` (world). `after` is the induction delay T -- the hours between ligand contact and the
+    induced cadherin (Toda 2018: E-cadherin and the GFP ligand appear in receivers, then the
+    ligand activates the neighbouring senders later, Fig. 2E-F). `decay` (1/time, default 0) lets
+    the signal fade while contact is lost: ds/dt = -decay s. Rules run in the declared order every
+    frame, each on the types as the previous left them; a cell switches at most once per frame.
+    The accumulators live on the operator (they are not recorded); the types are, per row.
+
+    WHY A NEW OPERATOR AND NOT A VARIANT (the registry, 2026-09-27). No existing contract rewrites a
+    cell's TYPE during the dynamics from what touches it: `seed_type_by_axis` retypes, but it is a
+    `seed` (runs once, before frame 0, and a variant may not change a contract's kind); `cell_divide`
+    types daughters at birth (kind `divide`); `bm_sense`, the one other contact-dependent structural
+    signal, senses the basement membrane on a vertex mesh and writes a block, never a type; the
+    `cell_chem_react` models and `neuron_signal` are lateral kinetics emitting deltas on a state block.
+    It therefore lives here, in the module of its family's contact-dependent operators, under its own
+    name. Moved from sorting_ops.py on 2026-09-27, otherwise unchanged.
+
+    Reference: Toda, S., Blauch, L.R., Tang, S.K.Y., Morsut, L. & Lim, W.A. (2018). Programming
+    self-organizing multicellular structures with synthetic cell-cell signaling. Science
+    361:156-162.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False             # rewrites node_type, not the state buffer
+    REQUIRES_PARAMS = ["rules", "contact"]
+    MECHANISM_TAGS = ["juxtacrine", "synnotch", "fate_switch", "contact_signal"]
+    PARAM_ROLES = {"rules": "list_of_from_by_to_after", "contact": "touching_distance_world",
+                   "min_contacts": "sender_neighbours_needed", "decay": "signal_decay_rate"}
+    PARAM_UNITS = {"contact": "length", "decay": "1/time"}
+    REFERENCE = ("Toda, S., Blauch, L.R., Tang, S.K.Y., Morsut, L. & Lim, W.A. (2018). Science "
+                 "361:156-162.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.rules = [dict(r) for r in params["rules"]]
+        self.contact = float(params["contact"])
+        self.min_contacts = int(params.get("min_contacts", 1))
+        self.decay = float(params.get("decay", 0.0))
+        self._s = None
+        self._idx = None
+
+    def forward(self, H, mask=None):
+        from plexus.engine import retype
+        lvl = H.level(self.at)
+        X = lvl.get("pos")
+        live = lvl.occ > 0
+        nt = lvl.node_type.to(X.device).long().clone()
+        if self._idx is None:
+            self._idx = [(_type_index(lvl, str(r["from"]), "contact_retype"),
+                          _type_index(lvl, str(r["by"]), "contact_retype"),
+                          _type_index(lvl, str(r["to"]), "contact_retype"),
+                          float(r["after"])) for r in self.rules]
+            self._s = torch.zeros(len(self.rules), X.shape[0], device=X.device, dtype=X.dtype)
+        h = float(getattr(H, "dt", 1.0))
+        switched = torch.zeros(X.shape[0], dtype=torch.bool, device=X.device)
+        near = (torch.cdist(X, X) < self.contact) & live[:, None] & live[None, :]
+        near.fill_diagonal_(False)
+        for k, (fr, by, to, after) in enumerate(self._idx):
+            n_by = (near & (nt == by)[None, :]).sum(1)
+            on = (nt == fr) & live & ~switched & (n_by >= self.min_contacts)
+            s = self._s[k]
+            s = torch.where(on, s + h, s * (1.0 - self.decay * h) if self.decay > 0 else s)
+            s = torch.where(nt == fr, s, torch.zeros_like(s))
+            flip = on & (s >= after)
+            if bool(flip.any()):
+                nt = torch.where(flip, torch.full_like(nt, to), nt)
+                switched |= flip
+                s = torch.where(flip, torch.zeros_like(s), s)
+            self._s[k] = s
+        if bool(switched.any()):
+            retype(lvl, nt.to(lvl.node_type.device, lvl.node_type.dtype))
+        return {}
+
+
 PLATE_CONTACT: list = []
 
 
-@register_operator("plate_confine", family="boundary", set="vertex", kind="structural")
+@register_operator("plate_confine", family="boundary", set="vertex", kind="structural",
+                   equation=r"""$$g(t)=g_0+(g_1-g_0)\,\mathrm{clamp}\!\left(\frac{t-t_0}{t_1-t_0},0,1\right),\qquad x_a\leftarrow c_a+\mathrm{sign}(x_a-c_a)\min\big(\lvert x_a-c_a\rvert,\,g(t)\big)$$""")
 class PlateConfine3D(Structural):
     """Confine a set between two rigid plates: a hard boundary imposed as a PROJECTION rather
     than as a force, so nothing can be pushed through it however hard it is pressed.
@@ -986,6 +1273,109 @@ class PlateConfine3D(Structural):
         return {}
 
 
+# =========================================================== plate_confine[sphere]: a spherical capsule
+# Folded here from its own module `sphere_confine.py` on 2026-09-27 (INSTRUCTION.md: every variant
+# lives beside its base operator). What it was written for, verbatim:
+#
+# A spherical capsule -- `plate_confine[model: sphere]`: a closed tissue held inside a sphere of radius R.
+#
+#     plate_confine[sphere]   x <- c + (x - c) (R + (1 - stiff)(|x - c| - R)) / |x - c|   for |x - c| > R
+#
+# WHY A MODEL OF `plate_confine` AND NOT A NEW OPERATOR. It is the same contract -- a hard boundary imposed
+# as a PROJECTION of positions, so nothing is pushed through it however hard it is pressed, with `stiff` the
+# fraction of the violation corrected each frame -- on a different geometry. The two plates bound one axis;
+# the capsule bounds the radius. Registered here, on the contract, so no existing operator is edited.
+#
+# WHY EXPERIMENT 13 NEEDS IT. Aegerter-Wilmsen et al. 2012 (Development 139:3221, p. 3223) build their
+# size arrest on a condition the free shell of `config/tissue/exp03_base.yaml` does not meet: "As long as
+# the disc stays flat, this will lead to a build up of compression in the center". A free shell relieves
+# compression by bulging outward -- exp 13's fast clone rose out of the shell as a cap and folded it, and
+# Shraiman 2005 Fig. 2 draws the same buckling -- so no compression builds with size and the crowding
+# readout of `cell_grow[stretch]` slowed the tissue without stopping it (exp 13 findings 30, 35). The
+# capsule is the wing disc's surroundings (peripodial epithelium, basement membrane, the larval body) in
+# the one form a closed shell allows: it forbids growth OUTWARD past R, so a tissue that fills it is
+# compressed in the plane, and the compression grows with every further increase of target volume.
+#
+# THE CENTRE is the live vertices' centroid by default (`centre: tissue`), so the capsule travels with the
+# tissue and exerts no net force; `centre: [x, y, z]` pins it in world units. R is the capsule radius in
+# world units, measured to the vertex positions (the apico-basal mid-surface on an apico-basal run).
+#
+# Reference: Aegerter-Wilmsen, T. et al. (2012). Development 139:3221 (the flat-disc condition); Plexus
+# (this work) for the capsule itself.
+
+SPHERE_CONTACT: list = []           # (vertices in contact, largest overshoot) per call, like PLATE_CONTACT
+
+
+def project_into_sphere(pos, centre, radius, stiff):
+    """(new positions, contact mask, overshoot): every point beyond `radius` of `centre` moved back by
+    `stiff` of its overshoot along the radius; points inside are untouched."""
+    d = pos - centre
+    r = d.norm(dim=1)
+    over = r - float(radius)
+    hit = over > 0
+    if bool(hit.any()):
+        scale = torch.where(hit, (r - float(stiff) * over) / r.clamp(min=1e-12), torch.ones_like(r))
+        pos = centre + d * scale[:, None]
+    return pos, hit, over
+
+
+@register_operator("plate_confine", model="sphere", family="boundary", set="vertex", kind="structural",
+                   equation=r"""$$\mathbf x\leftarrow\mathbf c+(\mathbf x-\mathbf c)\,\frac{R+(1-s)(\lvert\mathbf x-\mathbf c\rvert-R)}{\lvert\mathbf x-\mathbf c\rvert}\quad\text{for }\lvert\mathbf x-\mathbf c\rvert>R$$""")
+class SphereConfine3D(Structural):
+    """Confine a set inside a sphere of radius `radius` by projection (the comment above).
+
+    vertex -> vertex: reads pos, writes pos in place; kills the OUTWARD component of `vel` on contact
+    when the set carries one, as the plates do for their normal.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["radius"]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["rigid_confinement", "capsule", "solid_obstacle"]
+    PARAM_ROLES = {"radius": "capsule_radius_world_units", "stiff": "projection_fraction",
+                   "centre": "tissue_or_world_point"}
+    REFERENCE = "Aegerter-Wilmsen, T. et al. (2012). Development 139:3221; Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.radius = float(params["radius"])
+        self.stiff = float(params.get("stiff", 0.6))
+        c = params.get("centre", "tissue")
+        self.centre = None if (c is None or str(c).lower() == "tissue") else [float(v) for v in c]
+        self.damp_normal = bool(params.get("damp_normal", True))
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        m = getattr(lvl, "_mesh", None)
+        n = int(m["Nv"]) if (m is not None and "Nv" in m) else pos.shape[0]
+        p = pos[:n]
+        c = (p.mean(0, keepdim=True) if self.centre is None
+             else torch.as_tensor(self.centre, dtype=p.dtype, device=p.device)[None, :])
+        new, hit, over = project_into_sphere(p, c, self.radius, self.stiff)
+        n_hit = int(hit.sum())
+        if n_hit:
+            pos[:n] = new
+            if self.damp_normal and "vel" in lvl.state_schema:
+                v = lvl.get("vel")
+                d = new - c
+                u = d / d.norm(dim=1, keepdim=True).clamp(min=1e-12)
+                vr = (v[:n] * u).sum(1)
+                out = hit & (vr > 0)
+                v[:n] = torch.where(out[:, None], v[:n] - vr[:, None] * u, v[:n])
+        SPHERE_CONTACT.append((n_hit, float(over[hit].max()) if n_hit else 0.0))
+        if not self._said:
+            print(f"[plate_confine:sphere] {self.at}: capsule of radius {self.radius:.4g} around "
+                  f"{'the tissue centroid' if self.centre is None else self.centre}, stiff={self.stiff}; "
+                  f"{n_hit} of {n} vertices in contact at the first call", flush=True)
+            self._said = True
+        return {}
+
+
 def block_fraction(gap_half, half_extent):
     """Fraction of the domain's volume the two blocks occupy, for a box of half-width `half_extent`.
 
@@ -1066,7 +1456,7 @@ def _plate_half_edges(quads):
     return es[o], et[o], ef[o]
 
 
-@register_operator("seed_plate", family="seed", set="vertex", kind="seed")
+@register_operator("seed_plate", family="seed", set="vertex", kind="seed", title="Lay out the plate")
 class SeedPlate(Structural):
     """An open planar half-edge patch, laid out once at frame 0: the rigid tool a
     parallel-plate or nanoindentation assay presses with.
@@ -1213,7 +1603,8 @@ class SeedPlate(Structural):
 
 
 @register_operator("surface_drive", "plate_drive", family="mechanics", set="vertex",
-                   kind="structural")
+                   kind="structural", title="Drive the surface at a set rate",
+                   equation=r"""$$x_a(t)\leftarrow x_a(0)+b_y\,\mathrm{clamp}\!\left(\frac{t-t_{\mathrm{hold}}}{t_{\mathrm{over}}},0,1\right),\qquad v_a=\frac{b_y}{t_{\mathrm{over}}}$$""")
 class SurfaceDrive(Structural):
     """Move a seeded surface along one axis at a prescribed rate, and publish its velocity: the
     loading protocol of a displacement-controlled indentation.
@@ -1419,7 +1810,8 @@ class SurfaceElement:
         lvl.register_buffer("R", torch.zeros(n, device=device))
 
 
-@register_operator("surface_track", family="hierarchy", set="particle", kind="structural")
+@register_operator("surface_track", family="hierarchy", set="particle", kind="structural",
+                   equation=r"""$$\mathbf R(u,t)=\frac{\sum_j w_j\,\mathbf R_j}{\sum_j w_j}$$""")
 class SurfaceTrack(Structural):
     """Write a recorded epithelial surface into the `surface` set each frame, interpolated rather
     than binned, so the surface a strain field sees is smooth.
@@ -1530,7 +1922,8 @@ class SurfaceTrack(Structural):
 LOAD_TRACE: list = []
 
 
-@register_operator("ecm_load", family="mechanics", set="vertex", kind="structural")
+@register_operator("ecm_load", family="mechanics", set="vertex", kind="structural",
+                   equation=r"""$$s_i=\min\!\left(\frac{\text{gain}\,P(\theta_i,\phi_i,t)}{\mu}\,\Delta t,\;\text{cap}\cdot r_i\right),\qquad \mathbf x_i\leftarrow\mathbf x_i-s_i\,\mathbf u_i$$""")
 class ECMLoad3D(Structural):
     """The second half of the coupling: the matrix pushing back on the tissue, from a pressure
     map the matrix pass recorded.
@@ -1625,7 +2018,8 @@ class ECMLoad3D(Structural):
         return {}
 
 
-@register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural")
+@register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural",
+                   equation=r"""$$\mathrm{gate}_f=\mathrm{floor}+\frac{1-\mathrm{floor}}{1+(P_f/p_{1/2})^{n}},\qquad s_f\leftarrow s_{\mathrm{prev}}\big(1+\mathrm{gate}_f\,(f-1)\big)$$""")
 class ECMGrowthGate3D(Structural):
     """Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses
     hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.
@@ -1863,7 +2257,7 @@ class ECMGrowthGate3D(Structural):
 
 
 @register_operator("mesh_contact", model="centre", family="boundary", set="particle",
-                   kind="lateral")
+                   kind="lateral", title="Contact with a live surface")
 class MeshContactCentre(MeshContact):
     """`mesh_contact` as it has always worked, named: the surface indexed by DIRECTION from a centre.
 
@@ -1879,7 +2273,7 @@ class MeshContactCentre(MeshContact):
 
 
 @register_operator("mesh_contact", model="spatial_hash", family="boundary", set="particle",
-                   kind="lateral")
+                   kind="lateral", title="Contact with a live surface")
 class MeshContactHash(MeshContact):
     """The same contact, with candidates found by POSITION instead of by direction.
 
@@ -2033,3 +2427,265 @@ class MeshContactHash(MeshContact):
         tb[sel] = t[ar, best]
         w[sel] = torch.stack([1.0 - w1[ar, best] - w2[ar, best], w1[ar, best], w2[ar, best]], 1)
         return hit, tri, tb, w
+
+
+@register_operator("mesh_contact", implementation="basal_reaction", family="boundary",
+                   set="particle", kind="lateral", title="Contact with a live surface")
+class MeshContactBasalReaction(MeshContact):
+    """`mesh_contact` (the centre model) against a live apico-basal tissue's BASAL surface, with
+    its reaction returned to the tissue.
+
+        surface      pos - sep of the vertex set: the matrix touches the cells' basal membranes,
+                     half a cell thickness outside the mid-surface (0.44 of 0.88 on the working
+                     point), not the mid-surface the parent reads
+        shift        a constant translation of the tissue into the matrix box. The tissue stays
+                     about the world origin -- `cell_divide` takes a face's outward normal as its
+                     position from the origin -- while an MPM grid spans [0, world]; a translation
+                     leaves every force unchanged
+        reaction     the frame-mean of the per-substep vertex force (the impulse the matrix gave the
+                     tissue over the frame, divided by the frame) is added to the tissue's basal
+                     load, which `cell_mechanics[implementation: apicobasal_contact]` relaxes
+                     against; the pair is booked in the ledger in float64
+
+    The contact itself is the parent's, unchanged: penalty, friction, clamp, lookup. The weights
+    of each contact are re-derived here in float64 (the same Moller-Trumbore on the one triangle
+    already found), and a contact on an unoccupied or masked-out particle -- which the parent's
+    emitted acceleration zeroes -- returns no reaction either.
+
+    EXPLICIT ON THE TISSUE, unlike the membrane: the matrix's load is held through the relaxation.
+    Stable when the matrix is soft beside the tissue, which the spec must show before it is scored.
+
+    Reference: Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19.
+    """
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.shift = [float(v) for v in params.get("shift", [0.0, 0.0, 0.0])]
+        self.sep_block = str(params.get("sep_block", "sep"))
+        if self.scale != 1.0:
+            raise ValueError("mesh_contact[basal_reaction]: `scale` must be 1 -- a rescaled surface "
+                             "would return a reaction in the wrong units; translate with `shift`")
+        self._H = None
+        self._mask = None
+
+    def _mesh_live(self, H, dev, dt_):
+        lvl = H.level(self.surface)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            return None
+        nv = int(m["Nv"])
+        P = (lvl.get("pos")[:nv].to(dt_) - lvl.get(self.sep_block)[:nv].to(dt_)
+             + torch.tensor(self.shift, device=dev, dtype=dt_))
+        if self.centre_track:
+            self.centre = [a + b for a, b in zip(P.mean(0).detach().to("cpu").tolist(),
+                                                 self.centre_offset)]
+        V = P - torch.tensor(self.centre, device=dev, dtype=dt_)
+        return V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev), torch.zeros_like(V)
+
+    def forward(self, H, mask=None):
+        self._H, self._mask = H, mask
+        tm = getattr(H.level(self.surface), "_mesh", None)
+        f = getattr(H, "frame", None)
+        if tm is not None and int(tm.get("Nv", 0)) and f is not None:
+            basal_load(tm, int(f), int(tm["Nv"]), H.level(self.at).get("pos").device)
+        return super().forward(H, mask)
+
+    def _record(self, f, n_con, dmax, slip, a_max_seen, fpart, fvert, detail, M, dev, dt_):
+        if detail is not None and self._H is not None:
+            H = self._H
+            idx, tri, depth, a_par, mass = detail
+            lvl = H.level(self.at)
+            on = lvl.occ[idx] > 0
+            if self._mask is not None:
+                on = on & (self._mask[idx] > 0)
+            idx, tri, a_par = idx[on], tri[on], a_par[on]
+            if idx.numel():
+                c = torch.tensor(self.centre, device=dev, dtype=torch.float64)
+                d = lvl.get("pos")[idx].to(torch.float64) - c
+                u = d / d.norm(dim=1, keepdim=True).clamp_min(1e-30)
+                A, B, Cc = (M[k][tri].to(torch.float64) for k in ("A", "B", "C"))
+                e1, e2 = B - A, Cc - A
+                p = torch.cross(u, e2, dim=1)
+                inv = 1.0 / (e1 * p).sum(1)
+                q = torch.cross(-A, e1, dim=1)
+                w1 = ((-A) * p).sum(1) * inv
+                w2 = (u * q).sum(1) * inv
+                w = torch.stack([1.0 - w1 - w2, w1, w2], 1)
+                F_p = (mass * a_par).to(torch.float64)
+                fv64 = barycentric_reaction(M, tri, w, F_p, M["nv"])
+                _sd = getattr(H, "sub_dt", None)
+                count = max(1, int(round(float(H.dt) / float(_sd)))) if _sd else 1
+                tm = H.level(self.surface)._mesh
+                buf = basal_load(tm, f, M["nv"], dev)
+                buf += fv64 / count
+                record_interface(tm, F_p, fv64)
+        return super()._record(f, n_con, dmax, slip, a_max_seen, fpart, fvert, detail, M, dev, dt_)
+
+
+
+AFFINE_TRACE: list = []
+
+
+@register_operator("surface_drive", model="affine", family="mechanics", set="vertex",
+                   kind="structural", title="Drive the surface through an imposed affine flow",
+                   equation=r"""$$x_a(t)=c_0+e^{u(t)\,\mathsf L}\,(X_a-c_0),\quad \mathsf L=\begin{pmatrix}\varepsilon&-\theta\\ \theta&-\varepsilon\end{pmatrix},\quad u=\mathrm{clamp}\!\left(\frac{t-t_{\mathrm{hold}}}{t_{\mathrm{over}}},0,1\right)$$""")
+class SurfaceDriveAffine(Structural):
+    """An imposed homogeneous flow in the sheet's plane -- pure shear plus rotation -- applied
+    kinematically to a seeded surface: the tissue flow of a planar-polarity experiment, prescribed.
+
+    vertex -> vertex: reads the seeded positions, writes pos (and vel, if declared) in place.
+
+        x_a(t) = c_0 + exp(u(t) L) (X_a - c_0)
+        L      = [[eps, -theta], [theta, -eps]]        in the plane, in the (a0, a1) axes
+        u(t)   = clamp((t - hold) / over, 0, 1)
+
+    X_a are the seeded positions of the surface's vertices, c_0 their centroid. `strain` = eps is
+    the TOTAL pure shear, the time integral of the shear rate k_s: the sheet stretches by e^eps along
+    `extend_axis` and shortens by the same factor across it, so area is kept. `rotate_deg` = theta is
+    the total local rotation, the time integral of the vorticity omega = (dv_y/dx - dv_x/dy)/2,
+    counter-clockwise positive, in degrees. `extend_deg` turns the extension axis in the plane by
+    that many degrees (counter-clockwise from `extend_axis`): L = R D R^T + W with D = diag(eps, -eps),
+    R the rotation by `extend_deg` and W the spin -- so a flow can be imposed at any angle to a
+    sheet whose own lattice directions are fixed. One constant velocity gradient L applied for the whole
+    travel, so the deformation is its exponential rather than a rotation composed after a stretch --
+    shear and rotation act together, as they do in a flow. `hold` and `over` are frames.
+
+    Aigouy et al. 2010 measured this decomposition in the pupal wing (their Suppl. Eqs. 19-20): the
+    shear rate, its axis, and the local rotation, integrated over 15-30 h APF to a total shear ~0.4
+    and a total rotation ~0.2-0.3 rad, clockwise anterior to vein L3 (Figs. 2G-L, S2J-L).
+
+    `incremental: true` imposes the flow as a BACKGROUND VELOCITY instead of a prescribed shape: each
+    frame of the travel multiplies the CURRENT positions about their current centroid by
+    exp(du L), du = 1 / over, so whatever else moved the vertices this frame -- `cell_mechanics`
+    relaxing cell shapes, `edge_flip` exchanging neighbours -- is kept, and the tissue flows by
+    rearranging rather than being a stretched copy of its seed. The accumulated flow is still
+    exp(L) over the travel; what differs is that the cells may relax against it.
+
+    `return_over` (frames, default 0: no return) makes the flow TRANSIENT: after the travel the map is
+    undone over `return_over` more frames, u going 1 -> 0 -- Aw et al. 2016's deformation of the
+    mouse basal epidermis, a mediolateral elongation that peaks (E11.5-E12.5) and relaxes back to
+    isometric cells (E13.5-E14.5; their Fig. 1B, C). With a return the incremental form steps by
+    exp((u(t) - u(t-1)) L), so up and back compose to the identity exactly; with none it keeps its
+    original per-frame steps (every run made before the parameter existed is reproduced bit for bit).
+
+    A MODEL OF `surface_drive`, not a new operator: the same contract -- move a seeded surface along a
+    prescribed path, kinematically, from the SEEDED shape so it is exact at every frame -- with the
+    path an affine map instead of a translation or an isotropic scale. Selected in a spec with
+    `model: affine`; the default model is untouched.
+
+    Reference: Aigouy, B. et al. (2010). Cell flow reorients the axis of planar polarity in the wing
+    epithelium of Drosophila. Cell 142:773-786 (the flow decomposition it imposes).
+    """
+
+    EMIT = None                        # moves positions in place; no integrable delta
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["prescribed_kinematics", "tissue_flow", "pure_shear", "moving_boundary"]
+    PARAM_ROLES = {"strain": "total_pure_shear_log_stretch", "rotate_deg": "total_local_rotation_degrees",
+                   "extend_deg": "angle_of_the_extension_axis_in_the_plane_degrees",
+                   "return_over": "frames_to_undo_the_flow_after_its_travel",
+                   "extend_axis": "extension_axis_in_the_plane", "plane_axis": "sheet_normal_axis",
+                   "hold": "frames_held_before_the_flow", "over": "frames_of_flow"}
+    REFERENCE = ("Aigouy, B. et al. (2010). Cell flow reorients the axis of planar polarity in the wing "
+                 "epithelium of Drosophila. Cell 142:773-786.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.strain = float(params.get("strain", 0.0))
+        self.rotate = math.radians(float(params.get("rotate_deg", 0.0)))
+        self.plane_axis = int(params.get("plane_axis", 2))
+        self.extend_axis = int(params.get("extend_axis", 0))
+        self.extend_deg = math.radians(float(params.get("extend_deg", 0.0)))
+        self.hold = int(params.get("hold", 0))
+        self.over = int(params.get("over", 0)) or None
+        self.incremental = bool(params.get("incremental", False))
+        self.return_over = int(params.get("return_over", 0))
+        self._u_prev = 0.0
+        self._p0 = None
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            return {}                                   # the seed has not run yet
+        Nv = int(m["Nv"])
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        ax = [i for i in range(pos.shape[1]) if i != self.plane_axis]
+        if self.extend_axis not in ax:
+            raise ValueError(f"surface_drive[affine]: extend_axis {self.extend_axis} is the sheet normal")
+        a0, a1 = self.extend_axis, [i for i in ax if i != self.extend_axis][0]
+        if self.incremental:
+            return self._step(H, lvl, pos, Nv, a0, a1, dev, dt_)
+        if self._p0 is None:
+            self._p0 = pos[:Nv].clone()
+            self._c0 = self._p0.mean(0, keepdim=True)
+            self.over = self.over or max(1, int(getattr(H, "n_frames", 0) or 1) - self.hold)
+        if pos.shape[0] < Nv or self._p0.shape[0] != Nv:
+            raise RuntimeError("surface_drive[affine]: the vertex count changed; an affine drive of the "
+                               "seeded shape needs a fixed surface")
+        f = int(getattr(H, "frame", 0) or 0)
+        u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
+        c2, s2 = math.cos(2 * self.extend_deg), math.sin(2 * self.extend_deg)
+        L = torch.tensor([[self.strain * c2, self.strain * s2 - self.rotate],
+                          [self.strain * s2 + self.rotate, -self.strain * c2]], dtype=torch.float64)
+        F = torch.linalg.matrix_exp(u * L).to(dev, dt_)
+        d = self._p0 - self._c0
+        new = pos[:Nv].clone()
+        new[:, a0] = self._c0[0, a0] + F[0, 0] * d[:, a0] + F[0, 1] * d[:, a1]
+        new[:, a1] = self._c0[0, a1] + F[1, 0] * d[:, a0] + F[1, 1] * d[:, a1]
+        if "vel" in lvl.state_schema:
+            lvl.get("vel")[:Nv] = new - pos[:Nv]        # per frame, this Level's time unit
+        pos[:Nv] = new
+        AFFINE_TRACE.append((f, u, float(F[0, 0]), float(F[1, 0])))
+        self._say(a0)
+        return {}
+
+    def _u(self, f):
+        """The fraction of the map applied at frame f: 0 -> 1 over `over`, then back to 0 over `return_over`."""
+        u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
+        if self.return_over > 0 and f >= self.hold + self.over:
+            u = max(0.0, 1.0 - (f - self.hold - self.over) / float(self.return_over))
+        return u
+
+    def _L(self):
+        c2, s2 = math.cos(2 * self.extend_deg), math.sin(2 * self.extend_deg)
+        return torch.tensor([[self.strain * c2, self.strain * s2 - self.rotate],
+                             [self.strain * s2 + self.rotate, -self.strain * c2]], dtype=torch.float64)
+
+    def _step(self, H, lvl, pos, Nv, a0, a1, dev, dt_):
+        """The incremental form: one frame's share of the flow on the CURRENT positions."""
+        if self.over is None:
+            self.over = max(1, int(getattr(H, "n_frames", 0) or 1) - self.hold)
+        f = int(getattr(H, "frame", 0) or 0)
+        if self.return_over > 0:                           # transient: step by the change of u
+            u = self._u(f)
+            du, self._u_prev = u - self._u_prev, u
+            if du == 0.0:
+                return {}
+            F = torch.linalg.matrix_exp(du * self._L()).to(dev, dt_)
+        elif not (self.hold <= f < self.hold + self.over):
+            return {}
+        else:
+            F = torch.linalg.matrix_exp(self._L() / float(self.over)).to(dev, dt_)
+        p = pos[:Nv]
+        c = p.mean(0, keepdim=True)
+        d = p - c
+        new = p.clone()
+        new[:, a0] = c[0, a0] + F[0, 0] * d[:, a0] + F[0, 1] * d[:, a1]
+        new[:, a1] = c[0, a1] + F[1, 0] * d[:, a0] + F[1, 1] * d[:, a1]
+        pos[:Nv] = new
+        AFFINE_TRACE.append((f, 1.0 / self.over, float(F[0, 0]), float(F[1, 0])))
+        self._say(a0)
+        return {}
+
+    def _say(self, a0):
+        if not self._said:
+            print(f"[surface_drive:affine] total shear {self.strain} (stretch x{math.exp(self.strain):.3f} "
+                  f"along {math.degrees(self.extend_deg):.1f} deg from axis {a0}), rotation {math.degrees(self.rotate):.1f} deg, frames "
+                  f"{self.hold}-{self.hold + self.over}" + (", incremental" if self.incremental else ""), flush=True)
+            self._said = True

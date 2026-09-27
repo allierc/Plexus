@@ -3,8 +3,8 @@
 Plexus keeps three roots:
   * the **repo** holds `config/<pre_folder>/<name>.yaml` (the specs, version-controlled);
   * the **data root** holds `graphs_data/<pre_folder>/<name>/` (generated trajectories)
-    and `log/<pre_folder>/<name>/` (run logs);  default = the shared GraphData area,
-    overridable with `--output_root` / `$PLEXUS_OUTPUT_ROOT` / `$GNN_OUTPUT_ROOT`.
+    and `log/<pre_folder>/<name>/` (run logs);  set with `--output_root` /
+    `$PLEXUS_OUTPUT_ROOT` / `$GNN_OUTPUT_ROOT` (no default in code: its location is local).
 
 The **pre-folder** is the simulation *type* (interaction / boids / mpm / divide ...).
 It is inferred from the config name -- the way the prototype scenarios were named
@@ -19,8 +19,8 @@ import os
 # --------------------------------------------------------------------------- #
 #  data root (graphs_data/ + log/)
 # --------------------------------------------------------------------------- #
-_DEFAULT_DATA_ROOT = "/groups/saalfeld/home/allierc/GraphData"
-_data_root = os.environ.get("PLEXUS_OUTPUT_ROOT") or os.environ.get("GNN_OUTPUT_ROOT") or _DEFAULT_DATA_ROOT
+# No default in code: the shared data area is a local setting (this repo is public).
+_data_root = os.environ.get("PLEXUS_OUTPUT_ROOT") or os.environ.get("GNN_OUTPUT_ROOT") or ""
 
 
 def warn(msg: str) -> None:
@@ -42,6 +42,8 @@ def warn(msg: str) -> None:
 
 
 def get_data_root() -> str:
+    if not _data_root:
+        raise RuntimeError("no data root: pass --output_root or set PLEXUS_OUTPUT_ROOT / GNN_OUTPUT_ROOT")
     return _data_root
 
 
@@ -98,6 +100,20 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # the browser, and thrown away -- and mixing them into a curated family would make the family
     # untrustworthy.
     ("studio",      ("studio",)),
+    # THE PLATYNEREIS LADDER. A whole-animal family: the anatomy of a three-day nectochaete larva
+    # from Veraszto et al. (2025) eLife RP97964, its measured connectome, the activity that
+    # connectome supports, and the ciliary beat that activity drives. Registered here for the same
+    # reason the promotion's folders were -- `validate_pre_folder` admits only a known simulation
+    # TYPE, so an unregistered folder cannot be run by `Plexus_Main.py` at all, and the alternative
+    # is a private runner that makes the core's own path untested on this work.
+    ("platynereis", ("platynereis", "plat")),
+    # THE DEMO LADDER (builder/exp_03_cell_tissue): a presentation built one addition per slide --
+    # cells, then a morphogen, then diffusion, then reaction, then the minisite's variants. Its specs
+    # were only ever run through the GUI, which copies every spec into `studio/` first, so the folder
+    # was never checked; the first time its slides went to `gpu_l4` through `Plexus_Main.py` directly,
+    # both jobs died at `validate_pre_folder` before building anything. Matched by folder only: no
+    # spec NAME should be claimed by it, since `d4_...` and `a2_...` mean nothing outside the ladder.
+    ("demo",        ()),                     # no triggers: valid as a folder, claims no bare name
     ("active_matter", ("active_matter", "vicsek", "flock_am")),
     ("mpm",         ("mpm", "tissue", "elastic", "soft")),
     ("divide",      ("divide", "grow", "mitosis", "morula")),
@@ -170,6 +186,10 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # `assemblies_*` -- rather than for the folder, unlike the three above.
     ("neural",      ("neural", "ctrnn", "assemblies", "connectome")),
     ("metabolism",  ("metabol", "massaction", "stoich")),
+    # MEMBRANE PORES AND CHANNELS (experiments/exp04_membrane_channels): a protein's alpha carbons
+    # in a bead bilayer, the electrolyte as a conductor. No trigger substrings, like `tissue`: the
+    # specs are `channel/exp04_v<K><s>`, addressed explicitly.
+    ("channel",     ()),
 ]
 _VALID_PRE_FOLDERS = {f for f, _ in _PRE_FOLDER_RULES}
 

@@ -1,0 +1,324 @@
+general:
+  name: exp04_v5t
+  seed: 0
+  n_frames: 4000
+  dt: 3.936759889140841e-07
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: true
+  record_cap: 301
+  units: {length_um: 0.021, time_s: 6.067630774743499e-07, force_nN: 0.0001957142857142857}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      n_largest: {width: 1, integration: none, unit: count, title: largest assembly}
+      n_bonds: {width: 1, integration: none, unit: count, title: bonds between monomers}
+      ring: {width: 1, integration: none, unit: '1', title: ring membership}
+    title: the cell's interior (the voltage-clamped compartment)
+  aHL_1:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 1
+  aHL_2:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 2
+  aHL_3:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 3
+  aHL_4:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 4
+  aHL_5:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 5
+  aHL_6:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 6
+  aHL_7:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 7
+  aHL_8:
+    n: 252
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+    title: alpha-hemolysin, chain 8
+  lipid:
+    n: 842
+    start:
+    - [0.5, 0.5, 0.362624]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: membrane lipids
+fields: {}
+seed:
+- op: cloud_seed
+  at: aHL_1
+  cloud: exp04_ahl/m0
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_2
+  cloud: exp04_ahl/m1
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_3
+  cloud: exp04_ahl/m2
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_4
+  cloud: exp04_ahl/m3
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_5
+  cloud: exp04_ahl/m4
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_6
+  cloud: exp04_ahl/m5
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_7
+  cloud: exp04_ahl/m6
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: cloud_seed
+  at: aHL_8
+  cloud: exp04_ahl/m7
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+- op: seed_state_from_file
+  at: aHL_1
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m0_rim}
+- op: seed_state_from_file
+  at: aHL_2
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m1_rim}
+- op: seed_state_from_file
+  at: aHL_3
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m2_rim}
+- op: seed_state_from_file
+  at: aHL_4
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m3_rim}
+- op: seed_state_from_file
+  at: aHL_5
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m4_rim}
+- op: seed_state_from_file
+  at: aHL_6
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m5_rim}
+- op: seed_state_from_file
+  at: aHL_7
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m6_rim}
+- op: seed_state_from_file
+  at: aHL_8
+  file: shapes/exp04_ahl/assembly_blocks.npz
+  blocks: {rim: m7_rim}
+- op: cloud_seed
+  at: lipid
+  cloud: exp04_ahl/lipid_flat
+  origin: [0.5, 0.5, 0.362624]
+  scale: 47619047.61904761
+operators:
+- op: shape_match
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7, aHL_8]
+  alpha: 1.0
+- op: elastic_network
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7, aHL_8]
+  cutoff: 0.01904761904761905
+  k: 1.0
+  go_epsilon: 1.0
+  go_cutoff: 0.0380952380952381
+  go_mode: template
+  reference: exp04_ahl
+  reference_parts: [c0, c1]
+  reference_scale: 47619047.61904761
+  mobility: 1.0
+  f_max: 2419.2000000000003
+- op: pair_potential
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7, aHL_8]
+  law: wca
+  sigma: 0.02142857142857143
+  epsilon: 1.0
+  exclude_same_set: true
+  mobility: 1.0
+  f_max: 2419.2000000000003
+- op: tether
+  at: aHL_1
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_1, kT: 1.0, mobility: 1.0, seed: 20}
+- op: tether
+  at: aHL_2
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_2, kT: 1.0, mobility: 1.0, seed: 21}
+- op: tether
+  at: aHL_3
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_3, kT: 1.0, mobility: 1.0, seed: 22}
+- op: tether
+  at: aHL_4
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_4, kT: 1.0, mobility: 1.0, seed: 23}
+- op: tether
+  at: aHL_5
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_5, kT: 1.0, mobility: 1.0, seed: 24}
+- op: tether
+  at: aHL_6
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_6, kT: 1.0, mobility: 1.0, seed: 25}
+- op: tether
+  at: aHL_7
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_7, kT: 1.0, mobility: 1.0, seed: 26}
+- op: tether
+  at: aHL_8
+  k: 22050.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_8, kT: 1.0, mobility: 1.0, seed: 27}
+- op: assembly_probe
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7, aHL_8]
+  contact: 0.03333333333333333
+  min_contacts: 15
+  every: 200
+  cell: cell
+schedule: [shape_match, elastic_network, pair_potential, tether, brownian, tether, brownian, tether, brownian, tether,
+  brownian, tether, brownian, tether, brownian, tether, brownian, tether, brownian, assembly_probe]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7, aHL_8, lipid]
+  hide_sets: [cell]
+  surface:
+    aHL_1: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_2: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_3: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_4: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_5: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_6: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_7: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    aHL_8: {render: surface, spacing: 0.014286, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    lipid: {render: surface, spacing: 0.019048, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+  surface_min_points: 30
+  opacity: {aHL_1: 1.0, aHL_2: 1.0, aHL_3: 1.0, aHL_4: 1.0, aHL_5: 1.0, aHL_6: 1.0, aHL_7: 1.0, aHL_8: 1.0, lipid: 0.5}
+  colors:
+    aHL_1: [0.36, 0.58, 0.8]
+    aHL_2: [0.9, 0.62, 0.36]
+    aHL_3: [0.47, 0.72, 0.52]
+    aHL_4: [0.84, 0.47, 0.47]
+    aHL_5: [0.66, 0.56, 0.79]
+    aHL_6: [0.62, 0.5, 0.42]
+    aHL_7: [0.86, 0.6, 0.74]
+    aHL_8: [0.55, 0.7, 0.72]
+    lipid: [0.82, 0.82, 0.84]
+  camera: {elev: 55.0, azim: 30.0}
+  zoom: 1.0
+  curve:
+  - {quantity: 'block:cell:n_largest', ymin: 0.0, ymax: 9.0, ylabel: largest assembly, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:n_bonds', ymin: 0.0, ymax: 10.0, ylabel: protomer contacts, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:ring', ymin: -0.1, ymax: 1.1, ylabel: ring closed, font_size: 21, tick_font_size: 16}
+  subject: aHL_1
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  replay_curves: false

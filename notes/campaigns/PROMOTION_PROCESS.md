@@ -23,7 +23,7 @@ python tools/promotion_identical.py --phase BASE --batch 8      # a 20-row ladde
 python tools/promotion_identical.py --phase G    --batch 8      # every lifted gate spec
 ```
 
-Both sides run **fresh**, **together**, on `gpu_l4`. A stored okuda result is never the reference:
+Both sides run **fresh**, **together**, on `${CLUSTER_QUEUE_PREFIX}l4`. A stored okuda result is never the reference:
 `log/okuda` is a live tree that `round.py` and `staged.py` still write into, so a promotion checked
 against a file there proves the file has not changed, which is not the question. `--batch N`
 submits `N` pairs at a time and waits for a slot, so eighty jobs do not queue behind each other with
