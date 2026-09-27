@@ -248,3 +248,23 @@ def test_affine_drive_transient_returns_to_the_seed(tmp_path):
         assert np.allclose(P_[-1], P_[0], atol=1e-4), tag
         mid = P_[11]                                      # frame 11: u = 0.5, stretched along y
         assert np.ptp(mid[:, 1]) / np.ptp(P_[0][:, 1]) > 1.1, tag
+
+
+def test_isotropic_seed_has_no_shared_elongation():
+    """seed_mesh[isotropic]: the default disc's cells share an elongation along y (2/sqrt(3) pitch);
+    the isotropic builder's tissue-mean elongation is several times smaller, and its lattice angle
+    changes with the seed (the planted difference); both are valid discs of about n cells."""
+    from plexus.operators.vertex_ops import build_disc_mesh, build_disc_mesh_isotropic
+    def mean_e(builder, seed):
+        v, es, et, ef, nF = builder(400, 5.0, 0.15, seed)
+        e1, e2 = pcp_elongation(torch.as_tensor(v[:, :2]), torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF)
+        return complex(float(e1.mean()), float(e2.mean())), nF
+    d, nd = mean_e(build_disc_mesh, 1)
+    i1, ni = mean_e(build_disc_mesh_isotropic, 1)
+    i2, _ = mean_e(build_disc_mesh_isotropic, 2)
+    assert abs(d) > 3 * abs(i1) and 0.7 < ni / nd < 1.4
+    assert abs(np.angle(i1) - np.angle(i2)) > 1e-3 or abs(i1) < 1e-3
+    import plexus.operators  # noqa: F401
+    from plexus.models import registry as R
+    assert R.get_operator("seed_mesh", "isotropic").__name__ == "SeedMeshIsotropic"
+    assert R.get_operator("seed_mesh").__name__ == "SeedMesh3D"

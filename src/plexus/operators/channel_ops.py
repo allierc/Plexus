@@ -1124,6 +1124,39 @@ class Brownian(Lateral):
         return {self.at: v}
 
 
+@register_operator("brownian", model="anneal", family="motion", set="particle", kind="lateral",
+                   title="Thermal bath cooled over the run",
+                   equation=r"""$$\dot{\mathbf x}_i=\sqrt{2\mu k_BT(t)/\Delta t}\;\boldsymbol\xi_i,\qquad k_BT(t)=k_BT_0+(k_BT_1-k_BT_0)\,\min(1,t/t_1)$$""")
+class BrownianAnneal(Brownian):
+    """`brownian` whose temperature is cooled linearly from `kT` to `kT_end` over `frames` frames, then
+    held -- an annealing schedule.
+
+    WHY (experiment 9, Phase 1 Finding 14, direction 2). In a thermal particle model of cell sorting one
+    temperature sets both how freely cells move and how deeply the two types demix: at kT 0.35 of the
+    strongest adhesion the aggregate crystallised (hexagonal order 0.73-0.83) and sorted at half the
+    paper's pace; at 0.42 it sat near its demixing point and stalled at demix 0.19. A schedule crosses
+    the two regimes in time: fluid first, while the domains form, colder later, when they must deepen.
+    `kT` is the starting temperature (the default operator's parameter), `kT_end` the final one,
+    `frames` the length of the ramp in frames; with kT_end = kT it is the default exactly.
+
+    Reference: Kirkpatrick, S., Gelatt, C.D. & Vecchi, M.P. (1983). Optimization by simulated
+    annealing. Science 220:671-680.
+    """
+    PARAM_ROLES = dict(Brownian.PARAM_ROLES, kT_end="final_thermal_energy_sim", frames="ramp_length_frames")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.kT0 = self.kT
+        self.kT1 = float(params.get("kT_end", self.kT))
+        self.frames = max(1, int(params.get("frames", 1)))
+        self._step = 0
+
+    def forward(self, H, mask=None):
+        self.kT = self.kT0 + (self.kT1 - self.kT0) * min(1.0, self._step / self.frames)
+        self._step += 1
+        return super().forward(H, mask)
+
+
 @register_operator("tether", family="boundary", set="particle", kind="lateral",
                    title="Harmonic hold to the seeded place",
                    equation=r"""$$\dot{x}_{i,a}=-\mu\,k\,(x_{i,a}-x^0_{i,a}),\quad a\in\text{axes}$$""")

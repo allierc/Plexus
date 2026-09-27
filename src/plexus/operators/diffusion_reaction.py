@@ -226,7 +226,8 @@ class CellAdjacencyLabelImage(Rewire):
 
     Why a model and not a new operator: the contract is `cell_neighbours`' own (cell -> cell,
     writes `edge_index`); what differs is where the contact comes from, a measured image instead
-    of a half-edge mesh. The default is untouched.
+    of a half-edge mesh. The default is untouched. It also writes `edge_weight`, each junction's
+    contact length in pixels, which only `cell_chem_diffuse[model: contact_weighted]` reads.
 
     Reference: none -- the adjacency of a measured segmentation, not a mechanism. Plexus (this work).
     """
@@ -242,23 +243,31 @@ class CellAdjacencyLabelImage(Rewire):
         self._ei = None
 
     @staticmethod
-    def pairs(grid):
-        """[m, 2] unique label pairs (a < b) that share a pixel edge; background 0 excluded."""
+    def pairs(grid, counts=False):
+        """[m, 2] unique label pairs (a < b) that share a pixel edge; background 0 excluded. With
+        `counts`, also [m] the number of pixel edges each pair shares -- its contact length in pixels."""
         out = []
         for a, b in ((grid[:-1, :], grid[1:, :]), (grid[:, :-1], grid[:, 1:])):
             m = (a > 0) & (b > 0) & (a != b)
             out.append(torch.stack([torch.minimum(a[m], b[m]), torch.maximum(a[m], b[m])], 1))
-        return torch.unique(torch.cat(out, 0), dim=0)
+        u, c = torch.unique(torch.cat(out, 0), dim=0, return_counts=True)
+        return (u, c) if counts else u
 
     def forward(self, H, mask=None):
         clvl = H.level(self.at)
         if self._ei is None:
             grid = H.fields[self.field_name].grid[0]
-            p = self.pairs(grid) - 1                                     # label -> cell index
-            p = p[(p < clvl.n).all(1)]
+            p, c = self.pairs(grid, counts=True)
+            p = p - 1                                                    # label -> cell index
+            keep = (p < clvl.n).all(1)
+            p, c = p[keep], c[keep]
             e = p.T.to(torch.long)
             self._ei = torch.cat([e, e.flip(0)], 1).to(clvl.state.device)
+            # the contact length of each junction, in pixels, aligned with edge_index (both directions);
+            # read by `cell_chem_diffuse[model: contact_weighted]`, ignored by every other reader
+            self._ew = torch.cat([c, c]).to(clvl.state.device, torch.get_default_dtype())
         clvl.edge_index = self._ei
+        clvl.edge_weight = self._ew
         return {}
 
 
@@ -536,6 +545,57 @@ class CellRDSeedUniform(CellRDSeed):
 
 
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
+                   model="lognormal", title="Cell-to-cell variability around a common state")
+class CellRDSeedLognormal(CellRDSeedUniform):
+    """`lognormal` MODEL of seed_cell_chem -- `uniform`'s declared state with CELL-TO-CELL VARIABILITY:
+    column k of cell j is values[k] exp(s_k z_jk - s_k^2 / 2), z_jk standard normal from `seed`, s_k =
+    sqrt(ln(1 + cv[k]^2)), so each column keeps its declared MEAN and has coefficient of variation
+    cv[k] (standard deviation over mean). cv 0 is `uniform` exactly -- the no-variability control.
+
+    Log-normal because the quantity is a concentration: positive, and its spread multiplicative
+    (a cell with twice the YAP is as far from the mean as one with half). Serra et al. 2019 measure the
+    spread this seeds -- nuclear YAP varies from cell to cell before the first Paneth cell appears
+    (ED Fig. 7a, Fig. 5f) -- without naming a distribution; the log-normal is the model's choice.
+
+    Reference: Serra, D. et al. (2019). Nature 569:66-72 (the variability); Plexus (this work).
+    """
+    NUCLEATION = "lognormal"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        cv = params.get("cv", 0.0)
+        cv = [float(cv)] * len(self.values) if not isinstance(cv, (list, tuple)) else [float(c) for c in cv]
+        if len(cv) != len(self.values):
+            raise ValueError(f"seed_cell_chem[lognormal]: `cv` has {len(cv)} entries, `values` {len(self.values)}")
+        self.cv = cv
+
+    def forward(self, H, mask=None):
+        super().forward(H, mask)
+        clvl = H.level(self.at)
+        if "chem" not in clvl.state_schema or not any(self.cv):
+            return {}
+        vlvl = H.levels[self.vat] if self.vat in H.levels else None
+        m = getattr(vlvl, "_mesh", None) if vlvl is not None else None
+        if m is not None:
+            nF = int(m["nF"])
+        else:
+            occ = getattr(clvl, "occ", None)
+            nF = int(occ.sum().item()) if occ is not None else int(clvl.state.shape[0])
+        g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
+        h0, _ = clvl.state_schema["chem"]
+        st = clvl.state.clone()
+        for _k, _c in enumerate(self.cv):
+            if _c <= 0:
+                continue
+            sg = float(np.sqrt(np.log1p(_c * _c)))
+            z = torch.randn(nF, generator=g, dtype=torch.float64)
+            fac = torch.exp(sg * z - 0.5 * sg * sg).to(device=st.device, dtype=st.dtype)
+            st[:nF, h0 + self.chan + _k] = st[:nF, h0 + self.chan + _k] * fac
+        clvl.state = st
+        return {}
+
+
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
                    model="lattice_sites", title="Individuals on lattice sites, at random")
 class CellRDSeedLatticeSites(CellRDSeed):
     """`lattice_sites` MODEL of seed_cell_chem -- every cell is a lattice SITE, and each is given, at
@@ -780,6 +840,14 @@ class CellDiffuseLatticeExchange(Lateral):
     smallest random key among every swap touching either of its two sites, and the losers draw again
     among the still-free sites (three rounds), so conflicts cost almost nothing at eps dt <= 0.05.
 
+    CARRIED BLOCKS, `carry: [trait, ...]` (exp 15, direction 4): per-individual blocks that are not
+    integrated (e.g. the attack trait of `cell_chem_react[rps_lattice]`'s `trait:`) swap with the
+    individual -- for every kept swap (i, j), b_i <-> b_j for each listed block b, the same pairs as
+    chem, written in place into the set's state (the operator then declares MAY_MUTATE_INTEGRATED_STATE;
+    absent, it does not). A PARAM AND NOT A NEW OPERATOR because it is the same exchange: what moves is
+    the whole individual, and a trait is part of it. Absent, nothing else changes (tested); the swaps
+    and their draws are identical with or without it.
+
     Reads the provisional state (see the section comment above). Reference: Reichenbach, T.,
     Mobilia, M. & Frey, E. (2007). Nature 448:1046, Fig. 1 and Methods.
     """
@@ -790,11 +858,18 @@ class CellDiffuseLatticeExchange(Lateral):
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["diffusion", "mobility", "exchange", "lattice", "individual_based"]
     REFERENCE = "Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046."
-    PARAM_ROLES = {"d": "per_species_diffusivity", "chi": "spatial_scale", "seed": "rng_seed"}
+    PARAM_ROLES = {"d": "per_species_diffusivity", "chi": "spatial_scale", "seed": "rng_seed",
+                   "carry": "per_individual_blocks_moving_with_it"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
+        self.carry = [str(b) for b in (params.get("carry") or [])]
+        if "chem" in self.carry:
+            raise ValueError("cell_chem_diffuse[lattice_exchange]: `carry` lists blocks OTHER than chem -- "
+                             "chem already moves, through the returned increment")
+        if self.carry:
+            self.MAY_MUTATE_INTEGRATED_STATE = True                     # instance only: absent => the check stands
         d = params.get("d")
         if d is None:
             raise ValueError("cell_chem_diffuse[lattice_exchange]: needs `d: [..]`, one per species")
@@ -830,6 +905,7 @@ class CellDiffuseLatticeExchange(Lateral):
         ai, aj = torch.nonzero(a).flatten(), j[a]
         keep = ai != aj
         ai, aj = ai[keep], aj[keep]
+        won_i, won_j = [], []
         for _ in range(self.rounds):
             live = free[ai] & free[aj]
             ai, aj = ai[live], aj[live]
@@ -844,7 +920,19 @@ class CellDiffuseLatticeExchange(Lateral):
             ti, tj = tgt[wi].clone(), tgt[wj].clone()
             tgt[wi], tgt[wj] = tj, ti
             free[wi] = False; free[wj] = False
+            won_i.append(wi); won_j.append(wj)
             ai, aj = ai[~win], aj[~win]
+        if self.carry:
+            # The kept swaps are disjoint across rounds (`free`), so applying them all at once is the
+            # same as applying them round by round.
+            st = lvl.state.clone()
+            wi = torch.cat(won_i) if won_i else torch.zeros(0, dtype=torch.long, device=dev)
+            wj = torch.cat(won_j) if won_j else torch.zeros(0, dtype=torch.long, device=dev)
+            for blk in self.carry:
+                b0, b1 = lvl.state_schema[blk]
+                vi, vj = st[wi, b0:b1].clone(), st[wj, b0:b1].clone()
+                st[wi, b0:b1], st[wj, b0:b1] = vj, vi
+            lvl.state = st
         out = torch.zeros_like(chem)
         out[:, c0:c0 + ns] = (tgt - x[:, c0:c0 + ns].to(tgt.dtype)).to(chem.dtype) / dt
         return {self.at: out}
@@ -861,6 +949,9 @@ class CellDiffuseClosedJunctions(CellDiffuse):
         w_ij = 0 when the centroids of i and j lie on opposite sides of the plane, else 1
 
         closed: {point: [x, y, z], normal: [nx, ny, nz]}      required
+        closed: {..., half_length: L}                         optional: a SEGMENT, not a whole line --
+            only junctions whose midpoint lies within L of `point` along the line's in-plane tangent
+            (-ny, nx) are shut: a scar with two free ends, around which a wave can turn
 
     This is the conduction-block experiment (Kleber & Rudy 2004): a line of closed gap junctions, and
     nothing else changed. A shut junction still counts in deg(i) -- closing one junction removes its
@@ -892,8 +983,112 @@ class CellDiffuseClosedJunctions(CellDiffuse):
         p = torch.as_tensor([float(x) for x in self.closed["point"]], dtype=cen.dtype, device=cen.device)
         nrm = torch.as_tensor([float(x) for x in self.closed["normal"]], dtype=cen.dtype, device=cen.device)
         side = ((cen[:, :len(p)] - p) @ nrm) > 0
-        w = (side[i] == side[j]).to(chem.dtype)[:, None]
+        shut = side[i] != side[j]
+        if self.closed.get("half_length") is not None:
+            tan = torch.stack([-nrm[1], nrm[0]])
+            mid = 0.5 * (cen[i, :2] + cen[j, :2]) - p[:2]
+            shut = shut & ((mid @ tan).abs() <= float(self.closed["half_length"]))
+        w = (~shut).to(chem.dtype)[:, None]
         flux = torch.zeros_like(chem).index_add_(0, i, w * (chem[j] - chem[i]))
+        lap = flux / deg.clamp(min=1)[:, None] if self.norm else flux
+        _span(chem, self.chan, len(self.d), type(self).__name__)
+        coef = torch.zeros(chem.shape[1], device=chem.device, dtype=chem.dtype)
+        for _k, _dk in enumerate(self.d):
+            coef[self.chan + _k] = _dk * self.chi
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: (coef[None, :] * lap) * occ}
+
+
+@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", model="contact_weighted",
+                   title="Morphogen diffusion between neighbouring cells",
+                   equation=r"""$$\frac{dc_i}{dt}=D_s\sum_{j\sim i}\frac{\ell_{ij}}{\bar\ell}\,\frac{c_j-c_i}{\deg(i)}$$""")
+class CellDiffuseContactWeighted(CellDiffuse):
+    """`contact_weighted` MODEL of cell_chem_diffuse -- a junction's conductance proportional to the
+    length of membrane the two cells share, as gap-junction plaques are distributed along it:
+
+        dc_i/dt = D_s sum_{j ~ i} (l_ij / l_bar) (c_j - c_i) / deg(i)
+
+    l_ij is the contact length of the pair (the set's `edge_weight`, written by
+    `cell_neighbours[model: label_image]` from the segmentation), l_bar its mean over the sheet's
+    junctions, so the sheet's AVERAGE coupling is the default's and only its distribution changes: a
+    long shared edge couples more, a corner contact almost not at all. With every contact the same
+    length it IS `graph_laplacian` (the test). A model and not an implementation: it is a different
+    claim about where the conductance sits.
+
+    Reference: gap junctions at the intercalated disc scale with contact area: Kleber, A. G. & Rudy, Y.
+    (2004). Physiol. Rev. 84:431-488 (section IV); Plexus (this work).
+    """
+    READS = ["chem"]
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        ei = getattr(lvl, "edge_index", None)
+        w = getattr(lvl, "edge_weight", None)
+        if ei is None or ei.numel() == 0:
+            return {self.at: torch.zeros_like(chem)}
+        if w is None or w.numel() != ei.shape[1]:
+            raise ValueError("cell_chem_diffuse[contact_weighted]: the cell set has no `edge_weight` "
+                             "aligned with its edge_index -- use cell_neighbours[model: label_image].")
+        i, j = ei[0], ei[1]; N = chem.shape[0]
+        deg = torch.zeros(N, device=chem.device, dtype=chem.dtype).index_add_(0, i, torch.ones_like(i, dtype=chem.dtype))
+        wn = (w / w.mean()).to(chem.dtype)[:, None]
+        flux = torch.zeros_like(chem).index_add_(0, i, wn * (chem[j] - chem[i]))
+        lap = flux / deg.clamp(min=1)[:, None] if self.norm else flux
+        _span(chem, self.chan, len(self.d), type(self).__name__)
+        coef = torch.zeros(chem.shape[1], device=chem.device, dtype=chem.dtype)
+        for _k, _dk in enumerate(self.d):
+            coef[self.chan + _k] = _dk * self.chi
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: (coef[None, :] * lap) * occ}
+
+
+@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", model="fibre_anisotropic",
+                   title="Morphogen diffusion between neighbouring cells",
+                   equation=r"""$$\frac{dc_i}{dt}=D_s\sum_{j\sim i}\frac{a_{ij}}{\bar a}\,\frac{c_j-c_i}{\deg(i)},\quad a_{ij}=\tfrac12\sum_{k\in\{i,j\}}\big(\kappa\cos^2(\theta_{ij}-\phi_k)+\sin^2(\theta_{ij}-\phi_k)\big)$$""")
+class CellDiffuseFibreAnisotropic(CellDiffuse):
+    """`fibre_anisotropic` MODEL of cell_chem_diffuse -- cardiac conduction is faster along the fibre than
+    across it, because the junctions sit mostly at the cells' ends (intercalated discs). Each
+    junction's conductance follows the angle between it and the two cells' fibre axes:
+
+        a_ij = 1/2 sum_{k in {i, j}} ( kappa cos^2(theta_ij - phi_k) + sin^2(theta_ij - phi_k) )
+        dc_i/dt = D_s sum_{j ~ i} (a_ij / a_bar) (c_j - c_i) / deg(i)
+
+    theta_ij is the direction from cell i's centroid to cell j's (`centroid`, else `pos`), phi_k the
+    cell's fibre angle (its `phi` block -- the axis the cardio fit recovers), kappa = `ratio`, the
+    along/across conductance ratio. Speed goes as the square root of conductance, so a speed
+    anisotropy of 2.1 (Kleber & Rudy 2004 p. 441: from 10 in the crista terminalis to 2.1 in the
+    ventricles) is kappa = 4.41, the default. a_bar is the sheet's mean, so the average coupling is the
+    default's; with kappa = 1 it IS `graph_laplacian` (the test).
+
+    Reference: Kleber, A. G. & Rudy, Y. (2004). Physiol. Rev. 84:431-488, section IV.A.
+    """
+    READS = ["chem", "phi"]
+    PARAM_ROLES = {**CellDiffuse.PARAM_ROLES, "ratio": "along_across_conductance_ratio"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.ratio = float(params.get("ratio", 4.41))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        ei = getattr(lvl, "edge_index", None)
+        if ei is None or ei.numel() == 0:
+            return {self.at: torch.zeros_like(chem)}
+        if "phi" not in lvl.state_schema:
+            raise ValueError("cell_chem_diffuse[fibre_anisotropic]: the cell set has no `phi` block (the "
+                             "fibre angle); seed it, e.g. seed_state_from_file from a cardio fit.")
+        i, j = ei[0], ei[1]; N = chem.shape[0]
+        cen = lvl.get("centroid" if "centroid" in lvl.state_schema else "pos")
+        dx = cen[j, :2] - cen[i, :2]
+        th = torch.atan2(dx[:, 1], dx[:, 0])
+        phi = lvl.get("phi")[:, 0]
+        k = self.ratio
+        a = 0.5 * sum(k * torch.cos(th - phi[q]) ** 2 + torch.sin(th - phi[q]) ** 2 for q in (i, j))
+        wn = (a / a.mean()).to(chem.dtype)[:, None]
+        deg = torch.zeros(N, device=chem.device, dtype=chem.dtype).index_add_(0, i, torch.ones_like(i, dtype=chem.dtype))
+        flux = torch.zeros_like(chem).index_add_(0, i, wn * (chem[j] - chem[i]))
         lap = flux / deg.clamp(min=1)[:, None] if self.norm else flux
         _span(chem, self.chan, len(self.d), type(self).__name__)
         coef = torch.zeros(chem.shape[1], device=chem.device, dtype=chem.dtype)
@@ -1350,6 +1545,35 @@ class CellReactRPSLattice(Lateral):
     i.e. `rate: 1, a: 1`. Individuals, empty sites and neighbours make it the stochastic lattice whose
     extinction probability against mobility is the paper's Fig. 2b; the density model is its mean field.
 
+    CROSS-FEEDING, `feed: {block: food, matrix: F}` (exp 15, direction 3; Momeni et al. 2013, Han et al.
+    2021): an individual of species i reproduces at mu_i = mu (1 + sum_k F[i][k] f_k), f_k its site's
+    column k of the `food` block (a metabolite concentration, written by `readout` from a medium set),
+    F a 3 x 3 matrix of benefits per unit concentration, row = consumer, column = metabolite. Absent (or
+    F = 0) every mu_i = mu and the draws are the same, so the model above is unchanged (tested).
+
+    ARMS RACE, `trait: {block: trait, mutation: m, cost: c, seed: k, init: t0}` (exp 15, direction 4):
+    every individual carries a heritable attack trait t_i >= 0 in a width-1 block of the set
+    (`integration: none`; 0 on an empty site). It scales the individual's own selection rate and
+    taxes its reproduction:
+
+        P(i kills its prey neighbour in dt) = sigma dt t_i
+        P(i reproduces into an empty neighbour in dt) = mu dt max(0, 1 - c t_i)   (x the feed factor)
+        daughter:  t_daughter = max(0, t_i + m xi),  xi ~ N(0, 1)      a killed site: t = 0
+
+    t_i is dimensionless -- a multiple of the base selection rate sigma = r a -- so t_i = 1 is the
+    model above; c is the fractional loss of the base reproduction rate mu = r per unit of trait
+    (c t_i = 1 stops the individual reproducing); m is the standard deviation of the daughter's trait
+    around the parent's, in the same units of t. The trait is NOT integrated: it is written in place
+    into the set's state (the individual-based bookkeeping of who carries what), so the operator
+    declares MAY_MUTATE_INTEGRATED_STATE only when `trait` is given. `init: t0` (optional) sets t = t0 on
+    every occupied site on the first call if the block is still all zeros -- `seed_state_random` would
+    fill empty sites too. Sites the provisional state holds empty are reset to t = 0 on every call.
+    A PARAM OF THIS IMPLEMENTATION AND NOT A NEW OPERATOR because the events, the draws and the chem
+    increment are exactly this operator's; the trait only rescales two of its probabilities per
+    individual. t = 1, m = 0, c = 0 draws the same events as the model without it (tested). The
+    mutation draw uses its own generator (`seed`), so the event draws are never shifted by it.
+    `cell_chem_diffuse[lattice_exchange]`'s `carry: [trait]` moves the trait with its individual.
+
     One event per target site per tick (two individuals reaching for one site: one succeeds); an
     individual acts at most once per tick. Reads the provisional state (see the lattice section above
     `cell_chem_diffuse[lattice_exchange]`). Reference: Reichenbach, T., Mobilia, M. & Frey, E. (2007).
@@ -1360,7 +1584,9 @@ class CellReactRPSLattice(Lateral):
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["reaction", "competition", "cyclic_dominance", "may_leonard", "rock_paper_scissor",
                       "lattice", "individual_based"]
-    PARAM_ROLES = {"a": "cyclic_suppression", "rate": "reaction_time_scale", "seed": "rng_seed"}
+    PARAM_ROLES = {"a": "cyclic_suppression", "rate": "reaction_time_scale", "seed": "rng_seed",
+                   "feed": "cross_feeding_benefit_matrix_and_food_block",
+                   "trait": "heritable_attack_trait_block_mutation_sd_and_reproduction_cost"}
     REFERENCE = ("Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046; "
                  "May, R. M. & Leonard, W. J. (1975). SIAM J. Appl. Math. 29:243-253.")
 
@@ -1370,6 +1596,19 @@ class CellReactRPSLattice(Lateral):
         self.a = float(params.get("a", 0.6))
         self.rate = float(params.get("rate", 1.0))
         self.seed = int(params.get("seed", 0))
+        fd = params.get("feed")
+        self.feed_block = None if not fd else str(fd.get("block", "food"))
+        self.feed_F = None if not fd else [[float(v) for v in row] for row in fd["matrix"]]
+        tr = params.get("trait")
+        self.trait_block = None if tr is None else str(tr.get("block", "trait"))   # `trait: {}` = all defaults
+        if tr is not None:
+            self.trait_mut = float(tr.get("mutation", 0.0))            # sd of the daughter's trait, units of t
+            self.trait_cost = float(tr.get("cost", 0.0))               # fraction of mu lost per unit of t
+            self.trait_seed = int(tr.get("seed", self.seed + 1))
+            self.trait_init = None if tr.get("init") is None else float(tr["init"])
+            self._trait_gen = None
+            self._trait_first = True
+            self.MAY_MUTATE_INTEGRATED_STATE = True                    # instance only: absent => the check stands
         self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
 
     def forward(self, H, mask=None):
@@ -1385,6 +1624,22 @@ class CellReactRPSLattice(Lateral):
         tgt = _lattice_onehot(occ, s, 3)
         n = occ.shape[0]
         sig, mu = self.rate * self.a * dt, self.rate * dt
+        if self.feed_F is not None:
+            food = lvl.get(self.feed_block).to(torch.float64)                # [n, 3] metabolite at the site
+            F = torch.as_tensor(self.feed_F, dtype=torch.float64, device=dev)
+            mu = (mu * (1.0 + (food @ F.T).gather(1, s.clamp(min=0).long()[:, None])[:, 0])).to(chem.dtype)
+        if self.trait_block is not None:
+            st = lvl.state.clone()                                       # in-place writer: a fresh buffer
+            tb0, tb1 = lvl.state_schema[self.trait_block]
+            if tb1 - tb0 != 1:
+                raise ValueError(f"cell_chem_react[rps_lattice]: trait block {self.trait_block!r} must be width 1")
+            if self._trait_first and self.trait_init is not None and not torch.any(st[:, tb0] != 0):
+                st[occ, tb0] = self.trait_init                           # `init`: occupied sites only
+            self._trait_first = False
+            st[~occ, tb0] = 0.0                                          # an empty site carries no trait
+            t = st[:, tb0].to(chem.dtype)                                # t_i, a multiple of sigma
+            sig = sig * t                                                # per individual: sigma dt t_i
+            mu = mu * (1.0 - self.trait_cost * t).clamp(min=0.0)         # mu dt max(0, 1 - c t_i) (x feed)
         u = torch.rand(n, generator=gen, device=dev)
         j = _lattice_neighbour(self, lvl, gen)
         prey = (s + 2) % 3                                               # v (1) kills u (0), w kills v, u kills w
@@ -1400,6 +1655,21 @@ class CellReactRPSLattice(Lateral):
             b = ~k
             tgt[aj[b]] = 0.0
             tgt[aj[b], s[ai[b]]] = 1.0                                   # reproduction: its species fills it
+            if self.trait_block is not None:
+                # Parents' traits read from `t` (this tick's start), so an individual killed while it
+                # reproduces still passes on its own trait; kill and birth targets are disjoint (a birth
+                # needs an empty site, a kill an occupied one).
+                child = t[ai[b]].to(st.dtype)
+                if self.trait_mut != 0.0 and child.numel():
+                    if self._trait_gen is None or self._trait_gen.device != torch.device(dev):
+                        self._trait_gen = torch.Generator(device=dev)
+                        self._trait_gen.manual_seed(self.trait_seed)
+                    child = child + self.trait_mut * torch.randn(child.shape, generator=self._trait_gen,
+                                                                 device=dev, dtype=st.dtype)
+                st[aj[b], tb0] = child.clamp(min=0.0)                    # daughter: parent's t + m xi, >= 0
+                st[aj[k], tb0] = 0.0                                     # the killed site carries none
+        if self.trait_block is not None:
+            lvl.state = st
         out = torch.zeros_like(chem)
         out[:, c0:c0 + 3] = (tgt - x[:, c0:c0 + 3].to(tgt.dtype)).to(chem.dtype) / dt
         return {self.at: out}
@@ -1674,6 +1944,70 @@ class CellReactSourceDecay(Lateral):
         return {self.at: _emit(chem, self.chan, (dc,), self.rate, occ)}
 
 
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="source_ptch",
+                   title="A morphogen source, sequestered by the receptor it induces (Hedgehog / PTCH)",
+                   species=(("c", "morphogen"), ("R", "receptor")),
+                   equation=r"""$$\frac{dc_i}{dt}=r\big(p\,\mathbb{1}[i\in S]-k\,c_i-s\,R_i\,c_i\big),\qquad \frac{dR_i}{dt}=r\Big(b_0+b_1\frac{c_i^{\,n}}{K^n+c_i^{\,n}}-k_R\,R_i\Big)$$""")
+class CellReactSourcePtch(CellReactSourceDecay):
+    """`source_decay` with the morphogen also removed by a RECEPTOR THE MORPHOGEN INDUCES -- Shh bound
+    and sequestered by PTCH, whose own expression Hedgehog signalling raises (Li et al. 2018). chem =
+    [c, R], two adjacent columns from `chan`:
+
+        dc_i/dt = r ( p 1[i in S] - k c_i - s R_i c_i )
+        dR_i/dt = r ( b0 + b1 c_i^n / (K^n + c_i^n) - kR R_i )
+
+    c is the morphogen (dimensionless, as in `source_decay`; p, k, S and r are that model's). R is the
+    receptor level of cell i, dimensionless; s is `sequester`, the removal rate per unit receptor per
+    unit time; b0 is `r_basal`, the receptor's basal synthesis; b1 is `r_induced`, the extra synthesis
+    at full signalling, a Hill function of c with half-point K (`r_half`, in units of c) and exponent
+    n (`r_hill`); kR is `r_decay`, the receptor's own turnover rate. R is membrane-bound: nothing
+    diffuses it, so `cell_chem_diffuse` must name only c's column.
+
+    b1 = 0 is Li's OPEN LOOP: R relaxes to b0 / kR everywhere and c sees one extra uniform decay,
+    k + s b0 / kR -- exactly `source_decay` at that decay (tested), so amplitude and decay length are
+    set by the ratio of morphogen to receptor production (Li 2018 Fig. 2D-E). b1 > 0 CLOSES THE LOOP:
+    where c is high R rises and clears c faster, so raising p raises the clearance with it and the
+    profile moves less (Li 2018 Fig. 3B-C: amplitude and length scale robust to SHH production). In one
+    cell with no diffusion the steady c* solves c* (k + s R*(c*)) = p; open loop c* is linear in p,
+    closed loop sublinear (tested).
+
+    WHY A MODEL AND NOT A FLAG ON `source_decay`: a second species with its own dynamics is a different
+    reaction, and experiments do not edit an operator (INSTRUCTION.md); the source region is inherited
+    unchanged.
+
+    Reference: Li, P. et al. (2018). Morphogen gradient reconstitution reveals Hedgehog pathway design
+    principles. Science 360:543-548 (Figs. 2D-E open loop, 3B-C feedback).
+    """
+    N_SPECIES = 2
+    MECHANISM_TAGS = CellReactSourceDecay.MECHANISM_TAGS + ["receptor", "sequestration", "feedback", "ptch"]
+    PARAM_ROLES = dict(CellReactSourceDecay.PARAM_ROLES, sequester="receptor_removal_rate",
+                       r_basal="receptor_basal_synthesis", r_induced="receptor_induced_synthesis",
+                       r_half="receptor_induction_half_point", r_hill="receptor_induction_hill",
+                       r_decay="receptor_turnover_rate")
+    REFERENCE = "Li, P. et al. (2018). Science 360:543-548."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.s = float(params.get("sequester", 0.0))
+        self.b0 = float(params.get("r_basal", 0.0)); self.b1 = float(params.get("r_induced", 0.0))
+        self.K = float(params.get("r_half", 1.0)); self.n = float(params.get("r_hill", 1.0))
+        self.kR = float(params.get("r_decay", 1.0))
+
+    def rates(self, c, R, src):
+        cp = c.clamp(min=0.0)
+        dc = self.p * src - self.k * c - self.s * R * c
+        dR = self.b0 + self.b1 * cp ** self.n / (self.K ** self.n + cp ** self.n) - self.kR * R
+        return dc, dR
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        c, R = _span(chem, self.chan, 2, type(self).__name__)
+        src = self.source_mask(lvl).to(chem.dtype)
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: _emit(chem, self.chan, self.rates(c, R, src), self.rate, occ)}
+
+
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="stripe_decay",
                    title="A morphogen made by a central stripe",
                    equation=r"""$$\frac{dc_i}{dt}=r\big(p\,\mathbf 1[\,|x_i-\bar x|<\tfrac f2 L\,]-k\,c_i\big)$$""")
@@ -1693,10 +2027,20 @@ class CellReactStripeDecay(CellReactSourceDecay):
     compartment boundaries"), Aegerter-Wilmsen et al. 2012 Fig. 1B (Dpp highest along the AP boundary,
     lowest laterally). A two-sided exponential c ~ exp(-|x - xbar| / lambda) results.
 
+    `source.width` w (world units, off by default) fixes the stripe instead: |x_i - xbar| < w / 2 whatever
+    the tissue's extent -- a source that does NOT scale with the pouch, Aegerter-Wilmsen et al. 2007's
+    third assumption ("the growth factor ... has a fixed range"), under which a growing pouch outruns its
+    growth factor.
+
     Reference: Aegerter-Wilmsen, T. et al. (2012). Development 139:3221 (Fig. 1B); Crick, F. (1970).
     Nature 225:420-422 (source, diffusion, decay).
     """
     MECHANISM_TAGS = CellReactSourceDecay.MECHANISM_TAGS + ["stripe", "dpp"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        w = (params.get("source") or {}).get("width")
+        self.width = None if w is None else float(w)
 
     def source_mask(self, lvl):
         cen = lvl.get("centroid")
@@ -1707,7 +2051,8 @@ class CellReactStripeDecay(CellReactSourceDecay):
         lo = torch.where(live, x, torch.full_like(x, big)).min()
         hi = torch.where(live, x, torch.full_like(x, -big)).max()
         xbar = (x * live.to(x.dtype)).sum() / live.sum().clamp(min=1)
-        return ((x - xbar).abs() < 0.5 * self.frac * (hi - lo)) & live
+        half = 0.5 * self.width if self.width is not None else 0.5 * self.frac * (hi - lo)
+        return ((x - xbar).abs() < half) & live
 
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="clock_turnover",
@@ -1732,6 +2077,17 @@ class CellReactClockTurnover(Lateral):
     read from the `phase` block `phase_clock` advances, with the `gate:` keys `_gate` gives every
     phase-gated operator: `floor` f in [0, 1] (the gate's minimum, the enzyme's residual activity) and
     `offset` (radians, where on the cycle HDAC3 peaks). r is `rate`, a time rescaling.
+
+    TWO GATES, WHEN THE MICROBES' SHARE OF THE ENZYME KEEPS ITS OWN CLOCK. `gate_signal:` (same keys)
+    gates the INDUCED term separately from the basal one:
+
+        dA_i/dt = r ( k_in - k_out ( gamma_0(phi_i) + g s_i gamma_1(phi_i) ) A_i )
+
+    gamma_0 = `gate` (the basal, germ-free enzyme), gamma_1 = `gate_signal` (the part the microbes add).
+    Absent, gamma_1 = gamma_0 and the equation is the one above. Kuang's Fig. 2A mechanism is this
+    split -- the microbiota make HDAC3's recruitment rhythmic -- and it is what lets a mark whose
+    germ-free rhythm is weak (a high basal floor) gain a strong rhythm from the microbes without a
+    matching fall in its mean (exp 15, rig 4, Finding 26: H3K27ac).
 
     WHAT IT REPRODUCES (Kuang et al. 2019, Fig. 1C-D and Fig. 2A). Germ-free (m = 0): deacetylation
     runs at k_out gamma, so A sits high and follows the clock weakly; with a community (m > 0) the
@@ -1758,7 +2114,7 @@ class CellReactClockTurnover(Lateral):
     PARAM_ROLES = {"k_in": "acetylation_rate", "k_out": "germ_free_deacetylation_rate",
                    "g": "signal_induced_deacetylation_at_saturation_x_germ_free", "K": "signal_half_saturation",
                    "weights": "per_strain_signal_weight", "signal": "signal_block", "gate": "clock_gate",
-                   "rate": "reaction_time_scale"}
+                   "gate_signal": "clock_gate_of_the_induced_term", "rate": "reaction_time_scale"}
     REFERENCE = "Kuang, Z. et al. (2019). Science 365:1428-1434."
 
     def __init__(self, params, device="cpu"):
@@ -1770,10 +2126,13 @@ class CellReactClockTurnover(Lateral):
         self.w = params.get("weights")
         self.signal = str(params.get("signal", "signal"))
         self.gate = dict(params.get("gate") or {"block": "phase", "floor": 1.0})
+        gs = params.get("gate_signal")
+        self.gate_signal = None if gs is None else dict(gs)
         self.rate = float(params.get("rate", 1.0))
         self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
 
     def forward(self, H, mask=None):
+        import types
         from plexus.operators.cell_ops import _gate
         lvl = H.level(self.at)
         chem = lvl.get("chem")
@@ -1792,7 +2151,9 @@ class CellReactClockTurnover(Lateral):
         else:
             s = torch.zeros_like(A)
         gam = _gate(self, H, slice(None))
-        dA = self.k_in - self.k_out * (1.0 + self.g * s) * gam * A
+        gam1 = gam if self.gate_signal is None else \
+            _gate(types.SimpleNamespace(gate=self.gate_signal, cell_set=self.at), H, slice(None))
+        dA = self.k_in - self.k_out * (gam + self.g * s * gam1) * A
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: _emit(chem, self.chan, (dA,), self.rate, occ)}
 
@@ -1800,7 +2161,7 @@ class CellReactClockTurnover(Lateral):
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="notch_delta",
                    title="Notch-Delta lateral inhibition gated by YAP, and the Wnt its winners secrete",
                    species=(("N", "Notch activity"), ("D", "Delta (Dll1)"), ("Y", "nuclear YAP"), ("W", "Wnt")),
-                   equation=r"""$$\begin{aligned}\frac{dN_i}{dt}&=r\Big(\frac{\bar D_i^{k}}{a+\bar D_i^{k}}-N_i\Big),\quad \bar D_i=\langle D_j\rangle_{j\sim i}\\ \frac{dD_i}{dt}&=r\,v\Big(\frac{Y_i}{1+bN_i^{h}}-D_i\Big)\\ \frac{dY_i}{dt}&=r\,k_y\Big(\frac{W_i^{n}}{K_w^{n}+W_i^{n}}-Y_i\Big)\ \ \text{after } t_{\rm Wnt}\\ \frac{dW_i}{dt}&=r\Big(p\,\frac{D_i^{q}}{\theta^{q}+D_i^{q}}-k_wW_i\Big)\end{aligned}$$""")
+                   equation=r"""$$\begin{aligned}\frac{dN_i}{dt}&=r\Big(\frac{\bar D_i^{k}}{a+\bar D_i^{k}}-N_i\Big),\quad \bar D_i=\langle D_j\rangle_{j\sim i}\\ \frac{dD_i}{dt}&=r\,v\Big(\frac{Y_i}{1+bN_i^{h}}-D_i\Big)\\ \frac{dY_i}{dt}&=r\,k_y\Big(\frac{y_{\max}W_i^{n}}{K_w^{n}+W_i^{n}}-Y_i\Big)\ \ \text{after } t_{\rm Wnt}\\ \frac{dW_i}{dt}&=r\Big(p\,\frac{D_i^{q}}{\theta^{q}+D_i^{q}}-k_wW_i\Big)\end{aligned}$$""")
 class CellReactNotchDelta(Lateral):
     """Serra et al. 2019's symmetry breaking as a reaction: YAP variability biases Notch-Delta lateral
     inhibition, the winners (DLL1+ -> Paneth) secrete Wnt, and Wnt is what the crypt becomes.
@@ -1808,7 +2169,7 @@ class CellReactNotchDelta(Lateral):
 
         dN_i/dt = r ( Dbar_i^k / (a + Dbar_i^k) - N_i )             Dbar_i = mean D over the neighbours
         dD_i/dt = r v ( Y_i / (1 + b N_i^h) - D_i )
-        dY_i/dt = r k_y ( W_i^n / (K_w^n + W_i^n) - Y_i )           only from frame `wnt_off` on
+        dY_i/dt = r k_y ( y_max W_i^n / (K_w^n + W_i^n) - Y_i )     only from frame `wnt_off` on
         dW_i/dt = r ( p D_i^q / (theta^q + D_i^q) - k_w W_i )
 
     N is the cell's Notch activity and D its Delta (DLL1), both dimensionless; the first two lines are
@@ -1820,7 +2181,24 @@ class CellReactNotchDelta(Lateral):
     W = K_w) -- YAP falls after Wnt removal (Serra ED Fig. 7c) and an organoid with no Paneth cell by
     then has none to hold it: an enterocyst. A TARGET, not a decay damped by Wnt: a damped decay
     (-k_y (1 - W/(W + K_w)) Y) never reaches zero, so every organoid, Paneth cell or not, leaks to an
-    enterocyst given time; the target form has a held state (Wnt-high cells keep YAP near 1). W is the Wnt a DLL1-high cell secretes (Hill in D, half at
+    enterocyst given time; the target form has a held state (Wnt-high cells keep YAP near y_max, default 1).
+
+    A YAP THRESHOLD ON DELTA, opt-in (`y_th`, default None: Delta's production is v Y, Collier's scaled by
+    YAP): with `y_th` set, the production is v Y^m / (y_th^m + Y^m) (`m`, default 8) -- only a cell whose
+    nuclear YAP clears y_th makes enough Delta to win, as Serra's DLL1+ cells are the YAP-high ones (Fig.
+    5f, x2.8). Three things follow from it and from YAP being inherited at division: an organoid none of
+    whose cells clears y_th picks nobody (an enterocyst, the population's budding fraction); the high-YAP
+    cell's clone is a CLUSTER, so its winners are neighbours' neighbours rather than a salt-and-pepper
+    field; and after withdrawal only cells whose Wnt holds YAP above y_th (`y_max` sets the level Wnt
+    holds) can still win, so the chosen territory stays one patch. Without it (C1e, finding 32) winners
+    were scattered over the whole organoid and, dividing into identical pairs that inhibit each other,
+    died out.
+
+    EXPRESSION NOISE ON DELTA, opt-in (`sigma_d`, default 0): the production is multiplied by
+    max(0, 1 + sigma_d xi), xi standard normal per cell per call from the operator's own `seed`. A division
+    gives two IDENTICAL daughters that are neighbours -- the lateral-inhibition pair's unstable symmetric
+    state, which a deterministic model leaves to roundoff while their Wnt and YAP decay (C1e: a winner that
+    divided lost both daughters). Gene expression noise is what breaks such a tie in a cell. W is the Wnt a DLL1-high cell secretes (Hill in D, half at
     theta), lost at k_w; its SPREAD is `cell_chem_diffuse` on the same column, and the crypt region is
     where it lands -- `cell_mechanics[apicobasal_region]` reads it as the fate (Serra ED Fig. 10h: the
     canonical Wnt response in the Paneth cell's neighbours).
@@ -1844,7 +2222,9 @@ class CellReactNotchDelta(Lateral):
     PARAM_ROLES = {"a": "notch_activation_threshold", "b": "delta_repression_strength", "k": "notch_hill",
                    "h": "delta_hill", "v": "delta_rate_over_notch_rate", "p": "wnt_production",
                    "theta": "delta_level_for_wnt", "q": "wnt_hill", "k_w": "wnt_decay",
-                   "k_y": "yap_relaxation_after_wnt_withdrawal", "K_w": "wnt_that_holds_yap_half", "n": "yap_wnt_hill", "wnt_off": "frame_exogenous_wnt_ends",
+                   "k_y": "yap_relaxation_after_wnt_withdrawal", "K_w": "wnt_that_holds_yap_half", "n": "yap_wnt_hill",
+                   "y_th": "yap_threshold_for_delta", "m": "yap_delta_hill", "y_max": "yap_level_wnt_holds",
+                   "sigma_d": "delta_expression_noise", "wnt_off": "frame_exogenous_wnt_ends",
                    "rate": "reaction_time_scale"}
     REFERENCE = ("Collier, J. R. et al. (1996). J. Theor. Biol. 183:429-446; "
                  "Serra, D. et al. (2019). Nature 569:66-72.")
@@ -1859,6 +2239,12 @@ class CellReactNotchDelta(Lateral):
         self.q = float(params.get("q", 4.0)); self.k_w = float(params.get("k_w", 1.0))
         self.k_y = float(params.get("k_y", 0.0)); self.K_w = float(params.get("K_w", 0.1))
         self.n = float(params.get("n", 2.0))
+        _yt = params.get("y_th", None)
+        self.y_th = None if _yt is None else float(_yt)
+        self.m = float(params.get("m", 8.0))
+        self.y_max = float(params.get("y_max", 1.0))
+        self.sigma_d = float(params.get("sigma_d", 0.0))
+        self._gen = torch.Generator(device="cpu"); self._gen.manual_seed(int(params.get("seed", 0)))
         _wo = params.get("wnt_off", None)
         self.wnt_off = None if _wo is None else float(_wo)
         self.rate = float(params.get("rate", 1.0))
@@ -1878,11 +2264,19 @@ class CellReactNotchDelta(Lateral):
             Dbar = agg / deg.clamp(min=1)
         Dp = Dbar.clamp(min=0) ** self.k
         dN = Dp / (self.a + Dp) - N
-        dD = self.v * (Y / (1.0 + self.b * N.clamp(min=0) ** self.h) - D)
+        if self.y_th is None:
+            prod = Y
+        else:
+            Ym = Y.clamp(min=0) ** self.m
+            prod = Ym / (self.y_th ** self.m + Ym)
+        if self.sigma_d > 0:
+            xi = torch.randn(prod.shape[0], generator=self._gen, dtype=torch.float64)
+            prod = prod * (1.0 + self.sigma_d * xi).clamp(min=0).to(device=prod.device, dtype=prod.dtype)
+        dD = self.v * (prod / (1.0 + self.b * N.clamp(min=0) ** self.h) - D)
         fr = getattr(H, "frame", None)
         if self.wnt_off is not None and self.k_y > 0 and fr is not None and float(fr) >= self.wnt_off:
             Wn = W.clamp(min=0) ** self.n
-            dY = self.k_y * (Wn / (self.K_w ** self.n + Wn) - Y)
+            dY = self.k_y * (self.y_max * Wn / (self.K_w ** self.n + Wn) - Y)
         else:
             dY = torch.zeros_like(Y)
         Dq = D.clamp(min=0) ** self.q
@@ -2242,6 +2636,34 @@ class CellReactBalaskasCommit(CellReactBalaskasAdapt):
         frame = ft if ft is not None else torch.tensor(float(getattr(H, "frame", 0)))
         live = (self.rate * frame * float(H.dt) < self.t_commit)
         return {k: v * live.to(v) for k, v in out.items()}
+
+
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="balaskas_commit_schedule",
+                   title="The two-phase Pax6-Olig2-Nkx2.2 circuit with a scheduled change of its input",
+                   species=(("P", "Pax6"), ("O", "Olig2"), ("N", "Nkx2.2")),
+                   equation=r"""$$G=g\,c\,f(t)\,s(t),\qquad \frac{d(P,O,N)}{dt}=\mathbb{1}[t<t_c]\,(\dots)$$""")
+class CellReactBalaskasCommitSchedule(CellReactBalaskasCommit):
+    """`balaskas_commit` -- the adapting input (Fig. S7A) and the commitment -- with the drug of
+    `balaskas_schedule` applied on top: G = g_gain c f(t) s(t). Dessaud et al. 2007's explants ADAPT
+    (GLI activity decays over the culture, Fig. 2a) before cyclopamine halves what is left at 12 h
+    (Fig. 2c-e), so the in-silico explant of the model of record is this one, not the constant-input
+    `balaskas_schedule`. Empty schedule = `balaskas_commit` (tested).
+
+    Reference: Dessaud, E. et al. (2007). Nature 450:717-720; Balaskas, N. et al. (2012). Cell 148:273.
+    """
+    PARAM_ROLES = dict(CellReactBalaskasCommit.PARAM_ROLES, schedule="input_gain_schedule")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        sch = sorted([(float(t), float(f)) for t, f in (params.get("schedule") or [])])
+        self.sched_t = [t for t, _ in sch]
+        self.sched_f = [f for _, f in sch]
+
+    factor = CellReactBalaskasSchedule.factor
+
+    def profile(self, t):
+        base = CellReactBalaskasAdapt.profile(self, t)
+        return base * self.factor(t) if torch.is_tensor(t) else base * float(self.factor(torch.tensor(float(t))))
 
 
 @register_operator("cell_grow", set="vertex", kind="lateral", family="population", title="Growth where the morphogen is high",
@@ -2765,6 +3187,59 @@ def polar_gf(centroids, axis, angle_deg, width_deg):
     return torch.sigmoid((float(angle_deg) - theta) / max(float(width_deg), 1e-9)).to(c0.dtype)
 
 
+def isotropic_stress(pos, es, et, ef, nF, A, A0, P0, mech, myo=None):
+    """Each face's isotropic (Batchelor) stress on a vertex sheet, over 2 K_A A0 -- dimensionless:
+
+        s_f = [ 2 K_A (A_f - A0_f) + (1 / (4 A_f)) sum_{h in f} T_h |l_h| ] / (2 K_A A0_f)
+        T_h = tau_h + tau_twin,   tau_h = Lambda m_h + 2 K_P (P_f - P0_f) + Gamma P_f
+
+    half the trace of sigma_f = -Pi_f I + (1 / A_f) sum_h (T_h / 2) l_h l_h / |l_h| for the default
+    `cell_mechanics` energy (K_A, K_P, Gamma, Lambda read from the mesh's `mech`). Tensile positive; 0 for a
+    cell at force balance of ANY size, which is what a size-free stretch must be. m_h is the half-edge's
+    myosin multiplier on Lambda (`junction_myosin` writes it as m["myo"], `cell_mechanics` uses it); 1 when
+    `myo` is None or does not match the half-edge count, so a run without myosin reads as before."""
+    es, et, ef = (torch.as_tensor(a).long().to(pos.device) for a in (es, et, ef))
+    l = pos[et] - pos[es]
+    L = l.norm(dim=1)
+    dt = pos.dtype
+    P = torch.zeros(nF, dtype=dt, device=pos.device).index_add_(0, ef, L)
+    KA, KP, G, Lam = (float(mech.get(k, 0.0)) for k in ("K_A", "K_P", "Gamma", "Lambda"))
+    mh = torch.ones_like(L) if myo is None or myo.shape[0] != L.shape[0] else myo.to(pos.device, dt).reshape(-1)
+    tau = Lam * mh + (2 * KP * (P - P0.to(dt)) + G * P)[ef]            # per half-edge
+    big = int(torch.maximum(es.max(), et.max())) + 1
+    key, twin = es * big + et, et * big + es
+    ks, order = torch.sort(key)
+    j = torch.searchsorted(ks, twin).clamp(max=len(ks) - 1)
+    has = ks[j] == twin
+    T = tau + torch.where(has, tau[order[j]], torch.zeros_like(L))
+    iso_t = torch.zeros(nF, dtype=dt, device=pos.device).index_add_(0, ef, T * L) / (4 * A.to(dt).clamp(min=1e-12))
+    return (2 * KA * (A.to(dt) - A0.to(dt)) + iso_t) / (2 * max(KA, 1e-12) * A0.to(dt).clamp(min=1e-12))
+
+
+def clone_disk(centroids, point, frac):
+    """Indices of the `frac` of cells nearest the point centroid + `point` x R, R the largest distance of
+    a cell centroid from the tissue's centroid -- a compact clone INSIDE a tissue (on a flat disc the
+    polar cap of `clone_cap` is the free rim). At least one cell when frac > 0."""
+    c = torch.as_tensor(centroids).to(torch.float64)
+    g = c.mean(0)
+    R = (c - g).norm(dim=1).max()
+    target = g + torch.as_tensor(point, dtype=torch.float64, device=c.device) * R
+    n = max(1, int(round(float(frac) * len(c)))) if frac > 0 else 0
+    return torch.argsort((c - target).norm(dim=1))[:n] if n else torch.zeros(0, dtype=torch.long)
+
+
+def hinge_ring(centroids, frac):
+    """Indices of the `frac` of cells whose centroids lie FARTHEST from the tissue's centroid -- the outer
+    annulus of a disc, the hinge that rings the wing pouch. At least one cell when frac > 0."""
+    c = torch.as_tensor(centroids, dtype=torch.float64)
+    n = c.shape[0]
+    k = max(1, int(round(float(frac) * n))) if frac > 0 else 0
+    if k == 0:
+        return torch.zeros(0, dtype=torch.long)
+    r = (c - c.mean(0)).norm(dim=1)
+    return torch.argsort(r, descending=True)[:k]
+
+
 def clone_cap(centroids, axis, frac):
     """Indices of the `frac` of cells whose centroid lies farthest along `axis` from the tissue's
     centroid -- a polar cap, the compact patch a clone is (Shraiman 2005 Fig. 1). At least one cell
@@ -2839,6 +3314,22 @@ class Grow3DStretch(Grow3D):
     against its target is Aegerter-Wilmsen et al. 2012's own measure of compression ("a weighted average
     of the area of a cell and its surroundings", with `smooth`), and `cell_grow` raises A0 as s^2.
 
+    `readout: stress` READS THE CELL'S MECHANICAL STRESS, not a shape: sigma_j = 1 + s_j, s_j the isotropic
+    Batchelor stress of the default vertex energy over 2 K_A A0 (`isotropic_stress`), 0 at force balance
+    for a cell of any size -- Shraiman 2005's pressure, AW 2012's compression. WHY: every shape readout
+    tried is size-confounded on some tissue. On exp 13 Phase 2's flat pouch (exp07's energy, line tension
+    and contractility) cells sit at A / A0 ~0.36 and it RISES with cell size (0.36 -> 0.44 by frame 200 with
+    no feedback at all), so `a0` against the settled tissue fed size back positively and the pouch exploded
+    (x41,811 in area, the cell buffer full by frame 600, auditor wrecked at 220). `stretch_ref: tissue`
+    subtracts the tissue's median stress (Shraiman's "minus the average").
+
+    `and_chan: k` MAKES THE DRIVE AN AND GATE of two morphogens: rho + Hill(a) Hill_k(c_k), Hill_k relative
+    to c_k's own maximum (`and_sw`, `and_hill`). Aegerter-Wilmsen 2007 (p. 319): "Growth is induced if both
+    Dpp and the second growth factor are present" -- Dpp from the A/P stripe times Wg from the D/V
+    boundary, "a tent, with highest activity in the center of the disc" (Fig. 1); AW 2012 Fig. 1B. A stripe
+    alone drives growth along a line and the pouch elongates (exp 13 Phase 2, P5/P8); the tent peaks at
+    the centre, which LeGoff's concentric stress pattern needs.
+
     `gain` is dimensionless, the fractional change of the growth rate per unit of relative stretch.
     gain = 0 is f = 1 and the multiplication is skipped: the default law, bit for bit -- the identity
     this model is run against. f is clipped at 0 (a compressed cell stops; dying is `cell_die`'s job)
@@ -2853,12 +3344,17 @@ class Grow3DStretch(Grow3D):
     of a mesh run does not carry. The block is a declared cell-set column, which `cell_divide` copies
     onto both daughters, so the clone is a lineage. If the set declares a `stretch` block, sigma_j is
     written into it every call (a readout, like `inhib_frac`), for the rulers and the movie.
+    `clone_point: [x, y, z]` places the clone INSIDE the tissue instead (`clone_disk`): the `clone_frac` of
+    cells nearest the tissue's centroid plus `clone_point` times its radius -- on a flat disc the cap is
+    the free rim, and Pan et al. 2016's fast clones sit in the pouch (Fig. 1D).
 
     AEGERTER-WILMSEN 2007's LAW (all off by default). Relative stretch cannot stop a tissue that grows
     uniformly -- the tissue's own median is always 1 (exp 13 findings 11 and 19). AW 2007's arrest needs
     three things this model then adds, each a parameter:
       `drive: polar`          the growth factor only in a cap around `gf_axis` (`polar_gf`, half-width
                               `gf_angle_deg`, edge `gf_width_deg`), multiplying the default drive;
+      `stretch_ref: settle_median`  with `readout: stress`, the tissue's median stress at `ref_frame` is
+                              subtracted as a fixed offset (a shape readout treats it as `settle`);
       `stretch_ref: settle`   sigma read against the tissue's median at `ref_frame` (the settle frame),
                               then FIXED -- an absolute stretch, so a global compression can be read;
       `stretch_growth` k_s, `stretch_threshold` theta_s
@@ -2871,6 +3367,14 @@ class Grow3DStretch(Grow3D):
 
     Reference: Shraiman, B.I. (2005). Mechanical feedback as a possible regulator of tissue growth.
     PNAS 102:3318; Aegerter-Wilmsen, T. et al. (2007). Mech. Dev. 124:318.
+
+    THE HINGE (off by default). `hinge_frac` > 0 marks, at the first call, that fraction of live cells
+    farthest from the tissue's centroid (`hinge_ring`) into the declared `hinge_block`, and multiplies
+    their rate by `hinge_mult` (default 0: they do not grow). A non-growing ring of CELLS around the
+    pouch, as the hinge surrounds the wing pouch (Aegerter-Wilmsen et al. 2012, Development 139:3221):
+    unlike a wall (`plate_confine[sphere]`), it is elastic and stretches when the pouch pushes, so a
+    pouch that does not read its stress keeps growing into it instead of folding over itself (exp 13
+    Phase 2 P23, P28). Like the clone, the block is copied onto both daughters.
     """
     MECHANISM_TAGS = ["growth", "size_control", "mechanical_feedback", "stretch", "clone"]
     REFERENCE = ("Shraiman, B.I. (2005). PNAS 102:3318; Aegerter-Wilmsen, T., Aegerter, C.M., Hafen, E. "
@@ -2884,6 +3388,17 @@ class Grow3DStretch(Grow3D):
         self.clone_frac = float(params.get("clone_frac", 0.0))
         self.clone_axis = [float(v) for v in (params.get("clone_axis") or [0.0, 0.0, 1.0])]
         self.clone_block = str(params.get("clone_block", "clone"))
+        self.hinge_frac = float(params.get("hinge_frac", 0.0))
+        self.hinge_mult = float(params.get("hinge_mult", 0.0))
+        self.hinge_block = str(params.get("hinge_block", "hinge"))
+        self._hinge_marked = False
+        _ac = params.get("and_chan", None)
+        self.and_chan = None if _ac is None else int(_ac)
+        self.and_sw = float(params.get("and_sw", 0.3))
+        self.and_hill = float(params.get("and_hill", 2.0))
+        self._and = None
+        _cp = params.get("clone_point", None)
+        self.clone_point = None if _cp is None else [float(v) for v in _cp]
         self.readout = str(params.get("readout", "volume")).lower()
         self.smooth = int(params.get("smooth", 0))
         # AEGERTER-WILMSEN 2007's LAW, every option off by default (see the class docstring's last part)
@@ -2894,15 +3409,16 @@ class Grow3DStretch(Grow3D):
         self.gf_angle = float(params.get("gf_angle_deg", 60.0))
         self.gf_width = float(params.get("gf_width_deg", 10.0))
         self.stretch_ref = str(params.get("stretch_ref", "tissue")).lower()
-        if self.stretch_ref not in ("tissue", "settle"):
-            raise ValueError(f"cell_grow[stretch]: stretch_ref is tissue or settle, got {self.stretch_ref!r}")
+        if self.stretch_ref not in ("tissue", "settle", "settle_median"):
+            raise ValueError(f"cell_grow[stretch]: stretch_ref is tissue, settle or settle_median, got {self.stretch_ref!r}")
+        self._off = None
         self.ref_frame = int(params.get("ref_frame", 60))
         self.stretch_growth = float(params.get("stretch_growth", 0.0))
         self.stretch_threshold = float(params.get("stretch_threshold", 0.0))
         self._ref = None
         self._gf = None
-        if self.readout not in ("volume", "area", "thickness", "a0"):
-            raise ValueError(f"cell_grow[stretch]: readout is volume, area, thickness or a0, got {self.readout!r}")
+        if self.readout not in ("volume", "area", "thickness", "a0", "stress"):
+            raise ValueError(f"cell_grow[stretch]: readout is volume, area, thickness, a0 or stress, got {self.readout!r}")
         self._marked = False
         self._drive = None
 
@@ -2926,17 +3442,49 @@ class Grow3DStretch(Grow3D):
                 raise ValueError(f"cell_grow[stretch]: marking a clone needs the `centroid` block on "
                                  f"`{cat}` (written by `cell_geometry`, scheduled before this operator)")
             vals = torch.zeros(nF, dtype=clvl.state.dtype, device=clvl.state.device)
-            vals[clone_cap(clvl.get("centroid")[:nF].detach().cpu(), self.clone_axis, self.clone_frac)] = 1.0
+            _c = clvl.get("centroid")[:nF].detach().cpu()
+            vals[clone_disk(_c, self.clone_point, self.clone_frac) if self.clone_point is not None
+                 else clone_cap(_c, self.clone_axis, self.clone_frac)] = 1.0
             set_cell_block_t(H, cat, self.clone_block, vals, nF)
             self._marked = True
             k = cell_block_t(H, cat, self.clone_block, nF)
         one = torch.ones((), dtype=k.dtype, device=k.device)
         return torch.where(k > 0.5, one * self.clone_mult, one)
 
+    def _hinge_drive(self, H):
+        """`hinge_mult` for hinge cells, 1 elsewhere; None without a hinge (the default path)."""
+        if self.hinge_frac <= 0:
+            return None
+        from plexus.operators.vertex_ops import cell_block_t, set_cell_block_t
+        cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
+        m = getattr(H.level(self.at), "_mesh", None)
+        if m is None:
+            return None
+        nF = int(m["nF"])
+        k = cell_block_t(H, cat, self.hinge_block, nF)
+        if k is None:
+            raise ValueError(f"cell_grow[stretch]: a hinge needs `sets.{cat}.state.{self.hinge_block}: "
+                             f"{{width: 1}}` declared on the cell set")
+        if not self._hinge_marked:
+            clvl = H.level(cat)
+            if "centroid" not in clvl.state_schema:
+                raise ValueError(f"cell_grow[stretch]: marking a hinge needs the `centroid` block on `{cat}`")
+            vals = torch.zeros(nF, dtype=clvl.state.dtype, device=clvl.state.device)
+            vals[hinge_ring(clvl.get("centroid")[:nF].detach().cpu(), self.hinge_frac)] = 1.0
+            set_cell_block_t(H, cat, self.hinge_block, vals, nF)
+            self._hinge_marked = True
+            k = cell_block_t(H, cat, self.hinge_block, nF)
+        one = torch.ones((), dtype=k.dtype, device=k.device)
+        return torch.where(k > 0.5, one * self.hinge_mult, one)
+
     def forward(self, H, mask=None):
         self._drive = self._clone_drive(H)
+        hd = self._hinge_drive(H)
+        if hd is not None:
+            self._drive = hd if self._drive is None else self._drive * hd.to(self._drive.device)
         self._H = H
         self._gf = self._polar_gf(H) if self.drive_kind == "polar" else None
+        self._and = self._and_gate(H) if self.and_chan is not None else None
         return super().forward(H, mask)
 
     def _polar_gf(self, H):
@@ -2954,7 +3502,26 @@ class Grow3DStretch(Grow3D):
             set_cell_block_t(H, cat, "gf", gf, nF)
         return gf
 
+    def _and_gate(self, H):
+        """Hill(c) of the `and_chan` morphogen, relative to its own maximum (`and_sw` of it, sharpness
+        `and_hill`) -- the second growth factor of an AND gate (the class docstring)."""
+        cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
+        m = getattr(H.level(self.at), "_mesh", None)
+        clvl = H.level(cat)
+        if m is None or "chem" not in clvl.state_schema:
+            return None
+        nF = int(m["nF"])
+        h0, _ = clvl.state_schema["chem"]
+        c = clvl.state[:nF, h0 + self.and_chan].detach().clamp(min=0.0)
+        cmax = float(c.max()) if c.numel() else 0.0
+        if cmax <= 1e-9:
+            return torch.zeros_like(c)
+        thr = self.and_sw * cmax
+        return c ** self.and_hill / (thr ** self.and_hill + c ** self.and_hill)
+
     def _rate(self, s_prev, hillv, m, v_ref):
+        if self._and is not None:
+            hillv = hillv * self._and[:int(s_prev.shape[0])].to(hillv.dtype).to(hillv.device)
         base = super()._rate(s_prev, hillv, m, v_ref)
         nF = int(s_prev.shape[0])
         r = base
@@ -2964,6 +3531,37 @@ class Grow3DStretch(Grow3D):
             r = r * self._drive[:nF].to(r.dtype).to(r.device)
         need_sigma = self.gain != 0.0 or self._stretch_declared() or self.stretch_growth > 0
         if not need_sigma:
+            return r
+        if self.readout == "stress":
+            mech = m.get("mech")
+            vlvl = self._H.level(self.at)
+            if mech is None or not all(k in m for k in ("E_srce", "E_trgt", "E_face")):
+                return r                                       # the mechanics has not run yet: no signal
+            from plexus.operators.vertex_ops import cell_block_t
+            a = cell_block_t(self._H, self.cat, "area", nF)
+            pos = vlvl.get("pos")[:int(m["Nv"])].detach().to(r.dtype)
+            sig = 1.0 + isotropic_stress(pos, m["E_srce"], m["E_trgt"], m["E_face"], nF, a.to(r.device),
+                                         m["A0"][:nF], m["P0"][:nF], mech, myo=m.get("myo")).to(r.device)
+            if self.stretch_ref == "tissue":
+                sig = sig - sig.median() + 1.0
+            elif self.stretch_ref == "settle_median":
+                # the tissue's median stress at `ref_frame`, subtracted from then on as a FIXED offset: a
+                # settled pouch reads 1 (its line tension's standing compression removed), and a later
+                # global compression or stretch is still seen -- unlike `tissue`, which removes it every frame
+                # -- and NO signal before it (sigma = 1): an unsettled mesh's stress spans -0.7..1.8, which a
+                # stretch-growth term turns into x14 area in 30 frames (the batch-9 CPU smoke)
+                if self._off is None and getattr(self, "_k", 0) >= self.ref_frame:
+                    self._off = (sig.median() - 1.0).detach()
+                sig = sig - self._off if self._off is not None else torch.ones_like(sig)
+            if self.smooth > 0:
+                sig = face_neighbour_mean(sig, m["E_srce"], m["E_trgt"], m["E_face"], nF, self.smooth)
+            if self._stretch_declared():
+                from plexus.operators.vertex_ops import set_cell_block_t
+                set_cell_block_t(self._H, self.cat, "stretch", sig.detach(), nF)
+            if self.gain != 0.0:
+                r = r * (1.0 + self.gain * (sig - 1.0)).clamp(0.0, self.f_max)
+            if self.stretch_growth > 0:
+                r = r + s_prev.to(r.dtype) * self.rate * self.stretch_growth * (sig - 1.0 - self.stretch_threshold).clamp(min=0.0)
             return r
         v = self._v_now[:nF].to(r.dtype).clamp(min=1e-12)
         if self.readout == "a0":
@@ -2983,7 +3581,7 @@ class Grow3DStretch(Grow3D):
         else:
             ratio = v / m["V0f"][:nF].to(r.dtype).clamp(min=1e-12)
         ref = ratio.median().clamp(min=1e-12)
-        if self.stretch_ref == "settle":
+        if self.stretch_ref in ("settle", "settle_median"):
             if self._ref is None and getattr(self, "_k", 0) >= self.ref_frame:
                 self._ref = ref.detach().clone()
             ref = self._ref if self._ref is not None else ref

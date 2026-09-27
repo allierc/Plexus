@@ -39,7 +39,8 @@ BASE = os.path.join(ROOT, "config", "tissue", "exp11_base.yaml")
 
 
 def _spec(tmp_path, name, n_frames=12, hole=True, k=0.5, seed_offset=-0.1, membrane=True,
-          sense=True, gated=True, k_adh=0.0):
+          sense=True, gated=True, k_adh=0.0, cm_extra=None, op_extra=None, n_bm=1500,
+          seed_extra=None, add_ops=None):
     s = yaml.safe_load(open(BASE))
     s["general"].update(name=name, n_frames=n_frames, record_cap=n_frames + 2)
     s["plotting"] = {}
@@ -66,12 +67,20 @@ def _spec(tmp_path, name, n_frames=12, hole=True, k=0.5, seed_offset=-0.1, membr
     s["operators"] = [o for o in s["operators"] if o["op"] not in drop]
     s["schedule"] = [t for t in s["schedule"] if t not in drop]
     if membrane:
-        s["sets"]["bm_node"]["n"] = 1500
+        s["sets"]["bm_node"]["n"] = n_bm
         b = [o for o in s["seed"] if o["op"] == "bm_seed"][0]
         b["offset"] = seed_offset
+        b.update(seed_extra or {})
         if hole:
             b["hole"] = {"axis": [0, 0, 1], "half_angle_deg": 30}
         [o for o in s["operators"] if o["op"] == "bm_contact"][0].update(k=k, k_adh=k_adh)
+    if cm_extra:
+        [o for o in s["operators"] if o["op"] == "cell_mechanics"][0].update(cm_extra)
+    for op, kv in (op_extra or {}).items():
+        [o for o in s["operators"] if o["op"] == op][0].update(kv)
+    for o, after in (add_ops or []):              # (operator entry, the schedule name it follows)
+        s["operators"].append(dict(o))
+        s["schedule"].insert(s["schedule"].index(after) + 1, o["op"])
     p = tmp_path / f"{name}.yaml"
     yaml.safe_dump(s, open(p, "w"), sort_keys=False)
     return load(str(p))
@@ -400,9 +409,8 @@ def test_shape_contact_ledger_and_push(tmp_path):
 
 # ------------------------------------------------------------------------------ the inner cell mass
 def _core_volume_series(tmp_path, name, k_core, core_rate, n_frames=12):
-    s = _spec(tmp_path, name, n_frames=n_frames, hole=False, k=0.0, sense=False, gated=False)
-    cm = [o for o in s["operators"] if o["op"] == "cell_mechanics"][0]
-    cm.update(k_core=k_core, core_rate=core_rate)
+    s = _spec(tmp_path, name, n_frames=n_frames, hole=False, k=0.0, sense=False, gated=False,
+              cm_extra=dict(k_core=k_core, core_rate=core_rate))
     from plexus.operators.vertex_ops import enclosed_ring_volume
     rec = []
 
@@ -435,3 +443,139 @@ def test_inner_mass_grows_the_lumen(tmp_path):
     grow = _core_volume_series(tmp_path, "core_grow", 0.3, 0.05)
     assert grow[-1] > free[-1] * 1.05
     assert grow[-1] > grow[1]
+
+
+def _thickness_series(tmp_path, name, k_height, n_frames=30):
+    s = _spec(tmp_path, name, n_frames=n_frames, hole=False, k=0.5, sense=False, gated=False,
+              cm_extra=dict(k_height=k_height))
+    rec = []
+
+    def on_frame(H, t, rec=rec):
+        m = H.level("vertex")._mesh
+        nv = int(m["Nv"])
+        rec.append(float(2.0 * H.level("vertex").get("sep")[:nv].norm(dim=1).median()))
+    MO.CONTACT_TRACE.clear()
+    engine.run(s, device="cpu", on_frame=on_frame)
+    return np.asarray(rec)
+
+
+def test_columnar_height_holds_thickness(tmp_path):
+    """Ungated growth under the membrane thickens the cells; `k_height` holds them near their first
+    thickness, so the growth goes into footprint (the same run, the spring the only change)."""
+    free = _thickness_series(tmp_path, "h_free", 0.0)
+    held = _thickness_series(tmp_path, "h_held", 30.0)
+    assert free[-1] > free[0] * 1.05
+    assert abs(held[-1] / held[0] - 1.0) < abs(free[-1] / free[0] - 1.0) / 2
+
+
+def _core_targets(tmp_path, name, alpha, n_frames=16):
+    s = _spec(tmp_path, name, n_frames=n_frames, hole=False, k=0.0, sense=False, gated=False,
+              cm_extra=dict(k_core=0.3, core_alpha=alpha, k_height=30.0))
+    rec = []
+
+    def on_frame(H, t, rec=rec):
+        rec.append(H.level("vertex")._mesh.get("core_target"))
+    MO.CONTACT_TRACE.clear()
+    engine.run(s, device="cpu", on_frame=on_frame)
+    return np.asarray([v for v in rec if v is not None], float)
+
+
+def test_core_alpha_ties_the_interior_to_the_layer(tmp_path):
+    """`core_alpha` 0: the interior's target is its first volume however the layer changes; `core_alpha`
+    1: the target moves by the layer's own volume change -- the interior follows the layer, not the clock."""
+    held = _core_targets(tmp_path, "ca0", 0.0)
+    tied = _core_targets(tmp_path, "ca1", 1.0)
+    assert held.max() == pytest.approx(held.min())
+    assert abs(tied[-1] - tied[0]) > 1e-3 * abs(tied[0])
+
+
+def test_bm_bond_guard_reads_the_spec_dt(tmp_path):
+    """`guard_dt: spec` refuses batch 2's NaN settings (overdamped_gamma 5, k 5 at dt 1: k z dt / gamma ~6 > 2);
+    the default guard (the archive's dt 0.004) lets them through, as it did."""
+    bad = dict(overdamped_gamma=5.0, k=5.0)
+    _run(_spec(tmp_path, "guard_default", n_frames=1, op_extra={"bm_bond": bad}))
+    with pytest.raises(RuntimeError, match="explicit-integration ceiling"):
+        _run(_spec(tmp_path, "guard_spec", n_frames=1, op_extra={"bm_bond": dict(bad, guard_dt="spec")}))
+    _run(_spec(tmp_path, "guard_spec_ok", n_frames=1,
+               op_extra={"bm_bond": dict(overdamped_gamma=5.0, k=1.0, guard_dt="spec")}))
+
+
+# ------------------------------------------------------------------------------ bm_secrete[live] (M2)
+_SECRETE = {"op": "bm_secrete", "implementation": "live", "at": "bm_node", "surface": "vertex",
+            "offset": 0.05, "seed": 0}
+
+
+def _secrete_series(tmp_path, name, secrete, hole=False, n_frames=30):
+    """Ungated growth (cell_grow rate 0.006, area x1.5-1.7 over 30 frames) with the thickness held
+    (k_height 30), a soft fast sheet (bm_bond gamma 1, k 0.1) and a reserve of one slot per sheet slot
+    (bm_node n 3000 -> the same 1,500-node sheet as every test above, plus 1,500 dormant). Per frame:
+    live nodes, basal area, the alive mask, the new nodes' positions and the basal centroid."""
+    rec = []
+    geo = MO._basal_lookup()
+
+    def on_frame(H, t, rec=rec):
+        m, c, M = MO._live_basal(H, "vertex", "sep", geo, torch.device("cpu"), torch.float32)
+        A = float((0.5 * torch.cross(M["B"] - M["A"], M["C"] - M["A"], dim=1).norm(dim=1)).sum())
+        rec.append((int(H.membrane_alive.sum()), A, H.membrane_alive.clone(),
+                    H.level("bm_node").get("pos").clone(), c.clone()))
+    sim = _spec(tmp_path, name, n_frames=n_frames, hole=hole, sense=False, gated=False,
+                cm_extra=dict(k_height=30.0), n_bm=3000, seed_extra=dict(reserve=1.0),
+                op_extra={"bm_bond": dict(overdamped_gamma=1.0, k=0.1), "cell_grow": dict(rate=0.006)},
+                add_ops=[(_SECRETE, "bm_contact")] if secrete else None)
+    MO.CONTACT_TRACE.clear()
+    MO.SECRETE_LIVE_TRACE.clear()
+    H, _ = engine.run(sim, device="cpu", on_frame=on_frame)
+    return H, rec
+
+
+def test_seed_reserve_lays_the_same_sheet(tmp_path):
+    """`bm_seed[live]` with reserve 1 on 3,000 slots lays the 1,500-slot sheet (hole included) node for
+    node, and parks the other 1,500 dormant as reserve, distinct from the hole's left-out nodes."""
+    Ha, _ = _run(_spec(tmp_path, "res0", n_frames=0))
+    Hb, _ = _run(_spec(tmp_path, "res1", n_frames=0, n_bm=3000, seed_extra=dict(reserve=1.0)))
+    pa, pb = Ha.level("bm_node").get("pos"), Hb.level("bm_node").get("pos")
+    assert torch.equal(Ha.membrane_alive, Hb.membrane_alive[:1500])
+    assert torch.equal(pa[Ha.membrane_alive], pb[:1500][Ha.membrane_alive])
+    assert not Hb.membrane_alive[1500:].any()
+    assert Hb.membrane_reserve[1500:].all() and not Hb.membrane_reserve[:1500].any()
+    assert not Ha.membrane_reserve.any() and Hb.membrane_hole[1] == 30.0
+
+
+def test_secrete_live_holds_areal_density(tmp_path):
+    """The basal area grows ~1.5x in 30 frames; with `bm_secrete[live]` live nodes per basal area stay
+    within 15 % of the first frame's, without it they fall with the area (below 0.75 of the first)."""
+    _, off = _secrete_series(tmp_path, "sec_off", False)
+    H, on = _secrete_series(tmp_path, "sec_on", True)
+    dens = lambda rec: np.array([n / A for n, A, *_ in rec]) / (rec[0][0] / rec[0][1])
+    d_on, d_off = dens(on), dens(off)
+    assert on[-1][1] / on[0][1] > 1.3, "the planted growth must grow the basal area"
+    assert np.abs(d_on - 1.0).max() < 0.15
+    assert d_off[-1] < 0.75
+    assert on[-1][0] > on[0][0] * 1.25                     # it secreted, from the reserve only
+    assert torch.equal(on[-1][2] & ~H.membrane_reserve, on[0][2])
+    # every new node is crosslinked in by bm_bond's own new-node bonding
+    bi, bj, _, ba = H.membrane_bonds
+    deg = torch.zeros(H.membrane_alive.numel()).index_add_(0, bi[ba], torch.ones(int(ba.sum())))
+    deg.index_add_(0, bj[ba], torch.ones(int(ba.sum())))
+    new = (on[-2][2] & ~on[0][2]).nonzero(as_tuple=True)[0]   # secreted before the last bm_bond call
+    assert (deg[new] >= 2).float().mean() > 0.95
+    assert torch.isfinite(H.level("bm_node").get("pos")[H.membrane_alive]).all()
+
+
+def test_secrete_live_never_fills_the_hole(tmp_path):
+    """With the 30-degree hole: nodes are secreted, none becomes alive inside the cone (checked on the
+    frame it appears, about that frame's basal centroid), and the hole's left-out nodes stay dormant."""
+    H, rec = _secrete_series(tmp_path, "sec_hole", True, hole=True, n_frames=20)
+    hole_nodes = ~H.membrane_reserve & (H.membrane_u0[:, 2] >= math.cos(math.radians(30.0)))
+    assert hole_nodes.sum() > 0
+    cos_a = math.cos(math.radians(30.0))
+    n_new, worst = 0, -1.0
+    for (_, _, al0, _, _), (_, _, al1, p1, c1) in zip(rec[:-1], rec[1:]):
+        new = al1 & ~al0
+        assert not (al1 & hole_nodes).any()
+        if new.any():
+            d = p1[new] - c1
+            worst = max(worst, float((d[:, 2] / d.norm(dim=1)).max()))
+            n_new += int(new.sum())
+    assert n_new > 100
+    assert worst < cos_a, f"a secreted node appeared inside the hole cone (cos {worst:.4f} >= {cos_a:.4f})"

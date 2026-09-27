@@ -108,3 +108,56 @@ def test_delta_zero_outside_its_columns():
     out = m.forward(H(Lvl(chem, ring(6))))["cell"]
     assert float(out[:, :4].abs().max()) == 0.0 and float(out[:, 8].abs().max()) == 0.0
     assert float(out[:, 4:8].abs().max()) > 0.0
+
+
+def _seed_level(n, width=4):
+    from types import SimpleNamespace
+    lvl = SimpleNamespace(state=torch.zeros(n, width, dtype=torch.float64), state_schema={"chem": (0, width)},
+                          occ=None)
+    return SimpleNamespace(levels={}, level=lambda name: lvl), lvl
+
+
+def test_lognormal_seed_keeps_the_mean_and_sets_the_cv():
+    from plexus.operators.diffusion_reaction import CellRDSeedLognormal
+    H, lvl = _seed_level(200_000)
+    CellRDSeedLognormal({"values": [0.0, 0.0, 1.0, 0.0], "cv": [0.0, 0.0, 0.3, 0.0], "seed": 1}).forward(H)
+    y = lvl.state[:, 2]
+    assert abs(float(y.mean()) - 1.0) < 0.005 and abs(float(y.std() / y.mean()) - 0.3) < 0.005
+    assert float(lvl.state[:, [0, 1, 3]].abs().max()) == 0.0 and float(y.min()) > 0
+
+
+def test_lognormal_cv_zero_is_uniform():
+    from plexus.operators.diffusion_reaction import CellRDSeedLognormal
+    H, lvl = _seed_level(50)
+    CellRDSeedLognormal({"values": [0.1, 0.2, 1.0, 0.0], "cv": 0.0}).forward(H)
+    assert torch.equal(lvl.state, torch.tensor([[0.1, 0.2, 1.0, 0.0]], dtype=torch.float64).expand(50, 4))
+
+
+def test_yap_threshold_no_cell_above_it_picks_nobody():
+    c = start(20, y=1.0, noise=0.05, seed=3)
+    c = run(c, ring(20), steps=3000, y_th=1.4)
+    assert float(c[:, 1].max()) < 0.2                                   # Y^8/(1.4^8+Y^8) ~ 0.06: no winner
+
+
+def test_yap_threshold_winners_only_among_high_yap_cells():
+    n = 20
+    c = start(n, y=1.0, noise=0.05, seed=3)
+    c[5:9, 2] = 1.8                                                     # one high-YAP clone of four cells
+    c = run(c, ring(n), steps=4000, y_th=1.4)
+    win = (c[:, 1] > 0.5).nonzero().flatten().tolist()
+    assert win and all(5 <= w <= 8 for w in win)                         # winners inside the clone only
+    assert len(win) == 2                                                 # alternating within it: 5/7 or 6/8
+
+
+def test_y_max_sets_the_level_wnt_holds():
+    c = start(2); c[0, 1] += 1e-3
+    c = run(c, ring(2), steps=3000, p=2.0, theta=0.5, k_w=1.0, k_y=0.5, K_w=0.1, wnt_off=1500, y_max=1.5)
+    assert 1.4 < float(c[0, 2]) < 1.5 and float(c[1, 2]) < 0.05
+
+
+def test_delta_noise_breaks_an_identical_pair():
+    c = start(2)                                                        # two identical cells: a divided winner
+    c0 = run(c.clone(), ring(2), steps=2000)
+    assert abs(float(c0[0, 1] - c0[1, 1])) < 1e-9                       # deterministic: stuck symmetric
+    c1 = run(c.clone(), ring(2), steps=2000, sigma_d=0.05)
+    assert float(c1[:, 1].max()) > 0.9 and float(c1[:, 1].min()) < 0.05  # noise picks one

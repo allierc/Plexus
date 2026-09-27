@@ -194,3 +194,139 @@ def test_type_pair_multiplier_on_a_sphere_is_symmetric():
     assert (tw >= 0).all() and torch.equal(m, m[tw])
     het = ft[ef] != ft[ef[tw]]
     assert het.any() and (m[het] == 11.0).all() and set(m[~het].tolist()) <= {2.0, 14.0}
+
+
+# ------------------------------------------------------------------ edge_flip[boundary] (vertex_ops.py)
+def _disc_rings(n=120, seed=0):
+    from plexus.operators.vertex_ops import build_disc_mesh, rings_from_flat_3d
+    pos, es, et, ef, nF = build_disc_mesh(n, r=1.0, jitter=0.1, seed=seed)
+    rings = rings_from_flat_3d(np.asarray(es), np.asarray(et), np.asarray(ef), nF)
+    return [list(map(int, r)) for r in rings], [np.asarray(p, float) for p in pos]
+
+
+def _rim_faces(rings):
+    de = {(r[i], r[(i + 1) % len(r)]) for r in rings for i in range(len(r))}
+    return {f for f, r in enumerate(rings) for i in range(len(r)) if (r[(i + 1) % len(r)], r[i]) not in de}
+
+
+def _adjacent(rings, f, g):
+    ef = {(rings[f][i], rings[f][(i + 1) % len(rings[f])]) for i in range(len(rings[f]))}
+    return any((rings[g][(i + 1) % len(rings[g])], rings[g][i]) in ef for i in range(len(rings[g])))
+
+
+def test_boundary_t1_spoke_then_rim_is_the_identity():
+    """A spoke flip brings the inner cell C onto the rim and separates the two rim cells A, B; the rim
+    flip on C's new rim edge undoes it: A and B touch again and C leaves the rim."""
+    from plexus.operators.vertex_ops import _edge_face_map, _vertex_faces, t1_flip_boundary
+    rings, pos = _disc_rings()
+    emap, vf = _edge_face_map(rings), _vertex_faces(rings)
+    rim0 = _rim_faces(rings)
+    done = None
+    for (a, b), A in list(emap.items()):
+        B = emap.get((b, a))
+        if B is None or len(vf[b]) != 2 or len(vf[a]) != 3:
+            continue                                            # want a spoke: a interior, b on the rim
+        C = (vf[a] - {A, B}).pop()
+        if C in rim0:
+            continue
+        r0 = [list(r) for r in rings]
+        if t1_flip_boundary(rings, pos, (a, b), new_len=0.05, emap=emap, vf=vf, plane_axis=2) is not None:
+            done = (a, b, A, B, C, r0)
+            break
+    assert done is not None, "no spoke edge could flip on a planted disc"
+    a, b, A, B, C, r0 = done
+    assert len(rings) == len(r0)                                # no face created or lost
+    assert C in _rim_faces(rings) and not _adjacent(rings, A, B)
+    # the inverse: C's new rim edge is (b -> a) in C
+    rim_edge = next((x, y) for (x, y), f in emap.items() if f == C and (y, x) not in emap and {x, y} == {a, b})
+    assert t1_flip_boundary(rings, pos, rim_edge, new_len=0.05, emap=emap, vf=vf, plane_axis=2) is not None
+    assert _adjacent(rings, A, B) and C not in _rim_faces(rings)
+    assert sorted(map(sorted, rings)) == sorted(map(sorted, r0))  # the same vertex sets per face as before
+
+
+def test_boundary_t1_interior_edges_flip_as_the_default():
+    """On an interior edge the variant IS the default T1: identical rings and positions."""
+    from plexus.operators.vertex_ops import _edge_face_map, _vertex_faces, t1_flip_3d, t1_flip_boundary
+    rings, pos = _disc_rings(seed=1)
+    emap = _edge_face_map(rings)
+    vf = _vertex_faces(rings)
+    rim = _rim_faces(rings)
+    e = next((a, b) for (a, b), A in emap.items()
+             if emap.get((b, a)) is not None and len(vf[a]) == 3 and len(vf[b]) == 3 and not (vf[a] | vf[b]) & rim)
+    r1, p1 = [list(r) for r in rings], [p.copy() for p in pos]
+    r2, p2 = [list(r) for r in rings], [p.copy() for p in pos]
+    o1 = t1_flip_3d(r1, p1, e, new_len=0.05, plane_axis=2)
+    o2 = t1_flip_boundary(r2, p2, e, new_len=0.05, plane_axis=2)
+    assert o1 == o2 and r1 == r2 and all(np.array_equal(x, y) for x, y in zip(p1, p2))
+
+
+def _fake_H(n=200, seed=0):
+    """A stand-in hierarchy for junction_myosin[type_pair]: a closed sphere mesh and a typed cell set."""
+    from types import SimpleNamespace
+    from plexus.operators.vertex_ops import build_sphere_mesh
+    pos, es, et, ef, nF = build_sphere_mesh(n, r=1.0, jitter=0.05, seed=seed)
+    t = lambda a: torch.as_tensor(np.asarray(a))                                     # noqa: E731
+    mesh = {"E_srce": t(es).long(), "E_trgt": t(et).long(), "E_face": t(ef).long(), "nF": nF}
+    v = SimpleNamespace(_mesh=mesh, get=lambda k: t(pos).float(), mesh_cell_set="cell", name="vertex")
+    c = SimpleNamespace(node_type=t(np.arange(nF) % 2).long(), type_names=["LEP", "MEP"], name="cell")
+    levels = {"vertex": v, "cell": c}
+    return SimpleNamespace(level=lambda k: levels[k], levels=levels, dt=1.0), mesh
+
+
+def test_type_pair_noise_off_is_the_table_and_on_is_symmetric():
+    from plexus.models.registry import get_operator
+    from plexus.operators.junction_ops import pcp_twins, type_pair_multiplier
+    cls = get_operator("junction_myosin", variant="type_pair")
+    tens = {"LEP": {"LEP": 1.0, "MEP": 3.0}, "MEP": {"MEP": 6.0}}
+    H, m = _fake_H()
+    cls({"_at": "vertex", "cell_set": "cell", "tensions": tens}).forward(H)
+    base = m["myo"].clone()
+    assert set(base.tolist()) <= {1.0, 3.0, 6.0}                                         # noise 0: the table alone
+    op = cls({"_at": "vertex", "cell_set": "cell", "tensions": tens, "noise": 2.0, "tau": 5.0, "seed": 3})
+    dev = []
+    for _ in range(400):
+        op.forward(H)
+        dev.append((m["myo"] - base).numpy())
+    tw = pcp_twins(m["E_srce"], m["E_trgt"], int(max(m["E_srce"].max(), m["E_trgt"].max())) + 1)
+    assert torch.allclose(m["myo"], m["myo"][tw])                                          # a junction = its twin
+    d = np.stack(dev)
+    assert abs(d.std() - 2.0) < 0.3 and abs(d.mean()) < 0.3                               # sd = noise, per junction
+
+
+def test_brownian_anneal_ramps_the_temperature(tmp_path):
+    """brownian[anneal]: the kick's variance follows kT from kT to kT_end over `frames`, then holds;
+    with kT_end = kT the kicks are the default's, bit for bit."""
+    n = 20000
+    sim = _spec(tmp_path, {"general": {"name": "an", "n_frames": 1, "dt": 1e-6, "boundary": "free", "world": [1.0, 1.0]},
+                           "sets": {"p": {"n": n}}, "fields": {},
+                           "operators": [{"op": "brownian", "model": "anneal", "at": "p", "kT": 0.5, "kT_end": 0.3,
+                                          "frames": 10, "mobility": 1.0, "seed": 4}],
+                           "schedule": ["brownian"]}, "an")
+    H = build(sim, device="cpu")
+    H.dt = 1e-6
+    op = _ops(sim)[0]
+    var = [float(op.forward(H)["p"].var()) for _ in range(15)]
+    scale = 2.0 * 1.0 / 1e-6                                          # v = sqrt(2 mu kT / dt) xi
+    assert abs(var[0] / scale - 0.5) < 0.02 and abs(var[5] / scale - 0.4) < 0.02 and abs(var[14] / scale - 0.3) < 0.02
+    from plexus.models.registry import get_operator
+    a = get_operator("brownian", variant="anneal")({"_at": "p", "kT": 0.5, "kT_end": 0.5, "frames": 10, "seed": 7}, device="cpu")
+    b = get_operator("brownian")({"_at": "p", "kT": 0.5, "seed": 7}, device="cpu")
+    for _ in range(3):
+        assert torch.equal(a.forward(H)["p"], b.forward(H)["p"])
+
+
+def test_type_pair_noise_anneal_cools_to_the_end_value():
+    """noise -> noise_end over `frames` calls: the deviation from the table shrinks to zero and stays."""
+    from plexus.models.registry import get_operator
+    cls = get_operator("junction_myosin", variant="type_pair")
+    tens = {"LEP": {"LEP": 1.0, "MEP": 3.0}, "MEP": {"MEP": 6.0}}
+    H, m = _fake_H()
+    cls({"_at": "vertex", "cell_set": "cell", "tensions": tens}).forward(H)
+    base = m["myo"].clone()
+    op = cls({"_at": "vertex", "cell_set": "cell", "tensions": tens, "noise": 2.0, "noise_end": 0.0, "frames": 20,
+              "tau": 5.0, "seed": 1})
+    op.forward(H)
+    assert (m["myo"] - base).abs().max() > 0.5
+    for _ in range(25):
+        op.forward(H)
+    assert torch.equal(m["myo"], base)

@@ -586,6 +586,59 @@ def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
             np.array(ef, np.int64), len(faces))
 
 
+def build_disc_mesh_isotropic(n, r=1.0, jitter=0.0, seed=0):
+    """`build_disc_mesh` without its two preferred axes -- for `seed_mesh[isotropic]`.
+
+    The default lattice lays EQUAL x- and y-pitch with alternate rows offset by half a step, so each
+    Voronoi cell is 2/sqrt(3) = 1.155 times longer along y than along x, and the rows run along x.
+    Measured on exp08's relaxed sheet: a tissue-mean cell elongation M_E 0.07 along y, and a polarity
+    that orders along x when the tissue is stretched along y but not when it is stretched along x
+    (exp08 Phase 2, Finding P3). Here the row pitch is sqrt(3)/2 of the column pitch -- a true
+    hexagonal lattice -- and the lattice is turned by an angle drawn from `seed` (uniform on [0, pi)),
+    so no axis is preferred across seeds. Otherwise identical: the same jitter, collar and Voronoi.
+    """
+    from scipy.spatial import Voronoi
+    g = np.random.default_rng(seed)
+    th = float(g.uniform(0.0, np.pi))
+    m = int(np.ceil(np.sqrt(n / 0.7854 * (np.sqrt(3) / 2))))       # the default's cell count: rows are denser
+    step = 2.0 * r / max(m, 1)
+    ny = int(np.ceil(2.0 * r / (step * np.sqrt(3) / 2)))
+    xs, ys = np.meshgrid(np.arange(m + 1) * step - r, np.arange(ny + 1) * step * np.sqrt(3) / 2 - r)
+    xs = xs + (np.arange(ny + 1)[:, None] % 2) * 0.5 * step
+    pts = np.stack([xs.ravel(), ys.ravel()], 1)
+    c, s_ = np.cos(th), np.sin(th)
+    pts = pts @ np.array([[c, s_], [-s_, c]])
+    if jitter > 0:
+        pts = pts + jitter * step * (g.random(pts.shape) - 0.5)
+    pts = pts[np.linalg.norm(pts, axis=1) <= r * 1.35]
+    vor = Voronoi(pts)
+    faces, V = [], vor.vertices
+    for ip, ir in enumerate(vor.point_region):
+        reg = vor.regions[ir]
+        if not reg or -1 in reg:
+            continue
+        if np.linalg.norm(V[reg], axis=1).max() > r:
+            continue
+        faces.append(np.asarray(reg, np.int64))
+    if not faces:
+        raise ValueError(f"build_disc_mesh_isotropic: no bounded cell inside r={r} for n={n}")
+    used = np.unique(np.concatenate(faces))
+    remap = -np.ones(len(V), np.int64); remap[used] = np.arange(len(used))
+    verts = np.zeros((len(used), 3), np.float64); verts[:, :2] = V[used]
+    es, et, ef = [], [], []
+    for f, reg in enumerate(faces):
+        rr = remap[reg]
+        P = verts[rr, :2]
+        cc = P.mean(0)
+        if np.cross(P[0] - cc, P[1] - cc) < 0:
+            rr = rr[::-1]
+        k = len(rr)
+        for i in range(k):
+            es.append(int(rr[i])); et.append(int(rr[(i + 1) % k])); ef.append(f)
+    return (verts, np.array(es, np.int64), np.array(et, np.int64),
+            np.array(ef, np.int64), len(faces))
+
+
 def build_strip_mesh(n, r=1.0, jitter=0.0, seed=0, kind="plane", width=0.5, twist_R=None):
     """A Voronoi patch on a RECTANGLE, mapped onto a surface: `plane`, `ribbon` or `moebius`.
 
@@ -1771,6 +1824,68 @@ class ShapeEnergyContact3D(ShapeEnergy3D):
         finally:
             self._loads = None
         return _book_contacts(H, m, _fr, _bc, conts, Nv, pos.device, out)
+
+
+def junction_spring_grad(x, es, et, ef, nF, keys, l0, stride, k):
+    """dE/dx of E = sum over junctions of (k / 2) (l - l0)^2 / l0, one term per junction.
+
+    A junction is found by its vertex pair (key = min * stride + max, as `junction_ops` keys its store);
+    one with no stored rest length contributes nothing. Each undirected junction is two half-edges in
+    the interior and one on a free edge, so each half-edge carries 1 / (its key's count) of the term."""
+    live = ef < nF
+    vi, vj = es[live].long(), et[live].long()
+    key = torch.minimum(vi, vj) * stride + torch.maximum(vi, vj)
+    order = torch.argsort(keys)
+    ks, vs = keys[order], l0[order].to(x.dtype)
+    idx = torch.searchsorted(ks, key).clamp(max=max(ks.numel() - 1, 0))
+    hit = (ks.numel() > 0) & (ks[idx] == key)
+    L0 = torch.where(hit, vs[idx], torch.ones_like(vs[idx]) if vs.numel() else torch.ones(key.shape, dtype=x.dtype, device=x.device))
+    d = x[vj] - x[vi]
+    L = d.norm(dim=1).clamp_min(1e-12)
+    _, inv, cnt = torch.unique(key, return_inverse=True, return_counts=True)
+    T = torch.where(hit, k * (L - L0) / L0.clamp_min(1e-12), torch.zeros_like(L)) / cnt[inv].to(x.dtype)
+    f = (T / L)[:, None] * d
+    g = torch.zeros_like(x)
+    g.index_add_(0, vj, f)
+    g.index_add_(0, vi, -f)
+    return g
+
+
+@register_operator("cell_mechanics", model="junction_spring", set="vertex", kind="lateral",
+                   family="mechanics", title="Vertex-model shape energy with elastic junctions")
+class ShapeEnergyJunctionSpring3D(ShapeEnergy3D):
+    """`cell_mechanics` plus a SPRING on every junction whose rest length remodels:
+
+        E = E_shape + sum_j (k / 2) (l_j - l0_j)^2 / l0_j,        k = kappa Lambda
+
+    l0_j and kappa come from `junction_myosin[rest_length]` (its keyed store `rl_keys` / `rl_vals`, and
+    `rl_kappa`, `rl_stride`), which relaxes l0 toward l each frame. The shape energy is the parent's
+    with plain Lambda: m["myo"], which that operator also writes, is then a READOUT of
+    Lambda (1 + kappa (l - l0) / l0) -- the junction's total line tension, what the rulers and the
+    growth law's stress read -- and is not applied a second time here.
+
+    WHY A MODEL OF cell_mechanics (exp 13 Phase 2 P45): as a multiplier on Lambda, fixed through a
+    frame's relaxation, the same law collapsed junctions into a T1 cascade within two frames. A junction
+    at 1.13x shortened under a tension a spring would shed as it shortens (0 -> 314 flips a frame). In
+    the energy, the tension is re-evaluated at every relaxation iteration at the positions reached, as
+    `shape_contact` does for its contacts: the spring's tension falls as the junction shortens. With no
+    store (no junction_myosin[rest_length] scheduled) it IS the parent.
+
+    Reference: Staddon, M.F. et al. (2019). Biophys. J. 117:1739-1750; the shape energy as `cell_mechanics`.
+    """
+
+    def _grad_myo(self, m, *a, **kw):
+        keys = m.get("rl_keys") if isinstance(m, dict) else None
+        if keys is None:
+            return super()._grad_myo(m, *a, **kw)
+        m_shape = {k_: v for k_, v in m.items() if k_ != "myo"}
+        g = super()._grad_myo(m_shape, *a, **kw)
+        x, es, et, ef, nF = a[0], a[1], a[2], a[3], a[4]
+        k = float(m.get("rl_kappa", 0.0)) * float(self.Lambda)
+        if k == 0.0:
+            return g
+        return g + junction_spring_grad(x, es, et, ef, int(nF), keys.to(x.device), m["rl_vals"].to(x.device),
+                                        int(m["rl_stride"]), k).to(g.dtype)
 
 
 # There is ONE growth operator on this mesh, `cell_grow` in diffusion_reaction, and deliberately
@@ -3309,6 +3424,54 @@ class Apoptosis3DChemLow(Apoptosis3D):
     DEATH = "chem_low"
 
 
+@register_operator("cell_die", model="chem_rate", set="vertex", kind="die",
+                   family="population", title="Cell death")
+class Apoptosis3DChemRate(Apoptosis3D):
+    """`chem_rate` model of cell_die: a cell LEAVES the epithelium at a rate set by its fate -- the
+    differentiation of neural progenitors, which delaminate from the neuroepithelium at domain-
+    specific rates (Kicheva et al. 2014, Fig. 3C: pMN up to 0.145 per hour, p3 and pI ~0.03, pD ~0.015,
+    against a uniform proliferation of ~0.08 per hour, Fig. 3A).
+
+        fate_j = argmax_k chem_j[fate_cols[k]]   (none if the largest is below `fate_threshold`)
+        after frame `t_start`, mark j with probability fate_rates[fate_j] x `every` per call
+
+    The rates are per frame; the extrusion that follows is the base operator's (the ring contracts,
+    the cell is removed). WHY A NEW MODEL AND NOT `chem_low`: `chem_low` marks a SET -- every cell
+    below a threshold, at once -- where differentiation is a FLUX: a fraction of a domain leaves per
+    unit time and the rest keeps cycling; `field` compares to a median, not a fate. Without rates
+    (`fate_rates` empty or all 0) nothing is marked (tested).
+
+    Reference: Kicheva, A. et al. (2014). Science 345:1254927 (Figs. 3A, 3C, the two-phase model).
+    """
+    DEATH = "chem_rate"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.fate_cols = [int(c) for c in (params.get("fate_cols") or [])]
+        self.fate_rates = [float(r) for r in (params.get("fate_rates") or [])]
+        if len(self.fate_cols) != len(self.fate_rates):
+            raise ValueError("cell_die[chem_rate]: fate_cols and fate_rates must have the same length")
+        self.fate_threshold = float(params.get("fate_threshold", 0.5))
+        self.t_start = float(params.get("t_start", 0.0))
+        self.call_every = max(int(params.get("every", 1)), 1)
+        self._rng = np.random.default_rng(int(params.get("seed", 0)) + 7919)
+
+    def _marked(self, m, H, nF):
+        if not self.fate_cols or not any(r > 0 for r in self.fate_rates):
+            return set()
+        if float(getattr(H, "frame", 0) or 0) < self.t_start:
+            return set()
+        clvl = H.level(self.cat)
+        if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+            return set()
+        h0, _ = clvl.state_schema["chem"]
+        G = clvl.state[:nF, [h0 + c for c in self.fate_cols]].detach().cpu().numpy()
+        fate = np.argmax(G, axis=1)
+        p = np.asarray(self.fate_rates, float)[fate] * self.call_every
+        p[G.max(axis=1) < self.fate_threshold] = 0.0
+        return set(np.where(self._rng.random(nF) < p)[0].tolist())
+
+
 @register_operator("cell_die", model="prescribed", set="vertex", kind="die",
                    family="population", title="Cell death")
 class Apoptosis3DPrescribed(Apoptosis3D):
@@ -3354,6 +3517,55 @@ class Apoptosis3DField(Apoptosis3D):
     DEATH = "field"
 
 
+@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed",
+                   implementation="isotropic", title="Build the cell mesh, no preferred axis")
+class SeedMeshIsotropic(SeedMesh3D):
+    """`isotropic` IMPLEMENTATION of seed_mesh: the default mesh with the disc built by
+    `build_disc_mesh_isotropic` -- a true hexagonal lattice (row pitch sqrt(3)/2), turned by an angle
+    drawn from `seed` -- so the seeded cells carry no shared elongation and the packing no shared axis.
+    Every other shape, and every other parameter, is the default's.
+
+    WHY: exp08 Phase 2 (Finding P3) -- on the default disc the cells are 1.155 times longer along y and
+    a stretch along y ordered the polarity while the same stretch along x did not; an experiment about
+    a deformation setting an axis needs a seed that has none.
+
+    The swap is done for the length of this call only (the default forward looks its builder up by
+    module name at call time), so the default class and every spec using it are untouched.
+    """
+
+    def forward(self, H, mask=None):
+        import plexus.operators.vertex_ops as _V
+        orig = _V.build_disc_mesh
+        _V.build_disc_mesh = build_disc_mesh_isotropic
+        try:
+            return super().forward(H, mask)
+        finally:
+            _V.build_disc_mesh = orig
+
+
+def mutant_patches(m, pos, nF, pool, k, size, rng):
+    """k cells of `pool` as patches of `size` adjacent cells: ceil(k / size) patch centres drawn from the
+    pool, each grown by its nearest pool cells (face centroids), the last patch cut to make k in total."""
+    es = np.asarray(m["E_srce"].detach().cpu() if hasattr(m["E_srce"], "detach") else m["E_srce"], np.int64)
+    ef = np.asarray(m["E_face"].detach().cpu() if hasattr(m["E_face"], "detach") else m["E_face"], np.int64)
+    P = np.asarray(pos.detach().cpu() if hasattr(pos, "detach") else pos, np.float64)
+    live = ef < nF
+    cen = np.zeros((nF, 3))
+    np.add.at(cen, ef[live], P[es[live]])
+    cen /= np.maximum(np.bincount(ef[live], minlength=nF), 1)[:, None]
+    pool = np.asarray(pool, np.int64)
+    free = np.ones(nF, bool)
+    chosen = []
+    for c in rng.choice(pool, size=int(np.ceil(k / size)), replace=False):
+        if not free[c]:
+            continue
+        cand = pool[free[pool]]
+        near = cand[np.argsort(np.linalg.norm(cen[cand] - cen[c], axis=1), kind="stable")][:size]
+        free[near] = False
+        chosen.extend(near.tolist())
+    return np.asarray(chosen[:k], np.int64)
+
+
 @register_operator("seed_mesh", "mesh_seed", implementation="lineage", set="vertex", kind="seed",
                    family="seed", title="Build the cell mesh")
 class SeedMeshLineage(SeedMesh3D):
@@ -3385,6 +3597,12 @@ class SeedMeshLineage(SeedMesh3D):
         # `mutant_in: progenitors` (exp 14 Phase 3): the mutant is induced in single PROGENITORS, as Colom
         # 2020 induces DN-Maml1 (Fig. 6c); `mutant_frac` is then a fraction of the progenitors. Default: any cell.
         self.mutant_in = str(params.get("mutant_in", "any"))
+        # `mutant_cluster` (exp 12 Phase 2): the mutants are placed as patches of this many adjacent cells
+        # -- a leader cluster, Cheung 2013's multicellular leading front -- instead of singly. Default 1:
+        # the single-cell draw below, unchanged.
+        self.mutant_cluster = int(params.get("mutant_cluster", 1))
+        if self.mutant_cluster < 1:
+            raise ValueError(f"seed_mesh[lineage]: mutant_cluster must be >= 1, got {self.mutant_cluster}")
         if self.mutant_in not in ("any", "progenitors"):
             raise ValueError(f"seed_mesh[lineage]: mutant_in must be any|progenitors, got {self.mutant_in!r}")
         geo = params.get("geometry")
@@ -3421,8 +3639,11 @@ class SeedMeshLineage(SeedMesh3D):
             pool = np.flatnonzero(fate < 0.5) if (self.mutant_in == "progenitors" and fate is not None) \
                 else np.arange(nF)
             k = int(round(self.mutant_frac * len(pool)))
-            if k > 0:
+            if k > 0 and self.mutant_cluster == 1:
                 mut[np.random.default_rng(self.seed + 211).choice(pool, size=k, replace=False)] = 1.0
+            elif k > 0:
+                mut[mutant_patches(m, H.level(self.at).get("pos"), nF, pool, k, self.mutant_cluster,
+                                   np.random.default_rng(self.seed + 211))] = 1.0
             set_cell_block(H, self.cell_set, "mutant", mut, nF)
         return out
 
@@ -3525,6 +3746,14 @@ class Apoptosis3DT2(Apoptosis3D):
         # will, on average, win and persist" at a clone's edge (Fig. 5a); it acts only where a mutant and a
         # wild-type cell compete for the same exit, and is neutral inside a mutant patch.
         self.resist_block = params.get("resist_block")
+        # PROGENITORS MAY LEAVE TOO (exp 14 Phase 3). With `progenitor_fallback`, `rule: fate` names every
+        # basal cell old enough and the order puts the committed ones first: a progenitor differentiates and
+        # leaves only when too few committed cells are left to pay a division's excess. Without it a
+        # fate-biased mutant patch, which makes progenitors and few committed cells, cannot be thinned: two
+        # runs grew 1,100 -> 3,971-3,998 basal cells (3,690-3,780 progenitors) and filled the cell buffer
+        # (round 19). Colom 2020's model has no committed pool at all -- "progenitor cell division is linked
+        # to a neighboring cell differentiating" (Fig. 5a).
+        self.progenitor_fallback = bool(params.get("progenitor_fallback", False))
         if self.mode == "fate" and not (self.capacity or self.hazard > 0):
             raise ValueError("cell_die[t2] rule: fate needs `hazard` or `capacity` -- with neither, "
                              "every committed cell would be sentenced at once")
@@ -3544,6 +3773,17 @@ class Apoptosis3DT2(Apoptosis3D):
 
     def _severity(self, m, H, nF, idx):
         """`rule: fate` with `order: crowded`: most neighbours first; otherwise the base's order."""
+        if self.mode == "fate" and self.progenitor_fallback:
+            f = cell_block(H, self.cat, "fate", nF) if H is not None else None
+            base = (-self._nb(m, nF, np.ones(nF))[1][idx].astype(float) if self.order == "crowded"
+                    else np.zeros(len(idx)))
+            if f is not None:
+                base = base + 1e3 * (f[idx] < 0.5)            # committed cells first, progenitors after
+            if self.resist_block:
+                r = cell_block(H, self.cat, self.resist_block, nF) if H is not None else None
+                if r is not None:
+                    base = base + 1e6 * (r[idx] > 0.5)
+            return base
         if self.mode == "fate" and self.order == "crowded":
             sev = -self._nb(m, nF, np.ones(nF))[1][idx].astype(float)
             if self.resist_block:
@@ -3563,7 +3803,8 @@ class Apoptosis3DT2(Apoptosis3D):
         ag = m.get("age")
         old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
             else np.ones(nF, bool)
-        return set(np.flatnonzero((fate > 0.5) & old_enough).tolist())
+        who = old_enough if self.progenitor_fallback else ((fate > 0.5) & old_enough)
+        return set(np.flatnonzero(who).tolist())
 
     def forward(self, H, mask=None):
         if not self.to_set:
@@ -5563,6 +5804,10 @@ class ReconnectT1_3D(Rewire):
                    "l_th_frac": "threshold as fraction of the mean edge length",
                    "max_flips": "cap on reconnections per call", "every": "call period (ticks)"}
 
+    # THE FLIP ITSELF, AS AN ATTRIBUTE, so a variant can widen which edges may flip without copying the
+    # loop that chooses them (`edge_flip[boundary]` below). The default is `t1_flip_3d`, unchanged.
+    _t1 = staticmethod(lambda *a, **k: t1_flip_3d(*a, **k))
+
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
@@ -5604,7 +5849,7 @@ class ReconnectT1_3D(Rewire):
             if key in seen or a in used or b in used:
                 continue
             seen.add(key)
-            if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf,
+            if self._t1(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf,
                           plane_axis=_plane) is not None:
                 used.add(a); used.add(b); ndone += 1
                 moved.add(a); moved.add(b)
@@ -5721,6 +5966,140 @@ class ReconnectT1_3D(Rewire):
         lvl.state = st
         m["n_t1"] = int(m.get("n_t1", 0)) + ndone
         return {}
+
+
+def _commit_rings(rings, emap, vf, old_map, new_map):
+    """Write the changed faces back and keep the caller's edge->face and vertex->faces maps in sync."""
+    for fid, ro in old_map.items():
+        rn = new_map[fid]
+        for i in range(len(ro)):
+            emap.pop((ro[i], ro[(i + 1) % len(ro)]), None)
+        for w in ro:
+            s_ = vf.get(w)
+            if s_ is not None:
+                s_.discard(fid)
+    for fid, rn in new_map.items():
+        for i in range(len(rn)):
+            emap[(rn[i], rn[(i + 1) % len(rn)])] = fid
+        for w in rn:
+            vf.setdefault(w, set()).add(fid)
+        rings[fid] = rn
+
+
+def _mates_kept(emap, old_map, new_map):
+    """No directed edge repeats in the new patch, and every edge the patch shared with a face OUTSIDE it
+    is still there -- the closed-surface test without its "rim unchanged" half, which a boundary T1
+    changes by design."""
+    b_new = _boundary_de(new_map)
+    b_old = _boundary_de(old_map)
+    if b_new is None or b_old is None:
+        return False
+    patch = set(old_map)
+    for (x, y) in b_old:
+        f = emap.get((y, x))
+        if f is not None and f not in patch and (x, y) not in b_new:
+            return False
+    return True
+
+
+def t1_flip_boundary(rings, pos, e_uv, new_len=None, emap=None, vf=None, plane_axis=None):
+    """A T1 on an OPEN tissue: the interior T1 where it applies, and the two moves at the free rim that
+    `t1_flip_3d` refuses (a rim vertex has two faces, an interior T1 needs three).
+
+    SPOKE (an edge u-v from an interior vertex u to a rim vertex v, between rim cells A and B, with C the
+    third cell at u): A and B stop touching, C reaches the rim between them --
+        A loses v,  B loses u,  C gains v just before u.
+    This is the interior T1 with the outside medium as its fourth cell.
+    RIM (an edge v->u of cell C on the rim, u shared with A, v with B): the inverse -- C leaves the rim
+    there, A and B meet --
+        C loses v,  A gains v just after u,  B gains u just after v.
+    The geometry is the interior T1's: u and v collapse to their midpoint and reopen perpendicular to the
+    old edge, at `new_len`, both signs tried, kept only if every changed face stays simple and keeps its
+    orientation. Returns (u, v) on success, None when nothing valid exists."""
+    r = t1_flip_3d(rings, pos, e_uv, new_len=new_len, emap=emap, vf=vf, plane_axis=plane_axis)
+    if r is not None:
+        return r
+    if emap is None:
+        emap = _edge_face_map(rings)
+    if vf is None:
+        vf = _vertex_faces(rings)
+    a0, b0 = int(e_uv[0]), int(e_uv[1])
+    fa, fb = emap.get((a0, b0)), emap.get((b0, a0))
+    new_map = old_map = None
+    if fa is not None and fb is not None and fa != fb:                          # SPOKE candidate
+        ca, cb = vf.get(a0, set()) - {fa, fb}, vf.get(b0, set()) - {fa, fb}
+        if len(ca) == 1 and len(cb) == 0 and vf.get(b0, set()) == {fa, fb}:
+            u, v = a0, b0
+        elif len(cb) == 1 and len(ca) == 0 and vf.get(a0, set()) == {fa, fb}:
+            u, v = b0, a0
+        else:
+            return None
+        A, B = emap.get((u, v)), emap.get((v, u))
+        C = (vf[u] - {A, B}).pop()
+        old_map = {A: rings[A], B: rings[B], C: rings[C]}
+        new_map = {A: [w for w in rings[A] if w != v], B: [w for w in rings[B] if w != u],
+                   C: _insert_before(rings[C], u, v)}
+    elif (fa is None) != (fb is None):                                          # RIM candidate
+        v, u = (a0, b0) if fa is not None else (b0, a0)                         # C holds v -> u
+        C = emap[(v, u)]
+        Au, Bv = vf.get(u, set()) - {C}, vf.get(v, set()) - {C}
+        if len(Au) != 1 or len(Bv) != 1:
+            return None
+        A, B = Au.pop(), Bv.pop()
+        if A == B:
+            return None
+        old_map = {A: rings[A], B: rings[B], C: rings[C]}
+        new_map = {A: _insert_after(rings[A], u, v), B: _insert_after(rings[B], v, u),
+                   C: [w for w in rings[C] if w != v]}
+    else:
+        return None
+    if not all(_ring_ok(rn) for rn in new_map.values()) or not _mates_kept(emap, old_map, new_map):
+        return None
+    pu = np.asarray(pos[u], float); pv = np.asarray(pos[v], float)
+    mid = 0.5 * (pu + pv); d = pv - pu; L = np.linalg.norm(d)
+    if L < 1e-12:
+        return None
+    if plane_axis is None:
+        rmid = np.linalg.norm(mid)
+        if rmid < 1e-9:
+            return None
+        n = mid / rmid
+    else:
+        n = np.zeros(3); n[int(plane_axis)] = 1.0
+    perp = np.cross(n, d / L); pn = np.linalg.norm(perp)
+    if pn < 1e-9:
+        return None
+    perp = perp / pn
+    half = 0.5 * (new_len if new_len is not None else L)
+    for sign in (+1.0, -1.0):
+        nu = mid - sign * perp * half; nv = mid + sign * perp * half
+        if plane_axis is not None:
+            nu[int(plane_axis)] = mid[int(plane_axis)]; nv[int(plane_axis)] = mid[int(plane_axis)]
+        getp = lambda i: (nu if i == u else nv if i == v else pos[i])          # noqa: E731
+        if all(_face_ok_3d(rn, getp, normal=None if plane_axis is None else n) for rn in new_map.values()):
+            _commit_rings(rings, emap, vf, old_map, new_map)
+            pos[u] = nu; pos[v] = nv
+            return (u, v)
+    return None
+
+
+@register_operator("edge_flip", model="boundary", set="vertex", kind="rewire", family="topology",
+                   title="T1 neighbour exchange, the free rim included")
+class ReconnectT1Boundary(ReconnectT1_3D):
+    """`edge_flip` on an OPEN tissue: the interior T1 plus the two moves at the free rim, so a cell can
+    reach the boundary or leave it (`t1_flip_boundary`).
+
+    WHY (experiment 9, Phase 2, Finding 16). On a free aggregate the default flips only edges with a
+    cell on both sides and three cells at each end: an edge touching the rim is never flipped, so the
+    cells on the rim at frame 0 are the rim forever. Cerchiari et al. 2015's whole observable -- which
+    cell type ends outside -- is then fixed by the initial random draw (MEP's rim fraction 0.423 in
+    every arm, every row). With the rim moves, the same shortest-first loop, threshold and one-flip-
+    per-vertex rule apply to every edge; interior flips are exactly the default's.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (the reconnection);
+    the rim moves are the same reconnection with the outside medium as the fourth cell.
+    """
+    _t1 = staticmethod(t1_flip_boundary)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -6645,6 +7024,30 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
     interior radius over the layer thickness) -- and it resists the inward folds an empty lumen would
     let the layer make. k_core in F/L^5, like `k_v`.
 
+    `core_alpha` (default None: the linear clock above) TIES THE INTERIOR TO THE LAYER instead of to
+    the clock, as Wang define it -- alpha is the interior's gain over the surface layer's gain:
+
+        V*(t) = V_L(0) + core_alpha (V_S(t) - V_S(0))       V_S = the layer's own volume, the volume
+                                                            between its two rings, this frame
+
+    A clock target keeps growing when the membrane slows the layer, so the gap V* - V_L -- and the
+    pressure k_core (V* - V_L) on every apical vertex -- grows without bound until a weak three-cell
+    corner is pushed out through the membrane (batch 3: single vertices drifting 1.3 edge lengths a
+    frame from frame ~110). Tied to the layer, the interior grows only as fast as the layer does.
+
+    A COLUMNAR HEIGHT, `k_height` (default 0 = none) and `height_target` (exp 11 Phase 2). The parent's
+    energy charges every face of a cell the same tension, so a growing cell in a confined sheet takes
+    its new volume as HEIGHT, which costs almost nothing, rather than as footprint, which must push the
+    membrane out (measured, 200 cells under the live membrane, 60 frames: thickness x2.2, sheet area
+    x1.02; with the membrane contact off, area x1.56 at thickness x1.2). Wang et al. 2021's surface cells
+    keep a columnar height (h ~ 15 um, "an upper bound", STAR Methods) and the layer grows in area.
+    A spring on each vertex's thickness 2|s_v| toward `height_target` times the first frame's median:
+
+        U_h = 1/2 k_height sum_v (2 |s_v| - h*)^2
+
+    so growth goes into footprint -- the monolayer counterpart of `cell_grow[timer_planar]` (exp 14),
+    which holds height through an AREA target the apico-basal model does not have. k_height in F/L.
+
     Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (the apico-basal
     vertex model); Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the contact);
     Wang, S. et al. (2021). Cell 184:3702-3716 (the adhesion energy, the two compartments).
@@ -6658,6 +7061,10 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
                              f"kappa_s {self.kappa_s:g}, the basal tension it offsets")
         self.k_core = float(params.get("k_core", 0.0))
         self.core_rate = float(params.get("core_rate", 0.0))
+        _ca = params.get("core_alpha", None)
+        self.core_alpha = None if _ca is None else float(_ca)
+        self.k_height = float(params.get("k_height", 0.0))
+        self.height_target = float(params.get("height_target", 1.0))
 
     @staticmethod
     def _core_grad(x, s, es, et, ef, nF, eocc, core):
@@ -6674,16 +7081,20 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
         """This frame's inner-mass term, or None when `k_core` is 0. The ring and V_L(0) are fixed once."""
         if self.k_core <= 0:
             return None
+        o = x0.mean(dim=0).detach()
+        va = float(enclosed_ring_volume(x0 + s0, es, et, ef, nF, eocc, o))
+        vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
         if "core" not in m:
-            o = x0.mean(dim=0).detach()
-            va = float(enclosed_ring_volume(x0 + s0, es, et, ef, nF, eocc, o))
-            vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
-            m["core"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb))
+            m["core"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb), VS_first=abs(vb - va))
         _fr = getattr(H, "frame", None)
         t = 0.0 if _fr is None else float(int(_fr))
         C = m["core"]
-        return dict(k=self.k_core, sgn=C["sgn"], o=x0.mean(dim=0).detach(),
-                    V=C["V_first"] * (1.0 + self.core_rate * t))
+        if self.core_alpha is not None:
+            V = C["V_first"] + self.core_alpha * (abs(vb - va) - C["VS_first"])
+        else:
+            V = C["V_first"] * (1.0 + self.core_rate * t)
+        m["core_target"] = V
+        return dict(k=self.k_core, sgn=C["sgn"], o=o, V=V)
 
     @staticmethod
     def _adhesion_grad(x, s, es, et, ef, nF, cov, e_cm):
@@ -6748,6 +7159,11 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
             if torch.is_tensor(_lig) and m.get("bm_ligand_frame") == _fr and _lig.shape[0] == nF:
                 cov = (_lig / _lig.median().clamp_min(1e-12)).clamp(0.0, 1.0).to(device=dev, dtype=dt)
         core = self._core_target(H, m, x0, s0, es, et, ef, nF, eocc)
+        h_star = None
+        if self.k_height > 0 and move_sep:
+            if "h_star" not in m:
+                m["h_star"] = self.height_target * float(2.0 * s0.norm(dim=1).median())
+            h_star = m["h_star"]
         x = x0.clone(); s = s0.clone()
         for _ in range(max(1, self.relax_iters)):
             gx, gs = self._grad(x, s, es, et, ef, nF, V_eq, m["alive"], R0t, eocc, vocc, move_sep)
@@ -6756,6 +7172,9 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
                 gx = gx + gxa
                 if gs is not None:
                     gs = gs + gsa
+            if h_star is not None:
+                sn = s.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                gs = gs + self.k_height * (2.0 * sn - h_star) * 2.0 * s / sn
             if core is not None:
                 gxc, gsc, m["core_volume"] = self._core_grad(x, s, es, et, ef, nF, eocc, core)
                 gx = gx + gxc
@@ -6862,7 +7281,14 @@ def region_lumen_energy(pos, sep, es, et, ef, nF, alive, eocc, sig_a=None, sig_b
             E = E + (sig_b * A_ba * alive).sum()
     if lumen is not None:
         V_L = enclosed_ring_volume(pos + lumen["sgn"] * sep, es, et, ef, nF, eocc, lumen["o"])
-        E = E + 0.5 * lumen["k"] * (V_L - lumen["V0"]) ** 2
+        if lumen.get("V0") is not None:
+            E = E + 0.5 * lumen["k"] * (V_L - lumen["V0"]) ** 2
+        if lumen.get("frac") is not None:
+            # THE OSMOTIC LUMEN OF A GROWING ORGANOID: 1/2 k_f V_out (V_L / V_out - f)^2, V_out the volume
+            # inside the outer surface this frame (held fixed in the gradient). Its pressure on the lumen is
+            # -dE/dV_L = k_f (f - V_L / V_out): k_f, a pressure, times the lumen fraction's shortfall.
+            V_out = lumen["V_out"]
+            E = E + 0.5 * lumen["k_f"] * V_out * (V_L / V_out - lumen["frac"]) ** 2
     return E
 
 
@@ -6880,10 +7306,18 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
     frame 1). `k_lumen` (F/L^5, like `k_v`) and `lumen_target` (a fraction of the first frame's lumen
     volume): the lumen term, off at `k_lumen` 0. `v_swell`: [villus, crypt] target-volume factors,
     ramped with the tensions (module docstring).
+
+    `lumen_frac` and `k_lumen_frac` (a pressure): the lumen of a GROWING organoid, inflated toward a fraction
+    `lumen_frac` of the organoid's current volume (the volume inside the outer surface), pressure
+    k_lumen_frac x the shortfall, until frame `lumen_until` (None: always) -- then released, and the lumen
+    free to shrink as in Yang 2021 Figs 1e/f. `lumen_target` holds the FIRST frame's volume and cannot follow
+    an organoid that grows from 12 cells (exp 10 Phase 2: its lumen closed at 24 cells). Off at 0.
+    `lumen_frac` may be [start, end], ramped linearly over the frames `lumen_ramp: [from, to]`.
     """
     PARAM_UNITS = {**ApicoBasalShapeEnergy3D.PARAM_UNITS, "sigma_a": "tension", "sigma_b": "tension",
                    "sigma_ramp": "count", "k_lumen": "F/L^5", "lumen_target": "fraction",
-                   "v_swell": "fraction"}
+                   "v_swell": "fraction", "lumen_frac": "fraction", "k_lumen_frac": "pressure",
+                   "lumen_until": "count", "lumen_ramp": "count"}
     MECHANISM_TAGS = ApicoBasalShapeEnergy3D.MECHANISM_TAGS + ["region_tension", "spontaneous_curvature",
                                                                "lumen_volume"]
     REFERENCE = ("Yang, Q. et al. (2021). Nat. Cell Biol. 23:733-744 (Supplementary Note, Eq. 1, 7); "
@@ -6908,6 +7342,22 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
         self.sigma_ramp = float(params.get("sigma_ramp", 0.0))
         self.k_lumen = float(params.get("k_lumen", 0.0))
         self.lumen_target = float(params.get("lumen_target", 1.0))
+        _lf = params.get("lumen_frac", 0.0)
+        # ONE NUMBER, OR [start, end] RAMPED LINEARLY over the frames `lumen_ramp: [from, to]`: a real
+        # organoid's lumen is ~0.07 of it at 20 cells (LSTree 002-Budding) and ~0.26 before its crypt
+        # bulges (Yang 2021 Fig. 1f), so a growing organoid's target must move between them.
+        # A LIST of targets through the frames `lumen_ramp` (the same length) also works -- Yang's lumen
+        # INFLATES and then DEFLATES (0.26 -> 0.12, Fig. 1f), which one [start, end] pair cannot say.
+        self.lumen_frac_pair = ([float(x) for x in _lf] if isinstance(_lf, (list, tuple)) else [float(_lf)] * 2)
+        self.lumen_frac = max(self.lumen_frac_pair)
+        _lr = params.get("lumen_ramp", None)
+        self.lumen_ramp = None if _lr is None else [float(x) for x in _lr]
+        if self.lumen_ramp is not None and len(self.lumen_ramp) != len(self.lumen_frac_pair):
+            raise ValueError(f"cell_mechanics[apicobasal_region]: lumen_ramp has {len(self.lumen_ramp)} frames, "
+                             f"lumen_frac {len(self.lumen_frac_pair)} values -- one frame per value")
+        self.k_lumen_frac = float(params.get("k_lumen_frac", 0.0))
+        _lu = params.get("lumen_until", None)
+        self.lumen_until = None if _lu is None else float(_lu)
         self.v_swell = _pair(params.get("v_swell", None))
         self._sig_a = self._sig_b = self._lumen = None
 
@@ -6947,7 +7397,10 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
             if self.sigma_b is not None:
                 sig_b = ramp * (self.sigma_b[0] + (self.sigma_b[1] - self.sigma_b[0]) * f)
         lumen = None
-        if self.k_lumen > 0:
+        _fr = getattr(H, "frame", None)
+        frac_on = (self.k_lumen_frac > 0 and self.lumen_frac > 0
+                   and (self.lumen_until is None or (0 if _fr is None else int(_fr)) < self.lumen_until))
+        if self.k_lumen > 0 or frac_on:
             if "ab_lumen" not in m:
                 # ONCE: which ring faces the lumen (the one enclosing less) and its volume now.
                 o = x0.mean(dim=0).detach()
@@ -6955,8 +7408,18 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
                 vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
                 m["ab_lumen"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb))
             L = m["ab_lumen"]
-            lumen = dict(k=self.k_lumen, V0=self.lumen_target * L["V_first"], sgn=L["sgn"],
-                         o=x0.mean(dim=0).detach())
+            o = x0.mean(dim=0).detach()
+            lumen = dict(k=self.k_lumen, V0=self.lumen_target * L["V_first"] if self.k_lumen > 0 else None,
+                         sgn=L["sgn"], o=o, frac=None)
+            if frac_on:
+                V_out = float(enclosed_ring_volume(x0 - L["sgn"] * s0, es, et, ef, nF, eocc, o))
+                vals = self.lumen_frac_pair
+                if self.lumen_ramp is None or len(set(vals)) == 1:
+                    frac = vals[-1]
+                else:
+                    # PIECEWISE LINEAR through (lumen_ramp[k], lumen_frac[k]), held flat outside.
+                    frac = float(np.interp(0 if _fr is None else int(_fr), self.lumen_ramp, vals))
+                lumen.update(frac=frac, k_f=self.k_lumen_frac, V_out=max(V_out, 1e-12))
         return sig_a, sig_b, lumen
 
     def _grad(self, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, want_sep):
@@ -6984,7 +7447,7 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
         self._sig_a = self._sig_b = self._lumen = None
         if m is None or self.sep_block not in lvl.state_schema or (
                 self.sigma_a is None and self.sigma_b is None and self.k_lumen <= 0
-                and self.v_swell is None):
+                and self.v_swell is None and not (self.k_lumen_frac > 0 and self.lumen_frac > 0)):
             return super().forward(H, mask)
         pos_full = lvl.get("pos")
         Nv = int(m["Nv"]); nF = int(m["nF"]); es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]

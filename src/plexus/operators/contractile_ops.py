@@ -279,6 +279,89 @@ class ActiveStrain(Lateral):
         return {}
 
 
+@register_operator("active_strain", family="mechanics", set="particle", kind="lateral", model="excitation",
+                   equation=r"""$$\gamma_j(t)=\mathbb 1[\,j\text{ excited}\,]\;\gamma^{\mathrm{fit}}_j\big(t-(t^{\mathrm{exc}}_j-t_{\mathrm{ref}})\big)$$""")
+class ActiveStrainExcitation(ActiveStrain):
+    """`excitation` MODEL of active_strain -- the contraction is TRIGGERED by the cell's own excitation
+    instead of by the shared clock alone: the fitted time course is kept, its onset is the moment the
+    cell was excited, and a cell that is never excited never contracts.
+
+        gamma_j(t) = 1[j excited] * gamma_fit_j( t - (t_exc_j - t_ref) )
+
+    gamma_fit_j is the default's activation -- the fitted shared clock, cell j's fitted delay and time
+    course, the temporal modes -- unchanged; t_exc_j is the first frame at which the cell's excitation
+    variable (`chem` column `chan` of the parent set) reached `thr`; t_ref is the frame of the stimulus,
+    so a sheet excited everywhere at t_ref reproduces the default EXACTLY (the identity case), and a
+    wave that reaches cell j later shifts j's contraction by exactly that conduction delay. The fitted
+    per-cell delay stays where it was: it is each cell's own excitation-to-contraction delay (exp 6,
+    Stage 0 finding), which the conduction does not replace.
+
+    Why a model and not a new operator: the contract is active_strain's own (cell -> mpm_particle,
+    the rest-length change); what differs is the hypothesis about what starts a cell's contraction --
+    a clock shared by the sheet, or the cell's own excitation. The default is untouched.
+
+    `t_exc` is kept by the operator (it is the history of a threshold crossing, not a state the
+    engine integrates): the cell's LATEST upstroke, re-armed once its excitation falls below thr / 2,
+    so a paced sheet (`segments:`, one per beat) is triggered again at every beat; t_ref is then
+    counted from the beat's own segment start.
+
+    `frames_per_clock_frame: N` (default 1): the fitted clock counts RECORDING frames; a spec that
+    resolves the excitation finely runs N engine frames per recording frame (the chemistry needs
+    ~0.01 of a model time unit a step, a recording frame is 3.2), and this maps engine frame f to
+    clock frame f / N. The engine integrates a block once per tick at the frame's dt, so an excitable
+    chemistry cannot be sub-stepped inside a substep block -- only its last substep would count --
+    which is why the rig refines the frame instead. The active-strain increment telescopes exactly,
+    so N steps accumulate the same contraction as one.
+
+    Reference: excitation-contraction coupling as a trigger: Bers, D. M. (2002). Cardiac
+    excitation-contraction coupling. Nature 415:198-205; the fitted time course: prototype/cardio_mpm/
+    strain (Plexus, this work).
+    """
+    READS = ["phi", "g", "g2", "chem"]
+    PARAM_ROLES = {**ActiveStrain.PARAM_ROLES, "t_ref": "stimulus_frame", "thr": "excitation_threshold",
+                   "chan": "excitation_column", "frames_per_clock_frame": "engine_frames_per_recording_frame"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.t_ref = float(params.get("t_ref", 0.0))
+        self.thr = float(params.get("thr", 0.5))
+        self.chan = int(params.get("chan", 0))
+        self.fpf = float(params.get("frames_per_clock_frame", 1))
+        self._t_exc = None
+        self._shift = None
+
+    def _block(self, lvl, name, n, dev, dt):
+        b = super()._block(lvl, name, n, dev, dt)
+        if name == "delay" and self._shift is not None:
+            return b + self._shift
+        return b
+
+    def gamma(self, cell, frame, dev, dt):
+        frame = frame / self.fpf if self.fpf != 1 else frame
+        if "chem" not in cell.state_schema:
+            raise ValueError(f"active_strain[excitation]: {self.parent!r} has no `chem` block -- the "
+                             f"excitation this model reads. Put an excitable chemistry on the cell set.")
+        u = cell.get("chem")[:, self.chan].detach().to(dt)
+        if self._t_exc is None or self._t_exc.shape[0] != u.shape[0]:
+            self._t_exc = torch.full((u.shape[0],), float("nan"), device=dev, dtype=dt)
+            self._armed = torch.ones(u.shape[0], dtype=torch.bool, device=dev)
+        # ONE ONSET PER BEAT: a cell's onset is its latest upstroke through `thr`; it re-arms once its
+        # excitation has fallen below thr / 2, so a paced sheet is triggered again at every beat
+        new = self._armed & (u >= self.thr)
+        self._t_exc = torch.where(new, torch.full_like(self._t_exc, float(frame)), self._t_exc)
+        self._armed = (self._armed & ~new) | (u < 0.5 * self.thr)
+        # the beat this frame belongs to starts at the last segment offset (0 without segments), and
+        # only an onset inside it triggers this beat's contraction
+        seg = max([float(x) for x in self.segments if float(x) <= float(frame)], default=0.0)
+        excited = ~torch.isnan(self._t_exc) & (self._t_exc >= seg)
+        self._shift = torch.nan_to_num(self._t_exc - seg - self.t_ref, nan=0.0)[:, None]
+        try:
+            gam = super().gamma(cell, frame, dev, dt)
+        finally:
+            self._shift = None
+        return gam * excited.to(gam.dtype)[:, None]
+
+
 @register_operator("material_from_cell", family="mechanics", set="particle", kind="lateral",
                    equation=r"""$$E_j=e^{\,\log E_j}$$""")
 class MaterialFromCell(Lateral):
