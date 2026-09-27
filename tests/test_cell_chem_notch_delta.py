@@ -94,7 +94,7 @@ def test_wnt_holds_yap_after_withdrawal():
     c = run(c, ring(2), steps=3000, p=1.0, theta=0.5, k_w=1.0, k_y=0.5, K_w=0.1, wnt_off=1500)
     W, Y = c[:, 3], c[:, 2]
     assert W[0] > 0.5 and W[1] < 0.01                                   # Wnt from the Delta-high cell only
-    assert Y[0] > 0.7 and Y[1] < 0.05                                   # its YAP held, the other's lost
+    assert Y[0] > 0.9 and Y[1] < 0.05                                   # its YAP held, the other's lost
 
 
 def test_no_yap_decay_before_wnt_off():
