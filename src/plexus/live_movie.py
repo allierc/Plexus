@@ -1259,6 +1259,8 @@ class LiveMovie:
             _rgbv = self._rgb_field(H, lvl)
             if _rgbv is None:
                 _rgbv = self._rgb_chem(H, lvl)
+            if _rgbv is None and str((self.style or {}).get("color_by", "") or "").lower() == "chem":
+                _rgbv = self._rgb_parent_chem(H, lvl)     # opt-in: see `_rgb_parent_chem`
             self.cloud["rgb"] = _rgbv if _rgbv is not None else self._rgb(H, lvl, pos)
             self._base_rgb = None
             if str((self.style or {}).get("dot_shading", "")).lower() == "body":
@@ -1362,6 +1364,7 @@ class LiveMovie:
             self._static_mesh(H)
             self._chain_build(H)
             self._spheres_build(H)
+            self._also_build(H)                           # `plotting.also_sets` -- opt-in
             self._field_slice_update(H, first=True)
             self._field_iso_update(H, first=True)
             self._add_meshes(H)
@@ -1386,6 +1389,7 @@ class LiveMovie:
         self.cloud.points = self._xyz(lvl)
         self._chain_update(H)
         self._spheres_update(H)
+        self._also_update(H)
         self._field_slice_update(H)
         self._field_iso_update(H)
         self._glyph_update(lvl)
@@ -1405,7 +1409,8 @@ class LiveMovie:
             if _c is not None:
                 self.cloud["rgb"] = _c
         elif getattr(self, "_chem_live", False):
-            _c = self._rgb_chem(H, lvl)
+            _c = (self._rgb_parent_chem(H, lvl) if getattr(self, "_chem_parent", False)
+                  else self._rgb_chem(H, lvl))
             if _c is not None:
                 self.cloud["rgb"] = _c
         el = time.perf_counter() - self.t0
@@ -3361,7 +3366,7 @@ class LiveMovie:
                 # the marks are carrying; unlit, a cell's colour means only what it was set to.
                 _flat_m = (self._mesh_is_subject and style == "surface"
                            and bool(st.get("mesh_flat", True)))
-                _rgb = self._mesh_face_rgb(m, pd, H) if self._mesh_is_subject else None
+                _rgb = self._mesh_face_rgb(m, pd, H, lvl) if self._mesh_is_subject else None
                 # A CONCAVE CELL IS FILLED FROM A TRIANGULATION, NOT AS ONE POLYGON. VTK draws a
                 # polygon cell as a fan from its first vertex, which is right only when the cell is
                 # convex: a concave one paints over its neighbours. Measured on a C-shaped test
@@ -3440,7 +3445,26 @@ class LiveMovie:
             return None
         return (np.clip(np.asarray(rgb, float), 0, 1) * 255).astype(np.uint8)
 
-    def _mesh_face_rgb(self, m, pd, H=None):
+    @staticmethod
+    def _face_node_type(H, lvl, nF):
+        """[nF] type of each face of the mesh `lvl`, THIS frame: the paired cell set's `node_type`.
+
+        Live, `Level.mesh_cell_set` names the set and its `node_type` is current (an operator that
+        retypes a cell writes it there). On replay the level serves the recorded column itself --
+        the per-row `<cell>__node_type_t` when the types changed, the final column otherwise
+        (`_ReplayLevel.cell_node_type`). None when neither exists.
+        """
+        if lvl is None:
+            return None
+        pre = getattr(lvl, "cell_node_type", None)       # replay
+        if pre is not None:
+            return pre(nF)
+        cs = getattr(lvl, "mesh_cell_set", None)
+        clvl = H.level(cs) if (H is not None and cs and cs in getattr(H, "levels", {})) else None
+        nt = getattr(clvl, "node_type", None)
+        return None if nt is None else nt[:nF]
+
+    def _mesh_face_rgb(self, m, pd, H=None, lvl=None):
         """One colour per cell: the base, with the division pair marked -- `render_vtk`'s own rule.
 
         REUSED, NOT REIMPLEMENTED. `render_vtk._marks` is where the mother/daughter split lives, and
@@ -3535,6 +3559,29 @@ class LiveMovie:
         _lab = str(st.get("mesh_color_by", "") or "")
         if _lab and _lab.lower() not in ("phase", "cycle_progress"):
             lv = m.get(_lab)
+            # `node_type` (alias `type`) IS THE CELL SET'S TYPE COLUMN, which is not a state block and
+            # so is not on the view: read per frame off the face set (live) or its recorded per-row
+            # column (replay), so a cell retyped mid-run is recoloured (exp 9 Part B).
+            if lv is None and _lab.lower() in ("node_type", "type"):
+                lv = self._face_node_type(H, lvl, nF)
+            # A COLORMAP INSTEAD OF CATEGORIES is opt-in, `mesh_color_scale: continuous | auto` --
+            # `render_vtk.mesh_scale_continuous`. The range widens over the frames drawn (never
+            # narrows) unless `mesh_color_range` fixes it. Absent, the categorical law below stands.
+            if lv is not None:
+                from plexus.render_vtk import mesh_block_continuous, mesh_scale_continuous
+                _v = np.resize(np.asarray(lv.detach().cpu().numpy() if hasattr(lv, "detach")
+                                          else lv, np.float64).ravel(), nF)
+                if getattr(self, "_mcb_cont", False) or mesh_scale_continuous(_v, st):
+                    self._mcb_cont = True
+                    _f = np.isfinite(_v)
+                    _r = getattr(self, "_mcb_rng", None)
+                    if _f.any():
+                        _lo, _hi = float(_v[_f].min()), float(_v[_f].max())
+                        _r = (_lo, _hi) if _r is None else (min(_r[0], _lo), max(_r[1], _hi))
+                        self._mcb_rng = _r
+                    base = mesh_block_continuous(_v, st, _r)
+                    pd.cell_data["rgb"] = base
+                    return base
             if lv is not None:
                 from plexus.measures import label_rgb
                 q = np.rint(np.resize(np.asarray(lv.detach().cpu().numpy() if hasattr(lv, "detach")
@@ -3761,7 +3808,7 @@ class LiveMovie:
                     pd.points = self._mesh_xyz(lvl, nv, sc, ct)
                 self._edge_actor(H, lvl, m, first=False)
                 if self._mesh_is_subject:
-                    self._mesh_face_rgb(m, pd, H)
+                    self._mesh_face_rgb(m, pd, H, lvl)
                 self._near_side_faces(pd)
                 # THE TRIANGULATED FILL READS `pd` THROUGH A PIPELINE, which re-executes only when
                 # `pd` says it changed; a colour array replaced in place does not say so.
@@ -4553,6 +4600,55 @@ class LiveMovie:
         self.colour_by = f"chem, {b - a} column(s), via plexus.live.chem_rgb"
         return (np.clip(cols, 0, 1) * 255).astype(np.uint8)
 
+    def _rgb_parent_chem(self, H, lvl):
+        """`plotting.color_by: chem` -- each particle in its PARENT's `chem` colour, per frame.
+
+        WHY. A segmentation-seeded sheet (exp 6: `seed_from_segmentation` puts `mpm_particle`s in each
+        `cell`) has its chemistry on the cells and its positions on the material points, and the
+        points are the larger set, so they are the subject. They carry no `chem`, so `_rgb_chem`
+        returned None and `_rgb` painted them by parent BODY -- one hue per cell id, fixed at t = 0:
+        a static confetti square while the excitation wave crossed the tissue (14 exp 6 movies).
+        Opt-in because a parent-body hue is the right picture for every MPM run whose cells carry
+        a chemistry that is not the point (drops, balls). The law is `plexus.live.chem_rgb` over the
+        PARENT's rows -- `species`, `blend`, `chem_max` -- then gathered by `lvl.parent`, so a
+        particle is exactly its cell's colour. None when the subject has no chem-carrying parent.
+        """
+        pname = getattr(lvl, "parent_name", None)
+        par = getattr(lvl, "parent", None)
+        if not pname or par is None or pname not in getattr(H, "levels", {}):
+            return None
+        plv = H.level(pname)
+        try:
+            sch = getattr(plv, "state_schema", None)
+            if sch is not None and "chem" in sch:
+                a, b = sch["chem"]
+                v = plv.state[:, a:b]
+            else:
+                v = plv.get("chem")
+            if v is None:
+                return None
+            v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+            if v.ndim == 3:                                            # [T, n, w]: the replay's frame
+                v = v[int(getattr(plv, "t", 0))]
+            if v.ndim != 2 or v.shape[1] == 0:
+                return None
+            from plexus.live import chem_rgb
+            st = self.style or {}
+            cols, _ = chem_rgb(np.asarray(v, float), lut=st.get("species"), blend=st.get("blend"),
+                               background=st.get("background", "black"), vmax=st.get("chem_max"))
+        except Exception as e:                                       # noqa: BLE001
+            print(f"[live-movie] color_by: chem unavailable ({type(e).__name__}: {e})", flush=True)
+            return None
+        if cols is None:
+            return None
+        pi = par.detach().cpu().numpy() if hasattr(par, "detach") else np.asarray(par)
+        ix = self.idx.detach().cpu().numpy() if hasattr(self.idx, "detach") else np.asarray(self.idx)
+        pi = np.clip(np.asarray(pi, np.int64)[ix], 0, len(cols) - 1)
+        self._chem_live = True
+        self._chem_parent = True
+        self.colour_by = f"parent {pname!r} chem, {v.shape[1]} column(s), via plexus.live.chem_rgb"
+        return (np.clip(cols[pi], 0, 1) * 255).astype(np.uint8)
+
     def _rgb(self, H, lvl, pos):
         """Per-particle colour, FIXED AT t=0 and carried with the particle.
 
@@ -4938,6 +5034,127 @@ class LiveMovie:
                 self._fi_meshes[k].Modified()
             except Exception:                                    # noqa: BLE001 -- keep the last surface
                 pass
+
+    # ---- `plotting.also_sets`: MORE POINT SETS OVER THE SUBJECT ---------------------------------
+    #
+    #     plotting:
+    #       subject: cell
+    #       also_sets: [host]                  # drawn over the subject, every frame
+    #       also_colors: {host: "#ffffff"}     # optional: a fixed colour per set
+    #       also_dot_size: 6                   # optional: px; default the subject's dot size
+    #
+    # The movie draws ONE subject set, and a model with two populations -- exp 15's community on
+    # its lattice and the host cells it feeds -- lost the second: the talk movie needed its own
+    # script. Each named set is its own point actor, moved each frame. Its colour, in order: the
+    # fixed `also_colors` entry, else its own `chem` through `plexus.live.chem_rgb` (the spec's
+    # `species`, `blend`, `chem_max`; recomputed every frame), else its type palette
+    # (`plotting.colors` by type name), else white. Dormant slots are parked on a live point.
+    # Absent, nothing is built and no pixel changes.
+    def _also_names(self, H):
+        names = (self.style or {}).get("also_sets") or []
+        names = [names] if isinstance(names, str) else list(names)
+        out = []
+        for nm in names:
+            nm = str(nm)
+            if nm not in getattr(H, "levels", {}):
+                print(f"[live-movie] also_sets: no set {nm!r}; not drawn", flush=True)
+            elif nm != getattr(self, "_sname", None):
+                out.append(nm)
+        return out
+
+    def _also_xyz(self, lv):
+        P = lv.get("pos")
+        if P is None:
+            return None, None
+        P = np.asarray(P.detach().cpu().numpy() if hasattr(P, "detach") else P, np.float32)
+        occ = getattr(lv, "occ", None)
+        live = (np.ones(P.shape[0], bool) if occ is None else
+                np.asarray(occ.detach().cpu().numpy() if hasattr(occ, "detach") else occ).astype(bool)
+                .reshape(-1)[:P.shape[0]])
+        if live.any() and not live.all():
+            P = np.where(live[:, None], P, P[live][:1])
+        if P.shape[1] == 2:
+            # ON TOP, NOT IN THE SAME PLANE: a 2D run is drawn at z = 0 and seen from +z, and two
+            # point sets at one depth z-fight. A lift far below a pixel settles which is in front.
+            P = np.concatenate([P, np.full((P.shape[0], 1), 1e-3 * float(np.max(self.world)),
+                                           np.float32)], 1)
+        return P, live
+
+    def _also_rgb(self, H, nm, lv, n, live):
+        from matplotlib.colors import to_rgb
+        st = self.style or {}
+        fixed = (st.get("also_colors") or {}).get(nm) if isinstance(st.get("also_colors"), dict) else None
+        cols = None
+        if fixed is not None:
+            cols = np.tile(np.asarray(to_rgb(fixed), float), (n, 1))
+        else:
+            try:
+                sch = getattr(lv, "state_schema", None)
+                if sch is not None and "chem" in sch:
+                    a, b = sch["chem"]
+                    v = lv.state[:n, a:b]
+                else:
+                    v = lv.get("chem")
+                if v is not None:
+                    v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+                    if v.ndim == 2 and v.shape[1] > 0:
+                        from plexus.live import chem_rgb
+                        cols = chem_rgb(np.asarray(v, float)[:n], lut=st.get("species"),
+                                        blend=st.get("blend"), background=st.get("background", "black"),
+                                        vmax=st.get("chem_max"))[0]
+            except Exception:                                        # noqa: BLE001
+                cols = None
+            if cols is None:
+                own = getattr(lv, "node_type", None)
+                pal = None
+                if own is not None:
+                    from plexus.plot import _typed_palette
+                    pal, _ = _typed_palette(self.sim, nm, st)
+                if pal is not None:
+                    tid = np.asarray(own.detach().cpu().numpy() if hasattr(own, "detach") else own,
+                                     np.int64)[:n] % len(pal)
+                    cols = np.asarray(pal, float)[tid]
+                else:
+                    cols = np.ones((n, 3))
+        rgb = (np.clip(np.asarray(cols, float), 0, 1) * 255).astype(np.uint8)
+        if live is not None and live.any() and not live.all():
+            rgb[~live] = rgb[live][0]
+        return rgb
+
+    def _also_build(self, H):
+        self._also = []
+        if not (self.style or {}).get("also_sets"):
+            return
+        _ps = (self.style or {}).get("also_dot_size")
+        _ps = float(_ps) if _ps is not None else float(getattr(self, "px_used", None) or 3.0)
+        for nm in self._also_names(H):
+            try:
+                lv = H.level(nm)
+                P, live = self._also_xyz(lv)
+                if P is None or not len(P):
+                    continue
+                pd = self.pv.PolyData(P)
+                pd["rgb"] = self._also_rgb(H, nm, lv, P.shape[0], live)
+                self.p.add_mesh(pd, scalars="rgb", rgb=True, **FLAT, point_size=_ps)
+            except Exception as e:                                   # noqa: BLE001 -- not the movie
+                print(f"[live-movie] also_sets: {nm!r} not drawn ({type(e).__name__}: {e})", flush=True)
+                continue
+            self._also.append((nm, pd))
+            print(f"[live-movie] also_sets: {nm!r} drawn over the subject, {P.shape[0]:,} nodes, "
+                  f"{_ps:g} px", flush=True)
+
+    def _also_update(self, H):
+        for nm, pd in getattr(self, "_also", []) or []:
+            try:
+                lv = H.level(nm)
+                P, live = self._also_xyz(lv)
+                if P is None or P.shape[0] != pd.n_points:
+                    continue
+                pd.points = P
+                pd["rgb"] = self._also_rgb(H, nm, lv, P.shape[0], live)
+            except Exception as e:                                   # noqa: BLE001
+                print(f"[live-movie] also_sets: {nm!r} not updated ({type(e).__name__}: {e})",
+                      flush=True)
 
     def _spheres_build(self, H):
         """Draw a set's elements as SPHERES OF A WORLD RADIUS, `plotting.spheres`.
@@ -5442,6 +5659,14 @@ class _ReplayLevel:
                 if b in skip:
                     continue
                 self._cell_blocks[b] = np.asarray(z[k])
+        # AND ITS TYPE COLUMN, which is not a block: per row when a type changed during the run
+        # (`__node_type_t`), the final column otherwise. Read only by `mesh_color_by: node_type`.
+        self._cell_nt = None
+        if cell_set:
+            for _k in (f"{cell_set}__node_type_t", f"{cell_set}__node_type"):
+                if _k in z.files:
+                    self._cell_nt = np.asarray(z[_k])
+                    break
         # THE HALF-EDGE TABLE IS IN THE TRAJECTORY AND WAS NOT BEING READ, so a replay of a
         # vertex-model run drew the mesh's VERTICES as dots while the same renderer, driven live
         # from the engine, drew the surface. One renderer that produces two different pictures of
@@ -5523,6 +5748,13 @@ class _ReplayLevel:
         """
         return {k: np.asarray(v[self.t])[:nF, 0] for k, v in self._cell_blocks.items()
                 if v.ndim == 3 and v.shape[2] == 1}
+
+    def cell_node_type(self, nF):
+        """[nF] type of each face at this frame, from the paired cell set -- see `_cell_nt`."""
+        a = getattr(self, "_cell_nt", None)
+        if a is None:
+            return None
+        return np.asarray(a[min(int(self.t), len(a) - 1)] if a.ndim == 2 else a)[:nF]
 
     @property
     def mesh(self):
