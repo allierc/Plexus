@@ -163,6 +163,10 @@ schedule:
   - cell_divide
   - edge_flip
   - topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  duration_s: 10
 _basis:
   chem: gs
   mat: gated

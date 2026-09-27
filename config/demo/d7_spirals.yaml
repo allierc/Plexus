@@ -1,0 +1,69 @@
+general:
+  title: 'A different activity organization: three species, each suppressing the next'
+  name: d7_spirals
+  seed: 0
+  n_frames: 4000
+  dt: 1.0
+  save_data: true
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+  record_cap: 602
+sets:
+  cell:
+    n: 4000
+    types:
+      cell:
+        fraction: 1.0
+    state:
+      chem:
+        width: 3
+        integration: first_order
+        boundary: free
+fields: {}
+seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
+- op: seed_cell_chem
+  at: cell
+  model: simplex
+  seed: 0
+  n_species: 3
+operators:
+- op: radius_graph
+  at: cell
+  radius: 0.95
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  chi: 1.0
+  d:
+  - 0.02
+  - 0.02
+  - 0.02
+- op: cell_chem_react
+  at: cell
+  model: rock_paper_scissor
+  a: 2.0
+  rate: 0.05
+schedule:
+- radius_graph
+- cell_chem_diffuse
+- cell_chem_react
+plotting:
+  renderer: mpl2d
+  background: black
+  dot_fill: 0.9
+  duration_s: 10
+  colors:
+    cell: '#ffffff'
+  blend: additive
+  species:
+  - '#ff0000'
+  - '#00ff00'
+  - '#0000ff'

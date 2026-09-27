@@ -1,0 +1,63 @@
+general:
+  title: 'Reaction-diffusion: the two together make a pattern'
+  name: d4_reaction_diffusion
+  seed: 0
+  n_frames: 6000
+  dt: 1.0
+  save_data: true
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+  record_cap: 602
+sets:
+  cell:
+    n: 4000
+    types:
+      cell:
+        fraction: 1.0
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+fields: {}
+seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
+- op: seed_cell_chem
+  at: cell
+  seed: 0
+  seed_frac: 0.12
+operators:
+- op: radius_graph
+  at: cell
+  radius: 0.95
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 4.0
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  F: 0.05
+  kk: 0.063
+  rate: 1.0
+schedule:
+- radius_graph
+- cell_chem_diffuse
+- cell_chem_react
+plotting:
+  renderer: mpl2d
+  background: black
+  dot_fill: 0.9
+  duration_s: 10
+  colors:
+    cell: '#ffffff'
+  chem_max: 0.5

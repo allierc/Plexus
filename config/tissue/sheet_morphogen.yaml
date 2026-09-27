@@ -153,6 +153,7 @@ schedule:
 - edge_flip
 - topo_record
 plotting:
+  duration_s: 10
   renderer: vtk_mesh
   background: black
   mesh_mark_division: true

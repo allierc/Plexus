@@ -57,7 +57,7 @@
 \newlength{\bandgap}
 \setlength{\bandgap}{16pt}
 \newlength{\panelbox}
-\setlength{\panelbox}{0.72\textheight}
+\setlength{\panelbox}{0.92\textheight}
 \newlength{\colheight}
 \setlength{\colheight}{0.80\textheight}   % the slide, less the band and the footer
 \newcommand{\panelboxfull}{\setlength{\panelbox}{0.78\textheight}}
@@ -91,15 +91,17 @@
 % the scale that makes it fit is taken from BOTH dimensions -- width and height, whichever binds.
 \newlength{\fitwd}
 \newcommand{\fitcol}[1]{%
-  \sbox{\fitbox}{\begin{varwidth}{2\linewidth}#1\end{varwidth}}%
+  \sbox{\fitbox}{\begin{varwidth}{3\linewidth}#1\end{varwidth}}%
   \setlength{\fitht}{\dimexpr\ht\fitbox+\dp\fitbox\relax}%
   \setlength{\fitwd}{\wd\fitbox}%
   \edef\fit@f{\fpeval{min(1, \strip@pt\colheight / \strip@pt\fitht,
                              \strip@pt\linewidth / \strip@pt\fitwd)}}%
   \typeout{FITSCALE=\fit@f}%
   \vspace{0pt}%
-  \ifdim\fitfixed pt>0pt \scalebox{\fitfixed}{\usebox{\fitbox}}%
-  \else \scalebox{\fit@f}{\usebox{\fitbox}}\fi}
+  % The deck size, or this slide's own if it needs a smaller one: a column that would not fit at
+  % the deck size must still fit, so one outlier does not drag every other slide down with it.
+  \ifdim\fitfixed pt>0pt \edef\fit@f{\fpeval{min(\fitfixed, \fit@f)}}\fi
+  \scalebox{\fit@f}{\usebox{\fitbox}}}
 \makeatother
 % `\srcpath` -- the file a slide was generated from, in the corner -- comes from the Janelia
 % theme; it is not redefined here.

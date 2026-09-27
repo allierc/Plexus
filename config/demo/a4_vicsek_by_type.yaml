@@ -1,0 +1,60 @@
+general:
+  title: "One law, three settings of it: Vicsek alignment read per cell type"
+  name: a4_vicsek_by_type
+  seed: 0
+  n_frames: 1200
+  dt: 0.25
+  save_data: true
+  dim: 2
+  boundary: periodic
+  world:
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 4000
+    vel_init: 0.005
+    types:
+      a:
+        count: 1334
+        alignment: 1.0
+      b:
+        count: 1333
+        alignment: 0.35
+      c:
+        count: 1333
+        alignment: 0.0
+fields: {}
+seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 0.3846
+  seed: 0
+operators:
+- op: radius_graph
+  at: cell
+  radius: 0.05
+- op: velocity_align
+  at: cell
+  a: 0.5
+  per_type: true
+- op: velocity_cruise
+  at: cell
+  v0: 0.005
+  noise: 0.001
+  chirality: 0.0
+schedule:
+- radius_graph
+- velocity_align
+- velocity_cruise
+plotting:
+  renderer: mpl2d
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  duration_s: 10
+  colors:
+    a: '#4c8fd4'
+    b: '#5fb85f'
+    c: '#e08214'

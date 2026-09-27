@@ -58,3 +58,4 @@ plotting:
   renderer: mpl2d
   background: black
   dot_fill: 0.9
+  duration_s: 10

@@ -1,0 +1,40 @@
+general:
+  title: '4,000 cells of three kinds: one set, three types, three colours'
+  name: a2b_three_cell_types
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  save_data: true
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+sets:
+  cell:
+    n: 4000
+    types:
+      a:
+        count: 1334
+      b:
+        count: 1333
+      c:
+        count: 1333
+fields: {}
+seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
+operators: []
+schedule: []
+plotting:
+  renderer: mpl2d
+  background: black
+  dot_fill: 0.9
+  duration_s: 10
+  colors:
+    a: '#4c8fd4'
+    b: '#5fb85f'
+    c: '#e08214'

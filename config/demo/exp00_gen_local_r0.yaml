@@ -1,0 +1,46 @@
+general:
+  title: 4,000 cells on a disc, and the relation that says who neighbours whom
+  name: exp00_gen_local_r0
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  save_data: true
+  dim: 2
+  boundary: free
+  world: [49.4, 49.4]
+sets:
+  cell:
+    n: 4000
+    types:
+      cell: {fraction: 1.0}
+fields: {}
+seed:
+- {op: seed_positions, at: cell, mode: sunflower, radius: 19.0, seed: 0}
+operators: []
+schedule: []
+plotting:
+  renderer: mpl2d
+  background: black
+  dot_fill: 0.9
+  duration_s: 10
+  colors: {cell: '#ffffff'}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a large collection of white particles arranged in a circular formation.
+      Over the course of the video, the particles undergo a subtle, fluid-like rotation or shifting motion.
+      The overall structure remains stable, maintaining its circular boundary while the internal patterns
+      evolve. The computation time per frame decreases slightly as the simulation progresses.
+    objects: The scene contains thousands of small, white circular dots. These dots are arranged in a
+      dense, concentric pattern that forms a large disk. The particles are uniform in size and color,
+      creating a high-contrast effect against the black background. The topology of the arrangement resembles
+      a complex, woven spiral or a series of nested rings.
+  movie_cell:
+    description: The video shows a static image of a circular pattern of white dots on a black background.
+      There is no movement or change between the frames. The arrangement of dots remains perfectly constant
+      throughout the sequence. The overall visual remains a fixed geometric representation.
+    objects: The scene contains a large circular formation composed of thousands of small white dots.
+      These dots are arranged in concentric rings that exhibit a spiral-like interference pattern. Each
+      individual dot is uniform in size and bright white in color. The entire structure is centered against
+      a solid black background.

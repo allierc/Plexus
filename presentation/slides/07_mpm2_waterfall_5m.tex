@@ -2,29 +2,31 @@
 \begin{frame}[t]{A waterfall of 5,000,000 material points}
 \vspace*{\bandgap}
 \begin{columns}[T,onlytextwidth]
-\begin{column}{0.5\textwidth}
+\begin{column}{0.58\textwidth}
 \playmovie{Movies/07_mpm2_waterfall_5m}
 \end{column}
-\begin{column}{0.48\textwidth}
+\begin{column}{0.4\textwidth}
 \fitcol{%
 \vspace{6pt}
 {\normalsize\textbf{entities}}\\[4pt]
 {\scriptsize\begin{tabular}{@{}lr@{\hspace{7pt}}l@{}}
-cell & 1 & \textcolor{gray}{water} \\
-\hspace*{7pt}$\hookrightarrow$ mpm\_particle & 5,000,000 & \textcolor{gray}{5,000,000 per cell} \\
+cell & 5,000,000 & \textcolor{gray}{water} \\
 mpm\_grid & & \textcolor{gray}{field, grid 192} \\
 \end{tabular}\par}
 \vspace{10pt}{\normalsize\textbf{activities}}\\[4pt]
 {\scriptsize\begin{tabular}{@{}c@{\hspace{5pt}}l@{}}
 \raisebox{-4pt}{\includegraphics[height=15pt]{icons/lateral.png}} & \textcolor{gray}{lateral} \\
  & gravity \\[1pt]
- & the material update \\[1pt]
+ & {\tiny$\displaystyle \mathbf a_{\text{ext}} \;=\; \mathbf g \qquad (\text{default } \mathbf g=(0,-g_y))$} \\[3pt]
+ & material update \\[1pt]
+ & {\tiny$\displaystyle \mathbf F \;\leftarrow\; (\mathbf I + \Delta t\,\mathbf C)\,\mathbf F
+\qquad\text{(liquid: } \mathbf F\leftarrow J^{1/d}\mathbf I,\ J=\det\mathbf F\text{)}$} \\[3pt]
  & shear viscosity \\[1pt]
 \raisebox{-4pt}{\includegraphics[height=15pt]{icons/exchange.png}} & \textcolor{gray}{exchange} \\
  & particle to grid \\[1pt]
  & grid to particle \\[1pt]
 \raisebox{-4pt}{\includegraphics[height=15pt]{icons/field.png}} & \textcolor{gray}{field} \\
- & the grid solve \\[1pt]
+ & grid solve \\[1pt]
 \end{tabular}\par}}
 \end{column}
 \end{columns}
