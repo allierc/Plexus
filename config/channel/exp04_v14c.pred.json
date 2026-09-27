@@ -1,0 +1,38 @@
+{
+ "channel": "mscl",
+ "shape": "mscl_c",
+ "state": "closed",
+ "box_nm": 14,
+ "core_half_nm_opm": 1.81,
+ "ion_paths": 1,
+ "narrowest_R_in_core_nm": [
+  0.172
+ ],
+ "path_passable": [
+  false
+ ],
+ "path_free_radius_min_nm": [
+  0.134
+ ],
+ "dry_plug_on_path": [
+  true
+ ],
+ "charges": {
+  "tips": 100,
+  "net_tips": 0.0,
+  "lumen_carbonyl_atoms": 5
+ },
+ "ions": {
+  "K": 141,
+  "Cl": 141
+ },
+ "lipids": 782,
+ "cation": "K",
+ "psi_mV": -100.0,
+ "conc_mM": 150.0,
+ "dt_ps": 0.15647125768121545,
+ "n_frames": 300000,
+ "sim_time_ns": 46.941377304364636,
+ "born_cation_kT": 98.9,
+ "born_Cl_kT": 75.4
+}

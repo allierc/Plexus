@@ -1,0 +1,89 @@
+{
+ "box_nm": 23,
+ "grid_dx_nm": 0.18,
+ "chains": 2,
+ "beads_protein": 506,
+ "lipids": 596,
+ "frame_beads": 252,
+ "R_patch_nm": 8.29,
+ "a_lipid_nm": 0.866,
+ "sigma_LL_nm": 0.772,
+ "eps_LL_kT": 1.5,
+ "K_A_T0_mN_m": 34.6,
+ "K_A_real_mN_m": 230.0,
+ "tau_s_per_sim": 7.278405169703653e-07,
+ "dt_sim": 1.398194651066543e-07,
+ "dt_ps": 0.10176627176574722,
+ "n_frames": 399997,
+ "tau_patch_frames": 679898,
+ "protocol_frames": [
+  0,
+  12903,
+  167741,
+  219353,
+  374191,
+  399997
+ ],
+ "sim_time_ns": 40.70620340748359,
+ "drive_top": 0.10371274260190466,
+ "drive_mode": "strain",
+ "G_open_hille_nS": 1.718296128823968,
+ "I_open_pA": -171.82961288239682,
+ "deposited_constriction_diameter_nm": -0.327,
+ "psi_sim": -3.8982399854014598,
+ "volt_per_sim": 0.025652602296033736,
+ "lumen_radius_nm": 3.29,
+ "go_eps_kT": 1.0,
+ "ions": {
+  "dry_plug_on_path_closed": [
+   true
+  ],
+  "narrowest_R_in_core_nm_closed": [
+   0.026
+  ],
+  "path_free_radius_min_nm_closed": [
+   0.0
+  ],
+  "path_passable_closed": [
+   false
+  ],
+  "dry_plug_on_path_open": [
+   true
+  ],
+  "narrowest_R_in_core_nm_open": [
+   0.04
+  ],
+  "path_free_radius_min_nm_open": [
+   0.13
+  ],
+  "path_passable_open": [
+   true
+  ],
+  "seeded_in_the_filter": [
+   2.13,
+   1.35,
+   0.71
+  ],
+  "cation": "K",
+  "ions": {
+   "K": 421,
+   "Cl": 421
+  },
+  "charges": {
+   "tips": 76,
+   "net_tips": -12.0,
+   "lumen_carbonyl_atoms": 42
+  },
+  "born_cation_kT": 98.9,
+  "born_Cl_kT": 75.4,
+  "ion_paths": 1,
+  "dt_ion": 2.149801419856739e-07,
+  "flexible_carbonyls": [
+   42,
+   80.9
+  ]
+ },
+ "state": "traak_c -> traak_o under tension",
+ "rig_shape": "traak_c",
+ "core_half_nm_opm": 1.61
+}

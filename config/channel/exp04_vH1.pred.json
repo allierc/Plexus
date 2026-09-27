@@ -1,0 +1,16 @@
+{
+ "box_nm": 10.0,
+ "hole_radius_nm": 1.0,
+ "core_thickness_nm": 2.8,
+ "ions_per_species_per_side": 26,
+ "lipids": 284,
+ "sigma_ideal_S_m": 2.251,
+ "G_hille_nS": 1.618,
+ "psi_mV": -100.0,
+ "dt_ps": 0.15647125768121542,
+ "n_frames": 100000,
+ "sim_time_ns": 15.647125768121542,
+ "charges_expected_across": 15.8,
+ "born_K_kT": 98.9,
+ "born_Cl_kT": 75.4
+}

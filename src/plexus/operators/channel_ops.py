@@ -982,6 +982,89 @@ class PairPotential(Exchange):
         return out
 
 
+# pair_potential[typed] -- the well depth per pair of cell TYPES inside one set (experiment 9: Steinberg
+# 1963 / Graner & Glazier 1992 adhesion tables; a cell retyped by `contact_retype` adheres by its new type).
+# Moved here from sorting_ops.py on 2026-09-27, unchanged.
+def _type_index(lvl, name, where):
+    names = list(getattr(lvl, "type_names", None) or [])
+    if name not in names:
+        raise ValueError(f"{where}: type {name!r} is not one of the set's types {names}")
+    return names.index(name)
+
+
+@register_operator("pair_potential", model="typed", family="interaction", set="particle", kind="exchange",
+                   title="Pair potential with a well depth per pair of types",
+                   equation=r"""$$U_{ij}=\epsilon_{\tau_i\tau_j}\,U_1(r_{ij})$$""")
+class PairPotentialTyped(PairPotential):
+    """`pair_potential` within one set, the well depth of each pair read from a table of the two
+    cells' TYPES:
+
+        U_ij = eps[tau_i, tau_j] U_1(r_ij)          F_ij = eps[tau_i, tau_j] F_1(r_ij)
+
+    tau_i is cell i's current `node_type`, U_1 and F_1 the declared law(s) at depth 1 (`cooke`,
+    `lj`, `wca`), and eps the symmetric table `epsilon_types: {A: {A: 1.0, B: 0.7}, B: {B: 0.6}}`
+    keyed by the set's type names; every pair of types must be given (one order is enough). The
+    table is looked up every frame, so a cell retyped by `contact_retype` adheres with its new
+    type's depth from the next frame on. Coulomb is refused: its strength is a charge, not a depth.
+
+    Reference: Steinberg, M.S. (1963). Science 141:401-408 (the works of adhesion per pair of
+    types); Graner, F. & Glazier, J.A. (1992). Phys. Rev. Lett. 69:2013-2016 (the J table); Cooke,
+    I.R., Kremer, K. & Deserno, M. (2005). Phys. Rev. E 72:011506 (the law).
+    """
+    REQUIRES_PARAMS = ["law", "epsilon_types"]
+    PARAM_ROLES = dict(PairPotential.PARAM_ROLES, epsilon_types="well_depth_per_pair_of_types")
+    # THE CELL GRID FROM 10 MILLION CANDIDATE PAIRS, not the parent's 2 billion. The parent's threshold
+    # keeps every exp04 rig on the all-pairs path it always ran; an aggregate of 50,000 cells in one set
+    # is 2.5e9 candidates a frame all-pairs (~100 ms on an L4) against ~5e6 on the grid. `_cell_pairs`
+    # never loses a pair (tests/test_exp09_variants.py::test_typed_cell_list_equals_all_pairs).
+    CELL_LIST_ABOVE = 1e7
+
+    def __init__(self, params, device="cpu"):
+        p = dict(params)
+        p["epsilon"] = 1.0
+        super().__init__(p, device)
+        if "coulomb" in self.laws:
+            raise ValueError("pair_potential[typed]: coulomb's strength is a charge, not a depth")
+        if not self.same or len(self.A) != 1:
+            raise ValueError("pair_potential[typed]: one set, with itself (its types carry the table)")
+        self.table_spec = params["epsilon_types"]
+        self._tab = None
+        self._nt = None
+        self._cur = None
+
+    def _table(self, lvl, device, dtype):
+        names = list(getattr(lvl, "type_names", None) or [])
+        K = len(names)
+        tab = torch.full((K, K), float("nan"), device=device, dtype=dtype)
+        for a, row in self.table_spec.items():
+            for b, e in (row or {}).items():
+                i = _type_index(lvl, str(a), "pair_potential[typed]")
+                j = _type_index(lvl, str(b), "pair_potential[typed]")
+                tab[i, j] = tab[j, i] = float(e)
+        miss = [(names[i], names[j]) for i in range(K) for j in range(i, K) if torch.isnan(tab[i, j])]
+        if miss:
+            raise ValueError(f"pair_potential[typed]: no depth for the type pairs {miss}")
+        return tab
+
+    def _pairs(self, *a, **kw):
+        for gi, jj in super()._pairs(*a, **kw):
+            self._cur = (gi, jj)
+            yield gi, jj
+
+    def _force(self, d, r, *a, **kw):
+        f, nc, ez = super()._force(d, r, *a, **kw)
+        gi, jj = self._cur
+        return f * self._tab[self._nt[gi], self._nt[jj]][:, None], nc, ez
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.A[0])
+        X = lvl.get("pos")
+        if self._tab is None or self._tab.device != X.device:
+            self._tab = self._table(lvl, X.device, X.dtype)
+        self._nt = lvl.node_type.to(X.device).long()
+        return super().forward(H, mask)
+
+
 # =============================================================================================
 # THE BATH, THE PLANE, THE PIPETTE
 # =============================================================================================

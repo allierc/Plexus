@@ -1,0 +1,38 @@
+{
+ "channel": "gramicidin",
+ "shape": "gA",
+ "state": "dimer, the channel",
+ "box_nm": 10,
+ "core_half_nm_opm": 1.14,
+ "ion_paths": 1,
+ "narrowest_R_in_core_nm": [
+  0.111
+ ],
+ "path_passable": [
+  true
+ ],
+ "path_free_radius_min_nm": [
+  0.08
+ ],
+ "dry_plug_on_path": [
+  false
+ ],
+ "charges": {
+  "tips": 0,
+  "net_tips": 0.0,
+  "lumen_carbonyl_atoms": 64
+ },
+ "ions": {
+  "K": 44,
+  "Cl": 44
+ },
+ "lipids": 435,
+ "cation": "K",
+ "psi_mV": -100.0,
+ "conc_mM": 150.0,
+ "dt_ps": 0.15647125768121542,
+ "n_frames": 300,
+ "sim_time_ns": 0.04694137730436464,
+ "born_cation_kT": 98.9,
+ "born_Cl_kT": 75.4
+}

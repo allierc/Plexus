@@ -1,0 +1,458 @@
+general:
+  name: exp04_v7a
+  seed: 0
+  n_frames: 400000
+  dt: 1.398194651066543e-07
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  record_cap: 3001
+  field_record_cap: 2
+  units: {length_um: 0.023, time_s: 7.278405169703653e-07, force_nN: 0.00017869565217391303}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      psi: {width: 1, integration: first_order, unit: voltage, title: membrane potential}
+      j_channel: {width: 1, integration: none, unit: current, title: channel current}
+      g_channel: {width: 1, integration: none, unit: '1', title: channel conductance}
+      pore_r: {width: 1, integration: none, unit: length, title: pore radius}
+      n_largest: {width: 1, integration: none, unit: count, title: largest assembly}
+      n_bonds: {width: 1, integration: none, unit: count, title: bonds between monomers}
+      ring: {width: 1, integration: none, unit: '1', title: ring membership}
+    title: the cell's interior (the voltage-clamped compartment)
+  aHL_1:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 1
+  aHL_2:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 2
+  aHL_3:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 3
+  aHL_4:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 4
+  aHL_5:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 5
+  aHL_6:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 6
+  aHL_7:
+    n: 293
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      rim: {width: 1, integration: none, unit: '1', title: rim bead}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+      dg: {width: 1, integration: none, unit: energy, title: insertion free energy (Wimley-White)}
+    title: alpha-hemolysin, chain 7
+  lipid:
+    n: 649
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: membrane lipids
+  frame:
+    n: 288
+    start:
+    - [0.5, 0.5, 0.374569]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+    title: frozen lipids at the patch's rim (they hold the tension)
+fields:
+  elec: {frame: grid, res: 128, components: 1, title: electric potential in the electrolyte}
+seed:
+- op: cloud_seed
+  at: aHL_1
+  cloud: exp04_ahl2/m0
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: aHL_2
+  cloud: exp04_ahl2/m1
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: aHL_3
+  cloud: exp04_ahl2/m2
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: aHL_4
+  cloud: exp04_ahl2/m3
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: aHL_5
+  cloud: exp04_ahl2/m4
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: aHL_6
+  cloud: exp04_ahl2/m5
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: aHL_7
+  cloud: exp04_ahl2/m6
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: seed_state_from_file
+  at: aHL_1
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m0_rim, domain: m0_domain, dg: m0_dg}
+- op: seed_state_from_file
+  at: aHL_2
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m1_rim, domain: m1_domain, dg: m1_dg}
+- op: seed_state_from_file
+  at: aHL_3
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m2_rim, domain: m2_domain, dg: m2_dg}
+- op: seed_state_from_file
+  at: aHL_4
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m3_rim, domain: m3_domain, dg: m3_dg}
+- op: seed_state_from_file
+  at: aHL_5
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m4_rim, domain: m4_domain, dg: m4_dg}
+- op: seed_state_from_file
+  at: aHL_6
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m5_rim, domain: m5_domain, dg: m5_dg}
+- op: seed_state_from_file
+  at: aHL_7
+  file: shapes/exp04_ahl2/assembly_blocks_7a.npz
+  blocks: {rim: m6_rim, domain: m6_domain, dg: m6_dg}
+- op: cloud_seed
+  at: lipid
+  cloud: exp04_ahl2/lipid
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: frame
+  cloud: exp04_ahl2/frame
+  origin: [0.5, 0.5, 0.374569]
+  scale: 43478260.86956522
+operators:
+- op: shape_match
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  alpha: 1.0
+  domain_block: domain
+  flexible: [1]
+- op: membrane_potential
+  at: cell
+  capacitance: 224155.3300199186
+  pump_max: 0.0
+  pump_rev: 1.0
+  leak: 0.0
+  psi0: -1.559295994160584
+  h0: [0.0, 0.0]
+  flux: j_channel
+- op: elastic_network
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  cutoff: 0.043478260869565216
+  k: 89401.0
+  local_max_sep: 2
+  domain_block: domain
+  flexible_domains: [1]
+  go_epsilon: 1.0
+  go_cutoff: 0.034782608695652174
+  rest_from_reference: true
+  reference: exp04_ahl2
+  reference_parts: [c0]
+  reference_scale: 43478260.86956522
+  mobility: 1.0
+  f_max: 6219.2
+- {op: pair_potential, at: aHL_1, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- {op: pair_potential, at: aHL_2, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- {op: pair_potential, at: aHL_3, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- {op: pair_potential, at: aHL_4, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- {op: pair_potential, at: aHL_5, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- {op: pair_potential, at: aHL_6, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- {op: pair_potential, at: aHL_7, law: wca, sigma: 0.013043478260869565, epsilon: 1.0, exclude: domain, mobility: 1.0,
+  f_max: 6219.2}
+- op: elastic_network
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  cutoff: 0.017391304347826087
+  k: 0.0
+  go_epsilon: 1.0
+  go_cutoff: 0.034782608695652174
+  go_mode: template
+  reference: exp04_ahl2
+  reference_parts: [c0, c1]
+  reference_scale: 43478260.86956522
+  mobility: 1.0
+  f_max: 6219.2
+- op: pair_potential
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  law: wca
+  sigma: 0.01956521739130435
+  epsilon: 1.0
+  exclude_same_set: true
+  mobility: 1.0
+  f_max: 6219.2
+- {op: pair_potential, at: lipid, law: cooke, tail: 0.05369235686423239, sigma: 0.03355772304014524, epsilon: 1.5,
+  mobility: 1.0, f_max: 6219.2}
+- op: pair_potential
+  at: lipid
+  with_sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  law: lj
+  sigma: 0.03260869565217391
+  epsilon: 1.0
+  mobility: 1.0
+  mobility_with: 1.0
+  react: true
+  f_max: 6219.2
+- {op: pair_potential, at: lipid, with: frame, law: cooke, tail: 0.05369235686423239, sigma: 0.03355772304014524,
+  epsilon: 1.5, mobility: 1.0, react: false, f_max: 6219.2}
+- op: tether
+  at: lipid
+  k: 52900.0
+  axes: [2]
+  mobility: 1.0
+- {op: brownian, at: lipid, kT: 1.0, mobility: 1.0, seed: 1}
+- op: tether
+  at: aHL_1
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_1, kT: 1.0, mobility: 1.0, seed: 20}
+- op: tether
+  at: aHL_2
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_2, kT: 1.0, mobility: 1.0, seed: 21}
+- op: tether
+  at: aHL_3
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_3, kT: 1.0, mobility: 1.0, seed: 22}
+- op: tether
+  at: aHL_4
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_4, kT: 1.0, mobility: 1.0, seed: 23}
+- op: tether
+  at: aHL_5
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_5, kT: 1.0, mobility: 1.0, seed: 24}
+- op: tether
+  at: aHL_6
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_6, kT: 1.0, mobility: 1.0, seed: 25}
+- op: tether
+  at: aHL_7
+  k: 26450.0
+  axes: [2]
+  block: rim
+  mobility: 1.0
+- {op: brownian, at: aHL_7, kT: 1.0, mobility: 1.0, seed: 26}
+- op: residue_slab
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  z0: 0.374569
+  half_thickness: 0.0608695652173913
+  edge: 0.013043478260869565
+  block: dg
+  mobility: 1.0
+- op: assembly_probe
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  contact: 0.03043478260869565
+  min_contacts: 15
+  every: 200
+  cell: cell
+- op: pore_probe
+  at: aHL_1
+  sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  bead_radius: 0.021739130434782608
+  z: [0.26587378460427985, 0.5267433498216711]
+  h: 0.013043478260869565
+  slices: 25
+  cell: cell
+- op: electrolyte_conduction
+  at: cell
+  field: elec
+  insulators:
+  - {set: aHL_1, radius: 0.021739130434782608}
+  - {set: aHL_2, radius: 0.021739130434782608}
+  - {set: aHL_3, radius: 0.021739130434782608}
+  - {set: aHL_4, radius: 0.021739130434782608}
+  - {set: aHL_5, radius: 0.021739130434782608}
+  - {set: aHL_6, radius: 0.021739130434782608}
+  - {set: aHL_7, radius: 0.021739130434782608}
+  - {set: lipid, radius: 0.02391304347826087}
+  sigma: 1.9
+  volt_per_sim: 0.025652602296033736
+  dx_m: 1.796875e-10
+  sim_current_per_A: 4542823191430.748
+  slab: [0.28761291503906244, 0.4615259585173233]
+  seal: frame
+  seal_margin: 0.018833608171593467
+  cell: cell
+  lining: {block: domain, value: 1}
+  axis_sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7]
+  every: 100
+  iters: 150
+  iters_first: 6000
+  omega: 1.0
+  probe_radius: 0.006086956521739131
+schedule: [shape_match, membrane_potential, elastic_network, pair_potential, pair_potential, pair_potential, pair_potential,
+  pair_potential, pair_potential, pair_potential, elastic_network, pair_potential, pair_potential, pair_potential,
+  pair_potential, tether, brownian, tether, brownian, tether, brownian, tether, brownian, tether, brownian, tether,
+  brownian, tether, brownian, tether, brownian, residue_slab, assembly_probe, pore_probe, electrolyte_conduction]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [aHL_1, aHL_2, aHL_3, aHL_4, aHL_5, aHL_6, aHL_7, lipid]
+  hide_sets: [cell, frame]
+  scale_bar_lift: 0.1
+  surface:
+    aHL_1: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    aHL_2: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    aHL_3: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    aHL_4: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    aHL_5: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    aHL_6: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    aHL_7: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    lipid: {render: surface, spacing: 0.017391, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+  surface_min_points: 30
+  opacity: {aHL_1: 1.0, aHL_2: 1.0, aHL_3: 1.0, aHL_4: 1.0, aHL_5: 1.0, aHL_6: 1.0, aHL_7: 1.0, lipid: 0.5}
+  colors:
+    aHL_1: [0.36, 0.58, 0.8]
+    aHL_2: [0.9, 0.62, 0.36]
+    aHL_3: [0.47, 0.72, 0.52]
+    aHL_4: [0.84, 0.47, 0.47]
+    aHL_5: [0.66, 0.56, 0.79]
+    aHL_6: [0.62, 0.5, 0.42]
+    aHL_7: [0.86, 0.6, 0.74]
+    lipid: [0.82, 0.82, 0.84]
+  field_iso:
+    field: elec
+    channel: 0
+    levels: [1.868988, 6.22996]
+    colors: ['#ff7b1c', '#ffe27a']
+    opacity: [0.28, 0.75]
+    smooth: 15
+  camera: {elev: 40.0, azim: 30.0}
+  zoom: 1.0
+  near_side_centre: [0.5, 0.5, 0.374569]
+  curve:
+  - {quantity: 'block:cell:n_largest', ymin: 0.0, ymax: 8.0, ylabel: protomers in the largest assembly, font_size: 21,
+    tick_font_size: 16}
+  - {quantity: 'block:cell:j_channel', unit: current_pA, smooth: 20.0, ymin: -28.77083586461198, ymax: 1.439, ylabel: current
+      at -40 mV, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:pore_r', unit: length_nm, factor: 2.0, ymin: 0.0, ymax: 3.0, ylabel: narrowest lumen
+      diameter, font_size: 21, tick_font_size: 16}
+  subject: aHL_1
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  replay_curves: false
+  curve_time: {per_frame_s: 1.0176627176574722e-13, unit: ns}
+descriptions:
+  movie: {description: 'The simulation shows a cluster of multi-colored organic-shaped structures embedded within
+      a larger, grey, semi-transparent spherical volume. Over time, the internal structures remain relatively static
+      in their spatial arrangement while the surrounding grey volume undergoes subtle surface fluctuations. The
+      accompanying graphs on the right show that the percentage of the largest assembly remains constant at 7.0%.
+      Meanwhile, the "nonvoid lumen diameter" graph shows a gradual increase in noise and small spikes as the simulation
+      progresses toward the 41 ns mark.', objects: "The scene contains a central cluster of approximately eight\
+      \ distinct, blob-like structures with smooth, rounded topologies. These internal objects are colored in various\
+      \ shades including green, red, purple, blue, pink, and brown. They are nested inside a larger, grey, roughly\
+      \ spherical shell that represents a surrounding medium or boundary. A scale bar at the bottom indicates a\
+      \ physical dimension of 0.005 \u03BCm, suggesting these are microscopic or molecular-scale structures."}
