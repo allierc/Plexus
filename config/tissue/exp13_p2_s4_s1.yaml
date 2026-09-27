@@ -1,14 +1,15 @@
 general:
-  name: exp13_smoke
+  name: exp13_p2_s4_s1
   seed: 1
-  n_frames: 121
+  n_frames: 600
   dt: 1.0
-  record_cap: 123
+  record_cap: 602
   boundary: free
   dim: 3
   world: [18.0, 18.0, 18.0]
   units: {length_um: 20.0, time_s: 540.0}
-  title: 'exp 13 Phase 2: a flat wing-disc pouch -- a Dpp stripe, growth gated on Dpp and fed back by stretch'
+  title: 'exp 13 Phase 2: a flat wing-disc pouch -- a Dpp stripe, growth gated on Dpp and fed back by
+    stretch'
 sets:
   cell:
     n: 8000
@@ -44,8 +45,8 @@ sets:
     maps: {srce: vertex, trgt: vertex, face: cell}
 fields: {}
 seed:
-- {op: seed_mesh, at: vertex, shape: disc, n_cells: 400, radius: 5.0, jitter: 0.15, p0: 3.5, seed: 1, vseed_cv: 0.3,
-  age_seed: 60.0, ref_frame: 20}
+- {op: seed_mesh, at: vertex, shape: disc, n_cells: 400, radius: 5.0, jitter: 0.15, p0: 3.5, seed: 1,
+  vseed_cv: 0.3, age_seed: 60.0, ref_frame: 60}
 operators:
 - {op: cell_geometry, at: cell}
 - {op: cell_neighbours, at: cell}
@@ -62,17 +63,17 @@ operators:
   decay: 0.0175
   source: {axis: 0, frac: 0.08}
   chan: 0
-- {op: cell_grow, at: vertex, model: stretch, rate: 0.004, rho: 0.2, a_sw: 0.3, a_sw_rel: true, a_live: 0.01, hill: 2.0,
-  chan: 0, vth_frac: 2.5, conserve_amount: false, gain: 0.0, readout: a0, stretch_ref: settle, ref_frame: 20}
-- {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 20.0, K_R: 0.0, Lambda: 0.5, Gamma: 0.4, p0: 3.5, mu: 1.0,
-  relax_iters: 30, eta: 0.08, cap_frac: 0.12, K_bend: 0.0, K_lumen: 0.0, plane_axis: 2}
-- {op: cell_divide, at: vertex, implementation: adder_sheet, delta: 1.0, factor: 2.0, plane_axis: 2,
-  phase_spread: 0.0, every: 4, engine_clock: true, cycle_cv: 0.0, min_cycle: 4, max_cycle: 1000000000, p0: 3.5,
-  reset_noise: 0.0}
+- {op: cell_grow, at: vertex, model: stretch, rate: 0.004, rho: 0.2, a_sw: 0.3, a_sw_rel: true, a_live: 0.01,
+  hill: 2.0, chan: 0, vth_frac: 2.5, conserve_amount: false, gain: 4.0, readout: stress, stretch_ref: settle,
+  ref_frame: 60}
+- {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 20.0, K_R: 0.0, Lambda: 0.5, Gamma: 0.4, p0: 3.5,
+  mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12, K_bend: 0.0, K_lumen: 0.0, plane_axis: 2}
+- {op: cell_divide, at: vertex, implementation: adder_sheet, delta: 1.0, factor: 2.0, plane_axis: 2, phase_spread: 0.0,
+  every: 4, engine_clock: true, cycle_cv: 0.0, min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.0}
 - {op: edge_flip, at: vertex, l_th_frac: 0.28, every: 1, max_flips: 300}
 - {op: topo_record, at: vertex, every: 1}
-schedule: [cell_geometry, cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_grow, cell_mechanics, cell_divide,
-  edge_flip, topo_record]
+schedule: [cell_geometry, cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_grow, cell_mechanics,
+  cell_divide, edge_flip, topo_record]
 plotting:
   duration_s: 10
   renderer: vtk_mesh

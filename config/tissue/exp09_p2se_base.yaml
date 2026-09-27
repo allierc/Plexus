@@ -1,0 +1,171 @@
+general:
+  name: exp09_p2se_base
+  seed: 0
+  n_frames: 432
+  dt: 1.0
+  record_cap: 433
+  boundary: free
+  dim: 3
+  world:
+  - 24.0
+  - 24.0
+  - 24.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  cell:
+    n: 8000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+    types:
+      LEP:
+        fraction: 0.5
+      MEP:
+        fraction: 0.5
+  vertex:
+    n: 20000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  half_edge:
+    n: 64000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: disc
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.7
+  p0: 3.878
+  seed: 0
+  vseed_cv: 0.15
+  age_seed: 25.0
+  type_layout: split_x
+operators:
+- op: cell_geometry
+  at: cell
+- op: junction_myosin
+  model: type_pair
+  at: vertex
+  tensions:
+    LEP:
+      LEP: 2.0
+      MEP: 2.5
+      medium: 0.5
+    MEP:
+      MEP: 2.0
+      medium: 0.5
+  noise: 2.0
+  tau: 12.0
+  seed: 0
+- op: cell_mechanics
+  at: vertex
+  K_A: 0.1
+  K_P: 0.1
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: -0.03
+  Gamma: 0.0
+  p0: 3.878
+  mu: 1.0
+  relax_iters: 3
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+  plane_axis: 2
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+  model: boundary
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- junction_myosin
+- cell_mechanics
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_points
+  background: black
+  duration_s: 10
+  slow_motion: 1
+  up_axis: 2
+  box_frame: false
+  camera:
+    elev: 90.0
+    azim: -90.0
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  fps: 30
+  real_time: false
+  mesh_color: '#ffffff'
+  mesh_style: surface
+  mesh_edges: true
+  mesh_mark_division: true
+  mesh_apop_color: '#0099ff'
+  zoom: 1.33
+  scale_bar_corner: right
+  scale_bar_um: 20
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4

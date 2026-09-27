@@ -1,0 +1,262 @@
+general:
+  name: exp10_c1a
+  seed: 0
+  n_frames: 1200
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 24.0
+  - 24.0
+  - 24.0
+sets:
+  cell:
+    n: 1024
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      chem:
+        width: 4
+        integration: first_order
+  vertex:
+    n: 2560
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 8192
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  model: apicobasal
+  at: vertex
+  n_cells: 12
+  radius: 0.6
+  jitter: 0.02
+  p0: 3.5
+  seed: 0
+  h0: 0.5
+  apical: in
+  lattice_rotation: true
+- op: seed_cell_chem
+  at: cell
+  model: lognormal
+  values:
+  - 0.0
+  - 0.0
+  - 1.0
+  - 0.0
+  cv:
+  - 0.0
+  - 0.0
+  - 0.3
+  - 0.0
+  seed: 0
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_neighbours
+  at: cell
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.1
+  chi: 1.0
+  chan: 0
+- op: cell_chem_react
+  at: cell
+  model: notch_delta
+  rate: 0.1
+  p: 1.0
+  theta: 0.5
+  q: 4.0
+  k_w: 1.0
+  k_y: 1.0
+  K_w: 0.3
+  n: 2.0
+  wnt_off: 450
+  chan: 0
+- op: cell_grow
+  at: vertex
+  rate: 0.003
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+  conserve_amount: false
+- op: cell_mechanics
+  implementation: apicobasal_region
+  at: vertex
+  k_v: 16.0
+  kappa_s: 0.05
+  gamma: 0.01
+  Lambda: 0.0
+  K_R: 0.0
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+  sigma_a:
+  - 0.15
+  - 0.85
+  sigma_ramp: 150
+  fate_block: chem
+  fate_col: 3
+  sigma_b:
+  - 0.27
+  - 0.15
+  v_swell:
+  - 1.56
+  - 1.0
+- op: cell_divide
+  at: vertex
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_grow
+- cell_mechanics
+- cell_divide
+- edge_flip
+- topo_record
+plotting:
+  duration_s: 10
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 6.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: false
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+  zoom: 4.0
+descriptions:
+  movie:
+    description: The simulation begins with a single point that rapidly expands into
+      a small, dense cluster of cells. As the frames progress, the cluster grows significantly
+      in volume, transitioning from a compact sphere into a complex, irregular porous
+      structure. The internal network of the structure becomes increasingly intricate,
+      showing a rapid increase in connectivity and spatial occupancy. By the final
+      frames, the structure has expanded to fill a large portion of the bounding box,
+      characterized by a dense web of interconnected filaments.
+    objects: The primary objects are cells that start as a single blue point and evolve
+      into a large, multi-colored cluster. These cells are arranged in a growing,
+      interconnected network that forms a porous, sponge-like topology. The colors
+      transition from a solid blue and red mix to a complex pattern of white, light
+      blue, and dark blue facets. The size of the overall structure increases exponentially
+      over time, eventually occupying a significant fraction of the 3D simulation
+      volume.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation begins with a single small, blue polyhedral cell in the center of a black
+      void. Over time, this cell rapidly divides and expands, increasing in both total cell count and
+      overall volume. The growth follows a non-linear trajectory, accelerating until it reaches a maximum
+      capacity of 1,001 cells. In the final frames, the structure becomes a massive, complex cluster of
+      interconnected polygons that fills most of the viewport.
+    objects: The primary objects are polygonal cells that form a growing, interconnected 3D cluster. These
+      cells are colored in shades of blue, white, and occasionally red or pink during the early growth
+      phases. The size of individual cells varies significantly, with smaller cells appearing at the periphery
+      and larger ones forming the core. The topology is a Voronoi-like tessellation where each cell shares
+      faces with its immediate neighbors to form a solid mass.

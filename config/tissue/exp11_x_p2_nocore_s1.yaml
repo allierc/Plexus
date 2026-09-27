@@ -1,0 +1,115 @@
+general:
+  name: exp11_x_p2_nocore_s1
+  seed: 1
+  n_frames: 160
+  dt: 1.0
+  record_cap: 162
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+  units: {length_um: 10.0, time_s: 600.0}
+sets:
+  cell:
+    n: 12800
+    state:
+      area: {width: 1}
+      centroid: {width: 3}
+      Vbirth: {width: 1, record: false}
+      divjit: {width: 1, record: false}
+      A0: {width: 1}
+      P0: {width: 1}
+      V0f: {width: 1}
+      alive: {width: 1, record: false}
+      age: {width: 1}
+      ndiv: {width: 1}
+      mg_scale: {width: 1, record: false}
+      A0_init: {width: 1, record: false}
+      P0_init: {width: 1, record: false}
+      V0f_init: {width: 1, record: false}
+      inhib_frac: {width: 1}
+      cell_id: {width: 1}
+      parent_id: {width: 1}
+      phase: {width: 1}
+      cycle_progress: {width: 1}
+      cyc_rate: {width: 1, record: false}
+      phase_t: {width: 1, record: false}
+      cyc_inhib: {width: 1, record: false}
+      cyc_vprev: {width: 1, record: false}
+      chem: {width: 2}
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      sep: {width: 3, integration: first_order}
+  half_edge:
+    n: 102400
+    maps: {srce: vertex, trgt: vertex, face: cell}
+  bm_node:
+    entity: basement_membrane_node
+    n: 6000
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+fields: {}
+operators:
+- {op: cell_geometry, at: cell}
+- {op: cell_grow, at: vertex, rate: 0.004, rho: 1.0, a_sw: 50.0, hill: 4.0, vth_frac: 2.5, chan: 0}
+- {op: bm_bond, at: bm_node, graph_mode: true, k: 5.0, cutoff: 0.5, max_neighbours: 6, overdamped_gamma: 5.0,
+  emit: velocity, snapshot_every: 50}
+- {op: bm_remodel, at: bm_node, tau: 5.0, cap: 0.2}
+- {op: bm_contact, implementation: live, at: bm_node, surface: vertex, k: 0.5, offset: 0.05, band: 0.3}
+- {op: cell_mechanics, implementation: apicobasal_contact, at: vertex, k_v: 4.0, kappa_s: 0.2, kappa_h: 0.2,
+  gamma: 0.0, Lambda: 0.0, K_R: 0.0, mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12, sep_mu: 1.0,
+  e_cm: 0.15, k_core: 0.0, core_rate: 0.0166, k_height: 30.0}
+- {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
+- {op: cell_cycle, at: vertex, t_g1: 400.0, t_s: 0.0, t_g2: 0.0, t_m: 0.0, phase_cv: 0.15, seed: 1, g1_size: 2.0}
+- {op: cell_divide, model: cycle, at: vertex, every: 4, engine_clock: true, min_cycle: 4, max_cycle: 1000000000,
+  p0: 3.5, orient_iface: true, orient_asw: 0.5}
+- {op: topo_record, at: vertex, every: 1}
+schedule: [cell_geometry, cell_grow, bm_bond, bm_remodel, bm_contact, cell_mechanics, edge_flip, cell_cycle,
+  cell_divide, topo_record]
+seed:
+- {op: seed_mesh, model: apicobasal, at: vertex, n_cells: 200, radius: 5.0, jitter: 0.02, p0: 3.5, seed: 1,
+  vseed_cv: 0.02, h0: 0.88, ref_frame: 60, apical: in}
+- op: bm_seed
+  implementation: live
+  at: bm_node
+  tissue: vertex
+  offset: 0.05
+  seed: 1
+  hole:
+    axis: [0, 0, 1]
+    half_angle_deg: 30
+plotting:
+  zoom: 3.0
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 34.0
+    walls: 64
+    loc: [0.015, 0.035]
+    wall_color: '#e8e8e8'
+    mid: true
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - {quantity: cells, xlabel: frame, ylabel: cells, ticks: 4}
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07
