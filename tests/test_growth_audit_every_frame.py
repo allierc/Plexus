@@ -67,3 +67,14 @@ def test_a_slot_whose_neighbours_changed_is_not_a_jump():
     z["vertex__mesh_E_srce"], z["vertex__mesh_E_trgt"] = rows[..., 0].ravel(), rows[..., 1].ravel()
     bad, why, jmax, jat, n = GA._every_frame(z, 1, 60)
     assert jat != 13 or jmax < GA.X_JUMP          # the move into row 13 is a topology change, not read
+
+
+def test_a_slot_rewired_in_the_previous_row_is_not_a_jump():
+    """A septum vertex settles one frame after its division (exp13, T-26)."""
+    z = _lattice(jump_at=13)
+    E = np.stack([z["vertex__mesh_E_srce"], z["vertex__mesh_E_trgt"]], 1).copy()
+    rows = E.reshape(60, len(E) // 60, 2)
+    rows[12:, 0, 1] = 7                           # vertex 7 re-wired in row 12, then moves in row 13
+    z["vertex__mesh_E_srce"], z["vertex__mesh_E_trgt"] = rows[..., 0].ravel(), rows[..., 1].ravel()
+    assert GA._jump(z, 13) < GA.X_JUMP
+    assert GA._jump(z, 14) >= GA.X_JUMP             # two rows after the re-wiring, a move is read again

@@ -143,8 +143,9 @@ def _jump(z, t, stride=1):
     Both qualifications added 2026-09-27 after exp12's report, once the test ran on every row: a disc
     recorded every 6th frame moves a rim vertex ~1 edge per ROW by ordinary growth (four clean discs read
     WRECKED at 1.10-1.44), and a slot re-used after a division or touched by a T1 "jumps" with no vertex
-    moving. A vertex that flies off with its neighbours unchanged -- the explosion this test is for --
-    still reads in full."""
+    moving. The same holds one row later for a vertex born or re-wired in row t-1 (a septum vertex
+    settles on the frame after its division). A vertex that flies off with its neighbours unchanged over
+    both rows -- the explosion this test is for -- still reads in full."""
     if t < 1:
         return 0.0
     nv = min(int(z["vertex__mesh_Nv"][t - 1]), int(z["vertex__mesh_Nv"][t]))
@@ -153,6 +154,15 @@ def _jump(z, t, stride=1):
     d = np.linalg.norm(b - a, axis=1)
     if "vertex__mesh_offsets" in z and d.size:
         same = (_signature(z, t - 1, nv) == _signature(z, t, nv)).all(1)
+        if t >= 2:
+            # A DIVISION'S SEPTUM VERTEX SNAPS ONE ROW LATER (exp13, T-26): the vertex born, or re-wired,
+            # in row t-1 settles in row t with its neighbours already unchanged. Slots born in row t-1
+            # (beyond row t-2's count) or re-wired between rows t-2 and t-1 are not read either -- the
+            # rule exp07's tube_audit uses (during AND on the frame after).
+            n2 = min(int(z["vertex__mesh_Nv"][t - 2]), nv)
+            prev = np.zeros(nv, bool)
+            prev[:n2] = (_signature(z, t - 2, n2) == _signature(z, t - 1, nv)[:n2]).all(1)
+            same &= prev
         d = d[same]
     off = z["vertex__mesh_offsets"]
     s = np.asarray(z["vertex__mesh_E_srce"][off[t]:off[t + 1]])
