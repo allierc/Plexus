@@ -1,0 +1,31 @@
+general:
+  name: exp09_v5_gt_s2
+  seed: 2
+  n_frames: 2000000
+  dt: 1.0e-07
+  boundary: free
+  world: [4.0, 4.0]
+  record_cap: 1000
+sets:
+  cells:
+    n: 50000
+    types:
+      A: {fraction: 0.5}
+      B: {fraction: 0.5}
+fields: {}
+seed:
+- {op: seed_positions, at: cells, mode: sunflower, radius: 0.93, seed: 0}
+operators:
+- op: pair_potential
+  model: typed
+  at: cells
+  law: cooke
+  sigma: 0.007
+  mobility: 1.0
+  step_max: 0.001
+  epsilon_types:
+    A: {A: 1.0, B: 0.7}
+    B: {B: 0.6}
+- {op: brownian, at: cells, kT: 0.35, mobility: 1.0, seed: 2}
+schedule: [pair_potential, brownian]
+plotting: {renderer: mpl2d, background: black, colormap: tab10, point_size: 1.5, duration_s: 10, slow_motion: 1}

@@ -1,0 +1,27 @@
+general:
+  name: exp09_sort_base
+  seed: 0
+  n_frames: 10000
+  dt: 0.1
+  boundary: free
+  world: [0.4, 0.4]
+sets:
+  particle:
+    n: 1000
+    types:
+      A: {fraction: 0.5, p: [1.0, 1.0, 5.0, 0.9]}
+      B: {fraction: 0.5, p: [0.5, 1.0, 5.0, 0.9]}
+fields: {}
+seed:
+- {op: seed_positions, at: particle, mode: sunflower, radius: 0.115, seed: 0}
+operators:
+- {op: radius_graph, at: particle, radius: 0.02}
+- {op: attraction_repulsion, at: particle, sigma: 0.005, aggr: sum, noise: 0.006}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 14.0
+  duration_s: 10
+  slow_motion: 1

@@ -1,0 +1,32 @@
+general:
+  name: exp09_prog_base
+  seed: 0
+  n_frames: 2000000
+  dt: 1.0e-07
+  boundary: free
+  world: [0.4, 0.4]
+  record_cap: 1000
+sets:
+  cells:
+    n: 240
+    types:
+      A: {fraction: 0.8333333}
+      B: {fraction: 0.1666667}
+      C: {fraction: 0.0}
+      D: {fraction: 0.0}
+fields: {}
+seed:
+- {op: seed_positions, at: cells, mode: sunflower, radius: 0.0642, seed: 0}
+operators:
+- {op: pair_potential, model: typed, at: cells, law: cooke, sigma: 0.007, mobility: 1.0, step_max: 0.001, epsilon_types: {A: {A: 0.5, B: 0.5, C: 0.5, D: 0.5}, B: {B: 0.5, C: 0.5, D: 0.5}, C: {C: 1.0, D: 0.7}, D: {D: 0.6}}}
+- {op: contact_retype, at: cells, contact: 0.0118, min_contacts: 1, rules: [{from: B, by: A, to: C, after: 0.001}, {from: A, by: C, to: D, after: 0.05}]}
+- {op: brownian, at: cells, kT: 0.35, mobility: 1.0, seed: 0}
+schedule: [pair_potential, contact_retype, brownian]
+plotting:
+  renderer: mpl2d
+  background: black
+  colors: {A: "#0072B2", B: "#F0E442", C: "#009E73", D: "#D55E00"}
+  frame_percentile: 98
+  point_size: 18.0
+  duration_s: 10
+  slow_motion: 1

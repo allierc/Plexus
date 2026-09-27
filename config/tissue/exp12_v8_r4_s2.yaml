@@ -1,0 +1,67 @@
+general:
+  name: exp12_v8_r4_s2
+  seed: 2
+  n_frames: 900
+  dt: 1.0
+  record_cap: 302
+  boundary: free
+  dim: 3
+  world: [120.6, 120.6, 120.6]
+  units: {length_um: 27.7, time_s: 600.0}
+sets:
+  cell:
+    n: 30000
+    state:
+      area: {width: 1}
+      centroid: {width: 3}
+      A0: {width: 1}
+      P0: {width: 1}
+      V0f: {width: 1}
+      alive: {width: 1, record: false}
+      age: {width: 1}
+      ndiv: {width: 1}
+      Vbirth: {width: 1, record: false}
+      divjit: {width: 1, record: false}
+      mg_scale: {width: 1, record: false}
+      A0_init: {width: 1, record: false}
+      P0_init: {width: 1, record: false}
+      V0f_init: {width: 1, record: false}
+      apop_flag: {width: 1}
+      inhib_frac: {width: 1}
+      chem: {width: 2, integration: first_order}
+  vertex:
+    n: 67500
+    mesh: half_edge
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+  half_edge:
+    n: 195000
+    maps: {srce: vertex, trgt: vertex, face: cell}
+fields: {}
+seed:
+- {op: seed_mesh, at: vertex, shape: disc, n_cells: 7022, radius: 20.94, jitter: 0.15, p0: 3.5, seed: 2,
+  vseed_cv: 0.15, implementation: settle, ref_frame: 60}
+operators:
+- {op: cell_geometry, at: cell}
+- {op: cell_neighbours, at: cell}
+- {op: cell_chem_diffuse, at: cell, model: steady_uptake, uptake: 0.0848, supply: 1.0, K_m: 0.0001}
+- {op: cell_grow, at: vertex, rate: 0.000578, rho: 0.0, a_sw: 0.1, hill: 4.0, vth_frac: 2.5, conserve_amount: false,
+  growth_dims: 2}
+- {op: cell_divide, at: vertex, every: 4, engine_clock: true, delta: 1.0, factor: 2.0, cycle_cv: 0.0,
+  min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.0, implementation: adder_sheet, plane_axis: 2,
+  phase_spread: 1.0}
+- {op: cell_die, at: vertex, model: chem_low, p0: 3.5, a_sw: 0.01, shrink_rate: 0.0, critical_frac: 0.15,
+  after_frame: 1, max_mark_frac: 1.0}
+- {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 20.0, K_R: 0.0, Lambda: 0.5, Gamma: 0.4, p0: 3.5,
+  mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.025, K_bend: 0.0, K_lumen: 0.0, plane_axis: 2}
+- {op: edge_flip, at: vertex, l_th_frac: 0.28, every: 1, max_flips: 300}
+- {op: topo_record, at: vertex, every: 1}
+schedule: [cell_geometry, cell_neighbours, cell_chem_diffuse, cell_grow, cell_divide, cell_die, cell_mechanics,
+  edge_flip, topo_record]
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: '#e8c33a'
+  camera: {elev: 90.0, azim: 0.0}

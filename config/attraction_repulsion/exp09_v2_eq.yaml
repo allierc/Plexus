@@ -1,0 +1,29 @@
+general:
+  name: exp09_v2_eq
+  seed: 0
+  n_frames: 100000
+  dt: 1.0e-06
+  boundary: free
+  world: [0.4, 0.4]
+  record_cap: 4000
+sets:
+  A:
+    n: 250
+    start: [0.095, 0.095, 0.305, 0.305]
+  B:
+    n: 250
+    start: [0.095, 0.095, 0.305, 0.305]
+fields: {}
+operators:
+- {op: pair_potential, at: A, law: cooke, sigma: 0.007, epsilon: 0.8, mobility: 1.0, step_max: 0.001, f_max: 1000.0}
+- {op: pair_potential, at: B, law: cooke, sigma: 0.007, epsilon: 0.8, mobility: 1.0, step_max: 0.001, f_max: 1000.0}
+- {op: pair_potential, at: A, with: B, law: cooke, sigma: 0.007, epsilon: 0.8, mobility: 1.0, mobility_with: 1.0, step_max: 0.001, f_max: 1000.0}
+- {op: brownian, at: A, kT: 0.5, mobility: 1.0, seed: 11}
+- {op: brownian, at: B, kT: 0.5, mobility: 1.0, seed: 12}
+schedule: [pair_potential, pair_potential, pair_potential, brownian, brownian]
+plotting:
+  renderer: mpl2d
+  background: black
+  point_size: 22.0
+  duration_s: 10
+  slow_motion: 1

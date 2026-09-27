@@ -1,0 +1,29 @@
+general:
+  name: exp09_v6_base
+  seed: 0
+  n_frames: 2000000
+  dt: 1.0e-07
+  boundary: free
+  world: [4.0, 4.0]
+  record_cap: 1000
+sets:
+  cells:
+    n: 50000
+    types:
+      A: {fraction: 0.5}
+      B: {fraction: 0.5}
+fields: {}
+seed:
+- {op: seed_positions, at: cells, mode: sunflower, radius: 0.93, seed: 0}
+operators:
+- {op: pair_potential, model: typed, at: cells, law: cooke, sigma: 0.007, mobility: 1.0, step_max: 0.001, epsilon_types: {A: {A: 0.9, B: 0.75}, B: {B: 0.9}}}
+- {op: brownian, at: cells, kT: 0.42, mobility: 1.0, seed: 0}
+schedule: [pair_potential, brownian]
+plotting:
+  renderer: mpl2d
+  background: black
+  colors: {A: "#0072B2", B: "#E69F00"}
+  zoom: 2.5
+  point_size: 1.5
+  duration_s: 10
+  slow_motion: 1
