@@ -1083,6 +1083,113 @@ class BasementMembraneBondBreak(Structural):
         return float(torch.bincount(lab).max().item() / max(denom or n, 1))
 
 
+RELEASE_TRACE: list = []                # (frame, nodes released this frame, live nodes left)
+
+
+def release_nodes(node_alive, bi, bj, bond_alive, dose, c_node, c_face, leader_face, rate, min_degree=0):
+    """One frame of `bm_unbond[model: release]`, in place, on torch tensors. Returns the released mask.
+
+        dose_n  += rate         for every live node n in contact with a LEADER cell's basal face this frame
+        release n  when  dose_n >= 1,  or when it keeps fewer than `min_degree` live bonds (min_degree > 0)
+
+    A released node is what `bm_seed[live]`'s declared hole is: not alive (so no contact acts through it
+    and no crosslink reforms to it) and its bonds dead. `c_node` / `c_face` are the frame's contact list
+    (`basal_contacts[set]` of `bm_contact[live]`): membrane node, and the tissue face it presses on."""
+    dev = node_alive.device
+    released = torch.zeros_like(node_alive)
+    if rate > 0 and c_node.numel():
+        lf = leader_face.to(dev)[c_face.long()]
+        hit = c_node.long()[lf]
+        if hit.numel():
+            touched = torch.zeros_like(node_alive)
+            touched[hit] = True
+            dose[touched & node_alive] += float(rate)
+        released |= node_alive & (dose >= 1.0)
+    if min_degree > 0:
+        deg = torch.zeros(node_alive.shape[0], dtype=torch.long, device=dev)
+        deg.index_add_(0, bi[bond_alive].long(), torch.ones_like(bi[bond_alive], dtype=torch.long))
+        deg.index_add_(0, bj[bond_alive].long(), torch.ones_like(bj[bond_alive], dtype=torch.long))
+        released |= node_alive & (deg < int(min_degree))
+    if bool(released.any()):
+        node_alive &= ~released
+        bond_alive &= ~(released[bi.long()] | released[bj.long()])
+    return released
+
+
+@register_operator("bm_unbond", model="release", family="topology", set="particle", kind="rewire")
+class BasementMembraneRelease(BasementMembraneBondBreak):
+    """`release` MODEL of bm_unbond: the parent's strain failure, and then membrane nodes LEAVE the
+    sheet -- degraded where LEADER cells press on them, or stranded with too few crosslinks -- so a tear
+    becomes a hole during the run, which the parent cannot make.
+
+        dose_n   += rate                  each frame live node n touches a leader cell's basal face
+        released    dose_n >= 1           (local breakdown by the leader's membrane-bound protease)
+                 or live bonds of n < min_degree                                   (min_degree > 0)
+
+    WHY A MODEL OF bm_unbond. The transformation is the same one -- the membrane's crosslink relation is
+    rewired, kind `rewire` -- under one more claim about the tissue: the membrane is LOST where the
+    invading front degrades it (invasive leader cells carry membrane-bound MT1-MMP; Cheung et al. 2013
+    identify the leaders by their basal program), not only torn where it is over-stretched. The parent
+    marks bonds dead and nothing else: a node without bonds still sits in `bm_contact[live]`'s list and
+    presses on the tissue, so a leader could only push a loose cap of nodes ahead of it. A released node
+    is exactly `bm_seed[live]`'s declared hole -- `membrane_alive` False, unoccupied, bonds dead -- and the
+    live coupling already turns such a gap into outgrowth: the cells under it read a deficit through
+    `bm_sense[live]` and grow (exp11's hole -> bud).
+
+    READS the frame's contact list, so it runs AFTER `bm_contact[live]` in the schedule, and the leader
+    label from the cell set's `leader_block` (default `mutant`, written by `seed_mesh[lineage]`).
+    With `rate: 0` and `min_degree: 0` it is `bm_unbond`, exactly; with no leader cell it releases nothing
+    by dose. Released nodes per frame go to `RELEASE_TRACE`.
+
+    Reference: Cheung, K. J. et al. (2013). Collective invasion in breast cancer requires a conserved
+    basal epithelial program. Cell 155:1639-1651; the parent's strain rule as in `bm_unbond`.
+    """
+    MECHANISM_TAGS = BasementMembraneBondBreak.MECHANISM_TAGS + ["membrane_degradation", "leader_cells"]
+    PARAM_ROLES = {**BasementMembraneBondBreak.PARAM_ROLES, "rate": "degradation_dose_per_contact_frame",
+                   "min_degree": "fewest_live_bonds_a_node_keeps", "leader_block": "leader_label_block",
+                   "surface": "tissue_vertex_set", "cell_set": "tissue_cell_set"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.rate = float(params.get("rate", 0.0))
+        self.min_degree = int(params.get("min_degree", 0))
+        self.leader_block = str(params.get("leader_block", "mutant"))
+        self.surface = str(params.get("surface", "vertex"))
+        self.cell_set = str(params.get("cell_set", "cell"))
+
+    def forward(self, H, mask=None):
+        out = super().forward(H, mask)
+        b = getattr(H, "membrane_bonds", None)
+        alive = getattr(H, "membrane_alive", None)
+        if b is None or alive is None:
+            return out
+        bi, bj, _rest, bond_alive = b
+        dose = H.__dict__.get("_bm_release_dose")
+        if dose is None or dose.shape[0] != alive.shape[0]:
+            dose = H._bm_release_dose = torch.zeros(alive.shape[0], dtype=torch.float32, device=alive.device)
+        c_node = c_face = torch.zeros(0, dtype=torch.long, device=alive.device)
+        leader = torch.zeros(0, dtype=torch.bool, device=alive.device)
+        m = getattr(H.level(self.surface), "_mesh", None)
+        if m is not None and self.rate > 0:
+            C = (m.get("basal_contacts") or {}).get(self.at)
+            nF = int(m["nF"])
+            from plexus.operators.vertex_ops import cell_block
+            lab = cell_block(H, self.cell_set, self.leader_block, nF)
+            if C is not None and lab is not None:
+                c_node, c_face = C["node"], C["face"]
+                leader = torch.as_tensor(lab > 0.5, device=alive.device)
+        rel = release_nodes(alive, bi, bj, bond_alive, dose, c_node, c_face,
+                            leader if leader.numel() else torch.zeros(1, dtype=torch.bool, device=alive.device),
+                            self.rate if leader.numel() else 0.0, self.min_degree)
+        n_rel = int(rel.sum())
+        if n_rel:
+            oc = getattr(H.level(self.at), "occ", None)
+            if oc is not None:
+                oc[rel.to(oc.device)] = 0.0
+        RELEASE_TRACE.append((int(getattr(H, "frame", -1) or -1), n_rel, int(alive.sum())))
+        return out
+
+
 @register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral",
                    equation=r"""$$\mathbf a_i=k\,(\mathbf x^{\mathrm{anchor}}_i-\mathbf x_i)-\text{damp}\,\mathbf v_i$$""")
 class IntegrinAdhesion(Lateral):

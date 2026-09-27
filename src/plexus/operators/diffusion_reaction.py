@@ -1674,10 +1674,133 @@ class CellReactSourceDecay(Lateral):
         return {self.at: _emit(chem, self.chan, (dc,), self.rate, occ)}
 
 
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="stripe_decay",
+                   title="A morphogen made by a central stripe",
+                   equation=r"""$$\frac{dc_i}{dt}=r\big(p\,\mathbf 1[\,|x_i-\bar x|<\tfrac f2 L\,]-k\,c_i\big)$$""")
+class CellReactStripeDecay(CellReactSourceDecay):
+    """`source_decay` with the source a STRIPE THROUGH THE MIDDLE of the tissue instead of a band at one
+    edge -- Dpp made along the anterior-posterior compartment boundary of the wing-disc pouch.
+
+        dc_i/dt = r ( p 1[|x_i - xbar| < f L / 2] - k c_i )
+
+    x_i is the cell centroid's coordinate along `source.axis`, xbar the live cells' mean on it and L
+    their current extent along it, so the stripe is centred on the tissue and keeps the fraction f of
+    its width as it grows; p, k, r and the diffusion that shapes the two flanks are `source_decay`'s.
+
+    WHY A MODEL AND NOT A `side` VALUE of `source_decay`: experiments do not edit an operator, and a
+    central source is a different geometry of the same dynamics -- the one every wing-disc paper of exp
+    13 draws: LeGoff et al. 2013 Fig. 1A ("the two sources of morphogens, Dpp and Wg, abutting the
+    compartment boundaries"), Aegerter-Wilmsen et al. 2012 Fig. 1B (Dpp highest along the AP boundary,
+    lowest laterally). A two-sided exponential c ~ exp(-|x - xbar| / lambda) results.
+
+    Reference: Aegerter-Wilmsen, T. et al. (2012). Development 139:3221 (Fig. 1B); Crick, F. (1970).
+    Nature 225:420-422 (source, diffusion, decay).
+    """
+    MECHANISM_TAGS = CellReactSourceDecay.MECHANISM_TAGS + ["stripe", "dpp"]
+
+    def source_mask(self, lvl):
+        cen = lvl.get("centroid")
+        x = cen[:, self.axis]
+        occ = getattr(lvl, "occ", None)
+        live = (occ > 0) if occ is not None else torch.ones_like(x, dtype=torch.bool)
+        big = torch.finfo(x.dtype).max
+        lo = torch.where(live, x, torch.full_like(x, big)).min()
+        hi = torch.where(live, x, torch.full_like(x, -big)).max()
+        xbar = (x * live.to(x.dtype)).sum() / live.sum().clamp(min=1)
+        return ((x - xbar).abs() < 0.5 * self.frac * (hi - lo)) & live
+
+
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="clock_turnover",
+                   title="A histone mark turned over by a clock-gated deacetylase that a microbial signal induces",
+                   species=(("A", "acetylation"),),
+                   equation=r"""$$\frac{dA_i}{dt}=r\Big(k_{in}-k_{out}\big(1+g\,\tfrac{m_i}{K+m_i}\big)\,\gamma(\phi_i)\,A_i\Big),\quad m_i=\sum_s w_s\,x_{i,s}$$""")
+class CellReactClockTurnover(Lateral):
+    """A HOST cell's histone acetylation A, written on at a constant rate and erased by a deacetylase
+    (HDAC3) whose activity follows the cell's clock and is raised by a microbial signal. chem = [A]:
+
+        dA_i/dt = r ( k_in - k_out (1 + g s_i) gamma(phi_i) A_i )
+        s_i     = m_i / (K + m_i),      m_i = sum_s w_s x_{i,s}
+        gamma   = f + (1 - f) (1 + cos(phi_i + offset)) / 2
+
+    A is the acetylation level, dimensionless (1 = the germ-free steady level at k_in = k_out). k_in is
+    the acetylation (writing) rate and k_out the germ-free deacetylation rate, both per unit time; g is
+    how many times the germ-free deacetylation the microbial signal adds at saturation; s_i in [0, 1) is
+    that signal's saturating read-out, K its half-saturation, in the units of m. m_i is the microbial
+    signal the cell sees: the weighted sum of its `signal:` block's columns x_{i,s} (one column per
+    strain, written by `readout` across the community-host relation), w_s = `weights:`, one per strain
+    -- `[1, 0, 0]` when strain 0 alone makes the metabolite. gamma(phi) is the clock's gate on HDAC3,
+    read from the `phase` block `phase_clock` advances, with the `gate:` keys `_gate` gives every
+    phase-gated operator: `floor` f in [0, 1] (the gate's minimum, the enzyme's residual activity) and
+    `offset` (radians, where on the cycle HDAC3 peaks). r is `rate`, a time rescaling.
+
+    WHAT IT REPRODUCES (Kuang et al. 2019, Fig. 1C-D and Fig. 2A). Germ-free (m = 0): deacetylation
+    runs at k_out gamma, so A sits high and follows the clock weakly; with a community (m > 0) the
+    total turnover k_out (1 + g s) is faster, so A's mean falls by roughly (1 + g s) and its daily
+    swing, relative to its mean, grows -- the fast-turnover limit tracks gamma fully, the slow one
+    averages it away. That is the direction of Kuang's Fig. 1C (reads higher in germ-free) and
+    Fig. 1D (amplitude lower in germ-free). One enzyme and one clock give both; the ratio of the two is
+    this model's prediction, not a separate dial.
+
+    WHY A MODEL OF `cell_chem_react` AND NOT A NEW OPERATOR: it is a reaction on a set's `chem`, read
+    per cell and integrated by the clock, like `source_decay` beside it; the clock is `phase_clock`,
+    the signal arrives by `readout` across a relation, and the gate is `_gate`'s. Nothing but the
+    reaction's right-hand side is new. `g: 0` (or an all-zero signal) and `floor: 1` is `source_decay`
+    with the source everywhere: dA/dt = k_in - k_out A.
+
+    Reference: Kuang, Z. et al. (2019). The intestinal microbiota programs diurnal rhythms in host
+    metabolism through histone deacetylase 3. Science 365:1428-1434 (Fig. 1C-D, Fig. 2A).
+    """
+    N_SPECIES = 1
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["k_in", "k_out"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem", "phase", "signal"]; WRITES = ["chem"]
+    MECHANISM_TAGS = ["reaction", "histone_acetylation", "hdac3", "circadian", "microbial_signal", "host"]
+    PARAM_ROLES = {"k_in": "acetylation_rate", "k_out": "germ_free_deacetylation_rate",
+                   "g": "signal_induced_deacetylation_at_saturation_x_germ_free", "K": "signal_half_saturation",
+                   "weights": "per_strain_signal_weight", "signal": "signal_block", "gate": "clock_gate",
+                   "rate": "reaction_time_scale"}
+    REFERENCE = "Kuang, Z. et al. (2019). Science 365:1428-1434."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.cell_set = self.at                                   # `_gate` reads the clock from this set
+        self.k_in = float(params["k_in"]); self.k_out = float(params["k_out"])
+        self.g = float(params.get("g", 0.0)); self.K = float(params.get("K", 1.0))
+        self.w = params.get("weights")
+        self.signal = str(params.get("signal", "signal"))
+        self.gate = dict(params.get("gate") or {"block": "phase", "floor": 1.0})
+        self.rate = float(params.get("rate", 1.0))
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+
+    def forward(self, H, mask=None):
+        from plexus.operators.cell_ops import _gate
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        (A,) = _span(chem, self.chan, 1, type(self).__name__)
+        if self.g != 0.0:
+            if self.signal not in lvl.state_schema:
+                raise ValueError(f"clock_turnover: set {self.at!r} has no {self.signal!r} block -- declare it "
+                                 f"(integration none) and fill it with `readout ... into: {self.signal}`")
+            x = lvl.get(self.signal)
+            w = torch.ones(x.shape[1], dtype=x.dtype, device=x.device) if self.w is None else \
+                torch.as_tensor([float(v) for v in self.w], dtype=x.dtype, device=x.device)
+            if w.shape[0] != x.shape[1]:
+                raise ValueError(f"clock_turnover: {w.shape[0]} weights for a {x.shape[1]}-wide {self.signal!r} block")
+            m = (x * w).sum(1).clamp(min=0.0)
+            s = m / (self.K + m)
+        else:
+            s = torch.zeros_like(A)
+        gam = _gate(self, H, slice(None))
+        dA = self.k_in - self.k_out * (1.0 + self.g * s) * gam * A
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: _emit(chem, self.chan, (dA,), self.rate, occ)}
+
+
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="notch_delta",
                    title="Notch-Delta lateral inhibition gated by YAP, and the Wnt its winners secrete",
                    species=(("N", "Notch activity"), ("D", "Delta (Dll1)"), ("Y", "nuclear YAP"), ("W", "Wnt")),
-                   equation=r"""$$\begin{aligned}\frac{dN_i}{dt}&=r\Big(\frac{\bar D_i^{k}}{a+\bar D_i^{k}}-N_i\Big),\quad \bar D_i=\langle D_j\rangle_{j\sim i}\\ \frac{dD_i}{dt}&=r\,v\Big(\frac{Y_i}{1+bN_i^{h}}-D_i\Big)\\ \frac{dY_i}{dt}&=-r\,k_y\Big(1-\frac{W_i}{W_i+K_w}\Big)Y_i\ \ \text{after } t_{\rm Wnt}\\ \frac{dW_i}{dt}&=r\Big(p\,\frac{D_i^{q}}{\theta^{q}+D_i^{q}}-k_wW_i\Big)\end{aligned}$$""")
+                   equation=r"""$$\begin{aligned}\frac{dN_i}{dt}&=r\Big(\frac{\bar D_i^{k}}{a+\bar D_i^{k}}-N_i\Big),\quad \bar D_i=\langle D_j\rangle_{j\sim i}\\ \frac{dD_i}{dt}&=r\,v\Big(\frac{Y_i}{1+bN_i^{h}}-D_i\Big)\\ \frac{dY_i}{dt}&=r\,k_y\Big(\frac{W_i^{n}}{K_w^{n}+W_i^{n}}-Y_i\Big)\ \ \text{after } t_{\rm Wnt}\\ \frac{dW_i}{dt}&=r\Big(p\,\frac{D_i^{q}}{\theta^{q}+D_i^{q}}-k_wW_i\Big)\end{aligned}$$""")
 class CellReactNotchDelta(Lateral):
     """Serra et al. 2019's symmetry breaking as a reaction: YAP variability biases Notch-Delta lateral
     inhibition, the winners (DLL1+ -> Paneth) secrete Wnt, and Wnt is what the crypt becomes.
@@ -1685,7 +1808,7 @@ class CellReactNotchDelta(Lateral):
 
         dN_i/dt = r ( Dbar_i^k / (a + Dbar_i^k) - N_i )             Dbar_i = mean D over the neighbours
         dD_i/dt = r v ( Y_i / (1 + b N_i^h) - D_i )
-        dY_i/dt = - r k_y (1 - W_i / (W_i + K_w)) Y_i                only from frame `wnt_off` on
+        dY_i/dt = r k_y ( W_i^n / (K_w^n + W_i^n) - Y_i )           only from frame `wnt_off` on
         dW_i/dt = r ( p D_i^q / (theta^q + D_i^q) - k_w W_i )
 
     N is the cell's Notch activity and D its Delta (DLL1), both dimensionless; the first two lines are
@@ -1693,9 +1816,11 @@ class CellReactNotchDelta(Lateral):
     a = 0.01, b = 100, k = h = 2, v = 1), with Delta's production scaled by Y, the cell's nuclear YAP --
     Serra's DLL1+ cells carry ~2.8x the nuclear YAP of DLL1- ones (Fig. 5f), and DLL1 is a YAP target.
     Y does not change while exogenous Wnt is in the medium; from frame `wnt_off` (Serra: Wnt for the
-    first three days, Fig. 1a) YAP decays at rate k_y except where the cell's own Wnt holds it (half at
+    first three days, Fig. 1a) YAP relaxes at rate k_y to the level the cell's own Wnt sets (half at
     W = K_w) -- YAP falls after Wnt removal (Serra ED Fig. 7c) and an organoid with no Paneth cell by
-    then has none to hold it: an enterocyst. W is the Wnt a DLL1-high cell secretes (Hill in D, half at
+    then has none to hold it: an enterocyst. A TARGET, not a decay damped by Wnt: a damped decay
+    (-k_y (1 - W/(W + K_w)) Y) never reaches zero, so every organoid, Paneth cell or not, leaks to an
+    enterocyst given time; the target form has a held state (Wnt-high cells keep YAP near 1). W is the Wnt a DLL1-high cell secretes (Hill in D, half at
     theta), lost at k_w; its SPREAD is `cell_chem_diffuse` on the same column, and the crypt region is
     where it lands -- `cell_mechanics[apicobasal_region]` reads it as the fate (Serra ED Fig. 10h: the
     canonical Wnt response in the Paneth cell's neighbours).
@@ -1719,7 +1844,7 @@ class CellReactNotchDelta(Lateral):
     PARAM_ROLES = {"a": "notch_activation_threshold", "b": "delta_repression_strength", "k": "notch_hill",
                    "h": "delta_hill", "v": "delta_rate_over_notch_rate", "p": "wnt_production",
                    "theta": "delta_level_for_wnt", "q": "wnt_hill", "k_w": "wnt_decay",
-                   "k_y": "yap_decay_without_wnt", "K_w": "wnt_that_holds_yap", "wnt_off": "frame_exogenous_wnt_ends",
+                   "k_y": "yap_relaxation_after_wnt_withdrawal", "K_w": "wnt_that_holds_yap_half", "n": "yap_wnt_hill", "wnt_off": "frame_exogenous_wnt_ends",
                    "rate": "reaction_time_scale"}
     REFERENCE = ("Collier, J. R. et al. (1996). J. Theor. Biol. 183:429-446; "
                  "Serra, D. et al. (2019). Nature 569:66-72.")
@@ -1733,6 +1858,7 @@ class CellReactNotchDelta(Lateral):
         self.p = float(params.get("p", 0.0)); self.theta = float(params.get("theta", 0.5))
         self.q = float(params.get("q", 4.0)); self.k_w = float(params.get("k_w", 1.0))
         self.k_y = float(params.get("k_y", 0.0)); self.K_w = float(params.get("K_w", 0.1))
+        self.n = float(params.get("n", 2.0))
         _wo = params.get("wnt_off", None)
         self.wnt_off = None if _wo is None else float(_wo)
         self.rate = float(params.get("rate", 1.0))
@@ -1755,8 +1881,8 @@ class CellReactNotchDelta(Lateral):
         dD = self.v * (Y / (1.0 + self.b * N.clamp(min=0) ** self.h) - D)
         fr = getattr(H, "frame", None)
         if self.wnt_off is not None and self.k_y > 0 and fr is not None and float(fr) >= self.wnt_off:
-            Wp = W.clamp(min=0)
-            dY = -self.k_y * (1.0 - Wp / (Wp + self.K_w)) * Y
+            Wn = W.clamp(min=0) ** self.n
+            dY = self.k_y * (Wn / (self.K_w ** self.n + Wn) - Y)
         else:
             dY = torch.zeros_like(Y)
         Dq = D.clamp(min=0) ** self.q
@@ -1877,6 +2003,7 @@ class CellReactAlievPanfilov(Lateral):
         stim: {times: [t1, t2, ...], duration: d, amp: A, center: [x, y, z], radius: R}
         stim: {times: [...], duration: d, amp: A, below: {axis: 0, value: x0}}
         stim: {times: [...], duration: d, amp: A, box: [[x_lo, y_lo], [x_hi, y_hi]]}
+        stim: [{...}, {...}]      several stimuli, each with its own site and times (S1 here, S2 there)
 
     I_stim = A on the cells whose centroid lies inside the disc (or below x0 along the axis, a strip
     that launches a planar front; or inside an axis-aligned box, the S2 stripe that breaks a wave
@@ -1910,36 +2037,45 @@ class CellReactAlievPanfilov(Lateral):
         self.rate = float(params.get("rate", 1.0))
         self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
         s = params.get("stim") or {}
-        self.stim_times = [float(t) for t in (s.get("times") or [])]
-        self.stim_dur = float(s.get("duration", 0.5)); self.stim_amp = float(s.get("amp", 0.0))
-        self.stim_center = s.get("center"); self.stim_radius = float(s.get("radius", 0.0))
-        self.stim_below = s.get("below")
-        self.stim_box = s.get("box")
-        if (self.stim_times and self.stim_amp and self.stim_center is None and self.stim_below is None
-                and self.stim_box is None):
+        self.stims = [self._site(x) for x in (s if isinstance(s, (list, tuple)) else [s])]
+        first = self.stims[0]
+        self.stim_times, self.stim_dur, self.stim_amp = first["times"], first["dur"], first["amp"]
+
+    @staticmethod
+    def _site(s):
+        st = dict(times=[float(t) for t in (s.get("times") or [])], dur=float(s.get("duration", 0.5)),
+                  amp=float(s.get("amp", 0.0)), center=s.get("center"), radius=float(s.get("radius", 0.0)),
+                  below=s.get("below"), box=s.get("box"))
+        if (st["times"] and st["amp"] and st["center"] is None and st["below"] is None
+                and st["box"] is None):
             raise ValueError("aliev_panfilov: `stim` needs a region -- `center` + `radius`, "
                              "`below: {axis, value}` or `box`. A stimulus on every cell is not a stimulus site.")
+        return st
 
     def _stim(self, H, lvl, like):
-        if not (self.stim_times and self.stim_amp):
-            return torch.zeros_like(like)
+        out = torch.zeros_like(like)
+        if not any(s["times"] and s["amp"] for s in self.stims):
+            return out
         cen = lvl.get("centroid" if "centroid" in lvl.state_schema else "pos")
-        if self.stim_below is not None:
-            ax = int(self.stim_below.get("axis", 0))
-            where = cen[:, ax] < float(self.stim_below["value"])
-        elif self.stim_box is not None:
-            lo = torch.as_tensor([float(x) for x in self.stim_box[0]], dtype=cen.dtype, device=cen.device)
-            hi = torch.as_tensor([float(x) for x in self.stim_box[1]], dtype=cen.dtype, device=cen.device)
-            k = len(lo)
-            where = ((cen[:, :k] >= lo) & (cen[:, :k] <= hi)).all(1)
-        else:
-            c = torch.as_tensor([float(x) for x in self.stim_center], dtype=cen.dtype, device=cen.device)
-            where = (cen[:, :len(c)] - c).norm(dim=1) <= self.stim_radius
         ft = getattr(H, "frame_t", None)
         t = (ft if ft is not None else torch.tensor(float(getattr(H, "frame", 0)))).to(like) * float(H.dt)
-        t0 = torch.as_tensor(self.stim_times, dtype=like.dtype, device=like.device)
-        on = ((t >= t0) & (t < t0 + self.stim_dur)).any().to(like.dtype)
-        return self.stim_amp * on * where.to(like.dtype)
+        for s in self.stims:
+            if not (s["times"] and s["amp"]):
+                continue
+            if s["below"] is not None:
+                where = cen[:, int(s["below"].get("axis", 0))] < float(s["below"]["value"])
+            elif s["box"] is not None:
+                lo = torch.as_tensor([float(x) for x in s["box"][0]], dtype=cen.dtype, device=cen.device)
+                hi = torch.as_tensor([float(x) for x in s["box"][1]], dtype=cen.dtype, device=cen.device)
+                k = len(lo)
+                where = ((cen[:, :k] >= lo) & (cen[:, :k] <= hi)).all(1)
+            else:
+                c = torch.as_tensor([float(x) for x in s["center"]], dtype=cen.dtype, device=cen.device)
+                where = (cen[:, :len(c)] - c).norm(dim=1) <= s["radius"]
+            t0 = torch.as_tensor(s["times"], dtype=like.dtype, device=like.device)
+            on = ((t >= t0) & (t < t0 + s["dur"])).any().to(like.dtype)
+            out = out + s["amp"] * on * where.to(like.dtype)
+        return out
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -1961,6 +2097,54 @@ class CellReactAlievPanfilov(Lateral):
 # optional slot. With the gate open (`a_sw = 0`) the same operator is plain uniform growth. Naming
 # the gate in the operator made the optional half look mandatory, and made the sibling pair
 # unreadable -- `cell_grow` / `cell_divide` says what the schedule actually does.
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="balaskas_schedule",
+                   title="The Pax6-Olig2-Nkx2.2 circuit with a scheduled change of its Shh-Gli input",
+                   species=(("P", "Pax6"), ("O", "Olig2"), ("N", "Nkx2.2")),
+                   equation=r"""$$G(\mathbf x,t)=g\,c(\mathbf x,t)\,s(t),\qquad s(t)=s_k\ \ \text{for}\ t_k\le t<t_{k+1}$$""")
+class CellReactBalaskasSchedule(CellReactBalaskas):
+    """`balaskas` whose Gli input is multiplied by a piecewise-constant factor in circuit time -- a drug
+    added to the dish at a declared time: Dessaud et al. 2007 (Fig. 2c-e) add cyclopamine to neural
+    plate explants that carry their own floor plate after 12 h, halve GLI activity (9.2 -> 4.1, Fig. 2c)
+    and find NKX2.2 at 7 % of the untreated explants' at 18 h while OLIG2 rises to 157 % (Fig. 2e).
+
+        G(x, t) = g_gain c(x, t) s(t),   `schedule: [[t_1, s_1], [t_2, s_2], ...]`, s = 1 before t_1
+
+    t is the circuit's own time, `rate` x frame x dt. Empty schedule = `balaskas`, term for term
+    (tested). Everything else, parameters and mutants, is `balaskas`; the class is a subclass.
+
+    Reference: Dessaud, E. et al. (2007). Nature 450:717-720 (Fig. 2c-e); Balaskas, N. et al. (2012).
+    Cell 148:273-284.
+    """
+    PARAM_ROLES = dict(CellReactBalaskas.PARAM_ROLES, schedule="input_gain_schedule")
+    REFERENCE = ("Dessaud, E. et al. (2007). Nature 450:717-720; Balaskas, N. et al. (2012). "
+                 "Cell 148:273-284.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        sch = sorted([(float(t), float(f)) for t, f in (params.get("schedule") or [])])
+        self.sched_t = [t for t, _ in sch]
+        self.sched_f = [f for _, f in sch]
+
+    def factor(self, t):
+        """s(t) on a 0-d tensor: the factor of the last step at or before t, 1 before the first."""
+        s = torch.ones_like(t)
+        for tk, fk in zip(self.sched_t, self.sched_f):
+            s = torch.where(t >= tk, torch.full_like(t, fk), s)
+        return s
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        P, O, N = _span(chem, self.chan, 3, type(self).__name__)
+        if self.g_col >= chem.shape[1]:
+            raise ValueError(f"balaskas_schedule: g_col={self.g_col} but `chem` is {chem.shape[1]} wide")
+        ft = getattr(H, "frame_t", None)
+        frame = (ft if ft is not None else torch.tensor(float(getattr(H, "frame", 0)))).to(chem)
+        G = self.g_gain * chem[:, self.g_col] * self.factor(self.rate * frame * float(H.dt))
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: _emit(chem, self.chan, self.rates(P, O, N, G), self.rate, occ)}
+
+
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="balaskas_adapt",
                    title="The Pax6-Olig2-Nkx2.2 circuit reading an ADAPTING Shh-Gli input",
                    species=(("P", "Pax6"), ("O", "Olig2"), ("N", "Nkx2.2")),
@@ -2649,6 +2833,12 @@ class Grow3DStretch(Grow3D):
     0.1-0.2, from division and relaxation) is larger than a clone's signal (~0.08), and a gain of 12 on
     the raw sigma broke the clone into shards (exp 13 batch 2, clone_a3_s1, wrecked at frame 1060).
 
+    `readout: a0` IS THE STRETCH OF A FLAT SHEET: sigma_j = (A_j / A0_j) / reference, the cell's area over
+    its target area. A flat vertex sheet at z = 0 has no wedge volume (V and V0f are 0 -- exp 13 Phase 2's
+    survey of exp01_v8 and exp07), so the three readouts above divide by zero there; the apical area
+    against its target is Aegerter-Wilmsen et al. 2012's own measure of compression ("a weighted average
+    of the area of a cell and its surroundings", with `smooth`), and `cell_grow` raises A0 as s^2.
+
     `gain` is dimensionless, the fractional change of the growth rate per unit of relative stretch.
     gain = 0 is f = 1 and the multiplication is skipped: the default law, bit for bit -- the identity
     this model is run against. f is clipped at 0 (a compressed cell stops; dying is `cell_die`'s job)
@@ -2711,8 +2901,8 @@ class Grow3DStretch(Grow3D):
         self.stretch_threshold = float(params.get("stretch_threshold", 0.0))
         self._ref = None
         self._gf = None
-        if self.readout not in ("volume", "area", "thickness"):
-            raise ValueError(f"cell_grow[stretch]: readout is volume, area or thickness, got {self.readout!r}")
+        if self.readout not in ("volume", "area", "thickness", "a0"):
+            raise ValueError(f"cell_grow[stretch]: readout is volume, area, thickness or a0, got {self.readout!r}")
         self._marked = False
         self._drive = None
 
@@ -2776,7 +2966,13 @@ class Grow3DStretch(Grow3D):
         if not need_sigma:
             return r
         v = self._v_now[:nF].to(r.dtype).clamp(min=1e-12)
-        if self.readout in ("area", "thickness"):
+        if self.readout == "a0":
+            from plexus.operators.vertex_ops import cell_block_t
+            a = cell_block_t(self._H, self.cat, "area", nF)
+            if a is None:
+                raise ValueError("cell_grow[stretch] readout: a0 needs the `area` block (cell_geometry)")
+            ratio = a.to(r.dtype).to(r.device).clamp(min=1e-12) / m["A0"][:nF].to(r.dtype).clamp(min=1e-12)
+        elif self.readout in ("area", "thickness"):
             from plexus.operators.vertex_ops import cell_block_t
             a = cell_block_t(self._H, self.cat, "area", nF)
             if a is None:

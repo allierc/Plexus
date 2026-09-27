@@ -260,6 +260,119 @@ class MetaboliteHomeostasis(Lateral):
         return {self.at: dc}
 
 
+@register_operator("membrane_potential", family="metabolism", set="particle", kind="lateral",
+                   equation=r"""$$C\frac{d\psi}{dt}=J_{\mathrm{pump}}(\psi)-J_{\mathrm{motor}}-g\psi,\qquad J_{\mathrm{pump}}=J_{\max}\max\!\left(0,\,1-\frac{\psi}{\psi_{\mathrm{rev}}}\right)$$""")
+class MembranePotential(Lateral):
+    """The cell's membrane potential as a capacitor charged by respiration and drained by its
+    motors and a leak -- the zero mode of Poisson-Nernst-Planck.
+
+    cell -> cell: reads the cell's `psi` (e psi, sim energy per elementary charge) and its motor
+    current block `flux` (charges per sim s, written by `aggregate`); integrates `psi`
+    (`INTEGRAND = "psi"`) and, if declared, the proton counts `h_peri` and `h_cyto`.
+
+        C dpsi/dt = J_pump(psi) - J_motor - g psi
+        J_pump    = J_max max(0, 1 - psi / psi_rev)      respiration, stalling at psi_rev
+        dh_peri/dt = J_pump - J_motor - g psi,  dh_cyto/dt = -dh_peri/dt
+
+    The counts carry the SAME three currents as the capacitor, the leak included (charge that
+    returns through everything that is not a stator), so that C dpsi = e dh_peri holds to the
+    digit; a first version counted only pump and motor and the counts rose while the potential
+    fell (exp_02 step 0036: +6,557 protons out against -4.4 mV -- a bookkeeping error, fixed).
+
+    `capacitance` C is in charges per unit of psi (the membrane's C_m A / e^2 in these units),
+    `pump_max` and `leak` in charges per sim s (per unit psi for the leak), `pump_rev` the
+    potential at which the pump stalls, `psi0` the potential written once at the first frame
+    (the cell starts charged), `h0` the two counts' start. On the first frame the operator writes
+    psi0 and h0 in place; from then on it only integrates.
+
+    WHY AN ODE AND NOT THE PDE. Nernst-Planck plus Poisson in a 140 nm box collapses to this law:
+    the cytoplasm and periplasm are each equipotential (Debye length 1 nm), the whole drop sits
+    across the membrane, and protons cross the box in 20 us against 380 us between one stator's
+    steps, so both sides are well mixed. The spatial version is the refinement for the day a
+    stator depletes its own neighbourhood, and the number that decides it is the flux, 88,000
+    protons/s for 17 units at 100 Hz against a diffusive supply orders of magnitude larger.
+
+    Reference: Berg, H.C. (2003). Annu. Rev. Biochem. 72:19-54 (proton-driven); Fung, D.C. & Berg,
+    H.C. (1995). Nature 375:809-812 (speed proportional to the potential); Gabel, C.V. & Berg, H.C.
+    (2003). PNAS 100:8748-8751; Plexus (this work).
+
+    NOT A VARIANT (moved from flagellum_ops.py into metabolism's module, 2026-09-27): a capacitor charged by respiration
+    and drained by the motors and a leak; `metabolite_homeostasis` relaxes a concentration to its set point and has no
+    currents in or out. exp04 uses it as the voltage clamp (a very large capacitance).
+    """
+    EMIT = "velocity"
+    INTEGRAND = "psi"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["psi"]; WRITES = ["psi", "h_peri", "h_cyto"]
+    REQUIRES_PARAMS = ["capacitance", "pump_max", "pump_rev"]
+    MECHANISM_TAGS = ["ion_motive_force", "membrane_capacitor", "respiration", "metabolism"]
+    PARAM_ROLES = {"capacitance": "charges_per_unit_psi", "pump_max": "respiration_charges_per_sim_s",
+                   "pump_rev": "psi_at_which_the_pump_stalls", "leak": "charges_per_sim_s_per_unit_psi",
+                   "psi0": "initial_psi", "h0": "initial_proton_counts", "flux": "the_motor_current_block",
+                   "shunt": "resistor_switched_across_the_membrane", "shunt_from": "the_frame_it_switches_on"}
+    # UNITS: psi is carried as e psi, an energy per elementary charge -- `voltage` in units.py, F L
+    # through the constant e, reported in mV; the capacitance is charges per unit of e psi, 1/(F L);
+    # currents are `current`, charges per time, reported in fA;
+    # the leak is a current per unit e psi. Counts are counts, and may be negative: `h_peri` is
+    # the NET number of protons that left the cytoplasm since frame 0 (pump - motor - leak), so
+    # a cell whose potential falls has a negative h_peri, equal to C dpsi / e to the digit.
+    PARAM_UNITS = {"capacitance": "1/(F*L)", "pump_max": "current", "pump_rev": "voltage", "leak": "1/(T*F*L)",
+                   "psi0": "voltage", "h0": "count", "shunt": "1/(T*F*L)", "shunt_from": "count"}
+    BLOCK_UNITS = {"psi": "voltage", "h_peri": "count", "h_cyto": "count", "j_motor": "current"}
+    REFERENCE = ("Berg, H.C. (2003). Annu. Rev. Biochem. 72:19; Fung & Berg (1995). Nature 375:809; "
+                 "Gabel & Berg (2003). PNAS 100:8748; Plexus (this work).")
+    MAY_MUTATE_INTEGRATED_STATE = True
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.C = float(params["capacitance"])
+        self.J_max = float(params["pump_max"])
+        self.psi_rev = float(params["pump_rev"])
+        self.g = float(params.get("leak", 0.0))
+        self.psi0 = float(params.get("psi0", 0.0))
+        self.h0 = [float(v) for v in (params.get("h0") or [0.0, 0.0])]
+        self.flux = str(params.get("flux", "j_motor"))
+        # THE RESISTOR, the sanity check the human asked for (2026-09-23): a shunt conductance
+        # switched across the membrane at frame `shunt_from`, in the leak's units. A load that is
+        # not the motor must pull psi down and the motor must slow with it -- proportionally, since
+        # near stall its torque is proportional to psi -- or the coupling is not what it claims.
+        self.shunt = float(params.get("shunt", 0.0))
+        self.shunt_from = int(params.get("shunt_from", 0))
+        self._started = False
+        if self.C <= 0 or self.psi_rev <= 0:
+            raise ValueError("membrane_potential: capacitance and pump_rev must be > 0")
+
+    def forward(self, H, mask=None):
+        c = H.level(self.at)
+        if not self._started:
+            st = c.state.clone()
+            a, b = c.state_schema["psi"]; st[:, a:b] = self.psi0
+            for k, v0 in (("h_peri", self.h0[0]), ("h_cyto", self.h0[1])):
+                if k in c.state_schema._slices:
+                    a, b = c.state_schema[k]; st[:, a:b] = v0
+            c.state = st
+            self._started = True
+        psi = c.get("psi")[:, 0]
+        J_m = c.get(self.flux)[:, 0] if self.flux in c.state_schema._slices else torch.zeros_like(psi)
+        J_p = self.J_max * (1.0 - psi / self.psi_rev).clamp_min(0.0)
+        fr = int(getattr(H, "frame", 0))
+        g = self.g + (self.shunt if (self.shunt > 0.0 and fr >= self.shunt_from) else 0.0)
+        net = J_p - J_m - g * psi                                # every current the capacitor sees
+        dpsi = net / self.C
+        if fr in (1, 5, 20, 50, 200, 500, 800, 1000, 1400):
+            print(f"[membrane_potential f{fr}] psi {float(psi.mean()):.4e} (sim e psi); pump {float(J_p.mean()):.4e}, "
+                  f"motor {float(J_m.mean()):.4e}, leak+shunt {float((g * psi).mean()):.4e} charges/s"
+                  f"{' (shunt ON)' if g > self.g else ''}; dpsi/dt {float(dpsi.mean()):.3e}", flush=True)
+        out = {(self.at, "psi"): dpsi[:, None]}
+        if "h_peri" in c.state_schema._slices:
+            out[(self.at, "h_peri")] = net[:, None]
+        if "h_cyto" in c.state_schema._slices:
+            out[(self.at, "h_cyto")] = (-net)[:, None]
+        return out
+
+
 @register_operator("reaction_seed", family="seed", set="reaction", kind="seed")
 class ReactionSeed(Seed):
     """x_0 for the reactions: every rate constant k_j drawn log-uniformly in [k_min, k_max], once.

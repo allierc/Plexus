@@ -2629,7 +2629,7 @@ class SurfaceDriveAffine(Structural):
             raise RuntimeError("surface_drive[affine]: the vertex count changed; an affine drive of the "
                                "seeded shape needs a fixed surface")
         f = int(getattr(H, "frame", 0) or 0)
-        u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
+        u = self._u(f)
         c2, s2 = math.cos(2 * self.extend_deg), math.sin(2 * self.extend_deg)
         L = torch.tensor([[self.strain * c2, self.strain * s2 - self.rotate],
                           [self.strain * s2 + self.rotate, -self.strain * c2]], dtype=torch.float64)

@@ -6629,9 +6629,25 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
     no membrane (under a hole, in a bud) gains nothing. `e_cm` must stay below `kappa_s`, the tension
     it offsets, or a bound basal cap has a negative tension and its area runs away.
 
+    THE INNER CELL MASS AS A GROWING VOLUME, `k_core` (default 0 = none) and `core_rate` (exp 11
+    Phase 2). Wang et al. 2021's gland is STRATIFIED: a surface cell layer -- this shell -- wraps an
+    interior of tightly packed cells, and their model (STAR Methods, Fig S2G) treats the two as
+    compartments whose volumes grow with their cell numbers ("the net volume is proportional to cell
+    number"). The interior enters the surface layer's energy as the volume the shell's LUMEN-FACING
+    ring encloses, held to a target that grows linearly from its first-frame value:
+
+        U_core = 1/2 k_core (V_L(x, s) - V_L(0) (1 + core_rate t))^2        t in frames
+
+    V_L by `enclosed_ring_volume` (exp 10's helper, called, not copied), the ring picked once as the
+    one enclosing less. An interior that grows SLOWER than the surface layer's cell number leaves
+    the layer more area than a sphere around it needs -- Wang's budding condition
+    alpha < beta^2 / (2 beta + 1) (Fig S2G, alpha the interior-to-surface expansion ratio, beta the
+    interior radius over the layer thickness) -- and it resists the inward folds an empty lumen would
+    let the layer make. k_core in F/L^5, like `k_v`.
+
     Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (the apico-basal
     vertex model); Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the contact);
-    Wang, S. et al. (2021). Cell 184:3702-3716 (the adhesion energy).
+    Wang, S. et al. (2021). Cell 184:3702-3716 (the adhesion energy, the two compartments).
     """
 
     def __init__(self, params, device="cpu"):
@@ -6640,6 +6656,34 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
         if self.e_cm and self.e_cm >= self.kappa_s:
             raise ValueError(f"cell_mechanics[apicobasal_contact]: e_cm {self.e_cm:g} must be below "
                              f"kappa_s {self.kappa_s:g}, the basal tension it offsets")
+        self.k_core = float(params.get("k_core", 0.0))
+        self.core_rate = float(params.get("core_rate", 0.0))
+
+    @staticmethod
+    def _core_grad(x, s, es, et, ef, nF, eocc, core):
+        """d/d(x, s) of 1/2 k_core (V_L - V_target)^2 by autograd, and V_L."""
+        with torch.enable_grad():
+            xg = x.detach().requires_grad_(True)
+            sg = s.detach().requires_grad_(True)
+            V = enclosed_ring_volume(xg + core["sgn"] * sg, es, et, ef, nF, eocc, core["o"])
+            E = 0.5 * core["k"] * (V - core["V"]) ** 2
+            gx, gs = torch.autograd.grad(E, (xg, sg))
+        return gx.detach(), gs.detach(), float(V.detach())
+
+    def _core_target(self, H, m, x0, s0, es, et, ef, nF, eocc):
+        """This frame's inner-mass term, or None when `k_core` is 0. The ring and V_L(0) are fixed once."""
+        if self.k_core <= 0:
+            return None
+        if "core" not in m:
+            o = x0.mean(dim=0).detach()
+            va = float(enclosed_ring_volume(x0 + s0, es, et, ef, nF, eocc, o))
+            vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
+            m["core"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb))
+        _fr = getattr(H, "frame", None)
+        t = 0.0 if _fr is None else float(int(_fr))
+        C = m["core"]
+        return dict(k=self.k_core, sgn=C["sgn"], o=x0.mean(dim=0).detach(),
+                    V=C["V_first"] * (1.0 + self.core_rate * t))
 
     @staticmethod
     def _adhesion_grad(x, s, es, et, ef, nF, cov, e_cm):
@@ -6703,6 +6747,7 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
             _lig = m.get("bm_ligand")
             if torch.is_tensor(_lig) and m.get("bm_ligand_frame") == _fr and _lig.shape[0] == nF:
                 cov = (_lig / _lig.median().clamp_min(1e-12)).clamp(0.0, 1.0).to(device=dev, dtype=dt)
+        core = self._core_target(H, m, x0, s0, es, et, ef, nF, eocc)
         x = x0.clone(); s = s0.clone()
         for _ in range(max(1, self.relax_iters)):
             gx, gs = self._grad(x, s, es, et, ef, nF, V_eq, m["alive"], R0t, eocc, vocc, move_sep)
@@ -6711,6 +6756,11 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
                 gx = gx + gxa
                 if gs is not None:
                     gs = gs + gsa
+            if core is not None:
+                gxc, gsc, m["core_volume"] = self._core_grad(x, s, es, et, ef, nF, eocc, core)
+                gx = gx + gxc
+                if gs is not None:
+                    gs = gs + gsc
             if fext is not None:
                 gx = gx - fext
                 if gs is not None:
