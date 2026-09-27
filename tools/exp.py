@@ -251,6 +251,8 @@ def job_dir(number, run_name):
 def launch(number, dry_run=False, only_arm=None, where=None):
     path = exp_path(number)
     fm, body = load(path)
+    if fm.get("mode") == "steps":
+        raise SystemExit(f"experiment {number} runs in steps: tools/exp_step.py run {number} <step.yaml>")
     rs = runs(fm, where, only_arm)
     print(f"[launch] experiment {number}: {len(rs)} run(s)")
     ids = dict(fm.get("job_ids") or {})

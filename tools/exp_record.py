@@ -172,6 +172,22 @@ def _readout(r: dict) -> str:
     return (nl + nl).join(out)
 
 
+def _step_jobs(number: int) -> dict:
+    """{run: (step record, candidate, arm, candidate's card, is winner)} from a steps experiment's steps.jsonl."""
+    import json
+    hits = glob.glob(os.path.join(ROOT, "experiments", f"exp{number:02d}_*", "steps.jsonl"))
+    out = {}
+    for line in (open(hits[0]).read().splitlines() if hits else []):
+        st = json.loads(line)
+        cards = {c["c"]: c.get("card") for c in st.get("candidates") or []}
+        for run in st.get("jobs") or []:
+            m = re.match(rf"exp{number:02d}_s\d+_c(\d+)_(.+)_s\d+$", run)
+            if m:
+                c = int(m.group(1))
+                out[run] = (st, c, m.group(2), cards.get(c), st.get("winner") == c)
+    return out
+
+
 def undeclared_rows(number: int, rows: list[dict]) -> list[dict]:
     """EVERY RUN OF THE EXPERIMENT REACHES THE WATCHER, declared or not (added 2026-09-27). The steps above
     come from the markdown's arms and results rows only, so a phase whose arms were not yet declared --
@@ -193,7 +209,17 @@ def undeclared_rows(number: int, rows: list[dict]) -> list[dict]:
         t = max(os.path.getmtime(x) for x in (tj, mv) if os.path.exists(x))
         found.append((t, group, run))
     out = []
+    by_run = _step_jobs(number)
     for t, group, run in sorted(found):
+        if run in by_run:                      # a steps experiment (tools/exp_step.py): the step says what it is
+            st, c, arm, card, win = by_run[run]
+            out.append({"_v": f"step {st['step']} c{c} {arm}", "_group": group, "_run": run, "_pred": {}, "_read": {},
+                        "arm": arm, "label": f"step {st['step']}: {st.get('intent', '')}"
+                                             + (f" | how: {st['answer']}" if st.get("answer") else ""),
+                        "verdict": (f"card {card:.2f}" if isinstance(card, (int, float)) else "running")
+                                   + (" WINNER" if win else "") + ("" if st.get("valid", True) else " (step void)"),
+                        "what changed": "; ".join(st.get("coarse_diff") or []) or "the sweep only"})
+            continue
         out.append({"_v": f"UNDECLARED {run}", "_group": group, "_run": run, "_pred": {}, "_read": {},
                     "arm": "(undeclared)", "label": "a run on disk not yet in the markdown's arms or results rows",
                     "verdict": "undeclared -- not scored in the record",
