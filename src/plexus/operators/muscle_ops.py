@@ -234,7 +234,7 @@ def _load_fit(path, need=("beta", "C", "K")):
 
 # --------------------------------------------------------------------------- g -- the static map
 @register_operator("muscle_pose_map", family="mechanics", set="muscle", kind="aggregate",
-                   equation=r"""$$g^{k}(\mathbf m)=\sum_i a^{k}_i m_i+\sum_{i\le j} b^{k}_{ij} m_i m_j$$""")
+                   equation=r"""$$g^{k}(\mathbf m, title="Sum the children onto their parent")=\sum_i a^{k}_i m_i+\sum_{i\le j} b^{k}_{ij} m_i m_j$$""")
 class MusclePoseMap(Aggregate):
     """g, the static map: where the eye would come to rest if these six drives were held.
 

@@ -345,7 +345,11 @@ class MeshTable(dict):
     # saw, `cell_divide` runs AFTER it and grows nF, and `snapshot` drops a short array rather
     # than padding it. Recorded per-face, the thickness came back 0.000 on every frame where a
     # division had fired and 1.200 only on the frames where none had -- a thickness that blinks.
-    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill", "renumber_failed", "mono_h")
+    #   interface_force_sum / interface_force_max   the contact ledger of `contact_ops.record_interface`
+    #                 -- |net force| of the worst interface scaled by the largest contact force, and
+    #                 that force -- so "the bodies create no force" is read per row (exp05, exp11)
+    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill", "renumber_failed", "mono_h",
+                     "interface_force_sum", "interface_force_max")
 
     # PER-HALF-EDGE STATE, and it is a THIRD ragged length. `myo` has one entry per half-edge, not
     # per face and not per row, so it cannot ride in `FACE_RECORD` (which drops anything shorter
@@ -359,7 +363,11 @@ class MeshTable(dict):
     # short of the edge arrays, and every reader indexes it positionally. The engine records at the
     # END of the tick, so what lands here is the re-keyed array -- and
     # `myosin_array_aligned_with_half_edges` is the bookkeeping row that says so.
-    EDGE_RECORD = ("myo", "myo_amount")
+    #
+    #   fz / vang   the two planar-polarity complexes on each cell's side of each junction
+    #               (`junction_pcp`), a line density per half-edge -- the polarity lives on the
+    #               half-edge, so the per-cell arrow is read from these offline (exp08)
+    EDGE_RECORD = ("myo", "myo_amount", "fz", "vang")
 
     def snapshot(self, face_record=None):
         """One recorded frame: the three half-edge arrays, the two counts, and the per-face state.

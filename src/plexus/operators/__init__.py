@@ -63,7 +63,7 @@ from . import protein_ops           # noqa: F401  protein_seed / _project / _exp
 #                                                 cell_geometry, cell_grow, cell_chem_from_shape,
 #                                                 cell_shape_probe, interface_tension/push
 from . import junction_ops          # noqa: F401  junction_myosin (default|two_pool), junction_sync,
-#                                                 medioapical_myosin, cytokinetic_ring
+#                                                 medioapical_myosin, cytokinetic_ring, junction_pcp
 from . import ecm_ops               # noqa: F401  ecm_stress/from_cell, cell_exclude,
 #                                                 block_seed/stress
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*

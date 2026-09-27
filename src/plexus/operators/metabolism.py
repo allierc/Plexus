@@ -83,7 +83,7 @@ class MetaboliteSeed(Seed):
 
 
 @register_operator("reaction_rate", family="metabolism", set="reaction", kind="aggregate",
-                   equation=r"""$$v_j=k_j\!\!\prod_{i\,:\,S_{ij}<0}\!\! c_i^{\,\lvert S_{ij}\rvert}$$""")
+                   equation=r"""$$v_j=k_j\!\!\prod_{i\,:\,S_{ij}<0}\!\! c_i^{\,\lvert S_{ij}\rvert}$$""", title="Sum the children onto their parent")
 class ReactionRate(Aggregate):
     """The mass-action rate of every reaction, from its substrates' concentrations.
 
@@ -166,7 +166,7 @@ class ReactionRate(Aggregate):
 
 
 @register_operator("metabolite_flux", family="metabolism", set="metabolite", kind="aggregate",
-                   equation=r"""$$\frac{dc_i}{dt}=\sum_j S_{ij}\,v_j$$""")
+                   equation=r"""$$\frac{dc_i}{dt}=\sum_j S_{ij}\,v_j$$""", title="Sum the children onto their parent")
 class MetaboliteFlux(Aggregate):
     """What the reactions do to every concentration: the stoichiometric sum of their rates.
 

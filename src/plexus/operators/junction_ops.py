@@ -12,6 +12,7 @@ In the order they appear below:
     junction_sync       rewire       re-key the store onto half-edge arrays topology has changed
     medioapical_myosin  lateral      the apical pool: an areal density on the face, not its edges
     cytokinetic_ring    structural   the ring a dividing cell leaves on the junction it just built
+    junction_pcp        lateral      planar cell polarity: two complexes on each side of each junction
 
 then the second model of `junction_myosin`, a different hypothesis in the same slot:
 
@@ -943,3 +944,690 @@ class CytokineticRing(Structural):
 # is what the medioapical pool paid, so a ring that creates myosin instead of moving it shows up as a
 # ledger that no longer closes.
 RING_TRACE: list = []
+
+
+@register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural",
+                   model="oriented", title="Junction tension set by orientation and position",
+                   equation=r"""$$m_e=a\,\big(1+\alpha\,w_e\big)\big(1+g\,\phi_e\big),\qquad w_e=(\hat{\mathbf t}_e\cdot\hat{\mathbf c}_e)^2\,\frac{\rho_e}{\rho_{\max}},\quad \phi_e=1-\Big(\frac{z_e}{z_{\max}}\Big)^2$$""")
+class JunctionMyosinOriented(Structural):
+    """In-surface ANISOTROPIC junction tension: circumferential junctions pull harder than
+    meridional ones about a declared body axis -- the "molecular corset" -- optionally scaled by an
+    A-P gradient that is strongest at the centre and vanishes at the poles.
+
+    vertex -> vertex: reads pos, writes m["myo"] (one multiplier per half-edge) for THIS frame's
+    topology. No store, no dynamics: the multiplier is recomputed from geometry every call, so it
+    survives T1, division and death by construction and needs no `junction_sync`.
+
+        m_e   = a (1 + alpha w_e)(1 + g phi_e)          what cell_mechanics multiplies Lambda by
+                (x l_e / l_0 under `law: stiffness`: a resistance to stretch, not a squeeze)
+        w_e   = (t_e . c_e)^2  rho_e / rho_max          circumferential alignment, faded at the poles
+        phi_e = 1 - (z_e / z_max)^2                      the A-P profile: 1 at the centre, 0 at a pole
+
+    t_e is the junction's unit direction, c_e the unit circumferential direction at its midpoint
+    (the axis crossed with the midpoint's offset from the tissue centroid), rho_e the midpoint's
+    distance from the axis and rho_max the largest over the tissue, z_e the midpoint's coordinate
+    along the axis from the centroid and z_max the largest |z| of any vertex. a is `activity` (the
+    absolute level), alpha is `aniso` (0 = isotropic: every junction pulls alike) and g is `grad`
+    (0 = no A-P pattern). All three are dimensionless.
+
+    WHY THE FADE AT THE POLES. The circumferential direction is undefined on the axis itself, where
+    the circles of latitude shrink to a point; weighting by rho_e makes the anisotropy vanish there
+    smoothly, which is what a corset does -- it grips the girth and nothing at the ends. It is the
+    same construction `bm_bond`'s `aniso` uses on the basement membrane (membrane_ops.py), applied
+    here to the epithelium's own junctions.
+
+    WHAT THIS IS AND IS NOT. The fly follicle's anisotropic resistance sits in the basement membrane
+    (Crest et al. 2017: AFM finds it in the BM, not in the epithelium, and it is a GRADIENT of
+    stiffness along A-P more than a directional anisotropy). This operator puts the corset in the
+    epithelium's line tension, which is the in-surface half of the roadmap's M6: a stated
+    reduction, standing in for the membrane until the tissue and the membrane are coupled live.
+    Line tension is contractile, not elastic: it biases where growth goes by pulling harder around
+    the girth, it does not store a rest length.
+
+    Reference: Haigo, S.L. & Bilder, D. (2011). Global tissue revolutions in a morphogenetic
+    movement controlling elongation. Science 331:1071-1074 (the molecular corset); Crest, J.,
+    Diz-Munoz, A., Chen, D.-Y., Fletcher, D.A. & Bilder, D. (2017). Organ sculpting by patterned
+    extracellular matrix stiffness. eLife 6:e24958 (the A-P stiffness gradient).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False          # writes m["myo"], not positions
+    MECHANISM_TAGS = ["planar_polarity", "anisotropic_tension", "molecular_corset", "ap_gradient"]
+    PARAM_ROLES = {"activity": "absolute_tension_level", "aniso": "circumferential_excess",
+                   "grad": "ap_gradient_amplitude", "axis": "body_axis_direction"}
+    PARAM_UNITS = {"activity": "fraction", "aniso": "fraction", "grad": "fraction"}
+    REFERENCE = ("Haigo, S.L. & Bilder, D. (2011). Science 331:1071-1074; Crest, J. et al. (2017). "
+                 "Organ sculpting by patterned extracellular matrix stiffness. eLife 6:e24958.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.activity = float(params.get("activity", 1.0))
+        self.aniso = float(params.get("aniso", 0.0))
+        self.grad = float(params.get("grad", 0.0))
+        ax = torch.as_tensor(params.get("axis", [0.0, 0.0, 1.0]), dtype=torch.float64)
+        self.axis = ax / ax.norm().clamp(min=1e-12)
+        # `law` -- A SQUEEZE OR A RESISTANCE. `tension` (the default) is a constant force per
+        # junction: it deforms the tissue at once and is outgrown as the tissue grows (exp 5 round
+        # 1: aspect ratio 1.88 by frame 100, before any division, relaxing to 1.24 by frame 1601).
+        # `stiffness` multiplies each junction's factor by its length over the tissue's mean
+        # junction length at the first call, so the energy Lambda m_e l_e becomes quadratic in the
+        # length -- a spring of zero rest length, whose force grows with STRETCH. That is what the
+        # follicle's basement membrane does (Crest et al. 2017: it resists expansion, and it
+        # stiffens 30 -> 70 kPa as the follicle grows), and what a corset is.
+        self.law = str(params.get("law", "tension")).lower()
+        # `hoop` -- THE CORSET AS A SUPRACELLULAR SHEET. A junction-level law cannot feel the tissue
+        # grow: divisions keep junctions at their length while the tissue widens by adding cells
+        # (round 2: `stiffness` squeezed at once and relaxed like `tension`). The follicle's
+        # membrane is one continuous sheet that does not divide and resists the GIRTH widening. So
+        # under `hoop` the circumferential excess is proportional to the local hoop strain,
+        #   m_e = a (1 + max(0, rho_e / rho_0 - 1) (alpha (t_e.c_e)^2 + g phi_e)),
+        # rho_0 the tissue's largest distance from the axis at the first call: zero at the start,
+        # rising only where the tissue has widened -- tension that grows with hoop strain.
+        if self.law not in ("tension", "stiffness", "hoop"):
+            raise ValueError(f"junction_myosin[oriented]: law must be tension|stiffness|hoop, "
+                             f"got {self.law!r}")
+        self._l0 = None
+        self._rho0 = None
+        # `grad_mode` -- WHERE THE A-P GRADIENT LIVES. `isotropic` (default): every junction near the
+        # centre is stiffer, whatever its direction. `corset`: the gradient multiplies only the
+        # CIRCUMFERENTIAL term -- a corset that is densest at the centre and fades toward the poles,
+        # which is what the follicle's membrane is (circumferential fibrils, Col IV highest at the
+        # centre; Crest et al. 2017 Fig 4-5). Round 4 found the isotropic gradient does not elongate.
+        self.grad_mode = str(params.get("grad_mode", "isotropic")).lower()
+        # BOUNDING THE HOOP LAW (round 5: at excess 8-16 the multiplier reached 10-25x the base
+        # tension as the girth grew 2-3x, and cells squeezed into slivers inverted from frame
+        # ~1400). The follicle's membrane stiffens ~2.3x over development (30 -> 70 kPa) and is
+        # continuously remodelled, so two bounded forms:
+        #   `m_max`   -- the multiplier saturates there (0 = unbounded, the round-4/5 law);
+        #   `tau_ref` -- the reference radius rho_0 relaxes toward the current girth with this time
+        #                constant, in frames (0 = never: strain from the seed, the round-4/5 law).
+        self.m_max = float(params.get("m_max", 0.0))
+        self.tau_ref = float(params.get("tau_ref", 0.0))
+        if self.grad_mode not in ("isotropic", "corset"):
+            raise ValueError(f"junction_myosin[oriented]: grad_mode must be isotropic|corset, got {self.grad_mode!r}")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        Nv = int(m["Nv"]); es, et = m["E_srce"].long(), m["E_trgt"].long()
+        pos = lvl.get("pos")[:Nv].detach()
+        a = self.axis.to(device=pos.device, dtype=pos.dtype)
+        c = pos.mean(0)
+        mid = 0.5 * (pos[es] + pos[et]) - c
+        t = pos[et] - pos[es]
+        t = t / t.norm(dim=1, keepdim=True).clamp(min=1e-12)
+        circ = torch.cross(a.expand_as(mid), mid, dim=1)
+        rho = circ.norm(dim=1)
+        ch = circ / rho.clamp(min=1e-12)[:, None]
+        w = (t * ch).sum(1) ** 2 * (rho / rho.max().clamp(min=1e-12))
+        z = mid @ a
+        zmax = ((pos - c) @ a).abs().max().clamp(min=1e-12)
+        phi = (1.0 - (z / zmax) ** 2).clamp(min=0.0)
+        if self.law == "hoop":
+            if self._rho0 is None:
+                self._rho0 = float(rho.max().clamp(min=1e-12))
+            elif self.tau_ref > 0.0:
+                _dt = float(getattr(H, "dt", 1.0))
+                self._rho0 += (float(rho.max()) - self._rho0) * min(1.0, _dt / self.tau_ref)
+            strain = (rho / self._rho0 - 1.0).clamp(min=0.0)
+            # BOTH patterns resist only once stretched: the directional corset (alpha) and the A-P
+            # stiffness gradient (g, Crest et al.'s stiffer centre) are stiffnesses, so each scales
+            # with the local hoop strain and is zero on the unstretched seed.
+            align = (t * ch).sum(1) ** 2
+            if self.grad_mode == "corset":
+                myo = self.activity * (1.0 + strain * align * (self.aniso + self.grad * phi))
+            else:
+                myo = self.activity * (1.0 + strain * (self.aniso * align + self.grad * phi))
+            if self.m_max > 0.0:
+                myo = myo.clamp(max=self.activity * self.m_max)
+            m["myo"] = myo
+            return {}
+        myo = self.activity * (1.0 + self.aniso * w) * (1.0 + self.grad * phi)
+        if self.law == "stiffness":
+            l_e = (pos[et] - pos[es]).norm(dim=1)
+            if self._l0 is None:
+                self._l0 = float(l_e.mean().clamp(min=1e-12))
+            myo = myo * (l_e / self._l0)
+        m["myo"] = myo
+        return {}
+
+
+# junction_myosin[type_pair] -- the line tension per pair of cell TYPES (experiment 9, Graner & Glazier 1992's
+# J table on the vertex model). Moved here from sorting_ops.py on 2026-09-27, unchanged.
+def type_pair_multiplier(es, et, ef, face_type, table, medium=None):
+    """Per half-edge: table[type of its face, type of the face across], or table[type, medium] on a
+    free edge (no twin). `table` [K+1, K+1] when `medium` is its last index, else [K, K]."""
+    from plexus.operators.junction_ops import pcp_twins
+    stride = int(max(int(es.max()), int(et.max()))) + 1 if es.numel() else 1
+    tw = pcp_twins(es, et, stride)
+    t_in = face_type[ef]
+    has = tw >= 0
+    t_out = torch.where(has, face_type[ef[tw.clamp(min=0)]], torch.full_like(t_in, -1))
+    if medium is None and not bool(has.all()):
+        raise ValueError("junction_myosin[type_pair]: the mesh has free edges and the table no `medium` entry")
+    t_out = torch.where(has, t_out, torch.full_like(t_in, medium if medium is not None else 0))
+    return table[t_in, t_out]
+
+
+@register_operator("junction_myosin", model="type_pair", family="mechanics", set="vertex", kind="structural",
+                   title="Junction tension set by the two cells' types",
+                   equation=r"""$$m_e=\gamma_{\tau(f_e)\,\tau(f'_e)},\qquad m_e^{\mathrm{free}}=\gamma_{\tau(f_e)\,M}$$""")
+class JunctionMyosinTypePair(Structural):
+    """The vertex model's differential adhesion: each junction's line tension set by the TYPES of the
+    two cells it separates, and by the cell's type and the medium on a free edge.
+
+    vertex -> vertex: reads the cell set's node_type, writes m["myo"] (one multiplier per half-edge)
+    for this frame's topology. No store: recomputed every call, so it follows T1s, divisions and a
+    retyped cell, and needs no `junction_sync`.
+
+        m_e      = gamma[tau(f_e), tau(f'_e)]     what cell_mechanics multiplies Lambda by
+        m_e_free = gamma[tau(f_e), medium]        an edge with no cell across (the aggregate's surface)
+
+    f_e is the face (cell) owning half-edge e, f'_e the face across (its twin's owner), tau a cell's
+    type and gamma the symmetric table `tensions: {A: {A: .., B: .., medium: ..}, B: {B: .., medium: ..}}`
+    keyed by the cell set's type names plus `medium`. With gamma = J / J_ref this is Graner & Glazier
+    1992's Potts surface energies on a vertex model's junctions: J(d,d)=2, J(d,l)=11, J(l,l)=14,
+    J(cell, medium)=16 sort (their Eq. 3); a lower homotypic tension is a higher adhesion.
+
+    WHY A MODEL OF junction_myosin. `interface_tension` is a purse-string on the activator
+    interface with one tension; `cell_mechanics` already multiplies its line tension junction by
+    junction by m["myo"], which `junction_myosin` writes. A table read by type is one more rule for
+    that multiplier, not a new force.
+
+    Reference: Graner, F. & Glazier, J.A. (1992). Phys. Rev. Lett. 69:2013-2016; Steinberg, M.S.
+    (1963). Science 141:401-408; Farhadifar, R. et al. (2007). Curr. Biol. 17:2095-2104 (the line
+    tension of the vertex model).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False             # writes m["myo"], not positions
+    REQUIRES_PARAMS = ["tensions"]
+    MECHANISM_TAGS = ["differential_adhesion", "cell_sorting", "type_pair_tension"]
+    PARAM_ROLES = {"tensions": "line_tension_multiplier_per_pair_of_types_and_medium"}
+    PARAM_UNITS = {"tensions": "fraction"}
+    REFERENCE = ("Graner, F. & Glazier, J.A. (1992). Phys. Rev. Lett. 69:2013-2016; Steinberg, M.S. "
+                 "(1963). Science 141:401-408.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self._cat = params.get("cell_set")
+        self.spec = params["tensions"]
+        self._tab = None
+        self._medium = None
+
+    def _table(self, clvl, device, dtype):
+        names = list(getattr(clvl, "type_names", None) or [])
+        want_m = any("medium" in (row or {}) for row in self.spec.values())
+        K = len(names) + (1 if want_m else 0)
+        idx = {n: i for i, n in enumerate(names)}
+        if want_m:
+            idx["medium"] = len(names)
+        tab = torch.full((K, K), float("nan"), device=device, dtype=dtype)
+        for a, row in self.spec.items():
+            for b, g in (row or {}).items():
+                if a not in idx or b not in idx:
+                    raise ValueError(f"junction_myosin[type_pair]: {a!r}/{b!r} is not one of {list(idx)}")
+                tab[idx[a], idx[b]] = tab[idx[b], idx[a]] = float(g)
+        miss = [(n, m) for n in names for m in list(idx) if torch.isnan(tab[idx[n], idx[m]])]
+        if miss:
+            raise ValueError(f"junction_myosin[type_pair]: no tension for {miss}")
+        return tab, (idx["medium"] if want_m else None)
+
+    def forward(self, H, mask=None):
+        from plexus.operators.vertex_ops import resolve_cell_set
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        clvl = H.level(resolve_cell_set(H, self.at, self._cat))
+        es, et, ef = m["E_srce"].long(), m["E_trgt"].long(), m["E_face"].long()
+        pos = lvl.get("pos")
+        if self._tab is None or self._tab.device != pos.device:
+            self._tab, self._medium = self._table(clvl, pos.device, pos.dtype)
+        nF = int(m["nF"])
+        ft = clvl.node_type[:nF].to(pos.device).long()
+        m["myo"] = type_pair_multiplier(es, et, ef, ft, self._tab, self._medium)
+        return {}
+
+
+# ================================================================================================ #
+#  junction_pcp -- planar cell polarity on the junction sides
+# ================================================================================================ #
+PCP_TRACE: list = []
+
+
+def pcp_twins(es, et, stride):
+    """Index of each half-edge's twin (t, s), or -1 on the free boundary."""
+    key = es.long() * stride + et.long()
+    tw = et.long() * stride + es.long()
+    order = torch.argsort(key)
+    ks = key[order]
+    j = torch.searchsorted(ks, tw).clamp(max=max(ks.numel() - 1, 0))
+    hit = ks[j] == tw
+    return torch.where(hit, order[j], torch.full_like(j, -1))
+
+
+def pcp_side_pairs(ef, ang, perim, nF, spread):
+    """The within-cell kernel of `junction_pcp`: pairs (a, b) of sides of one cell and their weights.
+
+    w_ab = exp(-d_ab / (spread * s_i)), d_ab the distance between the two sides' midpoints ALONG the
+    perimeter, taken as (P_i / 2 pi) times their angular separation about the centroid (exact for a
+    circle, close for a convex cell), s_i = P_i / n_i the cell's mean side length. Returns
+    (a, b, w) with the self pairs (w = 1) included; `spread` = 0 returns only the self pairs.
+    """
+    E = ef.shape[0]
+    idx = torch.arange(E, device=ef.device)
+    if spread <= 0.0:
+        return idx, idx, torch.ones(E, dtype=ang.dtype, device=ef.device)
+    order = torch.argsort(ef, stable=True)
+    fs = ef[order]
+    deg = torch.bincount(ef, minlength=nF)
+    start = torch.cumsum(deg, 0) - deg
+    kmax = int(deg.max())
+    a_l, b_l = [], []
+    for k in range(kmax):
+        ok = deg[fs] > k
+        j = start[fs] + k
+        a_l.append(order[ok]); b_l.append(order[j[ok]])
+    a, b = torch.cat(a_l), torch.cat(b_l)
+    dphi = torch.remainder(ang[a] - ang[b] + torch.pi, 2 * torch.pi) - torch.pi
+    f = ef[a]
+    d = perim[f] / (2 * torch.pi) * dphi.abs()
+    side = perim[f] / deg[f].clamp_min(1).to(perim.dtype)
+    return a, b, torch.exp(-d / (spread * side).clamp_min(1e-12))
+
+
+def pcp_rates(F, V, twin, ef, L, nF, Ftot, Vtot, A, k_on, k_off, g, beta, Kb, Kp, kern=None, AV=None,
+              hill=None):
+    """dF/dt and dV/dt per half-edge for `junction_pcp` (its docstring has the equations).
+
+    F, V, L, A: [E] line densities, lengths and the cue factor of the live half-edges; twin: [E]
+    index into the same arrays or -1; ef: [E] face; Ftot, Vtot: [nF] each cell's conserved amounts;
+    kern: (a, b, w) from `pcp_side_pairs`, or None for the side-local inhibition; AV: [E] a factor on
+    V's unbinding (the elongation coupling), None for 1; hill: (n, K) makes the recruitment by the
+    partner across the junction cooperative, x -> (1 + K^n) x^n / (K^n + x^n) (equal to x at x = 1),
+    None for linear (`junction_pcp[cooperative]`).
+    A module function so the two-cell test calls exactly what the operator integrates.
+    """
+    perim = torch.zeros(nF, dtype=F.dtype, device=F.device).index_add(0, ef, L).clamp_min(1e-12)
+    Fb = torch.zeros_like(perim).index_add(0, ef, F * L)
+    Vb = torch.zeros_like(perim).index_add(0, ef, V * L)
+    cF = (Ftot - Fb).clamp_min(0.0) / perim                     # the free pool, per unit perimeter
+    cV = (Vtot - Vb).clamp_min(0.0) / perim
+    has = twin >= 0
+    tw = twin.clamp_min(0)
+    Vn = torch.where(has, V[tw], torch.zeros_like(V))           # the neighbour's side of the junction
+    Fn = torch.where(has, F[tw], torch.zeros_like(F))
+    if kern is None:
+        Vs = V
+    else:                                                       # Vang nearby along the membrane
+        a, b, w = kern
+        num = torch.zeros_like(V).index_add(0, a, w * V[b] * L[b])
+        den = torch.zeros_like(V).index_add(0, a, w * L[b]).clamp_min(1e-12)
+        Vs = num / den
+    B = 1.0 + Kb * Vs.clamp_min(0.0) ** Kp                      # Vang on and near this side blocks Fz binding
+    if hill is not None:                                        # cooperative recruitment across the junction
+        n_, K_ = hill
+        Vn = (1 + K_ ** n_) * Vn.clamp_min(0.0) ** n_ / (K_ ** n_ + Vn.clamp_min(0.0) ** n_)
+        Fn = (1 + K_ ** n_) * Fn.clamp_min(0.0) ** n_ / (K_ ** n_ + Fn.clamp_min(0.0) ** n_)
+    dF = k_on * cF[ef] * (beta + g * Vn) - k_off * A * B * F
+    dV = k_on * cV[ef] * (beta + g * Fn) - k_off * (V if AV is None else AV * V)
+    return dF, dV
+
+
+def pcp_elongation(P, vi, vj, ef, nF):
+    """Each cell's elongation (e1, e2) = sum over its sides of l^2 (cos 2 psi, sin 2 psi) / (2 A), psi
+    the side's direction and A the cell's area (shoelace): Aigouy et al. 2010, Suppl. Eq. 25, written
+    with one consistent factor. 0 for a regular polygon, positive e1 for a cell long along axis 0."""
+    d = P[vj] - P[vi]
+    l2 = (d ** 2).sum(1)
+    psi = torch.atan2(d[:, 1], d[:, 0])
+    A = 0.5 * torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(
+        0, ef, P[vi, 0] * P[vj, 1] - P[vj, 0] * P[vi, 1]).abs().clamp_min(1e-12)
+    e1 = torch.zeros_like(A).index_add(0, ef, l2 * torch.cos(2 * psi)) / (2 * A)
+    e2 = torch.zeros_like(A).index_add(0, ef, l2 * torch.sin(2 * psi)) / (2 * A)
+    return e1, e2
+
+
+@register_operator("junction_pcp", family="polarity", set="vertex", kind="lateral",
+                   equation=r"""$$\frac{dF_h}{dt}=k_{\mathrm{on}}c^F_i(\beta+gV_{\bar h})-k_{\mathrm{off}}A_hB_hF_h,\quad \frac{dV_h}{dt}=k_{\mathrm{on}}c^V_i(\beta+gF_{\bar h})-k_{\mathrm{off}}V_h,\quad B_h=1+K_bV_h^{K_p}$$""")
+class JunctionPCP(Lateral):
+    """Planar cell polarity on the half-edges: two junctional complexes on each cell's side of each
+    junction, exchanged across the junction with the neighbour's side.
+
+    vertex -> vertex: reads pos and the half-edge table, writes m["fz"] and m["vang"] (one line
+    density per half-edge, recorded as `e_fz` / `e_vang`) and, when the cell set declares them, the
+    per-cell blocks `mutant` (the clone), `pcp_vec` (the polarity arrow p_i and its asymmetry) and,
+    with `color_block: chem`, three colour channels for the movie: the arrow's share along +cue,
+    along -cue and across it, each times min(1, 2 * asymmetry) -- the renderers colour a face from
+    `chem` only, so a spec drawing them red / blue / green (`plotting.species`, additive) shows an
+    aligned sheet as one red field, a reversed row as blue, a swirl as green.
+
+    THE MODEL is Amonlirdviman et al. 2005's feedback loop (SOM, reactions S1-S10 and PDEs S21-S30)
+    reduced to the two complexes the minimal model keeps: F, the Fz(-Dsh) complex, and V, the
+    Vang(-Pk) complex. On half-edge h of cell i, with h-bar its twin (cell j's side of the same
+    junction) and l_h its length:
+
+        dF_h/dt = k_on c^F_i (beta + g V_hbar) - k_off A_h B_h F_h
+        dV_h/dt = k_on c^V_i (beta + g F_hbar) - k_off V_h
+        B_h     = 1 + K_b Vs_h^K_p,    Vs_h = sum_{k in i} w_hk V_k l_k / sum_{k in i} w_hk l_k
+        w_hk    = exp(-d_hk / (spread * s_i))
+        c^F_i   = (F_tot,i - sum_{h in i} F_h l_h) / P_i          (and c^V_i likewise)
+
+    F_h, V_h are line densities (amount per unit junction length) of the complexes on the side h.
+    c^F_i is cell i's FREE pool per unit of its perimeter P_i: the SOM lets Dsh and Pk diffuse freely
+    in the cell interior, and a well-mixed pool is that diffusion's fast limit (Burak & Shraiman
+    2009 make the same fast-diffusion assumption, their Eq. 6). F_tot,i and V_tot,i are conserved per
+    cell (SOM: "the total amount of each protein in a cell is always conserved"), set to
+    `fz_total`, `vang_total` times the cell's perimeter at the first call.
+      g       the EXCHANGE: a complex on one side recruits its partner on the neighbour's side --
+              reaction S2, Fz on one cell binding Vang on the next (and S4, S6, S9 on the larger
+              complexes). g = 0 switches every cross-junction interaction off (the control).
+      beta    recruitment that needs no partner across (the basal rate, relative to g's unit).
+      B_h     Vang/Pk on and NEAR the side blocks Fz-Dsh binding: SOM Eq. S1's backward rate times
+              B = 1 + K_b (...)^K_p, the local Pk and Vang concentration to the exponent K_p.
+      Vs_h    that local concentration, spread along the membrane: d_hk is the distance between the
+              midpoints of sides h and k of the same cell along its perimeter, s_i the cell's mean
+              side length, `spread` the range in side lengths. WITHOUT IT THE SHEET CANNOT ORDER,
+              and that was measured: side-local inhibition (spread 0) polarised every cell (median
+              asymmetry 0.07 -> 0.46) and left neighbours uncorrelated (local order 0.07), because
+              then any orientation of the junctions is a steady state and nothing puts a cell's Fz
+              and Vang on OPPOSITE HALVES. The range is Burak & Shraiman 2009's non-local inhibitory
+              field (their Eq. 3, range 1/kappa = 0.45 cell spacings at locus A, Table 1) and the
+              reduced form of the SOM's membrane diffusion of Vang and the complexes (PDEs S24-S30).
+      A_h     the global cue: the SOM's reaction-based bias multiplies the Dsh-Fz backward rates by
+              M1 < 1 "in a region of the distal edge of each cell"; here A_h = `cue_m1` on the sides
+              whose outward in-plane normal lies within arccos(`cue_cos`) of `cue_axis`, else 1.
+              `cue_until` (a frame, default none) switches it off from that frame on: the SOM
+              removed its cue half way through and found the loop keeps the polarity it has.
+      k_on, k_off   the binding and unbinding rates, per model time unit.
+      elong   Aigouy et al. 2010's coupling of polarity to cell SHAPE (their Eq. 1, -J3 eps_a . Q_a,
+              J3/J1 = 0.05 and 0.5 in their Figs. 6C and S5B-D): both complexes unbind from side h at
+              k_off times exp(-elong (e1_i cos 2 phi_h + e2_i sin 2 phi_h)), phi_h the side's outward
+              normal angle and (e1_i, e2_i) cell i's elongation tensor (`pcp_elongation`, their Suppl.
+              Eq. 25). The proteins then prefer the sides facing along the cell's long axis, so the
+              polarity AXIS follows elongation. Default 0: no coupling.
+      elong_ref   `seed` couples to each cell's elongation RELATIVE TO ITS SHAPE AT THE FIRST CALL,
+              (e1 - e1_0, e2 - e2_0), instead of the absolute shape. Measured reason: `seed_mesh`'s
+              disc is anisotropic before anything moves (mean |e| 0.18, long axis along y), and with
+              the absolute form the coupling read that lattice artefact as a cue -- at elong 1.5 the
+              order snapped to y during establishment, at 0.15 it turned to y once the cue was off,
+              while the cells' real long axis after the flow was -54 deg (exp08 Finding 12). Relative
+              to the seed, a sheet that does not deform feels nothing, exactly. Default `none`.
+    A clone removes one complex: `clone: {center, radius, removes: fz|vang}` sets that complex's
+    total to 0 in the cells whose centroid lies within `radius` of `center` (in the sheet plane),
+    the SOM's loss-of-function clones.
+
+    THE START is random: every side gets `init_bound` of its cell's total density times
+    (1 + `init_noise` * U(-1, 1)), independently, from `seed` -- so each cell starts with a random
+    arrow and nothing is aligned. `noise` adds a multiplicative Gaussian kick of that relative size
+    per step (Burak & Shraiman 2009's stochastic term, Eq. 4), default 0: deterministic, as in the SOM.
+
+    THE STATE IS KEYED BY THE ORDERED VERTEX PAIR (srce, trgt), which names one cell's side of one
+    junction, so it follows the half-edge through a renumbering the way the myosin store follows the
+    junction. A side with no history takes its cell's current mean. On a sheet whose topology
+    changes AFTER this operator in the tick, m["fz"] / m["vang"] are the arrays this operator saw;
+    a run with T1s or divisions needs them re-keyed before `topo_record`, as `junction_sync` does
+    for myosin -- the fixed sheets of exp08 batch 1 do not.
+
+    A NEW OPERATOR, NOT A VARIANT, because no registered contract holds TWO values per junction that
+    talk ACROSS it. The ones it could not be a model of, and why:
+      junction_myosin   one multiplier per junction (keyed by the unordered vertex pair) feeding the
+                        edge tension `cell_mechanics` reads -- no cell's side, no partner across
+      junction_sync     bookkeeping that re-keys that one value after topology changes, no dynamics
+      protein_seed / protein_express / protein_project
+                        clusters placed by REGION of a cell (apical, basal, mid-surface, interior),
+                        not by junction side, and nothing exchanged between neighbours
+      seed_polarity     one heading per cell, written once as a seed
+      cell_chem_react / cell_chem_diffuse
+                        one concentration per cell on the cell graph; a polarity needs one per side
+    Its family is `polarity`, of which it is the only member; it lives here, beside the other
+    per-junction state and the helpers it shares (`_live_edges`, `_scatter_full`).
+
+    Integrated by explicit Euler, `substeps` steps of `dt` model time units per call; amounts are
+    clamped at 0.
+
+    Reference: Amonlirdviman, K., Khare, N. A., Tree, D. R. P., Chen, W.-S., Axelrod, J. D. &
+    Tomlin, C. J. (2005). Mathematical modeling of planar cell polarity to understand domineering
+    nonautonomy. Science 307:423-426, Supporting Online Material; Burak, Y. & Shraiman, B. I. (2009).
+    Order and stochastic dynamics in Drosophila planar cell polarity. PLoS Comput Biol 5:e1000628.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    # DERIVED READOUTS ON THE CELL SET: `mutant`, `pcp_vec` and the colour channels are written from
+    # the half-edge state and integrated by nothing, which is what the flag is for (as for the
+    # centroid aggregate). No position or velocity is touched; the dynamics live on the mesh table.
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["planar_cell_polarity", "junction_state", "contact_dependent_signalling",
+                      "topology_persistent"]
+    PARAM_ROLES = {"g": "exchange_gain_across_the_junction", "beta": "basal_recruitment",
+                   "spread": "range_of_the_cis_inhibition_along_the_membrane_in_side_lengths",
+                   "elong": "coupling_of_polarity_to_cell_elongation",
+                   "elong_ref": "elongation_measured_from_the_seeded_shape_or_absolute",
+                   "K_b": "cis_inhibition_strength", "K_p": "cis_inhibition_exponent",
+                   "cue_m1": "distal_unbinding_factor_of_the_global_cue", "k_on": "binding_rate",
+                   "k_off": "unbinding_rate"}
+    REFERENCE = ("Amonlirdviman, K. et al. (2005). Mathematical modeling of planar cell polarity to "
+                 "understand domineering nonautonomy. Science 307:423-426 (SOM); Burak, Y. & Shraiman, "
+                 "B. I. (2009). Order and stochastic dynamics in Drosophila planar cell polarity. "
+                 "PLoS Comput Biol 5:e1000628.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.cell_at = params.get("cell_at", "cell")
+        self.k_on = float(params.get("k_on", 1.0))
+        self.k_off = float(params.get("k_off", 1.0))
+        self.g = float(params.get("g", 10.0))
+        self.beta = float(params.get("beta", 0.1))
+        self.Kb = float(params.get("K_b", 5.0))
+        self.Kp = float(params.get("K_p", 2.0))
+        self.fz_total = float(params.get("fz_total", 1.0))
+        self.vang_total = float(params.get("vang_total", 1.0))
+        self.cue_m1 = float(params.get("cue_m1", 1.0))
+        self.cue_until = params.get("cue_until", None)
+        self.cue_axis = [float(x) for x in params.get("cue_axis", [1.0, 0.0, 0.0])]
+        self.cue_cos = float(params.get("cue_cos", 0.5))
+        self.plane_axis = int(params.get("plane_axis", 2))
+        self.init_bound = float(params.get("init_bound", 0.5))
+        self.init_noise = float(params.get("init_noise", 0.5))
+        self.noise = float(params.get("noise", 0.0))
+        self.seed = int(params.get("seed", 0))
+        self.dt = float(params.get("dt", 0.05))
+        self.substeps = int(params.get("substeps", 4))
+        self.spread = float(params.get("spread", 1.0))
+        self.elong = float(params.get("elong", 0.0))
+        self.elong_ref = str(params.get("elong_ref", "none"))
+        self._e0 = None
+        self.clone = params.get("clone") or None
+        self.color_block = params.get("color_block") or None
+        self._tot = None
+        self._gen = None
+        self._said = False
+
+    def _hill(self):
+        """The cooperativity of the cross-junction recruitment: None (linear) for this model."""
+        return None
+
+    def _cell_block(self, H, name):
+        try:
+            lvl = H.level(self.cell_at)
+        except Exception:                                                    # noqa: BLE001
+            return None
+        if name not in getattr(lvl, "state_schema", {}):
+            return None
+        return lvl.get(name)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, _ukey, L = _live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        nF = int(m["nF"])
+        ef = m["E_face"][live].long()
+        ax = [i for i in range(pos.shape[1]) if i != self.plane_axis]
+        P = pos[:, ax]
+        cen = torch.zeros(nF, 2, device=dev, dtype=dt_).index_add(0, ef, P[vi])
+        cen = cen / torch.bincount(ef, minlength=nF).clamp_min(1).to(dt_)[:, None]
+        d = P[vj] - P[vi]
+        n = torch.stack([d[:, 1], -d[:, 0]], 1) / L.clamp_min(1e-12)[:, None]
+        n = n * torch.sign(((0.5 * (P[vi] + P[vj]) - cen[ef]) * n).sum(1))[:, None]
+        perim = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, L)
+        twin = pcp_twins(vi, vj, stride)
+        okey = vi * stride + vj
+        mid = 0.5 * (P[vi] + P[vj]) - cen[ef]
+        kern = pcp_side_pairs(ef, torch.atan2(mid[:, 1], mid[:, 0]), perim, nF, self.spread)
+
+        # ---- first call: totals, clone, the random start --------------------------------------
+        if self._tot is None:
+            Ft = self.fz_total * perim
+            Vt = self.vang_total * perim
+            mut = torch.zeros(nF, dtype=torch.bool, device=dev)
+            if self.clone:
+                c0 = torch.tensor([float(x) for x in self.clone.get("center", [0.0, 0.0])][:2], device=dev, dtype=dt_)
+                mut = (cen - c0).norm(dim=1) <= float(self.clone.get("radius", 0.0))
+                rem = str(self.clone.get("removes", "fz"))
+                if rem not in ("fz", "vang"):
+                    raise ValueError(f"junction_pcp: clone.removes must be 'fz' or 'vang', not {rem!r}")
+                (Ft if rem == "fz" else Vt)[mut] = 0.0
+            self._tot = (Ft, Vt)
+            blk = self._cell_block(H, "mutant")
+            if blk is not None:
+                blk[..., :nF, 0] = mut.to(blk.dtype)
+            self._gen = torch.Generator(device="cpu").manual_seed(self.seed)
+            u = lambda: (2 * torch.rand(L.shape[0], generator=self._gen, dtype=torch.float64) - 1).to(dev, dt_)  # noqa: E731
+            F = self.init_bound * self.fz_total * (1 + self.init_noise * u())
+            V = self.init_bound * self.vang_total * (1 + self.init_noise * u())
+            F = torch.where(Ft[ef] > 0, F, torch.zeros_like(F))            # a clone cell has none to place
+            V = torch.where(Vt[ef] > 0, V, torch.zeros_like(V))
+        else:
+            keys, sF, sV = m["pcp_keys"], m["pcp_F"], m["pcp_V"]
+            order = torch.argsort(keys)
+            ks = keys[order]
+            j = torch.searchsorted(ks, okey).clamp(max=max(ks.numel() - 1, 0))
+            hit = ks[j] == okey
+            mF = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, torch.where(hit, sF[order[j]], torch.zeros_like(L)))
+            nh = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, hit.to(dt_)).clamp_min(1)
+            mV = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, torch.where(hit, sV[order[j]], torch.zeros_like(L)))
+            F = torch.where(hit, sF[order[j]], (mF / nh)[ef])
+            V = torch.where(hit, sV[order[j]], (mV / nh)[ef])
+        Ft, Vt = self._tot
+        if Ft.shape[0] != nF:
+            raise RuntimeError(f"junction_pcp: the sheet has {nF} cells, the totals were set for "
+                               f"{Ft.shape[0]} -- a division or death needs the totals carried")
+
+        cue = torch.tensor(self.cue_axis, device=dev, dtype=dt_)[ax]
+        cue = cue / cue.norm().clamp_min(1e-12)
+        m1 = self.cue_m1
+        if self.cue_until is not None and int(getattr(H, "frame", 0) or 0) >= int(self.cue_until):
+            m1 = 1.0
+        A = torch.where((n @ cue) >= self.cue_cos, torch.full_like(L, m1), torch.ones_like(L))
+        AV = None
+        if self.elong != 0.0:
+            e1, e2 = pcp_elongation(P, vi, vj, ef, nF)
+            if self.elong_ref == "seed":
+                if self._e0 is None:
+                    self._e0 = (e1.clone(), e2.clone())
+                if self._e0[0].shape[0] != nF:
+                    raise RuntimeError("junction_pcp: elong_ref seed needs a fixed set of cells")
+                e1, e2 = e1 - self._e0[0], e2 - self._e0[1]
+            phi = torch.atan2(n[:, 1], n[:, 0])
+            AV = torch.exp(-self.elong * (e1[ef] * torch.cos(2 * phi) + e2[ef] * torch.sin(2 * phi)))
+            A = A * AV
+        for _ in range(self.substeps):
+            dF, dV = pcp_rates(F, V, twin, ef, L, nF, Ft, Vt, A, self.k_on, self.k_off, self.g,
+                               self.beta, self.Kb, self.Kp, kern, AV, self._hill())
+            F = (F + self.dt * dF).clamp_min(0.0)
+            V = (V + self.dt * dV).clamp_min(0.0)
+            if self.noise > 0.0:
+                kF = torch.randn(L.shape[0], generator=self._gen, dtype=torch.float64).to(dev, dt_)
+                kV = torch.randn(L.shape[0], generator=self._gen, dtype=torch.float64).to(dev, dt_)
+                s = self.noise * (self.dt ** 0.5)
+                F = (F * (1 + s * kF)).clamp_min(0.0)
+                V = (V * (1 + s * kV)).clamp_min(0.0)
+
+        m["pcp_keys"], m["pcp_F"], m["pcp_V"] = okey.detach(), F.detach(), V.detach()
+        m["fz"] = _scatter_full(es, live, F.detach(), dev, dt_, fill=0.0)
+        m["vang"] = _scatter_full(es, live, V.detach(), dev, dt_, fill=0.0)
+        vec = self._cell_block(H, "pcp_vec")
+        col = self._cell_block(H, self.color_block) if self.color_block else None
+        if vec is not None or col is not None:
+            p = torch.zeros(nF, 2, device=dev, dtype=dt_).index_add(0, ef, ((F - V) * L)[:, None] * n)
+            s_ = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, (F + V) * L).clamp_min(1e-12)
+            asym = p.norm(dim=1) / s_
+            if vec is not None:
+                vec[..., :nF, 0:2] = p.to(vec.dtype)
+                if vec.shape[-1] > 2:
+                    vec[..., :nF, 2] = asym.to(vec.dtype)
+            if col is not None and col.shape[-1] >= 3:
+                u = p / p.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                along = u @ cue
+                w = (2.0 * asym).clamp(max=1.0)
+                col[..., :nF, 0] = (along.clamp_min(0.0) * w).to(col.dtype)
+                col[..., :nF, 1] = ((-along).clamp_min(0.0) * w).to(col.dtype)
+                col[..., :nF, 2] = ((1 - along ** 2).clamp_min(0.0).sqrt() * w).to(col.dtype)
+        PCP_TRACE.append((nF, float((F * L).sum()), float((V * L).sum())))
+        if not self._said:
+            print(f"[junction_pcp] {nF} cells, {int(live.sum())} junction sides, g={self.g}, "
+                  f"K_b={self.Kb}, K_p={self.Kp}, cue_m1={self.cue_m1}"
+                  + (f", clone removes {self.clone.get('removes')}" if self.clone else ""), flush=True)
+            self._said = True
+        return {}
+
+
+@register_operator("junction_pcp", model="cooperative", family="polarity", set="vertex", kind="lateral",
+                   equation=r"""$$\frac{dF_h}{dt}=k_{\mathrm{on}}c^F_i\big(\beta+g\,T(V_{\bar h})\big)-k_{\mathrm{off}}A_hB_hF_h,\quad T(x)=\frac{(1+K^n)\,x^n}{K^n+x^n}$$""")
+class JunctionPCPCooperative(JunctionPCP):
+    """`junction_pcp` with a COOPERATIVE exchange: the recruitment of a complex by its partner across
+    the junction is a Hill function of the partner's density instead of linear in it.
+
+        dF_h/dt = k_on c^F_i (beta + g T(V_hbar)) - k_off A_h B_h F_h      (and V with T(F_hbar))
+        T(x)    = (1 + K^n) x^n / (K^n + x^n)                              T(1) = 1, so g keeps its scale
+
+    n = `hill_n` (default 2) is the cooperativity, K = `hill_k` (default 1) the partner density,
+    in the same line-density units as F and V (a cell's total is 1 per unit perimeter), at which the
+    recruitment is half its saturated value. Everything else is the default model's.
+
+    K MUST SIT AT THE OPERATING DENSITY, and the two-cell test measured why: at K = 0.5, below the
+    ~1-1.5 the junction sides hold, the recruitment saturates where it acts, the junction no longer
+    orients and both cells put Vang on the shared side; at K = 1 the slope of T at x = 1 is 2 against
+    the linear model's 1 and the junction orients more sharply (Fz 2.12 against 0.018 on the two
+    sides, linear 2.32 against 0.11). n = 3 at K = 1 is too cooperative: nothing is recruited from
+    low density and the pair sits in the empty state.
+
+    WHY A SECOND MODEL, measured (exp08 Findings 9, 16, 17): with the linear exchange a clone lacking
+    Vang makes its wild-type neighbour hold Vang on BOTH ends -- recruited distally by the clone's
+    Fz, proximally by its other neighbour's -- so the neighbour's Fz escapes sideways and the rows
+    beside the clone circulate round it instead of reversing (0 reversed rows against the paper's
+    2-3). In the SOM the clone's unopposed Fz floods that one junction and drains the neighbour's
+    Vang pool, which frees its proximal side and lets it flip; a cooperative recruitment makes the
+    stronger junction take the pool outright. The SOM's own reactions are cooperative in this sense:
+    the complexes grow by successive bindings across the junction (S2, S4, S6, S9 then S5, S8, S10),
+    so a junction that already holds a complex recruits the next partner faster.
+
+    Reference: Amonlirdviman, K. et al. (2005). Science 307:423-426, SOM reactions S1-S10.
+    """
+
+    PARAM_ROLES = dict(JunctionPCP.PARAM_ROLES, hill_n="cooperativity_of_the_exchange",
+                       hill_k="partner_density_at_half_saturation")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.hill_n = float(params.get("hill_n", 2.0))
+        self.hill_k = float(params.get("hill_k", 1.0))
+
+    def _hill(self):
+        return (self.hill_n, self.hill_k)

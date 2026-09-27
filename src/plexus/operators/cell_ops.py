@@ -838,7 +838,7 @@ ATLAS_FORMS = _SHAPES
 
 
 @register_operator("aggregate_centroid", family="hierarchy", set="compartment", kind="aggregate",
-                   equation=r"""$$\mathbf x_p=\frac{\sum_{c\in\pi^{-1}(p)} m_c\,\mathbf x_c}{\sum_{c\in\pi^{-1}(p)} m_c}$$""")
+                   equation=r"""$$\mathbf x_p=\frac{\sum_{c\in\pi^{-1}(p, title="Sum the children onto their parent")} m_c\,\mathbf x_c}{\sum_{c\in\pi^{-1}(p)} m_c}$$""")
 class AggregateCentroid(Aggregate):
     """A parent's position as the mass-weighted mean of its children's: sum_pi, and nothing else.
 

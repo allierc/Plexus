@@ -733,7 +733,7 @@ class MPMScatter(MPMWrites, Exchange):
             gc.index_add_(0, flat, lw)
 
 
-@register_operator("mpm_grid_update", family="mpm", set="field", kind="field", title="The grid solve",
+@register_operator("mpm_grid_update", family="mpm", set="field", kind="field", title="Grid solve",
                    equation=r"""$$\mathbf v_g = \frac{\mathbf p_g}{m_g},
 \qquad
 \mathbf v_g \mathrel{+}= \Delta t\,\mathbf f^{\,\text{CSF}}_g,
@@ -1359,7 +1359,7 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
 # first update before the second, exactly as the in-place version does.
 # ==========================================================================================================
 @register_operator("mpm_grid_update", implementation="nosync", family="mpm",
-                   set="field", kind="field", title="The grid solve")
+                   set="field", kind="field", title="Grid solve")
 class MPMGridUpdateNoSync(MPMGridUpdate):
     """The grid solve with a sync-free 2D wall boundary condition: the same physics, with the
     host synchronisation that the default 2D path incurs removed. Identical in 3D, where the
@@ -1558,7 +1558,7 @@ class MPMGather(MPMWrites, Exchange):
         return {}
 
 
-@register_operator("mpm_strain", family="mpm", set="particle", kind="lateral", title="The material update",
+@register_operator("mpm_strain", family="mpm", set="particle", kind="lateral", title="Material update",
                    equation=r"""$$\mathbf F \;\leftarrow\; (\mathbf I + \Delta t\,\mathbf C)\,\mathbf F
 \qquad\text{(liquid: } \mathbf F\leftarrow J^{1/d}\mathbf I,\ J=\det\mathbf F\text{)}$$""")
 class MPMStrain(MPMWrites, Lateral):
@@ -1875,7 +1875,7 @@ class MPMViscosity(Lateral):
 
 
 @register_operator("mpm_anchor", family="mechanics", set="particle", kind="lateral",
-                   equation=r"""$$\mathbf a_p=k\,(\mathbf x^{\mathrm{rest}}_p-\mathbf x_p)$$""")
+                   equation=r"""$$\mathbf a_p=k\,(\mathbf x^{\mathrm{rest}}_p-\mathbf x_p, title="Spring to a rest position")$$""")
 class MPMAnchor(Lateral):
     """A spring to a rest position: what holds a body that must not drift, without pinning it
     rigidly.
@@ -3097,7 +3097,7 @@ if HAVE_WARP:
 
 
 @register_operator("mpm_strain", implementation="warp", family="mpm",
-                   set="particle", kind="lateral", title="The material update")
+                   set="particle", kind="lateral", title="Material update")
 class MPMStrainWarp(MPMStrain):
     """The deformation-gradient update and material response as one Warp kernel, elastic and
     liquid branches both.
@@ -3373,7 +3373,7 @@ if HAVE_WARP:
 
 
 @register_operator("mpm_grid_update", implementation="warp", family="mpm",
-                   set="field", kind="field", title="The grid solve")
+                   set="field", kind="field", title="Grid solve")
 class MPMGridUpdateWarp(MPMGridUpdate):
     """The 3D grid solve -- mass normalisation, the continuum surface force, box walls, obstacles
     and buoyancy -- as two Warp kernels rather than several dozen whole-grid torch operations.
@@ -4736,7 +4736,7 @@ class MPMScatterDiff(MPMScatter):
 
 
 @register_operator("mpm_grid_update", implementation="differentiable", family="mpm", set="field",
-                   kind="field", title="The grid solve")
+                   kind="field", title="Grid solve")
 class MPMGridUpdateDiff(MPMGridUpdate):
     """The grid solve, with the wall written as a stack rather than into a view.
 
@@ -4762,7 +4762,7 @@ class MPMGridUpdateDiff(MPMGridUpdate):
 
 
 @register_operator("mpm_strain", implementation="differentiable", family="mpm", set="particle",
-                   kind="lateral", title="The material update")
+                   kind="lateral", title="Material update")
 class MPMStrainDiff(MPMStrain):
     """The material update with F rebound rather than written in place.
 

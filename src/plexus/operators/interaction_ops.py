@@ -625,6 +625,82 @@ class RadiusGraph(Rewire):
 # ==========================================================================================================
 #  implementations -- same biology, different numerics
 # ==========================================================================================================
+
+@register_operator("radius_graph", family="topology", set="particle", kind="rewire", model="periodic_tiles",
+                   title="Neighbours within a radius, on periodic lattice tiles",
+                   equation=r"""$$E=\{(s,s'):\ \mathrm{tile}(s)=\mathrm{tile}(s'),\ 0<\lVert (i,j)-(i',j')\rVert_{\mathrm{mod}\,L}\le r\}$$""")
+class RadiusGraphPeriodicTiles(Rewire):
+    """The same relation as `radius_graph` -- two entities interact when they are within `radius` --
+    computed on the SITES of square lattices that are periodic each on its own, the geometry the
+    individual-based lattice models are defined on.
+
+    particle -> particle: writes the set's `edge_index` (receiver, neighbour) and `tile_index`.
+
+        E = { (s, s') : tile(s) = tile(s'),  0 < |(i, j) - (i', j')|_(mod L) <= r }
+
+    r is `radius` in SITE SPACINGS: 1 gives the 4 nearest neighbours (von Neumann; Reichenbach et al.
+    2007), 1.5 the 8 surrounding sites (Moore; Kerr et al. 2002's "local" neighbourhood). The distance is
+    the minimum image on each L x L tile (`tile_side`), so no lattice has an edge, as neither paper's has.
+
+    WHY A MODEL OF `radius_graph` AND NOT A NEW OPERATOR (experiments/INSTRUCTION.md: "a periodic
+    lattice is a model of `radius_graph`"): the relation is still "within a radius"; what differs is
+    the space it is measured in -- each lattice its own torus. The default reads Euclidean distances
+    with ONE periodic box for the whole world, which cannot give several independent periodic lattices
+    in one set (the replicas that make an extinction probability one run's number). This reads the layout `seed_positions[tiled_lattice]`
+    writes -- slot r L^2 + i L + j is site (i, j) of lattice r -- and checks it against the positions,
+    raising if the set was placed otherwise. `tile_index` (the lattice of each slot) is written beside
+    `edge_index`: it is the relation "same lattice", which a WELL-MIXED ("global") neighbourhood reads.
+    The positions never move, so the relation is built once and kept.
+
+    Reference: Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046; Kerr, B. et al. (2002).
+    Nature 418:171, Box 1.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [2]
+    REQUIRES_PARAMS = ["radius", "tile_side"]
+    MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire", "lattice", "periodic"]
+    PARAM_ROLES = {"tile_side": "lattice_side_sites"}
+    REFERENCE = "Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046; Kerr, B. et al. (2002). Nature 418:171."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.r = float(params["radius"])
+        self.L = int(params["tile_side"])
+        self.at = params.get("_at", "particle")
+        self._ei = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if self._ei is None or self._ei.device != lvl.state.device:
+            n, L = lvl.state.shape[0], self.L
+            if n % (L * L):
+                raise ValueError(f"radius_graph[periodic_tiles]: {n} slots is not a whole number of "
+                                 f"{L} x {L} tiles")
+            dev = lvl.state.device
+            pos = lvl.get("pos")                             # THE LAYOUT, CHECKED: a row's sites are evenly spaced
+            if L > 2:
+                d = torch.linalg.norm(pos[1:L] - pos[:L - 1], dim=1)
+                if float((d - d.mean()).abs().max()) > 1e-4 * float(d.mean()) + 1e-9:
+                    raise ValueError("radius_graph[periodic_tiles]: the positions are not laid out as "
+                                     "seed_positions[tiled_lattice] lays them (slot r L^2 + i L + j)")
+            R = int(math.floor(self.r))
+            offs = [(di, dj) for di in range(-R, R + 1) for dj in range(-R, R + 1)
+                    if 0 < di * di + dj * dj <= self.r * self.r + 1e-9]
+            s = torch.arange(n, device=dev)
+            tile, loc = s // (L * L), s % (L * L)
+            i, j = loc // L, loc % L
+            recv, nbr = [], []
+            for di, dj in offs:
+                recv.append(s)
+                nbr.append(tile * L * L + ((i + di) % L) * L + (j + dj) % L)
+            self._ei = torch.stack([torch.cat(recv), torch.cat(nbr)])
+            self._tile = tile
+        lvl.edge_index = self._ei
+        lvl.tile_index = self._tile
+        return {}
+
+
 # `squared_law[implementation: warp]` -- the all-pairs inverse square without the [N, N] matrices.
 if HAVE_WARP:
 
@@ -934,3 +1010,156 @@ class SquaredLawMesh(SquaredLaw):
         if mask is not None:
             acc = acc * mask[:, None].float()
         return {self.at: acc}
+
+
+# ==========================================================================================================
+# `radius_graph[implementation: warp]` -- the same neighbour relation, found by a hash grid.
+#
+# WHY A SECOND IMPLEMENTATION AND NOT A FASTER LOOP. The default body is `edges_radius_blockwise`,
+# which never materialises the [N, N] distance matrix but still SCORES every pair: the work is
+# O(N^2) whatever the radius, so it is bounded by the population and not by how many neighbours a
+# cell actually has. Measured on a 2D boids disc: 8 ms a frame at 4,000 cells and 87.6 SECONDS a
+# frame at 500,000 -- a factor 11,000 for a factor 125 in the count, which is the quadratic, and it
+# puts a 2,000-frame run at two days. A hash grid visits only the cells within the cutoff, so the
+# work is O(N) times the neighbours per point, which is the number the physics already fixed.
+#
+# The biology is untouched: the relation this writes is the same set of pairs the default writes,
+# to the last edge, and the two are checked against each other in `tests/`. Selecting it is a
+# numerical decision, which is exactly what `implementation:` means (plexus2.tex sec. 5).
+if HAVE_WARP:
+
+    @wp.kernel
+    def _rg_scan(P: wp.array(dtype=wp.vec3), grid: wp.uint64, r_min: float, r_max: float,
+                 ORIG: wp.array(dtype=wp.int32), LIVE: wp.array(dtype=wp.int32),
+                 OFF: wp.array(dtype=wp.int32), COUNT_ONLY: int,
+                 CNT: wp.array(dtype=wp.int32),
+                 EI: wp.array(dtype=wp.int32), EJ: wp.array(dtype=wp.int32)):
+        """One kernel, run twice: once to COUNT each receiver's neighbours and once to WRITE them.
+
+        Counting first and writing at an exact offset is what makes the edge list exact rather than
+        capped. The alternative -- one pass into a preallocated buffer with a per-point maximum --
+        silently drops a neighbour the moment a cluster exceeds the cap, and a flocking run is made
+        of clusters, so the cap would be exceeded precisely where the physics is happening.
+        """
+        i = wp.tid()
+        if LIVE[i] == 0:
+            if COUNT_ONLY == 1:
+                CNT[i] = 0
+            return
+        pi = P[i]
+        c = int(0)
+        q = wp.hash_grid_query(grid, pi, r_max)
+        j = int(0)
+        while wp.hash_grid_query_next(q, j):
+            oj = ORIG[j]                      # a ghost answers for the real point it copies
+            if oj != i and LIVE[oj] != 0:
+                d = P[j] - pi
+                r = wp.length(d)
+                if r > r_min and r <= r_max:
+                    if COUNT_ONLY == 1:
+                        c = c + 1
+                    else:
+                        k = OFF[i] + c
+                        EI[k] = i
+                        EJ[k] = oj
+                        c = c + 1
+        if COUNT_ONLY == 1:
+            CNT[i] = c
+
+
+@register_operator("radius_graph", implementation="warp", family="interaction",
+                   set="particle", kind="rewire")
+class RadiusGraphWarp(RadiusGraph):
+    """Same relation, found with a Warp hash grid: O(N * neighbours) instead of O(N^2).
+
+    PERIODICITY IS HANDLED BY GHOSTS, because a hash grid does not wrap. Every point within the
+    cutoff of a face is copied across to the opposite side, once per non-zero offset of the 3^D
+    stencil, and the grid is built over the real points plus those copies. A ghost carries the
+    index of the point it copies, so an edge found against it is recorded against the original --
+    and the distance TO THE GHOST is already the minimum-image distance, so no wrapping arithmetic
+    is needed inside the kernel. The shell is thin: at the cutoff a 500,000-cell disc uses about
+    1% extra points, against the 3^D - 1 shifted passes a wrapping query would need.
+
+    2D RUNS EMBED IN 3D. `wp.HashGrid` is three-dimensional, so a planar set is given z = 0 and the
+    same kernel serves both; the cells of the grid are then slabs one deep and nothing is lost.
+    """
+
+    def forward(self, H, mask=None):
+        import numpy as _np
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev = pos.device
+        if not str(dev).startswith("cuda") or pos.shape[0] < 4096:
+            # SMALL SETS AND CPU RUNS STAY ON THE DEFAULT BODY. Building a grid costs more than
+            # scanning a few thousand points, and warp's grid is CUDA-only here; falling back keeps
+            # one operator rather than making a spec choose an implementation by population.
+            return super().forward(H, mask)
+        n = int(pos.shape[0])
+        D = int(pos.shape[-1])
+        box = getattr(H, "world_size", None)
+        L = (box.to(dev).float() if torch.is_tensor(box)
+             else torch.as_tensor([float(getattr(H, "world_width", 1.0))] * D, device=dev))
+        p3 = torch.zeros(n, 3, device=dev, dtype=torch.float32)
+        p3[:, :D] = pos[:, :D].float()
+        orig = torch.arange(n, device=dev, dtype=torch.int32)
+
+        if getattr(H, "periodic", False):
+            p3[:, :D] = torch.remainder(p3[:, :D], L[:D])
+            shifts, r = [], float(self.r_max)
+            rng = (-1, 0, 1)
+            for sx in rng:
+                for sy in rng:
+                    for sz in (rng if D == 3 else (0,)):
+                        if sx == 0 and sy == 0 and sz == 0:
+                            continue
+                        s = torch.zeros(3, device=dev)
+                        for a, sv in enumerate((sx, sy, sz)[:D]):
+                            s[a] = sv * float(L[a])
+                        q = p3 + s
+                        keep = torch.ones(n, dtype=torch.bool, device=dev)
+                        for a in range(D):
+                            keep &= (q[:, a] > -r) & (q[:, a] < float(L[a]) + r)
+                        if bool(keep.any()):
+                            shifts.append((q[keep], orig[keep]))
+            if shifts:
+                p3 = torch.cat([p3] + [q for q, _ in shifts])
+                orig = torch.cat([orig] + [o for _, o in shifts])
+
+        live = (lvl.occ > 0).to(torch.int32)
+        m = int(p3.shape[0])
+        cell = max(float(self.r_max), 1e-6)
+        dim = [max(1, min(256, int(float(L[a]) / cell) + 1)) for a in range(3)] if D == 3 else \
+              [max(1, min(256, int(float(L[a]) / cell) + 1)) for a in range(2)] + [1]
+        gr = getattr(self, "_grid", None)
+        if gr is None or getattr(self, "_grid_dim", None) != tuple(dim):
+            gr = self._grid = wp.HashGrid(dim[0], dim[1], dim[2], device=wp.device_from_torch(dev))
+            self._grid_dim = tuple(dim)
+        wp_pts = wp.from_torch(p3.contiguous(), dtype=wp.vec3)
+        gr.build(points=wp_pts, radius=float(self.r_max))
+
+        cnt = torch.zeros(n, device=dev, dtype=torch.int32)
+        args = [wp_pts, gr.id, float(self.r_min), float(self.r_max),
+                wp.from_torch(orig.contiguous()), wp.from_torch(live.contiguous())]
+        zero = torch.zeros(1, device=dev, dtype=torch.int32)
+        # THE LAUNCH DEVICE IS NAMED, NOT INFERRED. `wp.launch` without it uses warp's CURRENT
+        # device, which is cuda:0 whatever the tensors say -- so a run on cuda:1 compiled the module
+        # for one card and read arrays living on the other, and the first launch died with
+        # `cudaErrorIllegalAddress`. The failure is not local to the launch: warp then cannot free
+        # any of its buffers and the process prints the same error for the rest of its life.
+        _wdev = wp.device_from_torch(dev)
+        wp.launch(_rg_scan, dim=n, device=_wdev,
+                  inputs=args + [wp.from_torch(zero), 1, wp.from_torch(cnt),
+                                 wp.from_torch(zero), wp.from_torch(zero)])
+        off = torch.cat([torch.zeros(1, device=dev, dtype=torch.int32),
+                         torch.cumsum(cnt, 0, dtype=torch.int32)[:-1]])
+        E = int(cnt.sum().item())
+        if E == 0:
+            lvl.edge_index = torch.empty(2, 0, dtype=torch.long, device=dev)
+            return {}
+        ei = torch.empty(E, device=dev, dtype=torch.int32)
+        ej = torch.empty(E, device=dev, dtype=torch.int32)
+        wp.launch(_rg_scan, dim=n, device=_wdev,
+                  inputs=args + [wp.from_torch(off.contiguous()), 0, wp.from_torch(cnt),
+                                 wp.from_torch(ei), wp.from_torch(ej)])
+        lvl.edge_index = torch.stack([ei.long(), ej.long()])
+        return {}

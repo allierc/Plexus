@@ -21,7 +21,83 @@ from plexus.models.base import Seed
 from plexus.models.registry import register_operator
 
 
-@register_operator("seed_positions", family="seed", set="cell", kind="seed", title="The initial positions",
+# THE TITLE NAMES WHAT x_0 IS, NOT ONLY WHAT THIS CLASS WRITES. A reader of the `seed` block wants
+# to know what the run STARTS FROM, and a set's opening state is more than its coordinates: the
+# placement here, the initial velocity (`vel_init`, applied right after the seeds so it reads the
+# placed positions), the partition into types that `sets.<name>.types` declares, the heading and
+# the spawn group derived below. Naming only the positions left the pane saying "initial positions"
+# beside a picture whose whole content was three colours -- the types -- and a reader then has
+# nowhere to learn where those came from.
+#
+# The trailing "..." is doing work and is not filler: it says the list is open. Types are read by
+# the engine at build (`_assign_types`) rather than written by this operator, and other seed
+# operators establish other parts of x_0; the row is the SEED's claim, and the ellipsis keeps it
+# from reading as an exhaustive one this class could not honour.
+@register_operator("seed_type_by_axis", family="seed", set="cell", kind="seed")
+class SeedTypeByAxis(Seed):
+    """Re-assign `node_type` by a coordinate, AFTER the positions are seeded.
+
+    set -> set: reads `pos`, writes `node_type` and every buffer derived from it.
+
+        the fraction of elements with the lowest `axis` takes type 0, the next fraction type 1,
+        and so on in DECLARED order -- so `types: {big: 0.5, small: 0.5}` with `axis: 0` puts
+        the big ones on the left.
+
+    WHY THIS EXISTS WHEN `type_layout: split_x` ALREADY DOES IT. `split_x` sorts on the positions
+    present when types are assigned, which is BUILD pass 1. Anything placed in the `seed:` section
+    -- `seed_positions` with its sunflower disc, an atlas, a segmentation -- runs AFTERWARDS and
+    overwrites them, so the split is made against coordinates the run then throws away. Measured
+    on a 400-cell disc: both halves came out mixed, x mean 24.74 against 25.22 across a disc
+    spanning 10 to 40, and two types with visibly different force laws produced a spacing ratio of
+    1.003 because neither type was anywhere in particular.
+
+    A build-time layout cannot see a seed-time placement. So the split has to be a seed operator
+    too, ordered after the one that places the cells.
+
+    Reference: none -- an initial condition, not a mechanism. Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    MECHANISM_TAGS = ["initial_condition", "spatial_patterning", "type_assignment"]
+    PARAM_ROLES = {"axis": "coordinate_index_0_is_x", "fractions": "share_per_type_in_order"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.axis = int(params.get("axis", 0))
+        self.fractions = list(params.get("fractions") or [])
+
+    def forward(self, H, mask=None):
+        from plexus.engine import retype
+        lvl = H.level(self.at)
+        names = list(getattr(lvl, "type_names", []) or [])
+        if not names:
+            raise ValueError(f"seed_type_by_axis: {self.at!r} declares no `types:` to assign.")
+        fr = self.fractions or [t.get("fraction", 1.0 / len(names)) for t in lvl._type_table]
+        if len(fr) != len(names):
+            raise ValueError(f"seed_type_by_axis: {len(fr)} fractions for {len(names)} types.")
+        live = torch.nonzero(lvl.occ > 0, as_tuple=False).flatten()
+        order = live[torch.argsort(lvl.state[live, self.axis])]
+        nt = lvl.node_type.clone()
+        cuts = (torch.tensor(fr, dtype=torch.float64).cumsum(0) / sum(fr) * len(order)).long()
+        lo = 0
+        for tid, hi in enumerate(cuts.tolist()):
+            nt[order[lo:hi]] = tid
+            lo = hi
+        nt[order[lo:]] = len(names) - 1                  # any remainder to the last type
+        retype(lvl, nt)
+        from plexus import engine as _eng
+        if not _eng._QUIET:
+            xs = lvl.state[:, self.axis]
+            per = "  ".join(f"{n}: {int((nt == i).sum())} at {float(xs[nt == i].mean()):.2f}"
+                            for i, n in enumerate(names))
+            print(f"[seed_type_by_axis] {lvl.name} by axis {self.axis} -- {per}", flush=True)
+        return {}
+
+
+@register_operator("seed_positions", family="seed", set="cell", kind="seed",
+                   title="Initial positions, velocities, types, ...",
                    equation=r"""$$\mathbf x_i=\mathrm{placement}(\text{mode},\,r,\,i)$$""")
 class SeedPositions(Seed):
     """Write every position of a set, once, at the opening of the trajectory -- and with it the
@@ -118,6 +194,154 @@ class SeedPositions(Seed):
             else:
                 lvl.register_buffer("spawn_group", gbuf)
             lvl.spawn_group_rot = rot
+        return {}
+
+
+@register_operator("seed_positions", family="seed", set="cell", kind="seed", model="tiled_lattice",
+                   title="Sites of square lattices, tiled",
+                   equation=r"""$$\mathbf x_{r,i,j}=h\,\big(b_x(r)(L+g)+i+\tfrac12,\;b_y(r)(L+g)+j+\tfrac12\big)+\mathbf o$$""")
+class SeedPositionsTiledLattice(Seed):
+    """The SITES of `tiles` independent square lattices of `side` x `side`, laid side by side.
+
+    set -> set: writes `pos` for every slot of the buffer.
+
+        x_{r,i,j} = h ( b_x(r) (L + g) + i + 1/2 ,  b_y(r) (L + g) + j + 1/2 ) + o
+
+    L is `side` (sites per lattice side), g is `gap` (empty sites between two lattices, drawing only),
+    h is `spacing` (world units per site), r the lattice (replica) index, (b_x, b_y) its block on a
+    ceil(sqrt(tiles))-wide grid, and o centres the tiling in the world box. SLOT r L^2 + i L + j is
+    site (i, j) of lattice r -- the layout `radius_graph[periodic_tiles]` builds its relation from and
+    `tools/exp_measures/exp15.py` counts replicas by.
+
+    WHY A MODEL OF `seed_positions` (a different placement, not a different numerics) and why
+    REPLICAS: an individual-based lattice model's headline number is a probability over realisations
+    (Reichenbach et al. 2007's P_ext, Fig. 2b, over 500-2000 runs). Several independent lattices in one
+    set give that probability from one run, and drawn side by side they show the spread directly.
+
+    Reference: Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046 (square lattice,
+    periodic); Kerr, B. et al. (2002). Nature 418:171, Box 1.
+    """
+
+    SUPPORTED_DIMS = [2]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = []; WRITES = ["pos"]
+    REQUIRES_PARAMS = ["side"]
+    MECHANISM_TAGS = ["initial_condition", "lattice", "replicas"]
+    PARAM_ROLES = {"side": "lattice_side_sites", "tiles": "replica_count", "gap": "gap_sites", "spacing": "site_spacing"}
+    REFERENCE = "Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046; Kerr, B. et al. (2002). Nature 418:171."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.side = int(params["side"])
+        self.tiles = int(params.get("tiles", 1))
+        self.gap = int(params.get("gap", 2))
+        self.h = float(params.get("spacing", 1.0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if "pos" not in lvl.state_schema:
+            raise ValueError(f"seed_positions[tiled_lattice]: set {self.at!r} has no `pos` block")
+        p0, p1 = lvl.state_schema["pos"]
+        L, K, n = self.side, self.tiles, lvl.state.shape[0]
+        if n != K * L * L:
+            raise ValueError(f"seed_positions[tiled_lattice]: the set holds {n} slots but {K} lattice(s) of "
+                             f"{L} x {L} need {K * L * L} -- set `n: {K * L * L}`")
+        dev = lvl.state.device
+        kx = int(math.ceil(math.sqrt(K)))
+        s = torch.arange(n, device=dev)
+        r, loc = s // (L * L), s % (L * L)
+        i, j = loc // L, loc % L
+        bx, by = r % kx, r // kx
+        pitch = L + self.gap
+        x = (bx * pitch + i).double() + 0.5
+        y = (by * pitch + j).double() + 0.5
+        ky = int(math.ceil(K / kx))
+        span = torch.tensor([kx * pitch - self.gap, ky * pitch - self.gap], dtype=torch.float64, device=dev) * self.h
+        box = torch.as_tensor(H.world_size, dtype=torch.float64, device=dev)[:2]
+        o = 0.5 * (box - span)
+        pos = torch.stack([x * self.h, y * self.h], 1) + o
+        st = lvl.state.clone()
+        st[:, p0:p1] = pos.to(st.dtype)
+        lvl.state = st
+        return {}
+
+
+# ============================================================================================
+#  a colony on a lattice of SITES (exp 15, rig 1; moved from colony_ops.py 2026-09-27, unchanged)
+# ============================================================================================
+# The set's buffer holds every SITE of the domain, placed once by `seed_positions`; a site is
+# occupied when its slot is live (`occ = 1`) and empty when it is dormant, and the strain is two
+# one-hot columns of `chem` at `chan`. A division wakes one specific empty slot beside the mother, so
+# nothing moves and the colony's history is written into WHERE each strain sits. `Level.spawn` is not
+# used: it wakes the FIRST free slots and copies the mother's position into them, right for an
+# off-lattice body and wrong for a site. Momeni et al. 2013 (eLife 2:e00230): two cooperating strains
+# intermix, competitors segregate -- their individual-based fitness model, every constant as printed.
+
+
+def _strain_span(lvl, chan, who):
+    if "chem" not in lvl.state_schema:
+        raise ValueError(f"{who}: the set has no `chem` block; declare `chem: {{width: 2}}` for the two strains")
+    h0, h1 = lvl.state_schema["chem"]
+    if h0 + chan + 2 > h1:
+        raise ValueError(f"{who}: chem is {h1 - h0} wide; the two strain columns at chan={chan} do not fit")
+    return h0 + chan
+
+
+@register_operator("seed_colony", set="cell", kind="seed", family="seed", title="Colony inoculum",
+                   equation=r"""$$\mathrm{occ}_i=\mathbb 1[\,|\mathbf x_i-\mathbf c|<R_0\,]\,\mathbb 1[\xi_i<f],\qquad s_i\sim\mathrm{Bernoulli}(1-q)$$""")
+class SeedColony(Seed):
+    """The inoculum of a colony on a lattice of sites. Every site already has its position (run
+    `seed_positions` first); this leaves occupied only the sites within `radius` of the lattice's
+    centre, each with probability `fill`, and gives each occupied site strain 0 with probability
+    `ratio` and strain 1 otherwise. Every other site becomes empty (a dormant slot).
+
+        occ_i = 1[|x_i - c| < R_0] 1[xi_i < f],     strain_i = 0 w.p. q, else 1
+
+    R_0 is `radius` (world units), c the centroid of all sites, f is `fill` (fraction of the
+    inoculum's sites occupied), q is `ratio` (fraction of strain 0), xi_i uniform in [0, 1).
+    Momeni et al. 2013 inoculated "randomly distributed" cells at R:G = 1:1 on the surface their
+    communities grew from; the disc is that surface's two-dimensional analogue.
+
+    Reference: Momeni, B., Brileya, K. A., Fields, M. W. & Shou, W. (2013). eLife 2:e00230.
+
+    A NEW OPERATOR, NOT A VARIANT -- checked against the registry (2026-09-27): it writes OCCUPANCY
+    (which sites are empty) as well as `chem`. `seed_cell_chem` writes only `chem`, and
+    `seed_positions` only `pos` (placing exactly the live slots), so neither contract covers it.
+    Moved here from `colony_ops.py`, unchanged, on 2026-09-27 (experiments/INSTRUCTION.md: no new
+    `*_ops.py` file).
+    """
+
+    SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["chem", "occ"]
+    REQUIRES_PARAMS = ["radius"]
+    MECHANISM_TAGS = ["initial_condition", "colony", "inoculum"]
+    PARAM_ROLES = {"radius": "inoculum_radius", "fill": "inoculum_occupancy", "ratio": "strain_0_fraction",
+                   "seed": "rng_seed"}
+    REFERENCE = "Momeni, B. et al. (2013). eLife 2:e00230."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.radius = float(params["radius"])
+        self.fill = float(params.get("fill", 1.0))
+        self.ratio = float(params.get("ratio", 0.5))
+        self.seed = int(params.get("seed", 0))
+        self.chan = int(params.get("chan", 0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        base = _strain_span(lvl, self.chan, "seed_colony")
+        x = lvl.get("pos")
+        c = x.mean(0, keepdim=True)
+        g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
+        n = x.shape[0]
+        occ = (torch.linalg.norm(x - c, dim=1).cpu() < self.radius) & (torch.rand(n, generator=g) < self.fill)
+        s1 = torch.rand(n, generator=g) >= self.ratio                      # strain 1 where True
+        st = lvl.state.clone()
+        st[:, base] = (occ & ~s1).to(st.dtype).to(st.device)
+        st[:, base + 1] = (occ & s1).to(st.dtype).to(st.device)
+        lvl.state = st
+        lvl.occ[:] = occ.to(lvl.occ.dtype).to(lvl.occ.device)
         return {}
 
 

@@ -963,7 +963,7 @@ class MorphologySeed(Seed):
 
 
 @register_operator("paint_children", family="observation", set="points", kind="aggregate",
-                   equation=r"""$$\text{paint}_i=x_{\pi(i)}$$""")
+                   equation=r"""$$\text{paint}_i=x_{\pi(i, title="Sum the children onto their parent")}$$""")
 class PaintChildren(Exchange):
     """Copy a parent's scalar onto every point that draws it, each frame.
 
