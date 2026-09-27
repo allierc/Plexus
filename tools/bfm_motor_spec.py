@@ -434,7 +434,7 @@ def main():
              "flux": "j_motor", **({"shunt": SHUNT_X * leak_sim, "shunt_from": SHUNT_FROM} if SHUNT_X > 0 else {})},
             {"op": "broadcast", "at": "stator_unit", "block": "psi", "source": "psi"},
         ] if ions else []) + [
-            {"op": "stator_contact", "at": PUSHED + "_pt", "stator": "stator_unit", "kappa": stepper["kappa"],
+            {"op": "stator_push", "model": "contact", "at": PUSHED + "_pt", "stator": "stator_unit", "kappa": stepper["kappa"],
              "reach": round(nm(REACH_NM), 6), "axis": [0.0, 0.0, 1.0], "sign": 1.0,
              **({"anchor": "MotB_pt", "anchor_reach": round(nm(8.0), 6)} if scaffold_material else {}),
              # THE LOAD'S ROTATIONAL DRAG, zeta = k_d I, in sim torque x time per radian: the

@@ -247,7 +247,8 @@ operators:
   shunt: 23512549.272298165
   shunt_from: 500
 - {op: broadcast, at: stator_unit, block: psi, source: psi}
-- op: stator_contact
+- op: stator_push
+  model: contact
   at: c_flig_pt
   stator: stator_unit
   kappa: 0.01456522628597254
@@ -283,7 +284,7 @@ operators:
 schedule:
 - membrane_potential
 - broadcast
-- stator_contact
+- stator_push
 - stator_step
 - aggregate
 - mpm_anchor

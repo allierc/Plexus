@@ -234,7 +234,8 @@ seed:
   origin: *id001
   scale: 7142857.142857143
 operators:
-- op: stator_contact
+- op: stator_push
+  model: contact
   at: c_flig_pt
   stator: stator_unit
   kappa: 0.01456522628597254
@@ -267,7 +268,7 @@ operators:
 - {op: mpm_gather, at: lp_ring_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
 - {op: mpm_gather, at: hook_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
 schedule:
-- stator_contact
+- stator_push
 - stator_step
 - mpm_anchor
 - substep_dt: 5.0e-05
