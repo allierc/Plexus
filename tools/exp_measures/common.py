@@ -157,7 +157,7 @@ def neighbour_pairs(T, t, c: Cells | None = None, cut: float = 2.0) -> np.ndarra
 # that minute (tools/exp_gate_score.py, `measure_all`). Add a line when a ruler's answer changes for the
 # same run; a pure speed-up or a new output key needs none.
 CHANGED = {
-    "shared.growth_audit": "2026-09-27 14:30",   # vertex-jump and finiteness tests on every frame, not every 20th
+    "shared.growth_audit": "2026-09-27 14:55",   # jump on every row, per simulated frame, over slots whose neighbours kept
 }
 
 

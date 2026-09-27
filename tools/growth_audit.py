@@ -123,22 +123,52 @@ def _rough(P):
     return float(r.std() / max(r.mean(), 1e-12))
 
 
-def _jump(z, t):
-    """Largest vertex displacement from t-1 to t, in median edge lengths (common vertex prefix)."""
+def _signature(z, t, nv):
+    """Per vertex slot (first nv): (degree, sum and sum of squares of neighbour ids + 1) at row t, from
+    the row's edges in both directions. Two rows' signatures differ where a slot's neighbourhood changed."""
+    off = z["vertex__mesh_offsets"]
+    s = np.asarray(z["vertex__mesh_E_srce"][off[t]:off[t + 1]]).astype(np.int64)
+    e = np.asarray(z["vertex__mesh_E_trgt"][off[t]:off[t + 1]]).astype(np.int64)
+    ok = (s >= 0) & (e >= 0) & (s < nv) & (e < nv)
+    a, b = np.concatenate([s[ok], e[ok]]), np.concatenate([e[ok], s[ok]]).astype(float) + 1.0
+    return np.stack([np.bincount(a, minlength=nv), np.bincount(a, weights=b, minlength=nv),
+                     np.bincount(a, weights=b * b, minlength=nv)], 1)[:nv]
+
+
+def _jump(z, t, stride=1):
+    """Largest vertex displacement from row t-1 to row t, in median edge lengths PER SIMULATED FRAME
+    (divided by `stride`, the simulated frames per recorded row), over the vertex slots whose
+    neighbourhood is the same in both rows.
+
+    Both qualifications added 2026-09-27 after exp12's report, once the test ran on every row: a disc
+    recorded every 6th frame moves a rim vertex ~1 edge per ROW by ordinary growth (four clean discs read
+    WRECKED at 1.10-1.44), and a slot re-used after a division or touched by a T1 "jumps" with no vertex
+    moving. A vertex that flies off with its neighbours unchanged -- the explosion this test is for --
+    still reads in full."""
     if t < 1:
         return 0.0
     nv = min(int(z["vertex__mesh_Nv"][t - 1]), int(z["vertex__mesh_Nv"][t]))
     a = np.asarray(z["vertex__pos"][t - 1], float)[:nv]
     b = np.asarray(z["vertex__pos"][t], float)[:nv]
     d = np.linalg.norm(b - a, axis=1)
+    if "vertex__mesh_offsets" in z and d.size:
+        same = (_signature(z, t - 1, nv) == _signature(z, t, nv)).all(1)
+        d = d[same]
     off = z["vertex__mesh_offsets"]
     s = np.asarray(z["vertex__mesh_E_srce"][off[t]:off[t + 1]])
     e = np.asarray(z["vertex__mesh_E_trgt"][off[t]:off[t + 1]])
     L = np.linalg.norm(b[np.clip(e, 0, nv - 1)] - b[np.clip(s, 0, nv - 1)], axis=1) if len(s) else [1.0]
-    return float(np.nanmax(d) / max(np.nanmedian(L), 1e-9)) if d.size else 0.0
+    return float(np.nanmax(d) / max(np.nanmedian(L), 1e-9) / max(stride, 1)) if d.size else 0.0
 
 
-def _every_frame(z, t0, T):
+def _stride(z):
+    """Simulated frames per recorded row: 1 when every frame is recorded or the run has no frame clock."""
+    R = int(len(z["vertex__mesh_nF"]))
+    F = int(np.asarray(z["frame_ms"]).size) if "frame_ms" in z.files else R
+    return max(1, int(round((F - 1) / max(R - 1, 1))))
+
+
+def _every_frame(z, t0, T, stride=1):
     """THE JUMP AND FINITENESS TESTS ON EVERY FRAME, not every `every`-th (added 2026-09-27). Sampled
     at every 20th frame, a vertex that jumped 4 edge lengths between two samples was never seen, so a
     clean audit did not mean a clean run: exp07's arms read 1.7 against 4.0 by sampling luck (its
@@ -150,7 +180,7 @@ def _every_frame(z, t0, T):
         P = np.asarray(z["vertex__pos"][t], float)[:int(z["vertex__mesh_Nv"][t])]
         if not np.isfinite(P).all():
             return (t if bad is None else bad), (why or "non-finite positions"), jmax, jat, n_over
-        j = _jump(z, t)
+        j = _jump(z, t, stride)
         if j > jmax:
             jmax, jat = j, t
         if j > X_JUMP:
@@ -189,6 +219,7 @@ def audit(spec, every=20, window=60, jump_every=1):
     d, z, settle = _load(spec)
     T = int(len(z["vertex__mesh_nF"]))
     kind = _kind(z)
+    stride = _stride(z)
     t0 = min(max(settle, 1), T - 1)
     ts = sorted(set(list(range(t0, T, every)) + [T - 1]))
     series, wrecked, why = [], None, ""
@@ -198,7 +229,7 @@ def audit(spec, every=20, window=60, jump_every=1):
         row = dict(t=t, cells=int(live.sum()), total=float(v[live].sum()),
                    median=float(np.median(v[live])) if live.any() else np.nan,
                    cv=float(v[live].std() / v[live].mean()) if live.any() else np.nan,
-                   jump=_jump(z, t), finite=bool(np.isfinite(P).all()))
+                   jump=_jump(z, t, stride), finite=bool(np.isfinite(P).all()))
         if kind != "sheet":
             row.update({k: float(val) for k, val in frame_metrics(z, t).items() if k != "cells"})
             row["rough"] = _rough(P[np.isfinite(P).all(1)])
@@ -218,7 +249,7 @@ def audit(spec, every=20, window=60, jump_every=1):
     jump_max, jump_at = max(((r["jump"], r["t"]) for r in series), default=(0.0, None))
     n_over = sum(r["jump"] > X_JUMP for r in series)
     if jump_every == 1:
-        ev, ev_why, jump_max, jump_at, n_over = _every_frame(z, t0, T)
+        ev, ev_why, jump_max, jump_at, n_over = _every_frame(z, t0, T, stride)
         if ev is not None and (wrecked is None or ev < wrecked):
             wrecked, why = ev, ev_why
     first, last = series[0], series[-1]
@@ -261,7 +292,7 @@ def audit(spec, every=20, window=60, jump_every=1):
     return dict(spec=spec, kind=kind, frames=T, settle=t0, score=round(float(score), 2), band=band,
                 reason=reason, wrecked_at=wrecked, growth=round(float(growth), 3),
                 cells=[first["cells"], last["cells"]],
-                jump_max=round(float(jump_max), 3), jump_at=jump_at, jumps_over=int(n_over), jump_every=jump_every, jitter_p90=round(float(jit), 5),
+                jump_max=round(float(jump_max), 3), jump_at=jump_at, jumps_over=int(n_over), jump_every=jump_every, stride=stride, jitter_p90=round(float(jit), 5),
                 jitter_mid=[round(x, 5) if isinstance(x, float) else x for x in jit_mid],
                 jitter_end=[round(x, 5) if isinstance(x, float) else x for x in jit_end],
                 uniformity={k: (round(float(v), 4) if v is not None else None) for k, v in u.items()},

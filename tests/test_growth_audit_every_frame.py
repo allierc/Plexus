@@ -50,3 +50,20 @@ def test_non_finite_is_caught_on_its_frame():
 def test_frames_before_the_settle_window_are_not_read():
     bad, *_ = GA._every_frame(_lattice(jump_at=5), 10, 60)
     assert bad is None
+
+
+def test_a_strided_record_divides_the_jump_by_its_stride():
+    z = _lattice(jump_at=13)                      # 3 edge lengths between two rows 6 frames apart
+    bad, why, jmax, jat, n = GA._every_frame(z, 1, 60, stride=6)
+    assert bad is None and abs(jmax - 0.5) < 1e-9
+
+
+def test_a_slot_whose_neighbours_changed_is_not_a_jump():
+    z = _lattice(jump_at=13)
+    E = np.stack([z["vertex__mesh_E_srce"], z["vertex__mesh_E_trgt"]], 1).copy()
+    ne = len(E) // 60
+    rows = E.reshape(60, ne, 2)
+    rows[13:, 0, 1] = 7                           # from row 13 on, vertex 7 has a new neighbour (a slot re-used)
+    z["vertex__mesh_E_srce"], z["vertex__mesh_E_trgt"] = rows[..., 0].ravel(), rows[..., 1].ravel()
+    bad, why, jmax, jat, n = GA._every_frame(z, 1, 60)
+    assert jat != 13 or jmax < GA.X_JUMP          # the move into row 13 is a topology change, not read
