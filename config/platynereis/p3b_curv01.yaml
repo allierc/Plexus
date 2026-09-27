@@ -1,0 +1,100 @@
+fields: {}
+general:
+  boundary: free
+  dim: 3
+  dt: 1.0e-05
+  n_frames: 30000
+  name: p3b_curv01
+  record_cap: 301
+  save_data: null
+  seed: 0
+  units:
+    length_um: 50.0
+    time_s: 1.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: rod_node
+  emit: velocity
+  k_bend: 4150.0
+  k_stretch: 30000.0
+  op: rod_elastic
+  zeta_bend: 0.0
+  zeta_stretch: 0.0
+- anchor: fixed
+  at: rod_node
+  clamp: 64.4
+  clamp_zeta: 0.0
+  emit: velocity
+  moment: 0.0
+  omega: 6.283185
+  omega_n: 100.0
+  op: rod_base
+  waveform: sine
+  zeta: 0.0
+- amplitude: 10.0
+  at: rod_node
+  control: curvature
+  emit: velocity
+  gain: 10.0
+  k_motor: 4150.0
+  op: rod_motor
+plotting:
+  background: black
+  box_frame: true
+  chain:
+    color: '#ffffff'
+    per: 8
+    set: rod_node
+    width: 7
+  dot_shading: true
+  dot_size: 5.0
+  fps: 20.0
+  keep_stills: true
+  max_frames: 300
+  renderer: vtk_points
+  slow_motion: 26.67
+  stills: 6
+  subject: rod_node
+  up_axis: 2
+schedule:
+- rod_elastic
+- rod_base
+- rod_motor
+seed:
+- at: rod_node
+  base:
+  - 0.0
+  - 0.0
+  - -0.2
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  length: 0.4
+  n_rod: 1
+  op: rod_seed
+sets:
+  rod_node:
+    n: 8
+    start:
+    - - 0.0
+      - 0.0
+      - -0.2
+    state:
+      pos:
+        boundary: free
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        boundary: free
+        integration: second_order_rate
+        role: rate
+        width: 3

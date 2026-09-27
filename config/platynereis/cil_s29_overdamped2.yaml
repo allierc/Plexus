@@ -1,0 +1,100 @@
+general:
+  name: cil_s29_overdamped2
+  seed: 0
+  n_frames: 30000
+  dt: 1.0e-05
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  boundary: free
+  save_data: true
+  units:
+    length_um: 50.0
+    time_s: 1.0
+  record_cap: 301
+sets:
+  rod_node:
+    n: 8
+    start:
+    - - 0.0
+      - 0.0
+      - -0.2
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        boundary: free
+seed:
+- op: rod_seed
+  at: rod_node
+  length: 0.4
+  base:
+  - 0.0
+  - 0.0
+  - -0.2
+  direction:
+  - 0.0
+  - 0.0
+  - 1.0
+  beat_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  n_rod: 1
+operators:
+- op: rod_elastic
+  at: rod_node
+  k_stretch: 30000.0
+  k_bend: 4150.0
+  zeta_stretch: 0.0
+  zeta_bend: 0.0
+  emit: velocity
+- op: rod_base
+  at: rod_node
+  moment: 0.0
+  omega: 6.283185
+  waveform: sine
+  omega_n: 100.0
+  zeta: 0.0
+  clamp: 64.4
+  clamp_zeta: 0.0
+  anchor: fixed
+  emit: velocity
+- op: rod_motor
+  at: rod_node
+  amplitude: 10.0
+  omega: 62.83185
+  wavelength: 0.4
+  k_motor: 4150.0
+  emit: velocity
+fields: {}
+schedule:
+- rod_elastic
+- rod_base
+- rod_motor
+plotting:
+  renderer: vtk_points
+  background: black
+  box_frame: true
+  up_axis: 2
+  subject: rod_node
+  dot_size: 5.0
+  dot_shading: true
+  max_frames: 300
+  stills: 6
+  keep_stills: true
+  fps: 20.0
+  chain:
+    set: rod_node
+    per: 8
+    width: 7
+    color: '#ffffff'
+  slow_motion: 26.67

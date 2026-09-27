@@ -496,7 +496,7 @@ def main():
             for b in bands(xyz, ch, en, de, c, ax):
                 print(f"  {b['entity']:8s} {b['name'][:40]:40s} {b['copies']:6d} {b['r_mean']:6.1f} {b['r_in']:6.1f} {b['r_out']:6.1f} {b['z0']:7.1f} {b['z1']:7.1f}")
                 if a.parts:
-                    key = (b["name"].replace(" ", "_")[:24] or f"entity_{b['entity']}")
+                    key = short_name(b["name"], b["entity"]).lower()    # the library lowercases part names
                     parts[key] = isosurface_from_points(frame(xyz[en == b["entity"]], c, ax) * 0.1)
             if a.stator_entity:
                 st = stator_positions(xyz, ch, en, c, ax, a.stator_entity)

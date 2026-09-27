@@ -1,0 +1,197 @@
+general:
+  name: bfm_a02_rotor_stator
+  seed: 0
+  n_frames: 1500
+  dt: 0.002
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: true
+  record_cap: 301
+  units: {length_um: 0.14, time_s: 0.005, force_nN: 0.5047076668008149}
+sets:
+  c_posts:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.2]
+    types:
+      c_posts:
+        count: 1
+        material: elastic
+        youngs: 2000.0
+        density: 1.0
+        shape: cylinder
+        axis: z
+        aspect: 2.7815263595531303
+        hollow: 0.0
+        ring: {n: 34, radius: 0.133929, axis: z}
+  c_posts_pt:
+    parent: c_posts
+    entity: mpm_particle
+    per_parent: 86437
+    radius: 0.160714
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  c_flig:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.271429]
+    types:
+      c_flig: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 0.08888888888888889,
+        hollow: 0.5777777777777777}
+  c_flig_pt:
+    parent: c_flig
+    entity: mpm_particle
+    per_parent: 25912
+    radius: 0.160714
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  ms_ring:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.328571]
+    types:
+      ms_ring: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 0.42857142857142855,
+        hollow: 0.39285714285714285}
+  ms_ring_pt:
+    parent: ms_ring
+    entity: mpm_particle
+    per_parent: 38205
+    radius: 0.1
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  rod:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.471429]
+    types:
+      rod: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 4.0,
+        hollow: 0.0}
+  rod_pt:
+    parent: rod
+    entity: mpm_particle
+    per_parent: 25566
+    radius: 0.039286
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  lp_ring:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.535714]
+    types:
+      lp_ring: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 0.5384615384615384,
+        hollow: 0.7692307692307693}
+  lp_ring_pt:
+    parent: lp_ring
+    entity: mpm_particle
+    per_parent: 18555
+    radius: 0.092857
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  hook:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.757143]
+    types:
+      hook: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 2.2222222222222223,
+        hollow: 0.0}
+  hook_pt:
+    parent: hook
+    entity: mpm_particle
+    per_parent: 62234
+    radius: 0.064286
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  stator_unit:
+    n: 11
+    start:
+    - [0.696429, 0.5, 0.271429]
+    - [0.665246, 0.606197, 0.271429]
+    - [0.581599, 0.678678, 0.271429]
+    - [0.472045, 0.694429, 0.271429]
+    - [0.371367, 0.648451, 0.271429]
+    - [0.311528, 0.55534, 0.271429]
+    - [0.311528, 0.44466, 0.271429]
+    - [0.371367, 0.351549, 0.271429]
+    - [0.472045, 0.305571, 0.271429]
+    - [0.581599, 0.321322, 0.271429]
+    - [0.665246, 0.393803, 0.271429]
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+operators:
+- op: stator_push
+  at: c_flig_pt
+  stator: stator_unit
+  force: 0.014463818325313805
+  reach: 0.064286
+  axis: [0.0, 0.0, 1.0]
+  sign: 1.0
+- {op: mpm_anchor, at: lp_ring_pt, k: 4000.0, applies_to: substrate}
+- {op: mpm_strain, at: c_posts_pt, implementation: warp}
+- {op: mpm_strain, at: c_flig_pt, implementation: warp}
+- {op: mpm_strain, at: ms_ring_pt, implementation: warp}
+- {op: mpm_strain, at: rod_pt, implementation: warp}
+- {op: mpm_strain, at: lp_ring_pt, implementation: warp}
+- {op: mpm_strain, at: hook_pt, implementation: warp}
+- {op: mpm_scatter, at: c_posts_pt, to: mpm_grid, drag: 50.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: c_flig_pt, to: mpm_grid, drag: 50.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: ms_ring_pt, to: mpm_grid, drag: 50.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: rod_pt, to: mpm_grid, drag: 50.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: lp_ring_pt, to: mpm_grid, drag: 50.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: hook_pt, to: mpm_grid, drag: 50.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: c_posts_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: c_flig_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: ms_ring_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: rod_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: lp_ring_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: hook_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+schedule:
+- stator_push
+- mpm_anchor
+- substep_dt: 5.0e-05
+  steps: [mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_scatter, mpm_scatter,
+    mpm_scatter, mpm_scatter, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather, mpm_gather,
+    mpm_gather, mpm_gather, mpm_gather]
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  hide_sets: [c_posts, c_flig, ms_ring, rod, lp_ring, hook, stator_unit]
+  render_3d: dots
+  dot_size: 2.2
+  dot_shading: body
+  color_field: copy
+  field_cmap: tab10
+  color_range: [0, 9]
+  spheres: {set: stator_unit, radius: 0.032143, color: '#e8b04a'}
+  subject: c_posts_pt
+  fps: 20.0
+  keep_stills: true
+  stills: 8
+  max_frames: 300

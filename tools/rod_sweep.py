@@ -49,13 +49,16 @@ KNOBS = {
     "bdamp":   ("op", "rod_elastic", "zeta_bend"),
     "stretch": ("op", "rod_elastic", "k_stretch"),
     "sdamp":   ("op", "rod_elastic", "zeta_stretch"),
-    "moment":  ("op", "rod_base", "moment"),
-    "omega":   ("op", "rod_base", "omega"),
-    "duty":    ("op", "rod_base", "duty"),
     "drag":    ("op", "drag", "k"),
     "ratio":   ("op", "drag", "ratio"),
     "pin":     ("op", "rod_base", "omega_n"),
     "clamp":   ("op", "rod_base", "clamp"),
+    # the DISTRIBUTED drive (rod_motor) -- `amp` is a curvature in inverse world units,
+    # `kmotor` the stiffness holding the filament to it, `lam` the wavelength in world units.
+    "amp":     ("op", "rod_motor", "amplitude"),
+    "kmotor":  ("op", "rod_motor", "k_motor"),
+    "womega":  ("op", "rod_motor", "omega"),
+    "lam":     ("op", "rod_motor", "wavelength"),
     "length":  ("seed", "rod_seed", "length"),
     "nodes":   ("set", "rod_node", "n"),
 }
@@ -180,9 +183,21 @@ def main():
                     (d["general"].get("units") or {}).get("length_um", 1.0))
             rows.append((combo, ab, at, mean_t, at / max(ab, 1e-12), flow,
                          100 * float(L[-1]) / float(rs["length"])))
-        except Exception as e:                                       # noqa: BLE001
-            print(f"  {tag} FAILED {type(e).__name__}: {str(e)[:120]}")
-            print(f"    {(r.stderr or r.stdout)[-300:]}")
+        # `SystemExit` IS NOT AN `Exception`, AND THAT COST A WHOLE SWEEP. `rod_probe.load` raises
+        # SystemExit when a run wrote no trajectory -- which is the normal case for a spec with
+        # `save_data: null`, since a 300-frame movie of 155,000 water particles is 1.8 GB of npz
+        # nobody asked for. SystemExit derives from BaseException, so it walked straight through
+        # the handler below and killed the sweep at its FIRST variant: measured, a nine-run
+        # amplitude/frequency grid produced one movie and then exited silently with "no trajectory
+        # for rs_amp10_womega31p4159" as its only output. The movies are the point of a sweep like
+        # that; the score table is a bonus, and a missing bonus must not take the sweep with it.
+        except (Exception, SystemExit) as e:                         # noqa: BLE001
+            print(f"  {tag} NOT SCORED ({type(e).__name__}: {str(e)[:100]}) -- "
+                  f"the run itself is in the builder; only its row is missing")
+            if getattr(r, "stderr", None) or getattr(r, "stdout", None):
+                tail = (r.stderr or r.stdout)[-300:]
+                if tail.strip():
+                    print(f"    {tail}")
 
     hdr = "  " + " ".join(f"{k:>9s}" for k, _ in axes)
     print(f"\n{hdr} {'base deg':>9s} {'tip deg':>9s} {'tip mean':>9s} "

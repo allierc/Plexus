@@ -1,0 +1,336 @@
+general:
+  name: bfm_d02_cj_emerge_drag200
+  seed: 0
+  n_frames: 600
+  dt: 0.002
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: true
+  record_cap: 301
+  units: {length_um: 0.14, time_s: 0.005, force_nN: 0.4035761135809463}
+sets:
+  c_posts_a:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.2]
+    types:
+      c_posts_a:
+        count: 1
+        material: elastic
+        youngs: 2000.0
+        density: 1.0
+        shape: cylinder
+        axis: z
+        aspect: 2.1291625896895083
+        hollow: 0.0
+        ring: {n: 17, radius: 0.171429, axis: z, phase: 0.0}
+  c_posts_a_pt:
+    parent: c_posts_a
+    entity: mpm_particle
+    per_parent: 73759
+    radius: 0.207143
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  c_posts_b:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.2]
+    types:
+      c_posts_b:
+        count: 1
+        material: elastic
+        youngs: 2000.0
+        density: 1.0
+        shape: cylinder
+        axis: z
+        aspect: 2.1291625896895083
+        hollow: 0.0
+        ring: {n: 17, radius: 0.171429, axis: z, phase: 10.588235294117647}
+  c_posts_b_pt:
+    parent: c_posts_b
+    entity: mpm_particle
+    per_parent: 73759
+    radius: 0.207143
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  c_flig:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.271429]
+    types:
+      c_flig: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 0.06896551724137931,
+        hollow: 0.4482758620689655}
+  c_flig_pt:
+    parent: c_flig
+    entity: mpm_particle
+    per_parent: 51632
+    radius: 0.207143
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  ms_ring:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.328571]
+    types:
+      ms_ring: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 0.42857142857142855,
+        hollow: 0.4714285714285714}
+  ms_ring_pt:
+    parent: ms_ring
+    entity: mpm_particle
+    per_parent: 35137
+    radius: 0.1
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  rod:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.471429]
+    types:
+      rod: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 4.0,
+        hollow: 0.0}
+  rod_pt:
+    parent: rod
+    entity: mpm_particle
+    per_parent: 25566
+    radius: 0.039286
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  lp_ring:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.535714]
+    types:
+      lp_ring: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 0.5384615384615384,
+        hollow: 0.7692307692307693}
+  lp_ring_pt:
+    parent: lp_ring
+    entity: mpm_particle
+    per_parent: 18555
+    radius: 0.092857
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  hook:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.757143]
+    types:
+      hook: {count: 1, material: elastic, youngs: 2000.0, density: 1.0, shape: cylinder, axis: z, aspect: 2.2222222222222223,
+        hollow: 0.0}
+  hook_pt:
+    parent: hook
+    entity: mpm_particle
+    per_parent: 62234
+    radius: 0.064286
+    density: 1.0
+    particle_mass: 5.960464477539063e-08
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      copy: {width: 1}
+  stator_unit:
+    n: 17
+    start:
+    - [0.686635, 0.531567, 0.289286]
+    - [0.662629, 0.596856, 0.289286]
+    - [0.616658, 0.649063, 0.289286]
+    - [0.554933, 0.681139, 0.289286]
+    - [0.485788, 0.688751, 0.289286]
+    - [0.418563, 0.670872, 0.289286]
+    - [0.362336, 0.629915, 0.289286]
+    - [0.324702, 0.571412, 0.289286]
+    - [0.310742, 0.503265, 0.289286]
+    - [0.322343, 0.434676, 0.289286]
+    - [0.357938, 0.374911, 0.289286]
+    - [0.412718, 0.332039, 0.289286]
+    - [0.479287, 0.311851, 0.289286]
+    - [0.548653, 0.317074, 0.289286]
+    - [0.611448, 0.347002, 0.289286]
+    - [0.659191, 0.397593, 0.289286]
+    - [0.685435, 0.462015, 0.289286]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world}
+      x: {width: 1, integration: first_order}
+      ions: {width: 1, integration: first_order}
+  FliL:
+    n: 6664
+    start:
+    - &id001 [0.5, 0.5, 0.360714]
+  PflA:
+    n: 13141
+    start:
+    - *id001
+  PflB:
+    n: 11611
+    start:
+    - *id001
+  PflCD:
+    n: 30107
+    start:
+    - *id001
+  Lipo:
+    n: 5406
+    start:
+    - *id001
+  MotB:
+    n: 6137
+    start:
+    - *id001
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+seed:
+- op: cloud_seed
+  at: FliL
+  cloud: 9hmf/FliL
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: PflA
+  cloud: 9hmf/PflA
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: PflB
+  cloud: 9hmf/PflB
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: PflCD
+  cloud: 9hmf/PflCD
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: Lipo
+  cloud: 9hmf/Lipo
+  origin: *id001
+  scale: 7142857.142857143
+- op: cloud_seed
+  at: MotB
+  cloud: 9hmf/MotB
+  origin: *id001
+  scale: 7142857.142857143
+operators:
+- op: stator_contact
+  at: c_flig_pt
+  stator: stator_unit
+  kappa: 0.01456522628597254
+  reach: 0.064286
+  axis: [0.0, 0.0, 1.0]
+  sign: 1.0
+- {op: stator_step, at: stator_unit, r0: 55.0, k_c: 50.0, eps: 0.0008506095944076743, kT: 7.256552927739212e-05,
+  delta: 0.241660973353061, theta: 0.1, ions: 2.0, stochastic: false, seed: 0}
+- {op: mpm_anchor, at: lp_ring_pt, k: 4000.0, applies_to: substrate}
+- {op: mpm_strain, at: c_posts_a_pt, implementation: warp}
+- {op: mpm_strain, at: c_posts_b_pt, implementation: warp}
+- {op: mpm_strain, at: c_flig_pt, implementation: warp}
+- {op: mpm_strain, at: ms_ring_pt, implementation: warp}
+- {op: mpm_strain, at: rod_pt, implementation: warp}
+- {op: mpm_strain, at: lp_ring_pt, implementation: warp}
+- {op: mpm_strain, at: hook_pt, implementation: warp}
+- {op: mpm_scatter, at: c_posts_a_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: c_posts_b_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: c_flig_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: ms_ring_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: rod_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: lp_ring_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_scatter, at: hook_pt, to: mpm_grid, drag: 200.0, a_max: 200.0, implementation: warp, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: c_posts_a_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: c_posts_b_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: c_flig_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: ms_ring_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: rod_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: lp_ring_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+- {op: mpm_gather, at: hook_pt, from: mpm_grid, vmax: 1000000000.0, wall_damp: 0.9, implementation: warp}
+schedule:
+- stator_contact
+- stator_step
+- mpm_anchor
+- substep_dt: 5.0e-05
+  steps: [mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_strain, mpm_scatter,
+    mpm_scatter, mpm_scatter, mpm_scatter, mpm_scatter, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather,
+    mpm_gather, mpm_gather, mpm_gather, mpm_gather, mpm_gather, mpm_gather]
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  hide_sets: [c_posts_a, c_posts_b, c_flig, ms_ring, rod, lp_ring, hook, stator_unit]
+  render_3d: compartments
+  compartment_sets: [c_posts_a_pt, c_posts_b_pt, c_flig_pt, ms_ring_pt, rod_pt, lp_ring_pt, hook_pt, FliL,
+    PflA, PflB, PflCD, Lipo, MotB]
+  surface:
+    c_posts_a_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    c_posts_b_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    c_flig_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    ms_ring_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    rod_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    lp_ring_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    hook_pt: {render: surface, spacing: 0.007812, blur: 1.0, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    FliL: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    PflA: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    PflB: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    PflCD: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    Lipo: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    MotB: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+  opacity: {c_posts_a_pt: 1.0, c_posts_b_pt: 1.0, c_flig_pt: 1.0, ms_ring_pt: 1.0, rod_pt: 1.0, lp_ring_pt: 1.0,
+    hook_pt: 1.0, FliL: 1.0, PflA: 1.0, PflB: 1.0, PflCD: 1.0, Lipo: 1.0, MotB: 1.0}
+  colors:
+    c_posts_a_pt: [0.88, 0.22, 0.2]
+    c_posts_b_pt: [0.92, 0.9, 0.82]
+    c_flig_pt: [0.62, 0.35, 0.82]
+    ms_ring_pt: [0.28, 0.52, 0.9]
+    rod_pt: [0.32, 0.76, 0.42]
+    lp_ring_pt: [0.6, 0.6, 0.62]
+    hook_pt: [0.95, 0.62, 0.2]
+    FliL: [0.75, 0.22, 0.17]
+    PflA: [0.18, 0.44, 0.71]
+    PflB: [0.29, 0.49, 0.35]
+    PflCD: [0.88, 0.51, 0.08]
+    Lipo: [0.48, 0.35, 0.65]
+    MotB: [0.09, 0.75, 0.81]
+  spheres: {set: stator_unit, radius: 0.032143, color: '#e8b04a', specular: 0.0, ambient: 0.25, diffuse: 0.8}
+  ssao: true
+  ssao_radius_frac: 0.03
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  subject: c_flig_pt
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  fps: 37.5

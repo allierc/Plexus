@@ -48,22 +48,23 @@ COLORS = {"FliL": [0.75, 0.22, 0.17], "PflA": [0.18, 0.44, 0.71], "PflB": [0.29,
 #   dots  every alpha carbon a lit matte sprite on black, eye-dome lighting for the outline and
 #         ambient occlusion for the shadow -- the data as deposited, nothing fitted.
 #   cryo  the structural-biology figure: a matte surface contoured around each protein's atoms
-#         (0.5 nm grid, blurred 1.2 cells = 0.6 nm, the look of an 8 A map), a black silhouette where one
+#         (0.5 nm grid, blurred 1.5 cells = 0.75 nm, the look of an 8 A map; 1.2 left holes in the loops), a black silhouette where one
 #         body's depth jumps against another's (ChimeraX `graphics silhouettes`), ambient
-#         occlusion, no specular anywhere, on white -- the rendering of every cryo-EM panel in
-#         Drobnic et al. 2025. The surface is a DRAWING of the atoms, not a model; the sets are
+#         occlusion, no specular anywhere -- the rendering of every cryo-EM panel in Drobnic
+#         et al. 2025, on black by the human's choice (2026-09-23; `background: white` gives the
+#         paper's page). The surface is a DRAWING of the atoms, not a model; the sets are
 #         still the atoms.
 LOOKS = {
     "dots": {"background": "black", "dot_shading": True, "dot_ambient": 0.35, "dot_diffuse": 0.75,
              "dot_specular": 0.0, "edl": True, "ssao": True},
-    "cryo": {"background": "white", "ssao": True, "ssao_radius_frac": 0.03,
+    "cryo": {"background": "black", "ssao": True, "ssao_radius_frac": 0.03, "legend": False,
              "silhouette": {"color": "black", "width": 1.5},
              "surface_specular": 0.0, "surface_ambient": 0.32, "surface_diffuse": 0.72,
              "light": "studio"},
 }
 SURFACE = {
     "dots": {"render": "dots", "point_size": 3.0},
-    "cryo": {"render": "surface", "spacing": round(0.5 / 140.0, 6), "blur": 1.2, "smooth": 20,
+    "cryo": {"render": "surface", "spacing": round(0.5 / 140.0, 6), "blur": 1.5, "smooth": 20, "iso_frac": 0.3,
              "specular": 0.0, "ambient": 0.32, "diffuse": 0.72},
 }
 
@@ -72,21 +73,35 @@ def nm(x):
     return x / BOX_NM
 
 
-def main():
+def scaffold(look="dots", z_membrane=Z_MEMBRANE, box_nm=BOX_NM):
+    """The six scaffold sets, their seeds, and the plotting entries that draw them, for a box of
+    `box_nm` whose inner-membrane plane is at world z `z_membrane`. The motor generator
+    (tools/bfm_motor_spec.py --scaffold) composes its rotor into the same frame."""
     from plexus.paths import graphs_data_path
     pts = np.load(os.path.join(graphs_data_path(), "shapes", "9hmf", "points.npz"))
-    origin = [0.5, 0.5, round(Z_MEMBRANE + nm(Z_OFFSET_NM), 6)]
-    scale = 1.0 / (BOX_NM * 1e-9)                       # world units per metre
-    sets, ops = {}, []
+    origin = [0.5, 0.5, round(z_membrane + Z_OFFSET_NM / box_nm, 6)]
+    scale = 1.0 / (box_nm * 1e-9)                       # world units per metre
+    sets, seeds = {}, []
     for part in COLORS:
-        n = int(len(pts[part]))
-        sets[part] = {"n": n, "start": [origin]}
-        ops.append({"op": "cloud_seed", "at": part, "cloud": f"9hmf/{part}", "origin": origin, "scale": scale})
+        sets[part] = {"n": int(len(pts[part])), "start": [origin]}
+        seeds.append({"op": "cloud_seed", "at": part, "cloud": f"9hmf/{part}", "origin": origin, "scale": scale})
+    plot = {"compartment_sets": list(COLORS), "surface": {p: dict(SURFACE[look]) for p in COLORS},
+            "opacity": {p: 1.0 for p in COLORS}, "colors": dict(COLORS)}
+    return sets, seeds, plot, origin
+
+
+def stator_ring(origin_z, r_nm=STATOR_R_NM, z_nm=STATOR_Z_NM, box_nm=BOX_NM):
+    """The 17 stator points at the MotB angles of PDB 9HMF, r and z in nm about the scaffold's
+    origin (its mean-atom plane)."""
     th = [math.radians(STATOR_PHASE_DEG) + 2.0 * math.pi * i / N_STATOR for i in range(N_STATOR)]
-    sets["stator_unit"] = {"n": N_STATOR, "start": [[round(0.5 + nm(STATOR_R_NM) * math.cos(a), 6),
-                                                     round(0.5 + nm(STATOR_R_NM) * math.sin(a), 6),
-                                                     round(origin[2] + nm(STATOR_Z_NM), 6)] for a in th]}
+    return [[round(0.5 + r_nm / box_nm * math.cos(a), 6), round(0.5 + r_nm / box_nm * math.sin(a), 6),
+             round(origin_z + z_nm / box_nm, 6)] for a in th]
+
+
+def main():
     look = "cryo" if "--cryo" in sys.argv else "dots"
+    sets, ops, plot, origin = scaffold(look)
+    sets["stator_unit"] = {"n": N_STATOR, "start": stator_ring(origin[2])}
     args_ = [x for x in sys.argv[1:] if not x.startswith("--")]
     name_spec = args_[0] if args_ else ("bfm_c01_scaffold_9hmf" + ("_cryo" if look == "cryo" else ""))
     spec = {
@@ -101,14 +116,11 @@ def main():
         "plotting": {
             "renderer": "vtk_points", "background": "black", "up_axis": 2, "box_frame": True,
             "hide_sets": ["stator_unit"],
-            "render_3d": "compartments", "compartment_sets": list(COLORS),
-            "surface": {p: dict(SURFACE[look]) for p in COLORS},
-            "opacity": {p: 1.0 for p in COLORS},
-            "colors": dict(COLORS),
+            "render_3d": "compartments", **plot,
             "spheres": {"set": "stator_unit", "radius": round(nm(STATOR_RADIUS_NM), 6), "color": "#e8b04a",
                         "specular": 0.0, "ambient": 0.25, "diffuse": 0.8},
             "subject": "PflA", "keep_stills": True, "stills": 4, "max_frames": 10,
-            "real_time": False, "fps": 300.0 / 8.0, "zoom": 1.6,
+            "real_time": False, "duration_s": 10.0, "zoom": 1.6,
             **LOOKS[look],
         },
     }
@@ -116,7 +128,7 @@ def main():
     with open(out, "w") as f:
         yaml.safe_dump(spec, f, sort_keys=False, default_flow_style=None, width=100)
     print(f"wrote {os.path.relpath(out, REPO)}: " + ", ".join(f"{p} {sets[p]['n']:,}" for p in COLORS)
-          + f"; origin {origin}, scale {scale:.4g} world/m, {N_STATOR} stator spheres at r {STATOR_R_NM} nm")
+          + f"; origin {origin}, {N_STATOR} stator spheres at r {STATOR_R_NM} nm")
 
 
 if __name__ == "__main__":

@@ -90,19 +90,25 @@ operators: []
 schedule: []
 plotting:
   renderer: vtk_points
-  background: white
+  background: black
   up_axis: 2
   box_frame: true
   hide_sets: [stator_unit]
   render_3d: compartments
   compartment_sets: [FliL, PflA, PflB, PflCD, Lipo, MotB]
   surface:
-    FliL: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
-    PflA: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
-    PflB: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
-    PflCD: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
-    Lipo: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
-    MotB: {render: surface, spacing: 0.003571, blur: 1.2, smooth: 20, specular: 0.0, ambient: 0.32, diffuse: 0.72}
+    FliL: {render: surface, spacing: 0.003571, blur: 1.5, smooth: 20, iso_frac: 0.3, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    PflA: {render: surface, spacing: 0.003571, blur: 1.5, smooth: 20, iso_frac: 0.3, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    PflB: {render: surface, spacing: 0.003571, blur: 1.5, smooth: 20, iso_frac: 0.3, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    PflCD: {render: surface, spacing: 0.003571, blur: 1.5, smooth: 20, iso_frac: 0.3, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    Lipo: {render: surface, spacing: 0.003571, blur: 1.5, smooth: 20, iso_frac: 0.3, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MotB: {render: surface, spacing: 0.003571, blur: 1.5, smooth: 20, iso_frac: 0.3, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
   opacity: {FliL: 1.0, PflA: 1.0, PflB: 1.0, PflCD: 1.0, Lipo: 1.0, MotB: 1.0}
   colors:
     FliL: [0.75, 0.22, 0.17]

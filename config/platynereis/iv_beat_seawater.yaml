@@ -96,14 +96,14 @@ plotting:
     thickness: 0.08
   dot_shading: true
   dot_size: 5.0
+  duration_s: 10.0
   field_cmap: bwr
   field_log: false
-  fps: 37.625
   keep_stills: true
   max_frames: 300
   real_time: false
   renderer: vtk_points
-  slow_motion: 26.67
+  slow_motion: 1.0
   stills: 8
   subject: water_particle
   up_axis: 2
