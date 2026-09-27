@@ -107,6 +107,13 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # TYPE, so an unregistered folder cannot be run by `Plexus_Main.py` at all, and the alternative
     # is a private runner that makes the core's own path untested on this work.
     ("platynereis", ("platynereis", "plat")),
+    # THE DEMO LADDER (builder/exp_03_cell_tissue): a presentation built one addition per slide --
+    # cells, then a morphogen, then diffusion, then reaction, then the minisite's variants. Its specs
+    # were only ever run through the GUI, which copies every spec into `studio/` first, so the folder
+    # was never checked; the first time its slides went to `gpu_l4` through `Plexus_Main.py` directly,
+    # both jobs died at `validate_pre_folder` before building anything. Matched by folder only: no
+    # spec NAME should be claimed by it, since `d4_...` and `a2_...` mean nothing outside the ladder.
+    ("demo",        ()),                     # no triggers: valid as a folder, claims no bare name
     ("active_matter", ("active_matter", "vicsek", "flock_am")),
     ("mpm",         ("mpm", "tissue", "elastic", "soft")),
     ("divide",      ("divide", "grow", "mitosis", "morula")),

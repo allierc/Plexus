@@ -333,6 +333,28 @@ def _watch_file(h, q, kind, ctype):
     return h._send_file(f, ctype)
 
 
+def g_watch_plexus(h, q):
+    from plexus.gui import watch
+    return h._send_json(watch.g_watch_plexus(h, q))
+
+
+def g_watch_records(h, q):
+    from plexus.gui import watch
+    return h._send_json(watch.g_watch_records(h, q))
+
+
+def g_watch_icon(h, q):
+    from plexus.gui import watch
+    p = watch.watch_icon(q)
+    return h._send_file(p, "image/png") if p else h.send_error(404)
+
+
+def g_watch_eq(h, q):
+    from plexus.gui import watch
+    p = watch.watch_eq(q)
+    return h._send_file(p, "image/png") if p else h.send_error(404)
+
+
 def g_watch_shot(h, q):
     return _watch_file(h, q, "png", "image/png")
 
@@ -341,13 +363,46 @@ def g_watch_mp4(h, q):
     return _watch_file(h, q, "mp4", "video/mp4")
 
 
-def _journal(msg: str) -> None:
-    """One line into the record's own journal, which the watcher's panel is already polling."""
+def _registry_is_stale(e: Exception, spec_path: str) -> bool:
+    """True when `e` is an unknown operator or variant AND a fresh interpreter loads `spec_path`: the spec is fine,
+    this process's operator registry is older than the library."""
+    msg = str(e)
+    if "not in registry" not in msg and "has no variant" not in msg:
+        return False
+    import subprocess
+    import sys as _sys
+    code = "import plexus.operators; from plexus.schema import load; load(__import__('sys').argv[1])"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.path.join(REPO_ROOT, "src") + os.pathsep + env.get("PYTHONPATH", "")
+    try:
+        r = subprocess.run([_sys.executable, "-c", code, spec_path], capture_output=True, text=True,
+                           timeout=300, cwd=REPO_ROOT, env=env)
+    except Exception:                                            # noqa: BLE001
+        return False
+    return r.returncode == 0
+
+
+def _restart_self(delay_s: float = 1.0) -> None:
+    """Replace this process with a fresh copy of itself (same interpreter, argv, environment and directory), after
+    `delay_s` so the reply that says so reaches the page. The listening socket is not inherited, so the new process
+    binds the same port; a page polling the server reconnects by itself."""
+    import sys as _sys
+    import threading
+
+    def _go():
+        _sys.stdout.flush(); _sys.stderr.flush()
+        os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+    threading.Timer(delay_s, _go).start()
+
+
+def _journal(msg: str, q=None) -> None:
+    """One line into the journal of the record the request is watching (`rec=`), which its panel is polling."""
     import time as _t
     try:
         from plexus.gui import watch
-        os.makedirs(os.path.dirname(watch.JOURNAL), exist_ok=True)
-        with open(watch.JOURNAL, "a") as f:
+        jp = watch.journal_path(watch.record_dir(q))
+        os.makedirs(os.path.dirname(jp), exist_ok=True)
+        with open(jp, "a") as f:
             f.write(f"{_t.strftime('%H:%M:%S')}  {msg}\n")
     except Exception:                                            # noqa: BLE001
         pass
@@ -367,9 +422,23 @@ def g_watch_open3d(h, q):
     f = watch._nth(q, "spec")
     if not f or not os.path.exists(f):
         return h._send_json({"error": "that step saved no spec"}, 404)
+    # NOT WHILE A RUN IS IN FLIGHT. Opening a step's spec re-seeds this server's one scene, and
+    # `open_view` stops a running generate to do it -- so the watcher's 3D button killed
+    # builder/exp_02_bacterium's first motor run at frame 57 of 1500 (step 0016, 2026-09-23),
+    # from a page whose contract is that watching cannot disturb the work. The button waits.
+    _cur = bio_view.CURRENT.get("view")
+    if _cur is not None and (getattr(_cur, "RUN", {}) or {}).get("running"):
+        _msg = "3D: a run is in flight on this server; the 3D view waits until it ends (it would stop the run)"
+        print(f"[watch] {_msg}", flush=True)
+        _journal(_msg, q)
+        return h._send_json({"error": _msg}, 409)
     import time as _time
     try:
         spec = yaml.safe_load(open(f))
+        # A MEASUREMENT STEP HAS NO SCENE: its spec is a comment-only stub (tools/builder_figure.py), which yaml reads
+        # as None -- the 3D button answered "'NoneType' object has no attribute 'get'" on exp_02's graphs
+        if not isinstance(spec, dict):
+            return h._send_json({"error": "this step is a measurement (a graph): it has a picture and no scene to open"}, 400)
         name = str(((spec.get("general") or {}).get("name")) or "opened").strip()
         dst = _spec_path(name)
         os.makedirs(studio.CONFIG_DIR, exist_ok=True)
@@ -382,21 +451,66 @@ def g_watch_open3d(h, q):
         _sets = ", ".join(f"{k}" for k in (spec.get("sets") or {}))
         _say = f"3D: VTK is building the scene for {name!r} -- sets: {_sets}"
         print(f"[watch] {_say}", flush=True)
-        _journal(_say)
+        _journal(_say, q)
         _t0 = _time.perf_counter()
         # AND SEEDED HERE, not left for the first render to pay for. `g_open` only imports the
         # file; the scene is built by `open_view`, which for a few hundred thousand particles
         # takes seconds. Leaving that to the render meant the browser's first frame hung, and a
         # drag begun while it hung fired more renders behind it -- which is what a black panel
         # looks like from the outside.
-        bio_view.open_view(dst)
+        try:
+            bio_view.open_view(dst)
+        except Exception as e_:                                  # noqa: BLE001
+            # A SPEC NEWER THAN THIS SERVER'S OPERATORS. The registry is filled once, at import, and a session that
+            # adds an operator or a variant while the watcher runs leaves it stale: exp13's `cell_grow` model
+            # `stretch` (added 20:13, the watcher started 19:25) failed the 3D button with "has no variant
+            # 'stretch'" (the human, 2026-09-26). Reloading the operator modules in place would leave every module
+            # that imported the old classes holding them; a fresh process has none of that. So when a fresh
+            # interpreter loads the spec, this server restarts itself -- the page reconnects and asks again.
+            if _registry_is_stale(e_, dst):
+                _say = ("3D: this step uses operators added since the watcher started -- the watcher restarts itself "
+                        "to load them, and the 3D view reopens")
+                print(f"[watch] {_say}", flush=True)
+                _journal(_say, q)
+                _restart_self()
+                return h._send_json({"error": _say, "restarting": True}, 503)
+            raise
         bio.STATE["name"] = name
         bio.bump(name, f"opened {f} for the 3-D view")
+        # THE RUN'S FRAMES, NOT ONLY ITS SEED: the recorded trajectory read into the scene now, so the page can open
+        # the 3-D view at the frame its movie was showing and scrub through the run with a slider (the human,
+        # 2026-09-26: "now it renders in 3D only frame 0"). `n_kept` frames, the run's length in ns for the label.
+        n_kept, total_ns = 0, None
+        try:
+            _v = bio_view.current()
+            n_kept = int(bio_view._vtk(_v.load_run_frames) or 0) if _v is not None else 0
+        except Exception as _e:                                  # noqa: BLE001
+            print(f"[watch] 3D: no recorded frames to scrub ({type(_e).__name__}: {_e})", flush=True)
+        try:
+            _g = spec.get("general") or {}
+            _ts = float(((_g.get("units") or {}).get("time_s")) or 0.0)
+            if _ts > 0:
+                total_ns = float(_g.get("n_frames", 0)) * float(_g.get("dt", 0.0)) * _ts * 1e9
+        except Exception:                                        # noqa: BLE001
+            total_ns = None
+        # THE MOVIE'S OWN CAMERA, so the 3-D view opens where the movie looks and the page's "nominal" button can go
+        # back to it: `plotting.camera: {elev, azim}` and `plotting.camera_roll` are what live_movie.py reads, in
+        # degrees; `plotting.zoom` is the movie's framing, 1.0 = the whole box. The page's old fixed opening camera
+        # (roll 180, for the Platynereis larva) showed exp04's channels upside down against their own movies.
+        camera = None
+        try:
+            _p = spec.get("plotting") or {}
+            _c = _p.get("camera") or {}
+            camera = {"elev": float(_c.get("elev", 18.0)), "azim": float(_c.get("azim", -58.0)),
+                      "zoom": float(_p.get("zoom", 1.0) or 1.0), "roll": float(_p.get("camera_roll", 0.0) or 0.0)}
+        except Exception:                                        # noqa: BLE001
+            camera = None
         _el = _time.perf_counter() - _t0
         _done = f"3D: {name!r} is ready after {_el:.1f}s -- drag to turn, wheel to zoom"
         print(f"[watch] {_done}", flush=True)
-        _journal(_done)
-        return h._send_json({"name": name, "spec": dst, "seconds": round(_el, 1)})
+        _journal(_done, q)
+        return h._send_json({"name": name, "spec": dst, "seconds": round(_el, 1), "n_kept": n_kept,
+                             "total_ns": round(total_ns, 4) if total_ns else None, "camera": camera})
     except Exception as e:                                       # noqa: BLE001
         return h._send_json({"error": f"{type(e).__name__}: {e}"[:300]}, 400)
 
@@ -407,8 +521,19 @@ def g_watch_render(h, q):
 
 
 def g_state(h, q):
-    from plexus.gui import bio
-    return h._send_json(dict(bio.STATE))
+    # `running` IS PART OF THE STATE A SPECTATOR PAGE NEEDS, and it is here because of what the
+    # page does when it does not have it. `app.py`'s poll loop FOLLOWS the server's session -- it
+    # notices a new spec `version` and calls `reseed()` so a person watching sees whatever the
+    # driver just opened. But a reseed goes through `bio_view.open_view`, which STOPS a run in
+    # flight so the scene can be rebuilt. So merely having the page open killed every run: exp_03's
+    # first archived cycle stopped at frame 81 of 201 and wrote no movie, because a browser opened
+    # on the page reseeded the scene ten seconds after the run began. The page cannot decide to wait
+    # without knowing a run is in progress, and this route was the only one it polls every 1.5 s.
+    from plexus.gui import bio, bio_view
+    v = bio_view.current()
+    return h._send_json({**dict(bio.STATE),
+                         "running": bool((getattr(v, "RUN", {}) or {}).get("running"))
+                         if v is not None else False})
 
 
 def g_spec(h, q):
@@ -589,6 +714,8 @@ def g_picture(h, q, route):
             v.highlight(pk)
             bio.STATE["pick"] = pk
             return h._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
+        if q.get("cut") and (_q1(q, "cut") in ("1", "far", "on", "true")) != bool(getattr(v, "cut", False)):
+            v.set_cut(_q1(q, "cut") in ("1", "far", "on", "true"))     # the slice: the near half cut away
         if q.get("azim") or q.get("elev") or q.get("zoom"):
             v.set_camera(*(float((q.get(k) or [str(getattr(v, k, 0.0) or 0.0)])[0])
                            for k in ("azim", "elev", "zoom", "roll")))
@@ -1276,7 +1403,8 @@ GET_ROUTES = {
     "/api/debug/stacks": g_stacks,
     "/watch": g_watch, "/api/watch/state": g_watch_state,
     "/api/watch/shot": g_watch_shot, "/api/watch/mp4": g_watch_mp4,
-    "/api/watch/open3d": g_watch_open3d,
+    "/api/watch/open3d": g_watch_open3d, "/api/watch/plexus": g_watch_plexus,
+    "/api/watch/icon": g_watch_icon, "/api/watch/eq": g_watch_eq, "/api/watch/records": g_watch_records,
 }
 for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
     GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]
@@ -1313,16 +1441,66 @@ class Handler(BaseHTTPRequestHandler):
         return self.wfile.write(body)
 
     def _send_file(self, path, ctype):
+        """Send a file, HONOURING `Range` so a <video> can SEEK.
+
+        WITHOUT THIS THE WATCHER'S SLIDER DOES NOTHING. A browser seeks by asking for a byte range;
+        a server that answers 200 with the whole body every time leaves the <video> element unable
+        to jump, so play and pause work and dragging the scrubber does not -- which is exactly what
+        the watcher did for every movie it served. `_serve_media` below has had Range support all
+        along, but it resolves paths under the SPEC directories and so cannot serve the builder's
+        record; the watch endpoints come through here instead, and quietly lost the feature.
+        """
         try:
-            with open(path, "rb") as f:
-                body = f.read()
+            size = os.path.getsize(path)
+            mtime = int(os.path.getmtime(path))
         except OSError:
             self.send_error(404)
             return
-        self.send_response(200)
+        rng = self.headers.get("Range")
+        start, end = 0, size - 1
+        partial = False
+        if rng and rng.strip().lower().startswith("bytes="):
+            try:
+                a, _, b = rng.split("=", 1)[1].partition("-")
+                start = int(a) if a else 0
+                end = int(b) if b else size - 1
+                end = min(end, size - 1)
+                partial = 0 <= start <= end
+            except ValueError:
+                partial = False
+        if not partial:
+            start, end = 0, size - 1
+        # SEEK AND READ ONLY WHAT WAS ASKED FOR. The first version read the WHOLE file and then
+        # sliced it, so every seek in a 75 MB movie cost a 75 MB read and scrubbing crawled --
+        # which is the opposite of what Range support is for.
+        etag = f'"{mtime:x}-{size:x}"'
+        if self.headers.get("If-None-Match") == etag and not partial:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.end_headers()
+            return
+        try:
+            with open(path, "rb") as f:
+                f.seek(start)
+                body = f.read(end - start + 1)
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(206 if partial else 200)
         self.send_header("Content-Type", ctype)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("ETag", etag)
+        if partial:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        # A BUILDER MOVIE NEVER CHANGES ONCE WRITTEN, so `no-store` on it was pure waste: toggling
+        # between two steps re-downloaded 75 MB each way every time. Indexed media is cacheable and
+        # carries an ETag so a stale one still revalidates; everything else keeps `no-store`,
+        # because the LIVE shot is rewritten in place and must never be served from cache.
+        if ctype.startswith("video/") or ctype == "image/png":
+            self.send_header("Cache-Control", "private, max-age=86400")
+        else:
+            self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 

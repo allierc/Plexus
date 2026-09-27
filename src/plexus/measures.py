@@ -382,10 +382,68 @@ class _MeshView:
 # activity with no declared dimension, and UNKNOWN prints bare.
 CURVE_DIMS = {"area": "area", "volume": "volume", "radius": "length",
               "cells": "count", "phase": "fraction", "cycle_progress": "fraction"}
-CURVE_QUANTITIES = ("cells", "area", "volume", "radius", "myosin", "phase", "cycle_progress")
+CURVE_QUANTITIES = ("cells", "area", "volume", "radius", "myosin", "phase", "cycle_progress",
+                    "shape_index")
 for _q in CURVE_QUANTITIES:
     register(_q, "curve", None, CURVE_DIMS.get(_q))
 register("count", "curve", None, "count", "the live count of a named set: `count:<set>`")
+register("species", "curve", None, "count", "the live count of each species of a set, a line per `chem` column in the `plotting.species` colours -- the twin of `phase`: `species:<set>`")
+register("block", "curve", None, None, "mean and sd of a named state block over a set's live elements: `block:<set>:<block>`")
+register("jacobian", "curve", None, None, "an MPM set's volume relative to rest, mean and sd of det F over its live particles: `jacobian:<set>`")
+register("strain", "curve", None, None, "an MPM set's shape change: rms of the Green strain |F^T F - I| over its live particles, rotation-free: `strain:<set>`")
+register("rate", "curve", None, None, "a set's rotation rate about the world z axis through the box centre, from its velocities, in turns per unit time: `rate:<set>`")
+register("clones", "curve", None, None, "a Muller plot of an integer label block on the mesh's cells (a clone, a mutant flag): each of the `top` labels with the largest peak share is a band between its cumulative limits, in % of the live cells, the rest one grey band -- replay only: `clones:<block>`")
+
+
+def label_rgb(k, pal=None):
+    """The colour of integer label `k` (a clone, a mutant flag), as an (r, g, b) in 0..1 -- ONE rule
+    for the mesh's faces (`live_movie`, `render_vtk`) and the `clones:` curve, so a clone is the same
+    colour on the cell and on its band. `pal` (hex strings) colours 0, 1, ... in order; any other
+    label takes a hue from splitmix64 of its number: a multiplicative (golden-ratio) step would put
+    neighbours of the seed's Fibonacci sphere, whose indices differ by Fibonacci numbers, at
+    near-equal hues."""
+    import colorsys
+    if pal and 0 <= int(k) < len(pal):
+        import matplotlib.colors as _mc
+        return tuple(_mc.to_rgb(pal[int(k)]))
+    x = (int(k) + 1) * 0x9E3779B97F4A7C15 % 2 ** 64
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) % 2 ** 64
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) % 2 ** 64
+    x ^= x >> 31
+    return colorsys.hsv_to_rgb((x & 0xFFFF) / 65536.0, 0.45 + 0.5 * ((x >> 16) & 0xFF) / 255.0,
+                               0.65 + 0.33 * ((x >> 24) & 0xFF) / 255.0)
+
+
+def muller_bands(frames, top=12):
+    """A Muller plot's bands from per-frame integer labels (one array of live cells' labels per frame,
+    None where unrecorded). Returns (S, ids, nsurv): S [T, top + 1, 2] of (centre, half-width) in % of
+    the live cells -- band j spans centre -/+ half-width, the `top` labels with the largest PEAK share
+    over the clip stacked bottom-up in that order, the last row every other label together -- `ids` the
+    labels of the first rows, `nsurv` [T] the number of distinct labels present. A (centre, half-width)
+    pair is what the curve panel's +-SD band draws, so the Muller plot needs no chart of its own."""
+    peak = {}
+    for a in frames:
+        if a is None or not len(a):
+            continue
+        u, c = np.unique(a, return_counts=True)
+        for i, f in zip(u.tolist(), (c / len(a)).tolist()):
+            if f > peak.get(i, 0.0):
+                peak[i] = f
+    ids = sorted(peak, key=lambda i: (-peak[i], i))[:int(top)]
+    T = len(frames)
+    S = np.full((T, len(ids) + 1, 2), np.nan)
+    nsurv = np.zeros(T, int)
+    for t, a in enumerate(frames):
+        if a is None or not len(a):
+            continue
+        nsurv[t] = len(np.unique(a))
+        lo = 0.0
+        for j, i in enumerate(ids):
+            f = 100.0 * float(np.mean(a == i))
+            S[t, j] = (lo + f / 2, f / 2)
+            lo += f
+        S[t, -1] = ((lo + 100.0) / 2, (100.0 - lo) / 2)
+    return S, ids, nsurv
 
 
 def curve_row(H, lvl, q, ntype, nt, cell_cols):
@@ -400,6 +458,137 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
     def _np(v):
         return v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
     row = np.full((nt, 2), np.nan)
+    if isinstance(q, str) and q.startswith("jacobian:"):
+        # AN MPM PART'S VOLUME, RELATIVE TO ITS REST: det F per particle, F the deformation gradient
+        # the strain operator keeps on the level (never in the trajectory, so a replay reads nan).
+        try:
+            lv = H.level(q[len("jacobian:"):])
+            F = getattr(lv, "F", None)
+            if F is None:
+                return row
+            J = np.linalg.det(_np(F).reshape(-1, F.shape[-2], F.shape[-1]).astype(np.float64))
+            occ = getattr(lv, "occ", None)
+            live = _np(occ).astype(bool) if occ is not None else np.ones(J.shape[0], bool)
+            v = J[live[: J.shape[0]]]
+            if v.size:
+                row[0] = (float(v.mean()), float(v.std()))
+        except Exception:                                # noqa: BLE001
+            return row
+        return row
+    if isinstance(q, str) and q.startswith("strain:"):
+        # SHAPE CHANGE WITHOUT THE ROTATION: E = (F^T F - I)/2 is zero for any rigid motion, so its
+        # Frobenius norm per particle, averaged, is the deformation a turning part actually
+        # suffers -- the number that says whether a rotor's parts deform or only look as if.
+        try:
+            lv = H.level(q[len("strain:"):])
+            F = getattr(lv, "F", None)
+            if F is None:
+                return row
+            Fn = _np(F).reshape(-1, F.shape[-2], F.shape[-1]).astype(np.float64)
+            Cg = np.einsum("nji,njk->nik", Fn, Fn)
+            E = 0.5 * (Cg - np.eye(Fn.shape[-1])[None])
+            e = np.sqrt((E ** 2).sum(axis=(1, 2)))
+            occ = getattr(lv, "occ", None)
+            live = _np(occ).astype(bool) if occ is not None else np.ones(e.shape[0], bool)
+            v = e[live[: e.shape[0]]]
+            if v.size:
+                row[0] = (float(np.sqrt((v ** 2).mean())), float(v.std()))
+        except Exception:                                # noqa: BLE001
+            return row
+        return row
+    if isinstance(q, str) and q.startswith("rate:"):
+        # THE ROTATION RATE OF A SET about the world z axis through the box centre, from its own
+        # velocities: mean of (r x v).z / r^2 over live points farther than a few cells from the
+        # axis, in turns per unit time (the units table converts 1/time to Hz through `time_s`).
+        try:
+            lv = H.level(q[len("rate:"):])
+            _t0 = getattr(lv, "t", None)                 # a replay level: read it at the curves' frame
+            if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
+                lv.t = int(getattr(lvl, "t", _t0))
+            try:
+                X = _np(lv.get("pos")).astype(np.float64); V = _np(lv.get("vel")).astype(np.float64)
+            finally:
+                if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
+                    lv.t = _t0
+            occ = getattr(lv, "occ", None)
+            live = _np(occ).astype(bool) if occ is not None else np.ones(X.shape[0], bool)
+            c = np.asarray(getattr(H, "world", [1.0, 1.0, 1.0]), float)[:2] * 0.5 if hasattr(H, "world") else np.array([0.5, 0.5])
+            rx, ry = X[:, 0] - c[0], X[:, 1] - c[1]
+            r2 = rx * rx + ry * ry
+            keep = live & (r2 > 1e-4)
+            w = (rx[keep] * V[keep, 1] - ry[keep] * V[keep, 0]) / r2[keep]
+            if w.size:
+                row[0] = (float(w.mean()) / (2.0 * np.pi), float(w.std()) / (2.0 * np.pi))
+        except Exception:                                # noqa: BLE001
+            return row
+        return row
+    if isinstance(q, str) and q.startswith("block:"):
+        # THE LEVEL OF A STATE BLOCK, `quantity: block:cell:psi`: the mean and sd of that block's
+        # first column over the set's live elements, at the current frame. What a membrane
+        # potential, a proton count or a stator's stretch is, as a curve, without a quantity of
+        # its own being registered for each -- the block IS the quantity. Bare units; a spec puts
+        # a `factor:` on the curve to draw it in mV or in protons.
+        try:
+            _, name, block = q.split(":", 2)
+            lv = H.level(name)
+            # ON THE REPLAY, FOLLOW THE FRAME THE CURVES ARE AT. The series loop advances `t` on the
+            # level the curves read (`lvl`) and on no other, so a replay level asked for its block
+            # served row 0 forever: the movie's membrane-potential panel was a flat line at 150 mV
+            # while the trajectory held 150 -> 143 (exp_02 step 0045, 2026-09-23). Same rule as
+            # `count:` below: the named set is read at `lvl.t`.
+            _t0 = getattr(lv, "t", None)
+            if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
+                lv.t = int(getattr(lvl, "t", _t0))
+            try:
+                val = _np(lv.get(block))
+            finally:
+                if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
+                    lv.t = _t0
+        except Exception:                                # noqa: BLE001
+            return row
+        if val.ndim == 3:                                # a replay keeps [T, n, w]; the level's t picks the row
+            val = val[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
+        occ = getattr(lv, "_occ", None)
+        if occ is not None and getattr(occ, "ndim", 1) == 2:
+            occ = occ[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
+        if occ is None:
+            occ = getattr(lv, "occ", None)
+        live = _np(occ).astype(bool) if occ is not None else np.ones(val.shape[0], bool)
+        v = np.asarray(val, float)[live][:, 0] if val.ndim == 2 else np.asarray(val, float)[live]
+        if v.size:
+            row[0] = (float(v.mean()), float(v.std()))
+        return row
+    if isinstance(q, str) and q.startswith("species:"):
+        # THE TWIN OF `phase`, FOR STRAINS: `quantity: species:cell` draws one line per species --
+        # per column of the set's `chem` block -- counting the live elements whose largest column
+        # is that one, in the spec's `plotting.species` colours, so the panel and the picture name
+        # the strains with the same colours. `phase` partitions a tissue by cycle stage and needs a
+        # mesh; this partitions any set, a mesh or a lattice of sites (exp 15's colonies), by strain.
+        try:
+            lv = H.level(q[len("species:"):])
+            _t0 = getattr(lv, "t", None)                 # a replay level: read it at the curves' frame
+            if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
+                lv.t = int(getattr(lvl, "t", _t0))
+            try:
+                val = _np(lv.get("chem"))
+            finally:
+                if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
+                    lv.t = _t0
+        except Exception:                                # noqa: BLE001
+            return row
+        if val.ndim == 3:
+            val = val[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
+        occ = getattr(lv, "_occ", None)
+        if occ is not None and getattr(occ, "ndim", 1) == 2:
+            occ = occ[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
+        if occ is None:
+            occ = getattr(lv, "occ", None)
+        live = _np(occ).astype(bool) if occ is not None else np.ones(val.shape[0], bool)
+        val = np.asarray(val, float).reshape(val.shape[0], -1)[live[: val.shape[0]]]
+        lab = np.argmax(val, axis=1) if val.size else np.zeros(0, int)
+        for j in range(min(nt, val.shape[1])):
+            row[j] = (float((lab == j).sum()), 0.0)
+        return row
     if isinstance(q, str) and q.startswith("count:"):
         # THE LIVE COUNT OF A NAMED SET, mesh or not: `quantity: count:integrin`. Live, `occ` is the
         # engine's occupancy vector; on replay `_ReplayLevel._occ` is [T, n] and `t` picks the row.
@@ -508,6 +697,12 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
     pos = torch.as_tensor(_np(lvl.get("pos")[:nv]), dtype=torch.float64)
     a, _p, _c, _v = face_geometry_3d(pos, _es, _et, _ef, nF, apex=wedge_apex(m, pos))
     a = a.numpy()
+    # `shape_index` -- HOW ROUND A CELL IS: perimeter / sqrt(area), dimensionless, of the same
+    # mid-surface polygon `area` reads. A circle is 3.545, a regular hexagon 3.722, a regular
+    # pentagon 3.812, a square 4.0 -- lower is rounder. It is the quantity the vertex model's `p0`
+    # targets, so the panel shows the energy's own shape variable relaxing.
+    if q == "shape_index":
+        a = _p.numpy() / np.sqrt(np.maximum(a, 1e-12))
     # `area` FOLLOWS `volume`'S RULE, AND FOR THE SAME REASON. What `face_geometry_3d`
     # returns is the MID-SURFACE area, and on an apico-basal run the mid-surface is not a
     # boundary of anything: the cell's surface is the polyhedron's -- two caps and one wall

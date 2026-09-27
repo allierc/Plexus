@@ -407,7 +407,8 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
             if _ch.ndim == 3 and _ch.shape[2] >= 2:
                 _cf = [chem_rgb(_ch[t], lut=style.get("species"),
                                 blend=style.get("blend"),
-                                background=style.get("background", "black"))[0]
+                                background=style.get("background", "black"),
+                                vmax=style.get("chem_max"))[0]
                        for t in range(_ch.shape[0])]
                 if all(x is not None for x in _cf):
                     color = np.stack(_cf)              # [T, N, 3] -- per FRAME, not per node

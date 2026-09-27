@@ -127,7 +127,7 @@ def dot_area_pt2(pos, span_data, fig_px, dpi, fill=0.9, cap=(1.0, 400.0)):
     return float(np.clip((fill * pt) ** 2, *cap))
 
 
-def chem_rgb(chem, nF=None, lut=None, blend=None, background="black"):
+def chem_rgb(chem, nF=None, lut=None, blend=None, background="black", vmax=None):
     """(rgb [n,3], [max per drawn column]) from a `chem` array -- THE ONE COLOUR LAW for RD output.
 
     Lives here and is imported by `plexus.plot`, because the alternative is two copies that drift:
@@ -178,11 +178,21 @@ def chem_rgb(chem, nF=None, lut=None, blend=None, background="black"):
     if not drawn:
         return None, []
     hi, norm = [], []
+    # `vmax` -- A FIXED SCALE, when the spec gives one (`plotting.chem_max`). By default each
+    # species is normalised by its OWN maximum in this frame, which is right for a pattern whose
+    # amplitude is not the point and WRONG for anything that decays: a field diffusing toward a
+    # uniform 0.076 has its max and min within 6% of each other, so every cell renders at 94-100%
+    # and the disc goes solid red at exactly the moment the concentration is lowest. Measured on
+    # exp_03 slide 7 (activator 0.0745-0.0789 at the last frame, seeded at 0.5). A scalar applies
+    # to every drawn column; a list is positional like `lut`. Absent, the per-frame law stands,
+    # so no existing picture changes.
+    _vm = (list(vmax) if isinstance(vmax, (list, tuple)) else [vmax] * ncol) if vmax is not None else None
     for k, _c in drawn:
         v = np.where(np.isfinite(a[:, k]), a[:, k], 0.0)
         top = float(v.max())
         hi.append(top)
-        norm.append(np.clip(v / top, 0, 1) if top > 1e-9 else np.zeros(n))
+        ref = float(_vm[k]) if (_vm is not None and k < len(_vm) and _vm[k]) else top
+        norm.append(np.clip(v / ref, 0, 1) if ref > 1e-9 else np.zeros(n))
 
     if blend == "additive":
         cols = np.zeros((n, 3))
@@ -210,7 +220,8 @@ def _face_colours(H, nF, style=None):
             continue
         return chem_rgb(c.detach().cpu().numpy(), nF,
                         lut=style.get("species"), blend=style.get("blend"),
-                        background=style.get("background", "black"))
+                        background=style.get("background", "black"),
+                        vmax=style.get("chem_max"))
     return None, []
 
 

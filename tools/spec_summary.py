@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import html as htmlmod
 import importlib.util
 import os
 import re
@@ -247,8 +248,33 @@ def equation_for(name: str, cls) -> tuple[str, str, list[str]]:
     made from -- re-deriving them from the registry would read a different class whenever the
     spec selected an implementation variant, and the two outputs would disagree.
     """
-    declared = getattr(cls, "EQUATION", "") if cls else ""
-    enriched = (ENRICH.get(name) or {}).get("equation")
+    # A MODEL VARIANT IS A DIFFERENT HYPOTHESIS AND MUST NOT BORROW ONE. `getattr` found an
+    # EQUATION through inheritance and `ENRICH` is keyed by operator NAME, so every variant of
+    # `cell_chem_react` that declared no equation of its own was shown Gray-Scott's: the May-Leonard
+    # slide printed da/dt and du/dt over a state that is u, v and w, and the coupled slide printed
+    # one pair over four columns. The registry already carries the distinction that decides it --
+    # an `implementation:` variant is the same biology computed differently and SHOULD share its
+    # equation (squared_law[warp] is squared_law), a `model:` variant is not and must say its own.
+    # Only the contract's default model, and implementation variants of anything, may fall back.
+    own = vars(cls).get("EQUATION", "") if cls else ""
+    axis = getattr(cls, "VARIANT_AXIS", "implementation") if cls else "implementation"
+    variant = getattr(cls, "IMPLEMENTATION", "default") if cls else "default"
+    try:
+        default = R.get_contract(name).default
+    except Exception:                                               # noqa: BLE001
+        default = variant
+    same_biology = axis != "model" or variant == default
+    declared = own or ((getattr(cls, "EQUATION", "") if cls else "") if same_biology else "")
+    enriched = (ENRICH.get(name) or {}).get("equation") if same_biology else None
+    # A REWIRE'S RELATION IS CALLED `edges`, NOT `E`. Every rewire equation opens by naming the set
+    # of pairs it builds -- `E = {(i, j) : ...}` -- and a single capital on a slide reads as an
+    # energy, which is exactly what `E` means in the lateral written a few lines below it
+    # (`cell_mechanics`: E = sum_f [...]). Only the LEADING symbol of a REWIRE's equation is
+    # rewritten, so an `E` anywhere else, in any kind of operator, is left as it was written.
+    if cls is not None and getattr(cls, "KIND", "") == "rewire":
+        _lead = re.compile(r"^(\$\$\s*)E(?=\s*(?:\\[;,:!]\s*)*=)")
+        declared = _lead.sub(r"\1\\mathrm{edges}", declared.strip()) if declared else declared
+        enriched = _lead.sub(r"\1\\mathrm{edges}", enriched.strip()) if enriched else enriched
     lines = docstring_math(cls.__doc__ or "")
     if declared:                                    # the operator's own, and it outranks the rest
         return declared.strip(), "registered", lines
@@ -292,7 +318,17 @@ def op_title(name: str, cls) -> str:
     back to its identifier with the underscores taken out, which reads as a machine name and is
     meant to: `--audit` lists exactly those, so the gap is visible instead of silent.
     """
-    return (getattr(cls, "TITLE", "") or prettify(name)) if cls else prettify(name)
+    t = (getattr(cls, "TITLE", "") or prettify(name)) if cls else prettify(name)
+    # ONE RATE EQUATION PER SPECIES, SO TWO OR MORE SPECIES ARE REACTIONS. A title is written once,
+    # at registration, in the singular -- "Autocatalytic reaction" -- and every reaction model in
+    # the library carries two to four species, each with its own d/dt, so the singular was wrong on
+    # every slide that showed one. The species count is declared on the class (`species=`), so the
+    # number is read rather than guessed, and only the bare word "reaction" is touched: a title
+    # already plural, or one that does not name a reaction, is left exactly as written.
+    sp = vars(cls).get("SPECIES") if cls else None
+    if sp and len(sp) > 1:
+        t = re.sub(r"\b([Rr])eaction\b", r"\1eactions", t)
+    return t
 
 
 def first_sentence(doc: str) -> str:
@@ -349,6 +385,11 @@ def seeded_counts(raw: dict) -> dict:
     return out
 
 
+def _rel_word(key: str, target: str) -> str:
+    """A relation's extra map in words: `face: cell` on a half-edge is 'borders one cell'."""
+    return f"borders one {target}" if key == "face" else f"{key}: one {target}"
+
+
 def read_sets(raw: dict) -> list[dict]:
     """One row per set: its size, what it is, its containment, its relation, its state."""
     sets = raw.get("sets") or {}
@@ -360,12 +401,18 @@ def read_sets(raw: dict) -> list[dict]:
         types = s.get("types") or {}
         rows.append(dict(
             name=name,
+            # THE NAME A READER IS GIVEN, when the spec gives one (`title:` on the set); the code name stays beside it
+            title=str(s.get("title") or ""),
             n=set_count(name, sets),
             seeded=seeded.get(name),
             entity=s.get("entity") or s.get("mesh") or "",
             parent=s.get("parent") or "",
             per_parent=s.get("per_parent"),
             relation=(maps.get("srce"), maps.get("trgt")) if maps else None,
+            # THE OTHER MAPS OF A RELATION, which say what it BELONGS to. A half-edge runs vertex ->
+            # vertex AND borders one cell (`face: cell`); printing only the first made the table
+            # show no link at all between the cells and the edges that bound them (user, 2026-09-25).
+            also={k: v for k, v in maps.items() if k not in ("srce", "trgt")} if maps else {},
             state=[dict(name=k,
                         role=(v or {}).get("role", ""),
                         width=(v or {}).get("width"),
@@ -376,13 +423,112 @@ def read_sets(raw: dict) -> list[dict]:
     return rows
 
 
+# WHAT EACH STATE BLOCK IS, in the words a reader of the equations needs. A block's name is the
+# spec's own and it is terse -- `pos`, `chem` -- and it is the one thing on the page that says what
+# every entity CARRIES. Without it an equation about `a` and `u` sits under a table that says only
+# `cell 4,000`, and nothing tells the reader those two letters are the cell's own state.
+BLOCK_WORD = {"pos": "position", "vel": "velocity", "chem": "morphogen"}
+
+
+def species_of(raw: dict, set_name: str) -> dict:
+    """{column: symbol} for a set's `chem` block, from the operators acting on it.
+
+    THE MODEL IS THE AUTHORITY, not the spec. A spec says only `chem: {width: 2}`; which column is
+    the activator is a property of the reaction model, and each model now says so in its
+    registration as `species=((symbol, meaning), ...)` -- stamped as `cls.SPECIES`, exactly as
+    `title=` and `equation=` are. The span starts at the operator's `chan`, because that is how a
+    model is placed in the block (`chan` is a COLUMN index: a second Gray-Scott pair sits at 2).
+    The seed section is read too, so a spec whose chemistry is seeded and not yet reacting still
+    names nothing it cannot back -- and an operator whose class declares no species names nothing.
+    """
+    cols = {}
+    # THE REACTION NAMES THE COLUMNS; THE SEED ONLY FILLS WHAT NOTHING ELSE NAMED. Walked seed-first,
+    # the two seeds of a coupled Gray-Scott each claimed their pair as `a, u`, and the reaction's
+    # `a1, u1, a2, u2` -- the names its equation is written in -- lost every column. The dynamics
+    # operators go first; a seed names a column only on a slide where nothing reacts yet, which is
+    # exactly the slide where the seed is the only thing that knows.
+    lines = ([o for o in (raw.get("operators") or [])] + [o for o in (raw.get("seed") or [])])
+    for o in lines:
+        if not isinstance(o, dict) or o.get("at") != set_name:
+            continue
+        try:
+            cls = R.get_operator(o["op"], o.get("implementation"), o.get("model"))
+        except Exception:                                           # noqa: BLE001
+            continue
+        # DECLARED ON THIS CLASS, NOT INHERITED. `species=` is stamped per registration, and a
+        # variant that subclasses another without declaring its own would otherwise speak with its
+        # parent's names: the simplex seed of the three-species model inherited the default seed's
+        # `a, u` and labelled May-Leonard's columns as Gray-Scott's.
+        sp = vars(cls).get("SPECIES")
+        if not sp:
+            continue
+        c0 = int(o.get("chan", 0) or 0)
+        for k, item in enumerate(sp):
+            cols.setdefault(c0 + k, item[0] if isinstance(item, (tuple, list)) else str(item))
+    return cols
+
+
+def state_labels(raw: dict, r: dict, max_blocks: int = 6) -> list[str]:
+    """What an element of this set carries: ['position', 'morphogen a, u'], or [] for a relation.
+
+    A SET THAT DECLARES NO `state:` STILL HAS ONE. The engine gives it `spatial_schema(dim)`, a
+    position and a velocity, and a boids or Vicsek spec relies on exactly that -- so reading only
+    the spec's `state:` key reported those cells as carrying nothing, on the slides where the
+    velocity is the thing aligning.
+    """
+    if r.get("relation"):
+        return []
+    # THE ENGINE'S OWN RESOLUTION, NOT A RE-DERIVATION OF IT. This guessed "the spec's `state:`,
+    # else position and velocity", which is two of the engine's three rules: `_resolve_schema`
+    # also consults the ENTITY's registered schema (a `neuron` carries voltage, not a velocity),
+    # and a summary that skips that rule describes a state the run does not have. Asking the
+    # resolver itself means the pane, the deck and the text can only ever say what Plexus builds.
+    # It is also what made this worth checking at all: the demo cells declared their own `state:`
+    # and so carried NO velocity, while the seed's title promised "positions, velocities".
+    try:
+        from plexus import engine as _E
+        _raw_set = (raw.get("sets") or {}).get(r["name"]) or {}
+        _dim = int((raw.get("general") or {}).get("dim", raw.get("dim", 2)) or 2)
+        # THE SAME `spatial` FACT THE ENGINE USES: a set some `seed_positions` places.
+        _sp = any(isinstance(o, dict) and o.get("op") == "seed_positions" and o.get("at") == r["name"]
+                  for o in list(raw.get("seed") or []) + list(raw.get("operators") or []))
+        _sch = _E._resolve_schema(_raw_set, _dim, r["name"], spatial=_sp)
+        blocks = [b.name for b in _sch.blocks]
+        widths = {b.name: b.width for b in _sch.blocks}
+    except Exception:                                               # noqa: BLE001
+        blocks = [v["name"] for v in r["state"]] or ["pos", "vel"]
+        widths = {v["name"]: v.get("width") for v in r["state"]}
+    _st = ((raw.get("sets") or {}).get(r["name"]) or {}).get("state") or {}
+    out = []
+    for b in blocks:
+        # a block's own `title:` in the spec first -- `psi` is "membrane potential", `nK_in` "K+ inside the cell"
+        word = str((_st.get(b) or {}).get("title") or "") or BLOCK_WORD.get(b, b)
+        if b == "chem":
+            cols = species_of(raw, r["name"])
+            w = int(widths.get("chem") or 0)
+            names = ([cols[i] for i in range(w) if i in cols] if w else [cols[i] for i in sorted(cols)])
+            if names:
+                word = "morphogen " + ", ".join(names)
+        out.append(word)
+    # WHAT THE MODEL IS ABOUT GOES FIRST. A vertex-model cell carries a dozen bookkeeping blocks --
+    # area, centroid, A0, P0, V0f, alive, age -- and in declaration order they buried the morphogen
+    # behind "+11 more", on a slide whose subject was the morphogen. The blocks with a meaning of
+    # their own lead; the rest keep their order after them.
+    lead = [w for b, w in zip(blocks, out) if b in BLOCK_WORD]
+    rest = [w for b, w in zip(blocks, out) if b not in BLOCK_WORD]
+    out = lead + rest
+    if len(out) > max_blocks:
+        out = out[:max_blocks] + [f"+{len(out) - max_blocks} more"]
+    return out
+
+
 def read_fields(raw: dict) -> list[dict]:
     out = []
     for name, f in (raw.get("fields") or {}).items():
         f = f or {}
-        out.append(dict(name=name, frame=f.get("frame", ""),
+        out.append(dict(name=name, title=str(f.get("title") or ""), frame=f.get("frame", ""),
                         n_grid=f.get("n_grid") or f.get("n") or "",
-                        params={k: v for k, v in f.items() if k not in ("frame", "n_grid")}))
+                        params={k: v for k, v in f.items() if k not in ("frame", "n_grid", "title")}))
     return out
 
 
@@ -407,8 +553,15 @@ def read_operators(raw: dict) -> list[dict]:
 
     def row(o: dict, phase: str, substep_dt=None) -> dict:
         name = o.get("op")
+        # `variant=`, THE AXIS-AGNOSTIC LOOKUP. This passed `model` in the IMPLEMENTATION slot, the
+        # registry refused the axis mismatch -- by design, "the word is the claim" -- and the
+        # `except` below silently took the DEFAULT class instead. So every `model:` variant was
+        # summarised as its contract's default: May-Leonard and the coupled pair were both titled
+        # "Autocatalytic reaction" and shown Gray-Scott's equation over state they do not have.
+        # The spec has already been validated, so the axis check has nothing left to protect here;
+        # the fallback stays only for a name the registry does not know at all.
         try:
-            cls = R.get_operator(name, o.get("implementation") or o.get("model"))
+            cls = R.get_operator(name, variant=o.get("implementation") or o.get("model"))
         except Exception:
             cls = R._OPERATOR_REGISTRY.get(name)
         kind = getattr(cls, "KIND", "") if cls else ""
@@ -429,13 +582,33 @@ def read_operators(raw: dict) -> list[dict]:
 
     for o in (raw.get("seed") or []):
         rows.append(row(o, "seed"))
+    # THE i-th OCCURRENCE OF A TOKEN IS THE i-th DECLARED INSTANCE, as the engine binds it
+    # (engine.py `_run_token`). This popped EVERY instance on a token's first occurrence and then
+    # invented a bare `{"op": name}` row for each later one: exp04's hole spec, 8 pair_potentials
+    # each named once in the schedule, was listed as "pair potential x15" (8 real + 7 phantom).
+    # An occurrence past the declared count re-runs instances already listed, so it adds no row;
+    # a token never declared (a builtin) still gets its bare row.
+    seen = {n: 0 for n in declared}
     for name, dt in schedule_order(raw):
-        for o in declared.pop(name, [{"op": name}]):
-            rows.append(row(o, "schedule", dt))
+        if name not in declared:
+            rows.append(row({"op": name}, "schedule", dt))
+            continue
+        i = seen[name]
+        seen[name] = i + 1
+        if i < len(declared[name]):
+            rows.append(row(declared[name][i], "schedule", dt))
+    for name in list(declared):
+        declared[name] = declared[name][seen.get(name, 0):]
+        if not declared[name]:
+            del declared[name]
     for name, os_ in declared.items():                  # declared but never scheduled
         for o in os_:
             rows.append(row(o, "unscheduled"))
-    return rows
+    # THE PAGE READS IN THE ORDER A MODEL IS BUILT, NOT THE ORDER IT IS STEPPED: what exists (seed),
+    # then who talks to whom (rewire), then what they do (everything else). The schedule's own
+    # order is kept inside each group, and the schedule itself is untouched -- this is the page.
+    rank = lambda r: 0 if r["phase"] == "seed" else (1 if r["kind"] == "rewire" else 2)   # noqa: E731
+    return sorted(rows, key=rank)
 
 
 def human_time(seconds: float) -> str:
@@ -457,6 +630,8 @@ def summarise(path: str) -> dict:
     units = g.get("units") or {}
     n_rec = min(sp.n_frames, sp.record_cap)
     sets = read_sets(raw)
+    for _r in sets:
+        _r["state_labels"] = state_labels(raw, _r)
     total = sum(r["n"] for r in sets if r["n"] and not r["relation"])
     um = float(units["length_um"]) if units.get("length_um") else None
     return dict(
@@ -514,23 +689,24 @@ def render_text(s: dict, max_ops: int | None = None) -> str:
     for r in s["sets"]:
         if r["relation"]:
             out.append(f"  {r['name']:<18} relation  {r['relation'][0]} -> {r['relation'][1]}"
+                       + "".join(f", {_rel_word(k, v)}" for k, v in (r.get("also") or {}).items())
                        + (f", {fmt_num(r['n'])} of them" if r["n"] else ""))
             continue
         n = fmt_num(r["n"]) if r["n"] is not None else "seeded"
+        if r.get("seeded") and r["n"] and r["seeded"] != r["n"]:
+            n = fmt_num(r["seeded"])
         head = f"  {r['name']:<18} {n:>10}"
+        if r.get("seeded") and r["n"] and r["seeded"] != r["n"]:
+            head += f"  of {fmt_num(r['n'])} declared"
         if r["entity"]:
             head += f"  {r['entity']}"
         if r["parent"]:
             head += f"  [{fmt_num(r['per_parent'])} per {r['parent']}]"
+        if r.get("title"):
+            head += f"  -- {r['title']}"
         out.append(head)
-        if r["state"]:
-            shown = r["state"][:6]
-            txt = ", ".join(f"{v['name']}" + (f" ({v['role']})" if v["role"] else "")
-                            + (f" x{v['width']}" if (v["width"] or 1) > 1 else "")
-                            for v in shown)
-            if len(r["state"]) > len(shown):
-                txt += f", +{len(r['state']) - len(shown)} more"
-            out.append("      state: " + txt)
+        if r.get("state_labels"):
+            out.append("      state: " + ", ".join(r["state_labels"]))
         if r["types"]:
             out.append("      types: " + ", ".join(r["types"]))
     for f in s["fields"]:
@@ -590,6 +766,21 @@ def containment(sets: list[dict], fields: list[dict]) -> list[dict]:
     rows = []
 
     def walk(r: dict, depth: int) -> None:
+        kids_of = kids.get(r["name"], [])
+        # A SET THAT EXISTS ONLY TO HOLD ONE CHILD IS NOT WORTH A ROW. A material block is
+        # declared as a body of n=1 carrying the material points that are its substance, so the
+        # pair is printed as the child alone, named for the parent it belongs to.
+        if r["n"] == 1 and len(kids_of) == 1 and not r["relation"]:
+            kid = dict(kids_of[0])
+            kid["name"] = f"{r['name']}"
+            kid["per_parent"] = None
+            kid["parent"] = ""
+            # A block's single material type is usually named after the block itself, and
+            # printing "c_posts_a  73,759  c_posts_a" says the name twice and the fact once.
+            kept = [t for t in (r["types"] or kid["types"]) if t != r["name"]]
+            kid["types"] = kept
+            rows.append(dict(kind="set", depth=depth, row=kid))
+            return
         rows.append(dict(kind="set", depth=depth, row=r))
         for rel in sets:                                  # a relation sits under what it maps
             if rel["relation"] and rel["relation"][0] == r["name"] and rel is not r:
@@ -606,8 +797,146 @@ def containment(sets: list[dict], fields: list[dict]) -> list[dict]:
     return rows
 
 
+# WHICH KINDS OF ACTIVITY CARRY THEIR EQUATION IN THE PANE. A SEED does not: "initial positions,
+# types, ..." is the whole of what it claims, and a formula beside it is notation for a sentence
+# the title already is. A REWIRE and a LATERAL do, and they are a pair -- the rewire states WHICH
+# pairs interact and the lateral states WHAT passes between them, so between them they are the
+# mechanism, and neither is legible from its title alone. "neighbours within a radius" does not say
+# whether the radius has an inner bound; the equation does.
+EQ_KINDS = ("rewire", "lateral")
+
+
+def render_html(s: dict, icon_url, eq_url, max_ops: int | None = None,
+                eq_for: int | None = None, probes: bool = False,
+                eq_kinds: tuple = EQ_KINDS) -> str:
+    """The same summary as `render_tex`, as HTML -- for the watcher's `plexus` pane.
+
+    THE THIRD RENDERING OF ONE STRUCTURE, and it is here rather than in the watcher for the
+    reason the module exists at all: `render_text` and `render_tex` already answer the paper's
+    three questions in the paper's order, and a fourth copy living in a web page would drift from
+    them the first time an operator's title or an entity's containment changed. Everything below
+    is the tex renderer's structure with tags instead of macros; the two are meant to be read side
+    by side.
+
+    `icon_url(kind)` and `eq_url(k)` are supplied BY THE CALLER, so this module knows nothing about
+    routes. `k` is the equation's index among the ones actually shown, which is what lets the
+    caller serve the image without the LaTeX ever travelling through a query string.
+
+    `eq_for` bounds how many equations are drawn; None means all of them. The deck passes 2 because
+    a slide has a finite height -- a scrolling pane does not, and the equations are the part a
+    reader cannot reconstruct from the operator's name.
+    """
+    def esc(x):
+        return htmlmod.escape(str(x))
+
+    def named(r):
+        """The plain-English title, the code name small beside it; the code alone when there is no title."""
+        if r.get("title"):
+            return f'{esc(r["title"])} <span class="ps-g" style="font-size:85%">{esc(r["name"])}</span>'
+        return esc(r["name"])
+
+    L = ['<div class="ps">']
+    L.append('<div class="ps-h">entities</div>')
+    L.append('<table class="ps-e">')
+    for e in containment(s["sets"], s["fields"]):
+        r, pad = e["row"], f'padding-left:{10 * e["depth"]}px'
+        if e["kind"] == "relation":
+            L.append(f'<tr><td style="{pad}" class="ps-rel">&#8618; {esc(r["name"])}</td>'
+                     f'<td class="ps-n">{fmt_num(r["n"]) if r["n"] else ""}</td>'
+                     f'<td class="ps-g">{esc(r["relation"][0])} &rarr; {esc(r["relation"][1])}'
+                     + "".join(f', {esc(_rel_word(k, v))}' for k, v in (r.get("also") or {}).items())
+                     + '</td></tr>')
+        elif e["kind"] == "field":
+            L.append(f'<tr><td class="ps-en">{named(r)}</td><td class="ps-n"></td>'
+                     f'<td class="ps-g">field, grid {esc(r["n_grid"])}</td></tr>')
+        else:
+            n = fmt_num(r["n"]) if r["n"] is not None else "seeded"
+            note = []
+            if r.get("seeded") and r["n"] and r["seeded"] != r["n"]:
+                n = fmt_num(r["seeded"])
+                note.append(f"of {fmt_num(r['n'])} declared")
+            if r["parent"]:
+                note.append(f"{fmt_num(r['per_parent'])} per {r['parent']}")
+            # HOW MANY KINDS, NOT THREE OF THEIR NAMES. The list was truncated at three, so a set
+            # of sixteen types read `cell 4,000 t00, t01, t02` -- which states a fact that is false
+            # by omission, and is least informative exactly where it matters most, on the slide
+            # whose subject is that there are sixteen. The count is always right and always short;
+            # the names are in the `spec` tab beside this one.
+            #
+            # A SINGLE TYPE STILL SHOWS ITS NAME, because there the name IS the information and a
+            # row reading `1 type` says less than nothing. And a lone type named after its own set
+            # -- `types: {cell: {fraction: 1.0}}`, which is how a spec asks for one colour -- is
+            # dropped entirely: `cell 4,000 cell` puts a word in the annotation column that carries
+            # no fact at all.
+            _ts = list(r["types"] or [])
+            if len(_ts) > 1:
+                note.append(f"{len(_ts)} types")
+            elif _ts and _ts[0] != r["name"]:
+                note.append(_ts[0])
+            lead = "&#8618; " if e["depth"] else ""
+            L.append(f'<tr><td style="{pad}" class="ps-en">{lead}{named(r)}</td>'
+                     f'<td class="ps-n">{n}</td><td class="ps-g">{esc("; ".join(note))}</td></tr>')
+            if r.get("state_labels"):
+                L.append(f'<tr><td colspan="3" class="ps-st" style="padding-left:{10 * e["depth"] + 12}px">'
+                         f'state: {esc(", ".join(r["state_labels"]))}</td></tr>')
+    L.append("</table>")
+
+    L.append('<div class="ps-h">activities</div>')
+    ops = [o for o in s["operators"] if probes or not o["probe"]]
+    ops = ops[:max_ops] if max_ops else ops
+    shown, times, neq = set(), {}, [0]
+    for o in ops:
+        times[o["title"]] = times.get(o["title"], 0) + 1
+    L.append('<table class="ps-a">')
+    for kind, group in group_by_kind(ops):
+        if all(o["title"] in shown for o in group):
+            continue
+        L.append(f'<tr><td class="ps-i"><img src="{icon_url(kind)}" alt="{esc(kind)}"></td>'
+                 f'<td class="ps-k">{esc(KIND_LABEL.get(kind, kind))} '
+                 f'<span class="ps-g">&times;{len(group)}</span></td></tr>')
+        for o in group:
+            if o["title"] in shown:
+                continue
+            shown.add(o["title"])
+            k = times[o["title"]]
+            n = f' <span class="ps-g">&times;{k}</span>' if k > 1 else ""
+            L.append(f'<tr><td></td><td class="ps-t">{esc(lower_first(o["title"]))}{n}</td></tr>')
+            if (o["equation"] and (not eq_kinds or kind in eq_kinds)
+                    and (eq_for is None or neq[0] < eq_for)):
+                L.append(f'<tr><td></td><td class="ps-q">'
+                         f'<img src="{eq_url(neq[0])}" alt="equation"></td></tr>')
+                neq[0] += 1
+    L.append("</table></div>")
+    return "\n".join(L)
+
+
+def equations_shown(s: dict, max_ops: int | None = None, eq_for: int | None = None,
+                    probes: bool = False, eq_kinds: tuple = EQ_KINDS) -> list[str]:
+    """The LaTeX bodies `render_html` draws, in the order it draws them.
+
+    Kept beside the renderer and walking the same dedup so the k-th image a page asks for is the
+    k-th equation that renderer emitted. Deriving it twice in two places is how they come apart.
+    """
+    ops = [o for o in s["operators"] if probes or not o["probe"]]
+    ops = ops[:max_ops] if max_ops else ops
+    shown, out = set(), []
+    for _kind, group in group_by_kind(ops):
+        for o in group:
+            if o["title"] in shown:
+                continue
+            shown.add(o["title"])
+            if (o["equation"] and (not eq_kinds or _kind in eq_kinds)
+                    and (eq_for is None or len(out) < eq_for)):
+                body = o["equation"].strip()
+                if body.startswith("$$") and body.endswith("$$"):
+                    body = body[2:-2].strip()
+                out.append(body)
+    return out
+
+
 def render_tex(s: dict, max_ops: int | None = None, show_params: bool = False,
                eq_for: int = 0, probes: bool = False) -> str:
+    """`eq_for` is how many activities get their equation printed beneath them; 0 prints none."""
     """The summary as a beamer column body: the entities, then the activities.
 
     The two words are the paper's (plexus2.tex Sec. 2, and the site's front page): a model
@@ -629,7 +958,9 @@ def render_tex(s: dict, max_ops: int | None = None, show_params: bool = False,
         if e["kind"] == "relation":
             L.append(rf"{pad}$\hookrightarrow$ {tex_escape(r['name'])} & {fmt_num(r['n']) if r['n'] else ''} & "
                      rf"\textcolor{{gray}}{{{tex_escape(r['relation'][0])} $\to$ "
-                     rf"{tex_escape(r['relation'][1])}}} \\")
+                     rf"{tex_escape(r['relation'][1])}"
+                     + "".join(f", {tex_escape(_rel_word(k, v))}" for k, v in (r.get("also") or {}).items())
+                     + r"} \\")
         elif e["kind"] == "field":
             L.append(rf"{tex_escape(r['name'])} & & \textcolor{{gray}}{{field, "
                      rf"grid {tex_escape(r['n_grid'])}}} \\")
@@ -646,6 +977,9 @@ def render_tex(s: dict, max_ops: int | None = None, show_params: bool = False,
             lead = (rf"{pad}$\hookrightarrow$ " if e["depth"] else "")
             L.append(rf"{lead}{tex_escape(r['name'])} & {n} & "
                      rf"\textcolor{{gray}}{{{'; '.join(note)}}} \\")
+            if r.get("state_labels"):
+                L.append(rf"\multicolumn{{3}}{{@{{}}l}}{{{pad}\hspace*{{8pt}}\textcolor{{gray}}{{state: "
+                         rf"{tex_escape(', '.join(r['state_labels']))}}}}} \\")
     L.append(r"\end{tabular}\par}")
 
     L.append(r"\vspace{10pt}{\normalsize\textbf{activities}}\\[4pt]")
@@ -656,11 +990,33 @@ def render_tex(s: dict, max_ops: int | None = None, show_params: bool = False,
     ops = [o for o in s["operators"] if probes or not o["probe"]]
     ops = ops[:max_ops] if max_ops else ops
     L.append(r"{\scriptsize\begin{tabular}{@{}c@{\hspace{5pt}}l@{}}")
+    shown, times, shown_eq = set(), {}, [0]
+    for o in ops:
+        times[o["title"]] = times.get(o["title"], 0) + 1
     for kind, group in group_by_kind(ops):
+        if all(o["title"] in shown for o in group):      # every activity of this kind already listed
+            continue
         L.append(rf"\raisebox{{-4pt}}{{\includegraphics[height=15pt]{{icons/{kind}.png}}}} & "
-                 rf"\textcolor{{gray}}{{{KIND_LABEL.get(kind, kind)}}} \\")
+                 rf"\textcolor{{gray}}{{{KIND_LABEL.get(kind, kind)} $\times${len(group)}}} \\")
+        # ONE ROW PER DISTINCT ACTIVITY, and never twice -- an MPM spec declares `mpm_scatter`
+        # once per material, so the same activity would otherwise be listed eleven times. How
+        # many of them there are is still worth saying, so the row carries a greyed count.
         for o in group:
-            L.append(rf" & {tex_escape(lower_first(o['title']))} \\[1pt]")
+            if o["title"] in shown:
+                continue
+            shown.add(o["title"])
+            k = times[o["title"]]
+            n = rf"\,\textcolor{{gray}}{{$\times${k}}}" if k > 1 else ""
+            L.append(rf" & {tex_escape(lower_first(o['title']))}{n} \\[1pt]")
+            # THE EQUATION UNDER ITS ACTIVITY, for as many as `eq_for` allows. It is set inline
+            # with \displaystyle rather than as $$...$$, because the list is a tabular and an
+            # `l` cell cannot hold display maths; the look is the same, the box is legal.
+            if shown_eq[0] < eq_for and o["equation"]:
+                body = o["equation"].strip()
+                if body.startswith("$$") and body.endswith("$$"):
+                    body = body[2:-2].strip()
+                L.append(rf" & {{\tiny$\displaystyle {body}$}} \\[3pt]")
+                shown_eq[0] += 1
     if max_ops and len(ops) == max_ops:
         L.append(r" & \textcolor{gray}{\ldots and more} \\")
     L.append(r"\end{tabular}\par}")
@@ -682,7 +1038,7 @@ FRAME = r"""\begin{frame}[t]{%(title)s}
 
 
 def render_frame(s: dict, title: str, movie: str | None, figure: str | None,
-                 caption: str = "", left: float = 0.50, **kw) -> str:
+                 caption: str = "", left: float = 0.58, **kw) -> str:
     """A whole slide: media on the left, the spec summary on the right."""
     if movie:
         media = "\\playmovie{%s}" % movie

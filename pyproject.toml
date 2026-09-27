@@ -21,6 +21,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 # The regression series (tests/regression, marker `regression`) reruns working points for minutes
 # on a GPU; it is deselected by default and requested with `pytest tests/regression -m regression`.
-addopts = "-m 'not regression'"
-markers = ["regression: reruns working points; needs CUDA and minutes (tests/REGRESSION_PLAN.md)"]
+addopts = "-m 'not regression and not engine'"
+markers = ["regression: reruns working points; needs CUDA and minutes (tests/REGRESSION_PLAN.md)",
+           "engine: runs the engine on a GPU for minutes (e.g. tests/test_ion_flow.py, the exp04 ion-flow element)"]
 testpaths = ["tests"]

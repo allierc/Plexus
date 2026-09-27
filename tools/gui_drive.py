@@ -27,7 +27,6 @@ import urllib.request
 
 BASE = os.environ.get("PLEXUS_GUI", "http://127.0.0.1:8799")
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-JOURNAL = os.path.join(REPO, "log", "gui_runs", "journal.txt")
 # THE HISTORY. Every picture is kept with the SPEC that produced it and the REASON it was taken,
 # because a picture alone does not say what was built and a spec alone does not say why. One
 # SUBFOLDER PER KIND OF OUTPUT, and the step number is the filename, so a step is read across the
@@ -41,8 +40,24 @@ JOURNAL = os.path.join(REPO, "log", "gui_runs", "journal.txt")
 # The mp4 is COPIED, not linked: the run folder is rewritten by the next run of the same spec, and
 # a history whose oldest entries quietly change is not a history. Nothing here is ever deleted.
 # `tools/watch.py` walks it.
-HISTORY = os.path.join(REPO, "builder")
-KINDS = {"png": ".png", "spec": ".yaml", "why": ".txt", "mp4": ".mp4"}
+# WHICH EXPERIMENT'S RECORD THIS IS. The builder used to be one flat pile at `builder/`, which
+# works until a second line of work starts and its steps interleave with the first -- the record
+# then reads as one story told by two people. `PLEXUS_BUILDER` names the folder, so a new
+# experiment is a new directory rather than a new numbering scheme, and the watcher and the writer
+# read the SAME variable so they cannot drift apart.
+HISTORY = os.environ.get("PLEXUS_BUILDER") or os.path.join(REPO, "builder", "exp_01_memiopsis")
+# THE JOURNAL LIVES INSIDE THE RECORD, so it is per-experiment by construction. It was a fixed
+# path under log/gui_runs/, which two sessions running at once both appended to -- the watcher on
+# 8826 then showed the cilium campaign's lines interleaved with the bacterium's, and neither
+# session could tell which line was its own. One folder per experiment already isolates the four
+# step files; the journal is the fifth thing that has to be there.
+JOURNAL = os.path.join(HISTORY, "journal.txt")
+# THE CAPTION IS THE FIFTH FILE OF A STEP. It was computed on every cycle and written into ONE shared
+# `log/gui_runs/captions.txt`, truncated by the next caption, so nothing tied a description to the
+# step it described and the watcher could not show it at all -- the VLM's reading of a movie, the
+# one reader that can say "the body never moves" without being told what to look for, was the part
+# of each step nobody could see afterwards. It lives beside the other four now, by step number.
+KINDS = {"png": ".png", "spec": ".yaml", "why": ".txt", "mp4": ".mp4", "caption": ".txt"}
 
 
 def _path(kind: str, i: int) -> str:
@@ -245,18 +260,31 @@ def engine_log(name: str, tail: int = 80) -> dict:
     return {"log": p, "lines": len(lines), "tail": lines[-tail:]}
 
 
-def caption(mp4: str, frames: int = 8) -> dict:
+def caption(mp4: str, frames: int = 8, index: int | None = None) -> dict:
     """Ask the local Gemma VLLM what the movie shows. It is the only reader here that can say
-    'the body never moves' without being told what to look for."""
+    'the body never moves' without being told what to look for.
+
+    With `index`, the caption is written as that step's `caption/NNNN.txt` -- once, here -- and
+    the watcher reads it from there. `describe_video.py --out` truncates its file on every call, so
+    the step's file holds exactly this movie's description and nothing left over from another."""
     script = os.path.join(REPO, "VLLM", "describe_video.py")
     if not os.path.exists(script):
         return {"error": f"no {script}"}
-    out = os.path.join(REPO, "log", "gui_runs", "captions.txt")
+    out = (_path("caption", index) if index is not None
+           else os.path.join(REPO, "log", "gui_runs", "captions.txt"))
     r = subprocess.run([sys.executable, script, mp4, "--out", out, "--frames", str(frames)],
                        capture_output=True, text=True, timeout=3600)
     if r.returncode != 0:
         return {"error": r.stderr[-400:]}
     txt = open(out, errors="replace").read() if os.path.exists(out) else ""
+    # AN EMPTY CAPTION IS A FAILURE, NOT A SUCCESS. `describe_video.py` skips a video it cannot read
+    # -- exp_01's step 0604 is a 762-byte mp4 with no stream in it -- writes `"records": []` and
+    # exits 0, so this returned an empty caption as if the VLM had looked and found nothing to say.
+    # Said out loud instead, with the one fact that usually explains it.
+    if not txt.strip():
+        sz = os.path.getsize(mp4) if os.path.exists(mp4) else 0
+        return {"error": f"no caption produced for {mp4} ({sz:,} bytes) -- the video could not be "
+                         f"read, or the model returned nothing", "out": out}
     return {"out": out, "caption": txt[-1200:]}
 
 
@@ -284,6 +312,10 @@ def main():
     # `--roll 180` turns the picture over without touching the data or the lighting.
     ap.add_argument("--roll", type=float, default=0.0)
     ap.add_argument("--no-caption", action="store_true")
+    # `--no-before`: NO STILL BEFORE THE RUN. The before-shot is the anatomy check; on a series of
+    # runs of one validated anatomy it is the same picture every time and the human called it
+    # useless in the record (exp_02 steps 0039, 0042, 2026-09-23). The after-shot and the movie stay.
+    ap.add_argument("--no-before", action="store_true")
     # WHY THIS STEP EXISTS, in the session's own words. It is the third file of the record and the
     # only one that cannot be reconstructed from the others.
     ap.add_argument("--why", default="")
@@ -314,8 +346,9 @@ def main():
         rep = {"open": open_spec(a.spec)}
         if rep["open"].get("error"):
             print(json.dumps(rep, indent=1)); return
-        rep["shot_before"] = shot(f"{a.why} (before the run)".strip(),
-                                  azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
+        if not a.no_before:
+            rep["shot_before"] = shot(f"{a.why} (before the run)".strip(),
+                                      azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
         note(f"run  device={a.device}")
         rep["started"] = _post("/api/scene/run", {"device": a.device})
         rep["final"] = wait()
@@ -326,7 +359,7 @@ def main():
         rep["shot_after"] = shot(f"{a.why} (after the run)".strip(), mp4,
                                  azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
         if mp4 and not a.no_caption and os.path.exists(mp4):
-            rep["caption"] = caption(mp4)
+            rep["caption"] = caption(mp4, index=rep["shot_after"].get("index"))
         print(json.dumps(rep, indent=1))
     elif a.cmd == "cycle":
         # THE WHOLE LOOP, which is the reason this file exists: build, look, run, wait, collect,
@@ -346,7 +379,7 @@ def main():
         rep["shot_after"] = shot(f"{a.why} (after the run)".strip(), mp4,
                                  azim=a.azim, elev=a.elev, zoom=a.zoom, roll=a.roll)
         if mp4 and not a.no_caption and os.path.exists(mp4):
-            rep["caption"] = caption(mp4)
+            rep["caption"] = caption(mp4, index=rep["shot_after"].get("index"))
         print(json.dumps(rep, indent=1))
 
 
