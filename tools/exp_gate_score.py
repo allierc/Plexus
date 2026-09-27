@@ -45,6 +45,7 @@ VALUE KINDS (a gate's `value:`):
   {file: path, key: dotted.key}           a number from a JSON file (data, not a run)
   {const: x, source: "..."}               a declared number (a paper's value, a data target)
   {min_over_arms: {key: K, arms: [..]}}   the smallest K over every run of every arm, or of the listed arms only
+                                          (a listed arm with no measured run makes the gate "no value")
                                           (the caps and G-sanity: list the arms the card claims, so a wrecked
                                           EXPLORATION arm does not cap the model of record)
 KEYS are `<measure>.<field>` as the measure returns them, e.g. `exp11.bud.hole.excess_last`.
@@ -220,6 +221,13 @@ def value(spec, M):
         only = spec["min_over_arms"].get("arms")          # optional: the arms the card claims (exploration arms excluded)
         v = [float(x) for (arm, _s), vals in M.items() if (only is None or arm in only)
              and isinstance((x := vals.get(k)), (int, float)) and math.isfinite(float(x))]
+        # A LISTED ARM WITH NO VALUE VOIDS THE MINIMUM (2026-09-27): exp14's mutant arm had both runs killed at
+        # the 4 h wall, and the minimum over the other arms read 4.0 -- "intact" was never tested on the arm
+        # most likely to fail. The listed arms are the card's claim; each must have been measured.
+        missing = [a for a in (only or []) if not any(a == arm and isinstance(vals.get(k), (int, float))
+                                                        and math.isfinite(float(vals[k])) for (arm, _s), vals in M.items())]
+        if missing:
+            return None, f"arm(s) {missing} have no run with {k} (not landed, died, or the ruler failed)"
         return (float(min(v)), f"min over {len(v)} runs" + (f" of {only}" if only else "")) if v else (None, f"no run has {k}")
     if "file" in spec:
         f = spec["file"] if os.path.isabs(spec["file"]) else os.path.join(ROOT, spec["file"])

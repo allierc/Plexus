@@ -37,3 +37,13 @@ def test_cache_is_refreshed_when_the_run_relands_or_the_ruler_changes(tmp_path, 
     assert S.measure_all(G, 99)[("a", 1)]["m.x.v"] == 2 and len(calls) == 2
     monkeypatch.setattr(C, "CHANGED", {"m.x": time.strftime("%Y-%m-%d %H:%M", time.localtime(time.time() + 120))})
     assert S.measure_all(G, 99)[("a", 1)]["m.x.v"] == 3                           # the ruler changed
+
+
+def test_min_over_listed_arms_is_void_when_one_arm_has_no_run():
+    """exp14: a listed arm whose runs all died must not be skipped by the minimum (2026-09-27)."""
+    import exp_gate_score as S
+    M = {("wt", 1): {"a": 5.0}, ("ctrl", 1): {"a": 4.0}}
+    v, note = S.value({"min_over_arms": {"key": "a", "arms": ["wt", "mutant"]}}, M)
+    assert v is None and "mutant" in note
+    assert S.value({"min_over_arms": {"key": "a", "arms": ["wt", "ctrl"]}}, M)[0] == 4.0
+    assert S.value({"min_over_arms": {"key": "a"}}, M)[0] == 4.0          # no list: every run on disk, as before
