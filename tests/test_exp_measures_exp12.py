@@ -320,3 +320,55 @@ def test_strands_on_a_shell(tmp_path):
     finger = 20.0 + np.outer(np.arange(10.5, 18.5, 1.0), [0, 0, 1])
     T2 = write_run(tmp_path, [np.concatenate([x, finger])])
     assert exp_measures.run_measure("exp12.strands", T2, body="shell")["strands_last"] == 1
+
+
+def test_mesh_sanity_radial_line_can_be_waived_for_outgrowth():
+    """A closed triangulated shell with a spike of 6 edge lengths: broken by the radial line, sane without it
+    only if no other line (edge, area) breaks -- here the spike stretches edges, so it stays broken."""
+    import numpy as np
+    from scipy.spatial import ConvexHull
+    v = np.random.default_rng(2).normal(size=(400, 3)); v /= np.linalg.norm(v, axis=1, keepdims=True)
+    hull = ConvexHull(v)
+    es, et, ef = [], [], []
+    for f, tri in enumerate(hull.simplices):
+        a, b, c = tri
+        if np.dot(np.cross(v[b] - v[a], v[c] - v[a]), v[a]) < 0:
+            b, c = c, b
+        for s_, t_ in ((a, b), (b, c), (c, a)):
+            es.append(s_); et.append(t_); ef.append(f)
+    es, et, ef = map(np.array, (es, et, ef))
+    nF = len(hull.simplices)
+    ok = exp_measures.run_measure("exp12.mesh_sanity", MeshTraj([(v, es, et, ef, nF)]), every=1)
+    assert ok["sane"] == 1.0
+    L = np.median(np.linalg.norm(v[es] - v[et], axis=1))
+    w = v.copy(); w[0] *= 1 + 6 * L                    # one vertex 6 edges out: a spike
+    bad = exp_measures.run_measure("exp12.mesh_sanity", MeshTraj([(w, es, et, ef, nF)]), every=1)
+    waived = exp_measures.run_measure("exp12.mesh_sanity", MeshTraj([(w, es, et, ef, nF)]), every=1, radial_line=False)
+    assert bad["sane"] == 0.0 and "off the shell" in bad["why"]
+    assert waived["sane"] == 0.0 and "off the shell" not in waived["why"]   # the edge line still catches it
+
+
+def test_strands_reports_the_cell_gain_of_a_growing_shell():
+    import numpy as np
+    from exp_measures import exp12 as E
+
+    class Row:
+        def __init__(self, n):
+            g = np.random.default_rng(n)
+            v = g.normal(size=(n, 3))
+            self.x = v / np.linalg.norm(v, axis=1, keepdims=True) * 5.0
+
+    class Fake:
+        rows = [Row(200), Row(300), Row(500)]
+    old_cells, old_rows, old_d, old_um = E.cells, E._rows, E._diameter, E._um
+    try:
+        E.cells = lambda T, t: T.rows[t]
+        E._rows = lambda T, every: [0, 1, 2]
+        E._diameter = lambda T, t, c: 0.5
+        E._um = lambda T, u: 10.0
+        Row.__len__ = lambda self: len(self.x)
+        out = E.strands(Fake(), dim=3, body="shell")
+    finally:
+        E.cells, E._rows, E._diameter, E._um = old_cells, old_rows, old_d, old_um
+    assert out["cells_first"] == 200 and out["cells_last"] == 500 and abs(out["cell_gain"] - 2.5) < 1e-12
+    assert out["strands_max"] == 0

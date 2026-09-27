@@ -299,6 +299,8 @@ def write_results(number=8):
         if meas == "exp08.polarity":
             pol.setdefault(run, {}).update({k: v.get(k) for k in ("order_last", "local_last", "rc_last",
                                                                  "cue_last", "asym_last", "turn_axial_deg")})
+        elif meas == "exp08.celsr":
+            pol.setdefault(run, {}).update({k: v.get(k) for k in ("MP_last", "ang_P_deform_deg_last", "ME_peak", "ME_last")})
         elif meas == "exp08.clone" and v.get("available"):
             pol.setdefault(run, {}).update({k: v.get(k) for k in ("toward_1", "rev_distal", "rev_proximal")})
         elif meas == "shared.growth_audit" and v.get("available"):

@@ -315,9 +315,10 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
     from scipy.spatial import cKDTree
     s = _um(T, um_per_unit)
     ts = _rows(T, every)
-    counts, reach = [], []
+    counts, reach, ncell = [], [], []
     for t in ts:
         c = cells(T, t)
+        ncell.append(len(c))
         if len(c) < 8:
             counts.append(None); reach.append(None)
             continue
@@ -338,11 +339,16 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
         counts.append(n)
         reach.append(finite((r.max() - Rb) / d))
     last = counts[-1]
+    # THE CELL COUNT, BESIDE THE STRANDS: an outgrowth that multiplies the tissue is budding, not
+    # migration. exp12 Phase 2 batch 2: the leader spheroid went 200 -> 1,825-2,015 cells in 72 h (the
+    # leaderless one 200 -> 205-207) and its "strands" were proliferating buds (finding 58).
     return {"strands_last": last, "strands_max": max((v for v in counts if v is not None), default=None),
-            "reach_last_cd": reach[-1], "series": counts, "rows": ts, "um_per_unit": s}
+            "reach_last_cd": reach[-1], "series": counts, "rows": ts, "um_per_unit": s,
+            "cells_first": ncell[0] if ncell else None, "cells_last": ncell[-1] if ncell else None,
+            "cell_gain": (ncell[-1] / ncell[0]) if ncell and ncell[0] else None}
 
 
-def mesh_sanity(T, every=5, **_):
+def mesh_sanity(T, every=5, radial_line=True, **_):
     """`tools/mesh_sanity.py` (exp 14's per-cell geometry check) over the run: `sane` 1.0 when no sampled
     row breaks a line -- Euler characteristic, longest edge 8x the median, largest cell 10x the median
     area, a vertex 4 edges off a closed shell -- else 0.0, with the first broken row and the worst
@@ -352,6 +358,13 @@ def mesh_sanity(T, every=5, **_):
     import mesh_sanity as MS
     rows = [MS.row(T, t) for t in range(0, T.n_rows(), max(1, int(every)))]
     for r in rows:
+        # THE SHELL-RADIUS LINE IS WAIVED WHERE OUTGROWTH IS THE CLAIM (`radial_line: false`, the invading
+        # spheroid of Phase 2 only). "A vertex 4 edges off the shell" catches a vertex flying off a closed
+        # surface; an invasive strand is, by construction, cells leaving the shell (p2_leader_s1: strands
+        # reaching 4.8 cell diameters out read "4.1 edge lengths off"). The edge, area and Euler lines still
+        # hold, and would catch a flying vertex (its edges stretch).
+        if not radial_line:
+            r["bad"] = [b for b in r["bad"] if "off the shell" not in b]
         # THE TOOL'S EULER COUNT ASSUMES A CLOSED SURFACE: E = half-edges // 2, true only when every edge
         # has a twin. A disc's rim edges have one half-edge each, so every exp12 disc read chi = 305
         # (= 1 + 608 rim half-edges / 2) on every row. Recounted here with undirected edges; the flag is

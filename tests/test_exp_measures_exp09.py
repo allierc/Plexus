@@ -357,3 +357,11 @@ def test_mesh_inverted_cells(tmp_path):
     np.savez(tmp_path / "flip" / "trajectory.npz", **z)
     r = exp_measures.run_measure("exp09.sorting", open_run(str(tmp_path / "flip")), types=[1, 0], every=1)
     assert r["inverted_max"] == 1.0
+
+
+def test_point_run_validity_is_the_largest_cluster_share(tmp_path):
+    x = disk()
+    typ = np.random.default_rng(16).integers(0, 2, len(x))
+    far = np.concatenate([x[:-100], x[-100:] + 10.0])                 # 100 cells lost from the aggregate
+    r = exp_measures.run_measure("exp09.sorting", write_run(tmp_path, [x, far], typ), every=1)
+    assert abs(r["valid_frac_min"] - (len(x) - 100) / len(x)) < 1e-9

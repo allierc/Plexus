@@ -404,3 +404,146 @@ def test_phase2_tube_pairs_differ_by_their_one_change():
     assert _spec_diff("exp07_tube_commit", "exp07_tube_commit_nosource") == {"operators.[3:cell_chem_react].production"}
     assert _spec_diff("exp07_tube_readout", "exp07_tube_cyc") == {"operators.[4:cell_chem_react].model",
                                                                    "operators.[4:cell_chem_react].schedule"}
+
+
+def test_scaling_index_lin_ignores_noise_and_reads_trend():
+    """A tube doubling its radius over 21 rows. Boundary constant in s plus noise (sd 0.004): the range
+    index is noise-inflated, the trend index stays near 0. Boundary fixed in arc length: both read ~1."""
+    rng = np.random.default_rng(0)
+    frames, noisy, fixed = [], [], []
+    for t in range(21):
+        R = 3.0 * (1 + t / 20)
+        x, s = tube_cells(R, n_around=192)
+        frames.append(x)
+        b1 = 0.2 + rng.normal(0, 0.004)
+        noisy.append(three_genes(s, b1, 0.5))
+        fixed.append(three_genes(s * np.pi * R / (np.pi * 3.0), 0.2, 0.5))
+    kw = dict(GENES, every=1, from_frac=0.0, **TUBE)
+    rn = exp_measures.run_measure("exp07.domains", write_run(tmp_path_factory_dir("lin_noisy"), frames, noisy), **kw)
+    rf = exp_measures.run_measure("exp07.domains", write_run(tmp_path_factory_dir("lin_fixed"), frames, fixed), **kw)
+    assert rn["scaling_index_lin_nkx22_olig2"] < 0.1 < rn["scaling_index_nkx22_olig2"]
+    assert abs(rf["scaling_index_lin_nkx22_olig2"] - 1.0) < 0.15
+
+
+def test_the_recalibrated_tube_arms_are_one_line_apart():
+    """Phase 2 from P2-7: the Pax6-/-, 2x-production, relaxation-step and PTCH-feedback twins each change
+    only what their md arm says; the feedback pair differs in production alone."""
+    if not os.path.exists(os.path.join(ROOT, "config", "tissue", "exp07_tubeptch_prod2.yaml")):
+        pytest.skip("specs not written")
+    assert _spec_diff("exp07_tubep2_commit", "exp07_tubep2_commit_pax6ko") == {"operators.[4:cell_chem_react].alpha"}
+    assert _spec_diff("exp07_tubep2_commit", "exp07_tubep2_prod2") == {"operators.[3:cell_chem_react].production"}
+    assert _spec_diff("exp07_tubep2_commit", "exp07_tubep2_eta") == {"operators.[6:cell_mechanics].eta"}
+    assert _spec_diff("exp07_tubeptch_commit", "exp07_tubeptch_prod2") == {"operators.[3:cell_chem_react].production"}
+    d = _spec_diff("exp07_tubep2_commit", "exp07_tubeptch_commit")
+    assert {k.split(".")[-1] for k in d} == {"model", "production", "decay", "sequester", "r_basal", "r_induced",
+                                             "r_half", "r_hill", "r_decay"}
+    assert all(k.startswith("operators.[3:cell_chem_react].") for k in d)
+
+
+def test_the_rim_flip_twins_are_one_line_apart():
+    """From P2-10: the rim-flip tube (edge_flip[boundary]) and its twins, each one change from their parent."""
+    if not os.path.exists(os.path.join(ROOT, "config", "tissue", "exp07_tubep2bnd_nosource.yaml")):
+        pytest.skip("specs not written")
+    assert _spec_diff("exp07_tubep2_commit", "exp07_tubep2_bnd") == {"operators.[8:edge_flip].model"}
+    assert _spec_diff("exp07_tubep2_bnd", "exp07_tubep2bnd_pax6ko") == {"operators.[4:cell_chem_react].alpha"}
+    assert _spec_diff("exp07_tubep2_bnd", "exp07_tubep2bnd_nosource") == {"operators.[3:cell_chem_react].production"}
+    assert _spec_diff("exp07_tubep2_bnd", "exp07_tubep2bnd_ccyc") == {"operators.[4:cell_chem_react].model",
+                                                                     "operators.[4:cell_chem_react].schedule"}
+    assert _spec_diff("exp07_tubeptch_commit", "exp07_tubeptch_pax6ko") == {"operators.[4:cell_chem_react].alpha"}
+    assert _spec_diff("exp07_tubep2_bnd", "exp07_tubep2bnd_slow") == {"operators.[5:cell_grow].cycle_frames",
+                                                                     "operators.[7:cell_divide].cycle"}
+
+
+def test_the_half_step_tube_changes_only_the_clock():
+    """From P2-13: dt halved, every frame-counted period doubled, nothing else; twins one line apart."""
+    if not os.path.exists(os.path.join(ROOT, "config", "tissue", "exp07_tubep3_ccyc.yaml")):
+        pytest.skip("specs not written")
+    assert _spec_diff("exp07_tubep2_commit", "exp07_tubep3_commit") == {
+        "general.n_frames", "general.dt", "general.record_cap", "general.units.time_s",
+        "seed.[0:seed_mesh].age_seed", "seed.[0:seed_mesh].ref_frame",
+        "operators.[7:cell_divide].min_cycle", "operators.[7:cell_divide].cycle"}
+    assert _spec_diff("exp07_tubep3_commit", "exp07_tubep3_commit_pax6ko") == {"operators.[4:cell_chem_react].alpha"}
+    assert _spec_diff("exp07_tubep3_commit", "exp07_tubep3_commit_nosource") == {"operators.[3:cell_chem_react].production"}
+    assert _spec_diff("exp07_tubep3_commit", "exp07_tubep3_ccyc") == {"operators.[4:cell_chem_react].model",
+                                                                      "operators.[4:cell_chem_react].schedule"}
+
+
+def test_interior_jumps_ignore_the_rims_and_read_every_frame():
+    """A tube of vertices along z in [-2, 2]; at frame 5 a RIM vertex (z = 2) moves 3 edge lengths and at
+    frame 7 an INTERIOR one (z = 0) moves 1.5: the interior scan sees only the second, on its own frame."""
+    from exp_measures.exp07 import interior_jumps
+    zs = np.linspace(-2.0, 2.0, 41)
+    base = np.stack([np.ones_like(zs), np.zeros_like(zs), zs], 1)   # edge length 0.1 along the chain
+    es = np.arange(40); et = np.arange(1, 41)
+    frames = [base.copy() for _ in range(10)]
+    for t in range(5, 10):
+        frames[t][-1, 0] += 0.3                                      # rim vertex, 3 edge lengths, at t = 5
+    for t in range(7, 10):
+        frames[t][20, 0] += 0.15                                     # interior vertex, 1.5 edge lengths, at t = 7
+    Nv = np.full(10, 41); off = np.arange(11) * 40
+    ts, js = interior_jumps(frames, Nv, off, np.tile(es, 10), np.tile(et, 10), t0=0, strip=0.5, axis=2)
+    assert abs(js[ts == 7][0] - 1.5) < 1e-6
+    assert js[ts == 5][0] < 1e-9                                     # the rim's jump is not read
+    assert (js > 1.0).sum() == 1
+
+
+def test_the_local_relax_tube_is_one_line_from_the_recalibrated_tube():
+    if not os.path.exists(os.path.join(ROOT, "config", "tissue", "exp07_tubep2lr_ccyc.yaml")):
+        pytest.skip("specs not written")
+    assert _spec_diff("exp07_tubep2_commit", "exp07_tubep2lr_commit") == {"operators.[7:cell_divide].local_relax"}
+    assert _spec_diff("exp07_tubep2lr_commit", "exp07_tubep2lr_pax6ko") == {"operators.[4:cell_chem_react].alpha"}
+    assert _spec_diff("exp07_tubep2lr_commit", "exp07_tubep2lr_nosource") == {"operators.[3:cell_chem_react].production"}
+    assert _spec_diff("exp07_tubep2lr_commit", "exp07_tubep2lr_ccyc") == {"operators.[4:cell_chem_react].model",
+                                                                          "operators.[4:cell_chem_react].schedule"}
+
+
+def test_interior_jumps_can_leave_out_what_a_division_touched():
+    """Three interior moves of 1.5 edge lengths: vertex 18 at frame 4 with a CHANGED neighbour (a septum
+    split its edge), vertex 41 on its first frame after birth (appended at frame 5, moves at 6), vertex
+    22 at frame 8 with nothing changed. With exclude_division only the last is read."""
+    from exp_measures.exp07 import interior_jumps
+    zs = np.linspace(-2.0, 2.0, 41)
+    base = np.stack([np.ones_like(zs), np.zeros_like(zs), zs], 1)
+    frames, Nv, S, E, off = [], [], [], [], [0]
+    for t in range(10):
+        p = base.copy()
+        es = list(range(40)); et = list(range(1, 41))
+        if t >= 4:                                   # vertex 18's edge to 19 now goes to 41's slot... rewired
+            es[18], et[18] = 18, 20
+        if t >= 5:                                   # a new vertex 41 appended, joined to 20
+            p = np.vstack([p, [1.0, 0.0, 0.05]]); es.append(41); et.append(20)
+        if t >= 4:
+            p[18, 0] += 0.15
+        if t >= 6:
+            p[41, 0] += 0.15
+        if t >= 8:
+            p[22, 0] += 0.15
+        frames.append(p); Nv.append(len(p)); S += es; E += et; off.append(off[-1] + len(es))
+    Nv = np.asarray(Nv); off = np.asarray(off); S = np.asarray(S); E = np.asarray(E)
+    ts, js = interior_jumps(frames, Nv, off, S, E, t0=0, strip=0.5, axis=2)
+    assert (js > 1.0).sum() == 3
+    ts, js = interior_jumps(frames, Nv, off, S, E, t0=0, strip=0.5, axis=2, exclude_division=True)
+    assert (js > 1.0).sum() == 1 and ts[js > 1.0][0] == 8
+
+
+def test_a_rewired_vertex_is_also_left_out_on_the_frame_after():
+    """Vertex 18 rewired at frame 4 (a septum split its edge) and settling 1.5 edge lengths at frame 5,
+    with no change at 5; vertex 22 untouched moving 1.5 at frame 8. Only the latter is read."""
+    from exp_measures.exp07 import interior_jumps
+    zs = np.linspace(-2.0, 2.0, 41)
+    base = np.stack([np.ones_like(zs), np.zeros_like(zs), zs], 1)
+    frames, Nv, S, E, off = [], [], [], [], [0]
+    for t in range(10):
+        p = base.copy(); es = list(range(40)); et = list(range(1, 41))
+        if t >= 4:
+            es[18], et[18] = 18, 20
+        if t >= 5:
+            p[18, 0] += 0.15
+        if t >= 8:
+            p[22, 0] += 0.15
+        frames.append(p); Nv.append(len(p)); S += es; E += et; off.append(off[-1] + len(es))
+    Nv = np.asarray(Nv); off = np.asarray(off); S = np.asarray(S); E = np.asarray(E)
+    ts, js = interior_jumps(frames, Nv, off, S, E, t0=0, strip=0.5, axis=2, exclude_division=True)
+    assert (js > 1.0).sum() == 1 and ts[js > 1.0][0] == 8
+    ts, js = interior_jumps(frames, Nv, off, S, E, t0=0, strip=0.5, axis=2, exclude_division=False)
+    assert (js > 1.0).sum() == 2

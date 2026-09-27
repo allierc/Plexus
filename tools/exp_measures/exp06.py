@@ -332,6 +332,38 @@ def real(T, set="cell", fit=None, chan=0, thr=0.5, rearm=None, dt=None, frame_ms
     return out
 
 
+def follow(T, set="cell", block="gam_prev", chan=0, thr=0.5, cut=None, cut_margin=1.0, **_):
+    """Does the contraction follow the excitation? Read on the combined rig (active_strain[excitation]).
+
+    peak_ratio_beyond   mean peak activation (`gam_prev`, the active strain's clock value) of the cells
+                        more than `cut_margin` cell diameters past the cut, over that of the cells
+                        before it (0 when nothing past a closed line contracts)
+    frac_excited        fraction of cells whose excitation reached `thr`
+    frac_contracting    fraction whose activation rose above 1 % of the sheet's largest
+    """
+    U = _on_set(T, set)
+    n = U.n_rows()
+    c0 = cells(U, 0)
+    G = np.stack([np.asarray(U.state(block, t), float)[c0.slot, 0] for t in range(n)])
+    X = np.stack([np.asarray(U.state("chem", t), float)[c0.slot, chan] for t in range(n)])
+    peak = np.nanmax(G, 0)
+    out = {"frac_excited": finite((np.nanmax(X, 0) >= thr).mean()),
+           "frac_contracting": finite((peak > 0.01 * np.nanmax(peak)).mean()) if np.nanmax(peak) > 0 else 0.0,
+           "peak_mean": finite(np.nanmean(peak))}
+    if cut:
+        cd = _cell_diameter(U, c0)
+        p = np.asarray(cut["point"], float)[: c0.x.shape[1]]
+        nrm = np.asarray(cut["normal"], float)[: c0.x.shape[1]]
+        side = ((c0.x - p) @ (nrm / np.linalg.norm(nrm))) / cd
+        before, beyond = side < -cut_margin, side > cut_margin
+        pb = np.nanmean(peak[before]) if before.any() else np.nan
+        out["peak_before"] = finite(pb)
+        out["peak_beyond"] = finite(np.nanmean(peak[beyond])) if beyond.any() else None
+        if np.isfinite(pb) and pb > 0 and beyond.any():
+            out["peak_ratio_beyond"] = finite(np.nanmean(peak[beyond]) / pb)
+    return out
+
+
 def apd(T, set=None, chan=0, thr=0.5, end=0.1, rearm=None, late=4, dt=None, **_):
     """APD90 of every activation: from the upstroke through `thr` to the fall below `end` (u is 0 at
     rest and ~1 at the plateau, so `end` = 0.1 is 90 % repolarised).
@@ -384,7 +416,7 @@ def write_results(root=None):
     last = {}
     for line in open(os.path.join(d, "measures.jsonl")):
         r = json.loads(line)
-        if r["measure"] in ("exp06.wave", "exp06.cell_trace"):
+        if r["measure"] in ("exp06.wave", "exp06.cell_trace", "exp06.real", "exp06.apd", "exp06.follow"):
             last.setdefault(r["run"], {}).update({k: v for k, v in (r["value"] or {}).items()
                                                   if isinstance(v, (int, float)) or v is None})
     with open(os.path.join(d, "wave.jsonl"), "w") as fh:
@@ -395,3 +427,4 @@ def write_results(root=None):
 
 register_run("exp06.real", real, None, "the wave on the real Utrecht sheet: arrival spread, delay-map check, cut")
 register_run("exp06.apd", apd, None, "APD90 per activation: free pulse vs vortex")
+register_run("exp06.follow", follow, None, "contraction follows excitation: activation past a cut over before")

@@ -241,3 +241,36 @@ def persist(T, axis=None, every=5, **_):
 
 register_run("exp11.surface", surface, None, "surface layer growth over Wang Fig 1H's window")
 register_run("exp11.persist", persist, "fraction", "bud_excess last / peak on the hole axis")
+
+
+def membrane(T, set_name="bm_node", **_):
+    """Is the membrane still there? Over every row: `finite_min`, the smallest fraction of live membrane
+    nodes with finite positions (batch 2 of Phase 2 lost every node to an unstable spring step by row 60
+    and its tissues grew free -- Finding 38), and `r_ratio_last`, the membrane's median radius over the
+    tissue's at the last row, about the tissue's centroid (≥ ~1: the membrane outside the layer)."""
+    z = getattr(T, "z", None)
+    k = f"{set_name}__pos"
+    if z is None or k not in z.files:
+        return {"available": False, "why": f"no {k} in the trajectory"}
+    P = z[k]
+    ko = f"{set_name}__occ"
+    occ = z[ko] if ko in z.files else None
+    fmin, rr = 1.0, float("nan")
+    for t in range(T.n_rows()):
+        p = np.asarray(P[t], float)
+        if occ is not None:
+            p = p[np.asarray(occ[t]) > 0.5]
+        if len(p) == 0:
+            continue
+        fin = np.isfinite(p).all(1)
+        fmin = min(fmin, float(fin.mean()))
+        if t == T.n_rows() - 1:
+            x = np.asarray(T.pos(t), float)
+            x = x[np.isfinite(x).all(1)]
+            c = x.mean(0)
+            rt = float(np.median(np.linalg.norm(x - c, axis=1)))
+            rr = float(np.median(np.linalg.norm(p[fin] - c, axis=1)) / max(rt, 1e-12)) if fin.any() else float("nan")
+    return {"available": True, "finite_min": finite(fmin), "r_ratio_last": finite(rr)}
+
+
+register_run("exp11.membrane", membrane, "fraction", "membrane nodes finite (min over rows), radius vs tissue")

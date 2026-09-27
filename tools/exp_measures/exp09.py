@@ -47,7 +47,8 @@ covers the whole rim. With `surface_series: true` it is read at every row, and t
 at which it has made 90 % of its first-to-last change (t90_hours through the spec's declared
 `general.units.time_s` and `dt`).
 
-VALIDITY ON A MESH. inverted_max = the largest fraction of live cells, over the rows read, whose
+VALIDITY. On a point run, where no cell can turn inside out, valid_frac_min is the smallest share of
+cells in the largest touching cluster over the rows read (the aggregate stays whole). ON A MESH, inverted_max = the largest fraction of live cells, over the rows read, whose
 signed area is <= 0 (turned inside out). exp 3's growth auditor is not used for it: it scores a
 tissue that does not grow at 2 ("smooth but no growth"), and these aggregates are not meant to grow.
 
@@ -333,6 +334,8 @@ def sorting(T, every=10, types=(0, 1), cut=2.0, contact=None, sets=None, type_bl
             "t90_hours": None if (t90 is None or fpr is None or hpf is None) else finite(t90 * fpr * hpf),
             "share_A": finite(np.mean(typ[k] == A)),
             "inverted_max": finite(max(v for v in inv if v is not None)) if any(v is not None for v in inv) else None,
+            "valid_frac_min": (finite(1.0 - max(v for v in inv if v is not None)) if any(v is not None for v in inv)
+                               else finite(min(big))),
             "log_r2": finite(r2), "log_slope": finite(slope), "log_decades": finite(dec),
             "largest_cluster_last": finite(big[-1]), "largest_cluster_min": finite(min(big)),
             "contact_length": finite(L) if L is not None else None,
