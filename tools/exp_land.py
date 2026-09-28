@@ -233,6 +233,14 @@ _NOISE = re.compile(r"^(Warp \d|\s+CUDA Toolkit|\s+Devices:|\s+\"c(pu|uda)|\s+Ke
                     r"\s+CUDA peer|\s+Supported fully|.*RuntimeWarning|\s+jit = np\.nanmax)")
 
 
+def _question(md):
+    try:
+        import exp
+        return (exp.load(md)[0] or {}).get("question")
+    except Exception:                                                                # noqa: BLE001
+        return None
+
+
 def _sh(args, timeout=3600):
     env = dict(os.environ, PYTHONPATH=f"{os.path.join(ROOT, 'src')}:{os.path.join(ROOT, 'tools')}")
     try:
@@ -290,6 +298,10 @@ def land(n: int, runs: list[str] | None = None, waited: str = "") -> str:
     lines += ["", f"{flagged} run(s) flagged above. Landing took {int(time.time() - t0)} s.",
               f"**NEXT BATCH DUE by {due}** ({NEXT_BATCH_MIN} min, INSTRUCTION.md \"Ten minutes between batches\"): "
               f"write the rows and findings from THIS report, look at the flagged runs' movies, submit."]
+    q = _question(md)
+    if q:
+        lines += ["", f"**THE QUESTION** -- answer it under `## The question` before the next batch "
+                      f"(`- YYYY-MM-DD HH:MM -- ...`, >= 25 words; tools/exp.py launch checks): {q}"]
     text = "\n".join(lines)
     os.makedirs(os.path.join(d, "landings"), exist_ok=True)
     open(os.path.join(d, "landings", time.strftime("%Y-%m-%d_%H%M") + ".md"), "w").write(text + "\n")

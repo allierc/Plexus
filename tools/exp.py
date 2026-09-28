@@ -248,11 +248,42 @@ def job_dir(number, run_name):
 # --------------------------------------------------------------------------- #
 #  launch
 # --------------------------------------------------------------------------- #
+QUESTION_MIN_WORDS = 25
+
+
+def question_answered(path, fm, body):
+    """None when the batch may go; else why not. THE MAIN QUESTION (INSTRUCTION.md): an experiment that declares
+    `question:` must have, under `## The question`, a dated answer (`- YYYY-MM-DD HH:MM -- ...`, >= 25 words)
+    newer than its last landing report (`expNN_<name>/landings/`). Asked "how does the bud emerge here, and how
+    does that differ from Wang's mechanism?", exp11's session wrote a structural plan it had never proposed."""
+    if not fm.get("question"):
+        return None
+    reps = glob.glob(os.path.join(path[:-3], "landings", "*.md"))
+    if not reps:
+        return None                                   # no batch has landed yet: nothing to answer from
+    last = max(os.path.getmtime(p) for p in reps)
+    sec = re.search(r"^## The question\s*$(.*?)(?=^## |\Z)", body, flags=re.M | re.S)
+    ans = []
+    for m in re.finditer(r"^- (\d{4}-\d\d-\d\d \d\d:\d\d) -- (.+(?:\n(?!- \d{4}|\n).+)*)", sec.group(1) if sec else "", flags=re.M):
+        try:
+            t = time.mktime(time.strptime(m.group(1), "%Y-%m-%d %H:%M"))
+        except ValueError:
+            continue
+        if t >= last - 60 and len(m.group(2).split()) >= QUESTION_MIN_WORDS:
+            ans.append(t)
+    if ans:
+        return None
+    return (f"answer the main question first -- under `## The question` in {os.path.basename(path)}, a line "
+            f"`- YYYY-MM-DD HH:MM -- <answer, >= {QUESTION_MIN_WORDS} words>` dated after the last landing "
+            f"({time.strftime('%Y-%m-%d %H:%M', time.localtime(last))}):\n  {fm['question']}")
+
+
 def launch(number, dry_run=False, only_arm=None, where=None):
     path = exp_path(number)
     fm, body = load(path)
-    if fm.get("mode") == "steps":
-        raise SystemExit(f"experiment {number} runs in steps: tools/exp_step.py run {number} <step.yaml>")
+    why = question_answered(path, fm, body)
+    if why and not dry_run:
+        raise SystemExit(why)
     rs = runs(fm, where, only_arm)
     print(f"[launch] experiment {number}: {len(rs)} run(s)")
     ids = dict(fm.get("job_ids") or {})
