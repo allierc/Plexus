@@ -19,7 +19,6 @@ decides by the same rule.
     PYTHONPATH=src python tools/submit_runs.py --glob 'm*_zf285' --dry-run
 """
 import argparse
-import glob
 import os
 import sys
 
@@ -29,13 +28,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "discovery_okuda"))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 import cluster as C                                                   # noqa: E402
+from plexus.paths import training_specs                              # noqa: E402
 
 
 def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda:0"):
-    cfg = os.path.join(ROOT, "config", "run", f"{name}.yaml")
-    if not os.path.isfile(cfg):
-        print(f"  {name:<30} NO SUCH RUN SPEC")
+    hits = training_specs(name)
+    if len(hits) != 1:
+        print(f"  {name:<30} {'NO SUCH RUN SPEC' if not hits else f'IN {len(hits)} MODEL FOLDERS'}")
         return None
+    cfg = hits[0]
     run = yaml.safe_load(open(cfg))
     mod = "plexus.tasks.spec_trainer" if "spec" in run else "plexus.tasks.trainer"
     ph = phases if "spec" in run else phases.replace("analyse", "plot")
@@ -50,7 +51,7 @@ def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda
             "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
             "export MPLBACKEND=Agg",
             f"conda run -n {C.ENV} python -u -m {mod} --device {device} "
-            f"-o {ph} config/run/{name}.yaml",
+            f"-o {ph} {os.path.relpath(cfg, ROOT)}",
             # THE ROLLOUT MOVIES ARE A SECOND CALL, not a phase of the trainer: one module owns
             # every figure and movie (`plot_trainer`), and a fit that lands without them is still
             # a fit -- so a failure here must not take the training result with it.
@@ -79,7 +80,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*")
-    ap.add_argument("--glob", default=None, help="run-spec glob under config/run/")
+    ap.add_argument("--glob", default=None, help="run-spec glob under config/training/<model>/")
     ap.add_argument("--wall", default=None, help="minutes; default cluster.WALL")
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--phases", default="train test analyse")
@@ -88,7 +89,7 @@ def main():
     names = list(a.names)
     if a.glob:
         names += sorted(os.path.basename(p)[:-5] for p in
-                        glob.glob(os.path.join(ROOT, "config", "run", a.glob + ".yaml")))
+                        training_specs(a.glob))
     names = list(dict.fromkeys(names))
     if not names:
         ap.error("no run specs named")

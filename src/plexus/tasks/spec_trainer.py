@@ -1,6 +1,6 @@
 """Train a Plexus SPEC against a task, through `engine.run(grad=True)`.
 
-    python -m plexus.tasks.spec_trainer -o train test analyse config/run/eye_rig.yaml
+    python -m plexus.tasks.spec_trainer -o train test analyse config/training/neural_eye/eye_rig.yaml
 
 The difference from `tasks.trainer`, which is a standalone torch module: this one fits the model
 the spec describes, by running the engine. Nothing is transcribed, so nothing can drift -- the

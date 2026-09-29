@@ -23,7 +23,8 @@ import torch
 from plexus import engine
 from plexus.tasks.spec_trainer import _mse, build, rollout
 
-RUN = os.path.join(os.path.dirname(__file__), "..", "config", "run", "eye_rig.yaml")
+RUN = os.path.join(os.path.dirname(__file__), "..", "config", "training", "neural_eye",
+                   "eye_rig.yaml")
 B, T = 4, 90
 IO = dict(drive_set="retina", drive_block="signal", read_set="eye", read_block="pose")
 

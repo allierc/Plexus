@@ -158,8 +158,13 @@ def write_spec(fm, arm, point, run_name, number):
     d = os.path.join(EXP, "specs", f"exp{int(number):02d}")
     os.makedirs(d, exist_ok=True)
     kind = arm["kind"]
-    src = (os.path.join(ROOT, "config", "run", f"{arm['spec']}.yaml") if kind == "fit"
-           else os.path.join(ROOT, "config", f"{arm['spec']}.yaml"))
+    if kind == "fit":
+        from plexus.paths import training_specs
+        hits = training_specs(arm["spec"])
+        src = hits[0] if len(hits) == 1 else os.path.join(ROOT, "config", "training", "*",
+                                                         f"{arm['spec']}.yaml")
+    else:
+        src = os.path.join(ROOT, "config", f"{arm['spec']}.yaml")
     if not os.path.isfile(src):
         raise SystemExit(f"arm {arm['id']}: {src} does not exist")
     base = yaml.safe_load(open(src))

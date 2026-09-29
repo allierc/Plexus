@@ -1,8 +1,8 @@
 """Fit a circuit to a task, roll it out, and say whether it recovered the law.
 
-    python -m plexus.tasks.trainer -o train config/run/t1_integrator_ctrnn64.yaml
-    python -m plexus.tasks.trainer -o test plot config/run/t1_integrator_ctrnn64.yaml
-    python -m plexus.tasks.trainer -o train test plot config/run/*.yaml
+    python -m plexus.tasks.trainer -o train config/training/neural/t1_integrator_perfect_ctrnn64.yaml
+    python -m plexus.tasks.trainer -o test plot config/training/neural/t1_integrator_perfect_ctrnn64.yaml
+    python -m plexus.tasks.trainer -o train test plot config/training/neural/*_ctrnn64.yaml
 
 THE THIRD SPEC. A model spec says what the circuit is; a task spec says what the data is; neither
 can say which of them is paired with which, what the objective is, or how long to train. That is
@@ -571,7 +571,7 @@ def main():
     phases = [o for o in a.option if o in fns] or ["train"]
     specs = [o for o in a.option if o not in fns]
     if not specs:
-        ap.error("no run spec given. Usage: -o train test plot config/run/<name>.yaml")
+        ap.error("no run spec given. Usage: -o train test plot config/training/<model>/<name>.yaml")
     paths = [p for s in specs for p in (glob.glob(s) if any(c in s for c in "*?[") else [s])]
     for p in paths:
         if not os.path.exists(p):

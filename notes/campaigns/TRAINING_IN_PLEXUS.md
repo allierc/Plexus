@@ -268,7 +268,7 @@ than `repeat` would share storage and make eight identical runs agree with thems
 
 ## The eye rig, measured
 
-`config/run/eye_rig.yaml` fits W_in, W, W_out, the per-neuron τ and the two bias vectors of the
+`config/training/neural_eye/eye_rig.yaml` fits W_in, W, W_out, the per-neuron τ and the two bias vectors of the
 64-unit circuit through the frozen eye, by running the spec — not a transcription of it. The
 table below is the history of getting there; `eye_rig_fit*` no longer exist as configs.
 
@@ -323,12 +323,12 @@ excuses a bad result and so has to be paid for.
 1. **One teacher instead of four: 0.0005 against 0.2598, a factor of 520.** Same circuit, same
    hyperparameters, same 200 epochs. Reproduce it by generating `t1_integrator_tau_sweep` with its
    `conditions:` block deleted and `n_per_cond: 512`, then pointing
-   `config/run/t1_integrator_perfect_ctrnn64.yaml` at it. The corpus and its log directory were a
+   `config/training/neural/t1_integrator_perfect_ctrnn64.yaml` at it. The corpus and its log directory were a
    one-off and are not kept — `t1_integrator_perfect` already stands as the permanent single-law
    control at 0.0008.
 2. **The condition cell as an input: 0.0011**, with the slowest pole back at −0.0298 /s against
    the teacher's −0.0312 where the grid had left it fifteen times too fast. This one is the
-   default and is re-run by `-o train test plot config/run/t1_integrator_tau_sweep_ctrnn64.yaml`.
+   default and is re-run by `-o train test plot config/training/neural/t1_integrator_tau_sweep_ctrnn64.yaml`.
 
 The context channel is on by default for a corpus with more than one cell; `context: false` keeps
 the unanswerable version measurable, because it is a real and instructive failure. This closes the
