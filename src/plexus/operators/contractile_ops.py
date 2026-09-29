@@ -479,3 +479,59 @@ class MPMAnchorPerCell(MPMAnchor):
         if mask is not None:
             acc = acc * mask[:, None].float()
         return {self.at: acc}
+
+
+@register_operator("active_strain", family="mechanics", set="particle", kind="lateral", model="coupled",
+                   equation=r"""$$a_j(t)=\mathrm{clip}\Big(\gamma_j(t)+\sum_{i\in N(j)}W_2\tanh\!\big(W_1[a_i(t-1),a_j(t-1)]\big),\,0,\,1.5\Big)$$""")
+class ActiveStrainCoupled(ActiveStrain):
+    """`coupled` MODEL of active_strain -- each cell's pulse is modulated by a learned MESSAGE from
+    the cells it touches, one message-passing step per frame: a graph neural network between cells.
+
+        a_j(t) = clip( gamma_j(t) + sum_{i in N(j)} m(a_i(t-1), a_j(t-1)), 0, 1.5 )
+        m(x_i, x_j) = W2 tanh( W1 [x_i, x_j] )
+
+    gamma_j(t) is the default's activation (the shared clock, cell j's delay and time course, the
+    temporal modes), a_j the activation the contraction actually follows, and N(j) the cells whose
+    segmented outlines touch j's -- the `edge_index` `cell_neighbours[model: label_image]` writes,
+    the junctional contact graph a gap junction needs. The message m is a small network with hidden
+    width `hidden`: W1 is [hidden, 2], W2 is [1, hidden]. It has NO BIAS, so two cells at rest
+    exchange nothing and a resting sheet stays at rest; and W2 STARTS AT ZERO, so the model starts
+    as the default exactly and whatever the fit does to W2 is the coupling the data asked for.
+    W1 starts at seeded random values so the hidden units are not all alike.
+
+    W1 and W2 are PARAMETERS OF THE ACTIVITY, held as tensors on the instance, so a training spec
+    frees them as `{param: W1, op: active_strain}` and the trainer hands its own leaves to every
+    rollout through `on_ready`. The message reads last frame's activations, which the parent's
+    `gam_prev` block already carries.
+
+    Why a model and not a new operator: the contract is active_strain's own; what differs is the
+    hypothesis that a cell's excitation is shaped by its neighbours rather than by its own clock
+    alone. `excitation`, beside it, triggers the pulse by a threshold crossing, which is right for a
+    wave and has no gradient; this one is smooth so it can be fitted.
+
+    Reference: gap-junction coupling of cardiomyocyte excitation, e.g. Kléber, A. G. & Rudy, Y.
+    (2004). Basic mechanisms of cardiac impulse propagation and associated arrhythmias. Physiol.
+    Rev. 84:431-488; the message-passing form, Gilmer, J. et al. (2017). Neural message passing
+    for quantum chemistry. ICML.
+    """
+    PARAM_ROLES = {**ActiveStrain.PARAM_ROLES, "hidden": "message_network_width",
+                   "seed": "message_network_init_seed"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        h = int(params.get("hidden", 8))
+        gen = torch.Generator().manual_seed(int(params.get("seed", 0)))
+        self.W1 = torch.randn(h, 2, generator=gen) / np.sqrt(2.0)
+        self.W2 = torch.zeros(1, h)
+
+    def gamma(self, cell, frame, dev, dt):
+        gam = super().gamma(cell, frame, dev, dt)                        # [C, 1]
+        ei = getattr(cell, "edge_index", None)
+        if frame == 0 or ei is None or ei.numel() == 0 or "gam_prev" not in cell.state_schema:
+            return gam
+        a = cell.get("gam_prev")                                         # a(t-1), [C, 1]
+        src, dst = ei[0].to(a.device), ei[1].to(a.device)
+        x = torch.cat([a[src], a[dst]], -1)                              # [E, 2]
+        m = torch.tanh(x @ self.W1.to(device=dev, dtype=dt).T) @ self.W2.to(device=dev, dtype=dt).T
+        msg = torch.zeros_like(a).index_add(0, dst, m)                   # sum over each cell's contacts
+        return (gam + msg).clamp(min=0.0, max=1.5)
