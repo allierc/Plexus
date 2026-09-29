@@ -171,7 +171,7 @@ def largest_cluster(n, pairs):
     return np.flatnonzero(lab == np.bincount(lab).argmax())
 
 
-def surface_cells(T, t, x, c=None, L=None, cut=2.0):
+def surface_cells(T, t, x, c=None, L=None, cut=2.0, outer_only=True):
     """Boolean [n]: the cells of `x` on the aggregate's free surface (see the module docstring).
     A simplex is kept when all its edges are <= L (default `cut` x the median Delaunay edge of x)."""
     if isinstance(T, CoreTraj):
@@ -193,7 +193,23 @@ def surface_cells(T, t, x, c=None, L=None, cut=2.0):
     f = np.sort(f, 1)
     u, cnt = np.unique(f, axis=0, return_counts=True)
     out = np.zeros(n, bool)
-    out[u[cnt == 1].ravel()] = True
+    bf = u[cnt == 1]
+    if D == 2 and outer_only and len(bf):
+        # THE OUTER RIM ONLY (2026-09-27, round 16). The free boundary of the cut Delaunay complex also
+        # lines every internal VOID, and a porous half (voids lined by one type) then swamps the count:
+        # a two-halves run whose MEP half was plainly not engulfed read MEP 0.06 of the "surface". The
+        # boundary edges form closed loops; the outer rim is the loop reaching farthest from the centroid.
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.csgraph import connected_components
+        nv = int(bf.max()) + 1
+        g = coo_matrix((np.ones(len(bf)), (bf[:, 0], bf[:, 1])), shape=(nv, nv))
+        _, lab = connected_components(g, directed=False)
+        verts = np.unique(bf.ravel())
+        far = np.linalg.norm(x[verts] - x.mean(0), axis=1)
+        outer = lab[verts[np.argmax(far)]]
+        out[verts[lab[verts] == outer]] = True
+        return out
+    out[bf.ravel()] = True
     out[np.setdiff1d(np.arange(n), s.ravel())] = True                              # in no kept simplex
     return out
 

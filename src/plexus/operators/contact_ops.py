@@ -127,8 +127,13 @@ def linear_contact_forces(C, x, s, nF):
         f_v  = - sum_i w_iv F_i                     on the tissue
 
     Returns (F [K, 3], f_v [Nv, 3]), both float64. With k_adh 0 (a list without the key) the
-    tether term is absent and the forces are the repulsion alone."""
-    b = (x - s).to(torch.float64)
+    tether term is absent and the forces are the repulsion alone.
+
+    A list built on the APICAL surface (`C["side"] == "apical"`, `bm_contact[live]` with `side:
+    apical`) reads the points a = x + s instead, and its n_i is the normal INTO the lumen; f_v is
+    then the reaction on the apical points, which the relaxation turns into -f_v on x AND -f_v on s
+    (for the basal points: -f_v on x, +f_v on s). A list without the key is basal, as it always was."""
+    b = ((x + s) if C.get("side") == "apical" else (x - s)).to(torch.float64)
     es, ef = C["es"], C["ef"]
     cnt = C["cnt"].to(torch.float64)
     cent = torch.zeros(int(nF), 3, dtype=torch.float64, device=b.device).index_add_(0, ef, b[es])

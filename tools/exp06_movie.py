@@ -72,6 +72,24 @@ def main():
     edge[1:, :] |= lab[1:, :] != lab[:-1, :]
     edge[:, 1:] |= lab[:, 1:] != lab[:, :-1]
     edge = np.ma.masked_where(~edge, np.ones(lab.shape))
+    # a closed line / scar (`cell_chem_diffuse[closed_junctions]`) drawn in white: cell positions -> image
+    # pixels by a least-squares fit of each label's pixel centroid on its cell's `pos`, per axis
+    scar = None
+    closed = next((o.get("closed") for o in T.spec.get("operators", []) if o.get("closed")), None)
+    if closed is not None:
+        pos = np.asarray(T.state("pos", 0), float)[:, :2]
+        ids = np.arange(1, len(pos) + 1)
+        rr, cc = np.nonzero(lab > 0)
+        cnt = np.bincount(lab[rr, cc], minlength=len(pos) + 1)[ids]
+        cy = np.bincount(lab[rr, cc], weights=rr, minlength=len(pos) + 1)[ids] / np.maximum(cnt, 1)
+        cx = np.bincount(lab[rr, cc], weights=cc, minlength=len(pos) + 1)[ids] / np.maximum(cnt, 1)
+        ok = cnt > 0
+        fit = [np.polyfit(pos[ok, k], c[ok], 1) for k, c in ((0, cx), (1, cy))]   # x -> column, y -> row
+        p, nrm = np.asarray(closed["point"][:2], float), np.asarray(closed["normal"][:2], float)
+        tan = np.array([-nrm[1], nrm[0]]) / np.linalg.norm(nrm)
+        h = float(closed.get("half_length", 2.0))
+        ends = np.stack([p - h * tan, p + h * tan])
+        scar = (np.polyval(fit[0], ends[:, 0]), np.polyval(fit[1], ends[:, 1]))
     frames = []
     for i, t in enumerate(rows):
         fig, axs = plt.subplots(1, len(panels), figsize=(5 * len(panels), 5.3), facecolor="black")
@@ -82,6 +100,9 @@ def main():
             img[lab == 0] = np.nan
             ax.imshow(img, cmap=cmaps[p], vmin=0.0, vmax=vmax[p] or 1.0, interpolation="nearest")
             ax.imshow(edge, cmap="gray", vmin=0.0, vmax=2.0, interpolation="nearest")
+            if scar is not None:
+                ax.plot(*scar, color="white", lw=2.5)
+                ax.set_xlim(-0.5, lab.shape[1] - 0.5); ax.set_ylim(lab.shape[0] - 0.5, -0.5)
             ax.set_axis_off()
             ax.set_title(titles[p], color="white", fontsize=12, loc="left")
         fig.suptitle(f"{os.path.basename(a.run)}   t = {tt[t] * ts * 1e3:.2f} ms", color="white", fontsize=11, x=0.02, ha="left")

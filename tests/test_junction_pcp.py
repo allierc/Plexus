@@ -268,3 +268,51 @@ def test_isotropic_seed_has_no_shared_elongation():
     from plexus.models import registry as R
     assert R.get_operator("seed_mesh", "isotropic").__name__ == "SeedMeshIsotropic"
     assert R.get_operator("seed_mesh").__name__ == "SeedMesh3D"
+
+
+def test_primed_blend_is_linear_at_p0_and_cooperative_at_p1():
+    """`junction_pcp[primed]`'s recruitment (1 - p) x + p T(x): an unstretched side (p 0) must be the
+    linear model exactly, a fully primed one (p 1) the cooperative model exactly, and p 0.5 halfway,
+    at partner density 0.5 where the two differ (T(0.5) = 0.4 against 0.5)."""
+    half = torch.full((8,), 0.5, dtype=P.dtype)
+    twin = pcp_twins(ES, ET, 10)
+    L = geometry()[0]
+    tot = torch.full((2,), 4.0, dtype=P.dtype)
+    one = torch.ones(8, dtype=P.dtype)
+    lin = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, **KW)
+    coop = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0), **KW)
+    p0 = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0, torch.zeros(8, dtype=P.dtype)), **KW)
+    p1 = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0, torch.ones(8, dtype=P.dtype)), **KW)
+    ph = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0, torch.full((8,), 0.5, dtype=P.dtype)), **KW)
+    for i in range(2):
+        assert torch.allclose(p0[i], lin[i]) and torch.allclose(p1[i], coop[i])
+        assert torch.allclose(ph[i], 0.5 * (lin[i] + coop[i]))
+
+
+def test_primed_model_is_registered_and_needs_the_seed_strain():
+    from plexus.models import registry as R
+    cls = R.get_operator("junction_pcp", model="primed")
+    assert cls.__name__ == "JunctionPCPPrimed"
+    with pytest.raises(ValueError):
+        cls({"elong": 0.0})
+    o = cls({"elong": -0.5, "elong_ref": "seed", "prime_strain": 0.2})
+    ef = torch.tensor([0, 0, 1, 1])
+    o._eps = (torch.tensor([0.1, 0.0]), torch.tensor([0.0, 0.0]), ef)       # cell 0 stretched 0.1, cell 1 not
+    assert torch.allclose(o._hill()[2], torch.tensor([0.5, 0.5, 0.0, 0.0]))
+    o._eps = (torch.tensor([0.0, 0.3]), torch.tensor([0.0, 0.0]), ef)       # cell 0 relaxed: it keeps its 0.5
+    assert torch.allclose(o._hill()[2], torch.tensor([0.5, 0.5, 1.0, 1.0]))
+
+
+def test_celsr_colour_q_matches_the_ruler_on_a_planted_square():
+    """`pcp_celsr_q` on the unit square with the complex on its +-x sides only: q = (the two 90 deg arcs'
+    integral of exp(2 i phi)) / (their angle) = (2 x 1) / pi -> Re 2/pi, Im 0 (the axis at 0 deg, the
+    +-x borders); a uniform intensity reads 0."""
+    import math
+    from plexus.operators.junction_ops import pcp_celsr_q
+    Pq = torch.tensor([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=torch.float64) - 0.5
+    vi, vj, ef = torch.tensor([0, 1, 2, 3]), torch.tensor([1, 2, 3, 0]), torch.zeros(4, dtype=torch.long)
+    cen = torch.zeros(1, 2, dtype=torch.float64)
+    re, im = pcp_celsr_q(Pq, vi, vj, ef, cen, torch.tensor([0.0, 1.0, 0.0, 1.0], dtype=torch.float64), 1)
+    assert abs(float(re[0]) - 2 / math.pi) < 1e-9 and abs(float(im[0])) < 1e-9
+    re, im = pcp_celsr_q(Pq, vi, vj, ef, cen, torch.ones(4, dtype=torch.float64), 1)
+    assert abs(float(re[0])) < 1e-9 and abs(float(im[0])) < 1e-9

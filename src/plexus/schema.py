@@ -118,6 +118,11 @@ class Spec:
     units: "Units" = field(default_factory=lambda: Units(declared=False))
     # SAVE THE TRAJECTORY, OR DO NOT. None = the legacy `record_cap` path.
     save_data: bool = None
+    # THE WARM-UP, NOT RECORDED (2026-09-28). None = the default: as many ticks as the seed's settle window
+    # (`ref_frame`, e.g. 60 on an apico-basal shell) run BEFORE the recorded frames, the size rules idle and
+    # `cell_grow` holding, so frame 0 of the data is the relaxed tissue and growth, the cell cycle and the
+    # record start together. 0 = no warm-up: the old behaviour, bit for bit (the settle window is recorded).
+    warmup: int = None
 
 
 _RESERVED = {"op", "at", "to", "from", "implementation", "model"}
@@ -697,6 +702,7 @@ def load(path: str) -> Spec:
         field_record_cap=int(gv("field_record_cap", 256)),
         units=parse_units(gv("units", None)),
         save_data=gv("save_data", None),
+        warmup=(None if gv("warmup", None) is None else int(gv("warmup", None))),
     )
     # THE UNITS CHECK: ONE PASS, WARNING ONLY, AND IT CANNOT STOP THE LOAD. It runs here because
     # this is the first moment the whole declaration is visible at once -- the base scales, every

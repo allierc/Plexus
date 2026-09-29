@@ -123,3 +123,19 @@ def test_followers_pull_at_their_fraction_and_follow_zero_is_unchanged():
     lead2[minus_x] = True
     Fb = leader_traction(P, es, ef, nF, lead | lead2, f=0.1, zero_net=False, follow=0.5)
     assert torch.allclose(Fb.sum(0), torch.zeros(3, dtype=torch.float64), atol=1e-12)
+
+
+def test_group_stall_stops_a_leader_whose_neighbour_is_over_the_line_and_reach_0_is_unchanged():
+    P, es, et, ef, nF = _cube_et()
+    P = P.clone()
+    P[P[:, 0] > 0, 0] = 5.0
+    P[P[:, 1] > 0, 1] = 5.0                                   # +-z faces at 1.5x the median perimeter (16), the rest at 1x
+    side = next(k for k in range(nF) if bool((P[es[ef == k], 0] > 4).all()))   # the +x face: 1x, touches both z faces
+    lead = torch.zeros(nF, dtype=torch.bool)
+    lead[side] = True
+    F0 = leader_traction(P, es, ef, nF, lead, f=0.1, et=et, stall=1.5, zero_net=False)
+    assert float(F0.abs().max()) > 0.0                        # own shape at the median: pulls
+    Fr = leader_traction(P, es, ef, nF, lead, f=0.1, et=et, stall=1.5, zero_net=False, stall_reach=0)
+    assert torch.equal(F0, Fr)
+    F1 = leader_traction(P, es, ef, nF, lead, f=0.1, et=et, stall=1.5, zero_net=False, stall_reach=1)
+    assert float(F1.abs().max()) == 0.0                       # a +-z neighbour sits at the stall line: the leader stops

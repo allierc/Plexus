@@ -74,6 +74,17 @@ def _chan(params, who, n_species=2):
     return c
 
 
+def cap_target_rate(ds, s_prev, V0f, V0f_init, cap_v, dt, dims=3):
+    """The growth rate on the linear scale `ds`, gated so the TARGET `V0f` stops at `cap_v`.
+
+    The target's own rate is dV0f/dt = dims V0f_init s^(dims-1) ds (the chain rule `cell_grow` emits), so the
+    largest ds that keeps V0f <= cap_v this step is (cap_v - V0f) / (dt dims V0f_init s^(dims-1)), and never below
+    zero: a gate, not a pull -- a cell already over the cap holds, it is not shrunk."""
+    dvds = (dims * V0f_init * s_prev ** (dims - 1)).clamp(min=1e-12)
+    room = (cap_v - V0f).clamp(min=0.0) / max(float(dt), 1e-12) / dvds
+    return torch.minimum(ds, room)
+
+
 def _span(chem, chan, n, who):
     """The `n` columns starting at `chan`, or a loud failure -- the bounds half of `_chan`."""
     if chan + n > chem.shape[1]:
@@ -1551,6 +1562,30 @@ class CellReactRPSLattice(Lateral):
     F a 3 x 3 matrix of benefits per unit concentration, row = consumer, column = metabolite. Absent (or
     F = 0) every mu_i = mu and the draws are the same, so the model above is unchanged (tested).
 
+    HERITABLE FEEDING PREFERENCE, `feed: {..., heritable: {block: pref, mutation: m_p, budget: B, init:
+    "matrix" | [p0, p1, p2], seed: k}}` (exp 15, directions 3 x 4: does selection favour feeding on the
+    predator's metabolite?): every individual carries its own preference vector p_i over the 3
+    metabolite columns of `food`, in a width-3 block of the set (`integration: none`; 0 on an empty
+    site), and it replaces the species' row of F:
+
+        mu_i = mu (1 + sum_k p_ik f_k),      p_ik >= 0,   sum_k p_ik = B
+        daughter:  p_daughter = rescale_B( max(0, p_i + m_p xi) ),  xi ~ N(0, I_3)    a killed site: p = 0
+
+    p_ik is a benefit per unit concentration of metabolite k, in the units of F (so p_i = F[s_i] is the
+    matrix model); f_k is the site's column k of the `food` block, as above; B (default 1) is the total
+    benefit an individual spreads across the three metabolites -- a choice between them, not a free
+    gain; rescale_B multiplies a vector by B / (its sum), and a vector clamped to all zeros becomes B/3
+    in every column; m_p is the standard deviation of each component of the daughter's p around the
+    parent's, in the units of p, before the clamp and rescale (at m_p = 0 the daughter copies the
+    parent's p exactly). `init` (default "matrix") fills p on every occupied site on the first call if
+    the block is still all zeros: "matrix" gives each individual its species' row of F rescaled to sum
+    B, a 3-list gives every individual that list rescaled to sum B; F is used for nothing else (and may
+    be omitted with a list). Sites the provisional state holds empty are reset to p = 0 on every call.
+    The mutation noise comes from its own generator seeded `heritable.seed` (default `seed` + 3), so
+    the event draws and the trait and defence draws are never shifted by it. At init "matrix",
+    m_p = 0 and B = every row's sum, the events are the matrix feed's exactly (tested).
+    `cell_chem_diffuse[lattice_exchange]`'s `carry: [pref]` moves p with its individual.
+
     ARMS RACE, `trait: {block: trait, mutation: m, cost: c, seed: k, init: t0}` (exp 15, direction 4):
     every individual carries a heritable attack trait t_i >= 0 in a width-1 block of the set
     (`integration: none`; 0 on an empty site). It scales the individual's own selection rate and
@@ -1574,6 +1609,22 @@ class CellReactRPSLattice(Lateral):
     mutation draw uses its own generator (`seed`), so the event draws are never shifted by it.
     `cell_chem_diffuse[lattice_exchange]`'s `carry: [trait]` moves the trait with its individual.
 
+    COEVOLVING DEFENCE, `trait: {..., defence: {block: defence, mutation: m_d, cost: c_d, init: d0}}`
+    (exp 15, direction 4, attack vs defence): every individual also carries a heritable defence
+    d_i >= 0 in its own width-1 block (`integration: none`; 0 on an empty site). It divides the
+    selection rate of any attacker reaching it and taxes the carrier's own reproduction:
+
+        P(i kills its prey neighbour j in dt) = sigma dt t_i / (1 + d_j)
+        P(i reproduces into an empty neighbour in dt) = mu dt max(0, 1 - c t_i - c_d d_i)   (x feed)
+        daughter:  d_daughter = max(0, d_i + m_d zeta),  zeta ~ N(0, 1)   a killed site: d = 0
+
+    d_j is dimensionless: d_j = 1 halves the rate at which any attacker kills j, d = 0 is the attack-only
+    model above exactly (tested). c_d is the fractional loss of the base reproduction rate mu = r per
+    unit of defence, summed with the attack cost c t_i; m_d is the standard deviation of the daughter's
+    defence around the parent's, in units of d. `init: d0` and the empty-site reset behave as the
+    trait's. The defence noise comes from a SECOND generator seeded `defence.seed` (default `seed` + 2),
+    so the attack mutation draws are never shifted by it, at any m_d. `carry: [trait, defence]`.
+
     One event per target site per tick (two individuals reaching for one site: one succeeds); an
     individual acts at most once per tick. Reads the provisional state (see the lattice section above
     `cell_chem_diffuse[lattice_exchange]`). Reference: Reichenbach, T., Mobilia, M. & Frey, E. (2007).
@@ -1585,8 +1636,10 @@ class CellReactRPSLattice(Lateral):
     MECHANISM_TAGS = ["reaction", "competition", "cyclic_dominance", "may_leonard", "rock_paper_scissor",
                       "lattice", "individual_based"]
     PARAM_ROLES = {"a": "cyclic_suppression", "rate": "reaction_time_scale", "seed": "rng_seed",
-                   "feed": "cross_feeding_benefit_matrix_and_food_block",
-                   "trait": "heritable_attack_trait_block_mutation_sd_and_reproduction_cost"}
+                   "feed": ("cross_feeding_benefit_matrix_and_food_block"
+                            "_with_optional_heritable_preference_block_mutation_sd_budget_and_init"),
+                   "trait": ("heritable_attack_trait_block_mutation_sd_and_reproduction_cost"
+                             "_with_optional_defence_block_dividing_the_attackers_kill_rate")}
     REFERENCE = ("Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046; "
                  "May, R. M. & Leonard, W. J. (1975). SIAM J. Appl. Math. 29:243-253.")
 
@@ -1598,9 +1651,32 @@ class CellReactRPSLattice(Lateral):
         self.seed = int(params.get("seed", 0))
         fd = params.get("feed")
         self.feed_block = None if not fd else str(fd.get("block", "food"))
-        self.feed_F = None if not fd else [[float(v) for v in row] for row in fd["matrix"]]
+        hr = None if not fd else fd.get("heritable")
+        mat = None if not fd else fd.get("matrix")
+        if fd and mat is None and (hr is None or hr.get("init", "matrix") == "matrix"):
+            raise ValueError("cell_chem_react[rps_lattice]: `feed` needs `matrix` (or `heritable.init` as a 3-list)")
+        self.feed_F = None if mat is None else [[float(v) for v in row] for row in mat]
+        self.feed_on = bool(fd)
+        self.pref_block = None if hr is None else str(hr.get("block", "pref"))    # `heritable: {}` = all defaults
+        if hr is not None:
+            self.pref_mut = float(hr.get("mutation", 0.0))             # sd of each daughter component, units of p
+            self.pref_budget = float(hr.get("budget", 1.0))            # B = sum_k p_ik, in the units of F
+            ini = hr.get("init", "matrix")
+            if isinstance(ini, str):
+                if ini != "matrix":
+                    raise ValueError(f"cell_chem_react[rps_lattice]: heritable.init {ini!r} is 'matrix' or a 3-list")
+                self.pref_init = "matrix"
+            else:
+                self.pref_init = [float(v) for v in ini]
+                if len(self.pref_init) != 3:
+                    raise ValueError("cell_chem_react[rps_lattice]: heritable.init as a list has 3 entries")
+            self.pref_seed = int(hr.get("seed", self.seed + 3))
+            self._pref_gen = None
+            self._pref_first = True
+            self.MAY_MUTATE_INTEGRATED_STATE = True                    # instance only: absent => the check stands
         tr = params.get("trait")
         self.trait_block = None if tr is None else str(tr.get("block", "trait"))   # `trait: {}` = all defaults
+        self.def_block = None
         if tr is not None:
             self.trait_mut = float(tr.get("mutation", 0.0))            # sd of the daughter's trait, units of t
             self.trait_cost = float(tr.get("cost", 0.0))               # fraction of mu lost per unit of t
@@ -1608,8 +1684,22 @@ class CellReactRPSLattice(Lateral):
             self.trait_init = None if tr.get("init") is None else float(tr["init"])
             self._trait_gen = None
             self._trait_first = True
+            df = tr.get("defence")
+            self.def_block = None if df is None else str(df.get("block", "defence"))
+            if df is not None:
+                self.def_mut = float(df.get("mutation", 0.0))          # sd of the daughter's defence, units of d
+                self.def_cost = float(df.get("cost", 0.0))             # fraction of mu lost per unit of d
+                self.def_seed = int(df.get("seed", self.seed + 2))
+                self.def_init = None if df.get("init") is None else float(df["init"])
+                self._def_gen = None
             self.MAY_MUTATE_INTEGRATED_STATE = True                    # instance only: absent => the check stands
         self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+
+    def _pref_rescale(self, p):
+        """Each row times B / (its sum); a row summing to 0 becomes B/3 in every column."""
+        tot = p.sum(1, keepdim=True)
+        B = self.pref_budget
+        return torch.where(tot > 0, p * (B / tot.clamp(min=1e-300)), torch.full_like(p, B / 3.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -1624,26 +1714,56 @@ class CellReactRPSLattice(Lateral):
         tgt = _lattice_onehot(occ, s, 3)
         n = occ.shape[0]
         sig, mu = self.rate * self.a * dt, self.rate * dt
-        if self.feed_F is not None:
+        writes = self.trait_block is not None or self.pref_block is not None
+        st = lvl.state.clone() if writes else None                       # in-place writer: a fresh buffer
+        if self.pref_block is not None:
+            pb0, pb1 = lvl.state_schema[self.pref_block]
+            if pb1 - pb0 != 3:
+                raise ValueError(f"cell_chem_react[rps_lattice]: preference block {self.pref_block!r} must be width 3")
+            if self._pref_first and not torch.any(st[:, pb0:pb1] != 0):
+                if self.pref_init == "matrix":                           # each individual: its species' row of F
+                    rows = torch.as_tensor(self.feed_F, dtype=torch.float64, device=dev)[s.clamp(min=0).long()]
+                else:                                                    # every individual: the given list
+                    rows = torch.as_tensor(self.pref_init, dtype=torch.float64, device=dev).expand(n, 3)
+                st[occ, pb0:pb1] = self._pref_rescale(rows[occ]).to(st.dtype)
+            self._pref_first = False
+            st[~occ, pb0:pb1] = 0.0                                      # an empty site carries no preference
+            pref = st[:, pb0:pb1].clone()                                # p_i at this tick's start
+            food = lvl.get(self.feed_block).to(torch.float64)            # [n, 3] metabolite at the site
+            mu = (mu * (1.0 + (food * pref.to(torch.float64)).sum(1))).to(chem.dtype)   # mu (1 + sum_k p_ik f_k)
+        elif self.feed_on:
             food = lvl.get(self.feed_block).to(torch.float64)                # [n, 3] metabolite at the site
             F = torch.as_tensor(self.feed_F, dtype=torch.float64, device=dev)
             mu = (mu * (1.0 + (food @ F.T).gather(1, s.clamp(min=0).long()[:, None])[:, 0])).to(chem.dtype)
         if self.trait_block is not None:
-            st = lvl.state.clone()                                       # in-place writer: a fresh buffer
             tb0, tb1 = lvl.state_schema[self.trait_block]
             if tb1 - tb0 != 1:
                 raise ValueError(f"cell_chem_react[rps_lattice]: trait block {self.trait_block!r} must be width 1")
             if self._trait_first and self.trait_init is not None and not torch.any(st[:, tb0] != 0):
                 st[occ, tb0] = self.trait_init                           # `init`: occupied sites only
+            if self.def_block is not None:
+                db0, db1 = lvl.state_schema[self.def_block]
+                if db1 - db0 != 1:
+                    raise ValueError(f"cell_chem_react[rps_lattice]: defence block {self.def_block!r} must be width 1")
+                if self._trait_first and self.def_init is not None and not torch.any(st[:, db0] != 0):
+                    st[occ, db0] = self.def_init                         # `init`: occupied sites only
+                st[~occ, db0] = 0.0                                      # an empty site carries no defence
+                dfn = st[:, db0].to(chem.dtype)                          # d_i, divides attackers' sigma
             self._trait_first = False
             st[~occ, tb0] = 0.0                                          # an empty site carries no trait
             t = st[:, tb0].to(chem.dtype)                                # t_i, a multiple of sigma
             sig = sig * t                                                # per individual: sigma dt t_i
-            mu = mu * (1.0 - self.trait_cost * t).clamp(min=0.0)         # mu dt max(0, 1 - c t_i) (x feed)
+            if self.def_block is None:
+                mu = mu * (1.0 - self.trait_cost * t).clamp(min=0.0)     # mu dt max(0, 1 - c t_i) (x feed)
+            else:                                                        # mu dt max(0, 1 - c t_i - c_d d_i)
+                mu = mu * (1.0 - self.trait_cost * t - self.def_cost * dfn).clamp(min=0.0)
         u = torch.rand(n, generator=gen, device=dev)
         j = _lattice_neighbour(self, lvl, gen)
         prey = (s + 2) % 3                                               # v (1) kills u (0), w kills v, u kills w
-        kill = occ & (u < sig) & occ[j] & (s[j] == prey) & (j != torch.arange(n, device=dev))
+        # The victim's defence divides the attacker's selection probability: sigma dt t_i / (1 + d_j).
+        # Births need an empty j, where d_j = 0, so the birth window [sig, sig + mu) keeps the attacker's sig.
+        sig_k = sig if self.def_block is None else sig / (1.0 + dfn[j])
+        kill = occ & (u < sig_k) & occ[j] & (s[j] == prey) & (j != torch.arange(n, device=dev))
         birth = occ & (u >= sig) & (u < sig + mu) & ~occ[j]
         ai = torch.nonzero(kill | birth).flatten()
         if ai.numel():
@@ -1668,7 +1788,28 @@ class CellReactRPSLattice(Lateral):
                                                                  device=dev, dtype=st.dtype)
                 st[aj[b], tb0] = child.clamp(min=0.0)                    # daughter: parent's t + m xi, >= 0
                 st[aj[k], tb0] = 0.0                                     # the killed site carries none
-        if self.trait_block is not None:
+                if self.def_block is not None:
+                    dchild = dfn[ai[b]].to(st.dtype)                     # parent's d at this tick's start
+                    if self.def_mut != 0.0 and dchild.numel():
+                        if self._def_gen is None or self._def_gen.device != torch.device(dev):
+                            self._def_gen = torch.Generator(device=dev)
+                            self._def_gen.manual_seed(self.def_seed)
+                        dchild = dchild + self.def_mut * torch.randn(dchild.shape, generator=self._def_gen,
+                                                                     device=dev, dtype=st.dtype)
+                    st[aj[b], db0] = dchild.clamp(min=0.0)               # daughter: parent's d + m_d zeta, >= 0
+                    st[aj[k], db0] = 0.0                                 # the killed site: no defence
+            if self.pref_block is not None:
+                pchild = pref[ai[b]]                                     # parent's p at this tick's start
+                if self.pref_mut != 0.0 and pchild.numel():
+                    if self._pref_gen is None or self._pref_gen.device != torch.device(dev):
+                        self._pref_gen = torch.Generator(device=dev)
+                        self._pref_gen.manual_seed(self.pref_seed)
+                    pchild = pchild.to(torch.float64) + self.pref_mut * torch.randn(
+                        pchild.shape, generator=self._pref_gen, device=dev, dtype=torch.float64)
+                    pchild = self._pref_rescale(pchild.clamp(min=0.0)).to(st.dtype)   # >= 0, sum B
+                st[aj[b], pb0:pb1] = pchild                              # m_p = 0: the parent's p exactly
+                st[aj[k], pb0:pb1] = 0.0                                 # the killed site carries none
+        if writes:
             lvl.state = st
         out = torch.zeros_like(chem)
         out[:, c0:c0 + 3] = (tgt - x[:, c0:c0 + 3].to(tgt.dtype)).to(chem.dtype) / dt
@@ -2750,6 +2891,15 @@ class Grow3D(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
+        # `rate_decay_T` (exp 11, 2026-09-27; default 0 = none, unchanged): the growth rate falls as rate / (1 + t / T),
+        # t the simulated time. Exponential growth -- the law below at a fixed rate -- multiplied a gland's area x20 in
+        # 53 h and ran it into the world's walls; Wang et al. 2021 Fig 1H measured the surface outline growing LINEARLY in
+        # time in all 13 glands (r^2 0.80-0.99, 10-34 h), i.e. area A0 (1 + rho t)^2 with a relative rate 2 rho / (1 + rho t):
+        # T = 1 / rho. Every model of cell_grow that calls `_law` or reads `self._decay` inherits it.
+        self.rate_decay_T = float(params.get("rate_decay_T", 0.0))
+        self._decay = 1.0
+        self.hold_in_m = bool(params.get("hold_in_m", False))
+        self.ceiling_with_divider = bool(params.get("ceiling_with_divider", False))
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
         self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
@@ -2779,6 +2929,19 @@ class Grow3D(Lateral):
         # amount (else we silently CREATE mass each step -> spuriously feeds the tip). On (default) = correct.
         self.conserve_amount = bool(params.get("conserve_amount", True))
         self._said_no_cap = False       # the "ceiling not applied" note is printed once per run
+        # `target_cap: c` (exp 11, 2026-09-28; default 0 = off): the TARGET `V0f` stops growing at c x the seed's median
+        # target (`V0f_init` -- target against target, one convention), whether or not a `cell_divide` is scheduled.
+        # The growth writes the target while `cell_cycle`'s sizer reads the MEASURED volume, so a squeezed cell that
+        # never reached the checkpoint kept growing its target: 218 of the healthy gland's 1,006 cells above 2x the
+        # median target at row 160, the largest 8.4x (exp 11 Finding 119). With `cell_cycle` `size_from: target` the
+        # cap sits just above the checkpoint (`g1_size`) and a cell that cannot divide waits there.
+        self.target_cap = float(params.get("target_cap", 0.0) or 0.0)
+        # `body_cap: b` (exp 11, 2026-09-28; default 0 = off): the target may run at most b x ahead of the cell's own
+        # MEASURED volume -- V0f <= b x k x v, k the seed's median V0f / median measured volume (the two conventions'
+        # ratio, taken once on the first call). A squeezed cell stops growing its target instead of banking it (exp 11
+        # Finding 119: targets up to 12.7x the seed median while the body sat at a tenth), its push on its neighbours
+        # is bounded, and a cell with room is not held under a fixed ceiling (Finding 125: `target_cap` halved growth).
+        self.body_cap = float(params.get("body_cap", 0.0) or 0.0)
 
     def _rate(self, s_prev, hillv, m, v_ref):
         """The RATE LAW, and the only thing a `model=` variant of cell_grow changes.
@@ -2801,9 +2964,14 @@ class Grow3D(Lateral):
         unit of simulated time than the same `rate` now means, so those specs carry `rate / dt` to
         preserve what they did.
         """
-        return s_prev * self.rate * (self.rho + hillv)
+        return s_prev * self.rate * self._decay * (self.rho + hillv)
 
     def forward(self, H, mask=None):
+        if self.rate_decay_T > 0:
+            # the clock of the RECORDED run: the engine's unrecorded warm-up (`H.warmup` ticks) is not growth time
+            _t = max(float(getattr(H, "frame", 0) or 0) - float(getattr(H, "warmup", 0) or 0), 0.0) \
+                * float(getattr(H, "dt", 1.0) or 1.0)
+            self._decay = 1.0 / (1.0 + _t / self.rate_decay_T)
         # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
         self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
@@ -2917,6 +3085,23 @@ class Grow3D(Lateral):
                                       dtype=m["V0f"].dtype)
         dt = float(getattr(H, "dt", 1.0))
         ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only
+        # `hold_in_m: true` (default false = unchanged): a cell in M (`phase` >= 3 on the cell set) does not grow.
+        # exp 11's Type I loop: a division-ready cell WAITS in M for its turn to leave the layer (the dive cap), and
+        # growing there it inflated its targets 5x and stretched the layer 4x over them (Finding 102). A mitotic cell
+        # stops growing (Mitchison 1971); every cell that is not waiting is untouched.
+        if self.hold_in_m:
+            from plexus.operators.vertex_ops import cell_block
+            _ph = cell_block(H, self.cat, "phase", nF) if H is not None else None
+            if _ph is not None and len(_ph) == nF:
+                ds = ds * torch.as_tensor((np.asarray(_ph, np.float64) < 3.0).astype(np.float64),
+                                          device=ds.device, dtype=ds.dtype)
+        # THE WARM-UP HOLDS GROWTH (2026-09-28). While the engine's unrecorded warm-up runs (H.frame < H.warmup, the
+        # seed's settle window) the cell cycle and division idle; growing the targets there handed every cell about
+        # twice its age's size at frame 0 -- the large, young cells and the first division wave of exp 11 (Finding 130).
+        # `general.warmup: 0` turns the warm-up, and with it this hold, off.
+        _wu = int(getattr(H, "warmup", 0) or 0)
+        if _wu > 0 and int(getattr(H, "frame", 0) or 0) < _wu:
+            ds = ds * 0.0
         # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.
         #
         # `vth_frac` is Okuda's uniform-cell mode: cap `v_eq` under `vth_frac * v_ref` so every cell
@@ -2938,6 +3123,12 @@ class Grow3D(Lateral):
         # Same fixed point (`s` settles on `s_cap`), and it no longer overshoots-then-truncates
         # within a step, so the band is entered rather than snapped to.
         _has_divider = "cell_divide" in getattr(H, "scheduled_ops", frozenset())
+        # `ceiling_with_divider: true` (default false = unchanged): keep the ceiling although a `cell_divide` is
+        # scheduled -- for a layer whose `cell_divide`s do NOT reset its cells' size in place (exp 11's Type I loop:
+        # `reinsert` and `cell_divide[model: mpm]`; every division of a surface cell leaves the layer), where the
+        # uncapped targets grew x5 and blew the shell up past its own membrane (Finding 103).
+        if self.ceiling_with_divider:
+            _has_divider = False
         if self.rho > 0 and not _has_divider:                        # OKUDA uniform-cell mode
             s_cap = ((self.vth_frac * v_ref
                       / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)).clamp(min=1.0)
@@ -2965,6 +3156,22 @@ class Grow3D(Lateral):
         # alternative -- emitting the exact chord (s_new^2 - s^2)/dt -- would reproduce today's
         # numbers bit for bit but requires the operator to integrate `s` itself, which is the engine's
         # job and the thing this rung exists to give back to it.
+        if self.body_cap > 0:
+            _n = ds.shape[0]
+            _vb = self._v_now[:_n].to(ds.dtype)
+            if getattr(self, "_k_body", None) is None:
+                self._k_body = float(torch.median(m["V0f"][:_n])) / max(float(torch.median(_vb)), 1e-12)
+            ds = cap_target_rate(ds, s_prev, m["V0f"][:_n], m["V0f_init"][:_n],
+                                 self.body_cap * self._k_body * _vb.clamp(min=0.0), dt, self.GROWTH_DIMS)
+        if self.target_cap > 0:
+            # THE REFERENCE IS TAKEN ONCE, on the first call (the seed's targets). `V0f_init` cannot serve: this
+            # operator re-baselines it to the current `V0f` whenever the face count moves, so a cap on its median
+            # floated with the population and held nothing (exp 11 mc_e_tc_ctl, first build).
+            if getattr(self, "_v0_seed", None) is None:
+                self._v0_seed = float(torch.median(m["V0f"][:ds.shape[0]]))
+            _v0 = m["V0f"][:ds.shape[0]]
+            _cap = self.target_cap * self._v0_seed
+            ds = cap_target_rate(ds, s_prev, _v0, m["V0f_init"][:ds.shape[0]], _cap, dt, self.GROWTH_DIMS)
         s_next = s_prev + dt * ds                                # what `s` will be once the engine integrates
         deltas = {(self.cat, "mg_scale"): ds,
                   (self.cat, "A0"): 2.0 * m["A0_init"] * s_prev * ds,

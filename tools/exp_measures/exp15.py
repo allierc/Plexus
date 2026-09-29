@@ -725,6 +725,7 @@ def traits(T, block="trait", strains=("A", "B", "C"), late=0.2, **_):
         trait_gain              the mean over strains of trait_<s> / trait0_<s> (1 = no change; > 1 =
                                 attack escalated)
         trait_sd_late           the spread of individual traits over the last `late`, all strains pooled
+        (keys are named after `block`: `block: defence` gives defence0_<s>, defence_<s>, defence_gain, ...)
         n_late_<s>              the mean count of strain s over the last `late` (to read a trait gain
                                 against who is left)"""
     key, ck = f"cell__{block}", "cell__chem"
@@ -747,14 +748,82 @@ def traits(T, block="trait", strains=("A", "B", "C"), late=0.2, **_):
                 v = np.asarray(tr[r])[c, 0]
                 vals.append(float(v.mean())); pool.append(v)
         tl = float(np.mean(vals)) if vals else None
-        out[f"trait0_{s}"], out[f"trait_{s}"] = finite(t0), finite(tl)
+        out[f"{block}0_{s}"], out[f"{block}_{s}"] = finite(t0), finite(tl)
         out[f"n_late_{s}"] = finite(np.mean(cnt))
         if t0 and tl is not None:
             gains.append(tl / t0)
-    out["trait_gain"] = finite(np.mean(gains)) if gains else None
-    out["trait_sd_late"] = finite(np.std(np.concatenate(pool))) if pool else None
+    out[f"{block}_gain"] = finite(np.mean(gains)) if gains else None
+    out[f"{block}_sd_late"] = finite(np.std(np.concatenate(pool))) if pool else None
+    # ESCALATION WHILE CONTESTED. Once a lattice is down to one strain it has no prey, nothing selects the
+    # trait and it drifts, so a late mean mixes "escalated while fighting" with "stopped when won". The
+    # rate is read per lattice from the rows where it still holds >= 2 strains: the least-squares slope
+    # of its individuals' mean trait against time, in trait units per 1,000 time units (generations),
+    # averaged over lattices with >= 5 contested rows (every `stride`-th recorded row).
+    L, K, dt, _ = _lattice_spec(T)
+    if L:
+        t = _ticks(T) * dt
+        rates = []
+        rws = list(range(0, n, max(1, n // 120)))
+        per = {r: [] for r in range(K)}
+        for r in rws:
+            c = np.asarray(ch[r], float).reshape(K, L * L, 3)
+            v = np.asarray(tr[r], float)[:, 0].reshape(K, L * L)
+            occ = c.sum(2) > 0.5
+            nal = (c.sum(1) > 0.5).sum(1)
+            for k in range(K):
+                if nal[k] >= 2 and occ[k].any():
+                    per[k].append((t[r], float(v[k][occ[k]].mean())))
+        for k, pts in per.items():
+            if len(pts) >= 5:
+                x, y = np.asarray(pts).T
+                rates.append(np.polyfit(x, y, 1)[0] * 1000.0)
+        out[f"{block}_rate_contested"] = finite(np.mean(rates)) if rates else None
+        out["n_lattices_rate"] = len(rates)
     return out
 
 
 register_run("exp15.traits", traits, None,
              "direction 4: the heritable attack trait per strain -- first vs late mean, gain, spread")
+
+
+def prefs(T, block="pref", strains=("A", "B", "C"), late=0.2, **_):
+    """The heritable feeding preference of `cell_chem_react[rps_lattice]` `feed: {heritable: ...}` (exp 15,
+    directions 3 x 4: does selection favour feeding on the predator's metabolite?), read per strain from
+    the community set's width-3 `pref` block (column k = the benefit per unit concentration the
+    individual draws from metabolite k, the metabolite strain k secretes; each row sums to the budget
+    B on occupied sites, 0 on empty ones).
+
+        pref_prey_<s>    strain s's mean preference on its PREY's metabolite, column (s + 2) % 3 (v kills
+                         u, w kills v, u kills w), over its individuals and the last `late` of the run
+        pref_pred_<s>    the same on its PREDATOR's metabolite, column (s + 1) % 3
+        pref_pred_frac   the mean over strains of pref_pred_<s> / (pref_pred_<s> + pref_prey_<s>): 0.5 =
+                         the budget split evenly between the two, > 0.5 = selection moved it towards the
+                         predator's metabolite"""
+    key, ck = f"cell__{block}", "cell__chem"
+    files = getattr(T.z, "files", T.z)
+    if key not in files or ck not in files:
+        return {"available": False, "why": f"no cell {block!r} block in this run"}
+    pr = T.z[key]
+    ch = T.z[ck]
+    n = pr.shape[0]
+    rows = range(max(0, int(n * (1 - late))), n)
+    out, fracs = {}, []
+    for k, s in enumerate(strains):
+        prey, pred = (k + 2) % 3, (k + 1) % 3
+        vp, vd = [], []
+        for r in rows:
+            c = np.asarray(ch[r][:, k]) > 0.5
+            if c.any():
+                p = np.asarray(pr[r], float)[c]
+                vp.append(float(p[:, prey].mean())); vd.append(float(p[:, pred].mean()))
+        mp = float(np.mean(vp)) if vp else None
+        md = float(np.mean(vd)) if vd else None
+        out[f"pref_prey_{s}"], out[f"pref_pred_{s}"] = finite(mp), finite(md)
+        if mp is not None and md is not None and mp + md > 0:
+            fracs.append(md / (md + mp))
+    out["pref_pred_frac"] = finite(np.mean(fracs)) if fracs else None
+    return out
+
+
+register_run("exp15.prefs", prefs, None,
+             "directions 3 x 4: the heritable feeding preference per strain -- late mean on prey's vs predator's metabolite")

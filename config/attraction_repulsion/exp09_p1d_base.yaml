@@ -1,0 +1,63 @@
+general:
+  name: exp09_p1d_base
+  seed: 0
+  n_frames: 2000000
+  dt: 1.0e-07
+  boundary: free
+  world:
+  - 4.0
+  - 4.0
+  record_cap: 1000
+  units:
+    length_um: 1266.0
+    time_s: 1296000.0
+sets:
+  cells:
+    n: 50000
+    types:
+      LEP:
+        fraction: 0.5
+      MEP:
+        fraction: 0.5
+fields: {}
+seed:
+- op: seed_positions
+  at: cells
+  mode: sunflower
+  radius: 0.93
+  seed: 0
+operators:
+- op: pair_potential
+  model: typed
+  at: cells
+  law: cooke
+  sigma: 0.007
+  mobility: 1.0
+  step_max: 0.001
+  epsilon_types:
+    LEP:
+      LEP: 0.9
+      MEP: 0.75
+    MEP:
+      MEP: 0.9
+- op: brownian
+  at: cells
+  kT: 0.5
+  mobility: 1.0
+  seed: 0
+  model: anneal
+  kT_end: 0.3
+  frames: 2000000
+schedule:
+- pair_potential
+- brownian
+plotting:
+  renderer: mpl2d
+  background: black
+  colors:
+    LEP: '#0072B2'
+    MEP: '#E69F00'
+  zoom: 2.5
+  point_size: 1.5
+  duration_s: 10
+  slow_motion: 1

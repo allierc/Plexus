@@ -365,3 +365,16 @@ def test_point_run_validity_is_the_largest_cluster_share(tmp_path):
     far = np.concatenate([x[:-100], x[-100:] + 10.0])                 # 100 cells lost from the aggregate
     r = exp_measures.run_measure("exp09.sorting", write_run(tmp_path, [x, far], typ), every=1)
     assert abs(r["valid_frac_min"] - (len(x) - 100) / len(x)) < 1e-9
+
+
+def test_surface_is_the_outer_rim_not_the_voids(tmp_path):
+    """A disc whose rim is all B, with a void inside lined by A: the outer-rim fraction of A is 0.
+    Counting void linings as surface (the old reading) would have given A a large share."""
+    x = disk(n=3000)
+    r = np.linalg.norm(x - x.mean(0), axis=1)
+    hole = np.linalg.norm(x - (x.mean(0) + np.array([0.3, 0.0])), axis=1)
+    keep = hole > 0.15
+    x2, r2, h2 = x[keep], r[keep], hole[keep]
+    typ = np.where(r2 > 0.85, 1, np.where(h2 < 0.25, 0, np.random.default_rng(17).integers(0, 2, len(x2))))
+    res = exp_measures.run_measure("exp09.sorting", write_run(tmp_path, [x2], typ), every=1)
+    assert res["surface_frac_A_last"] < 0.02                     # A = type 0 lines only the void

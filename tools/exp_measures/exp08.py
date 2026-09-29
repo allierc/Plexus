@@ -335,6 +335,8 @@ def celsr(T, a="fz", b="vang", deform_axis=(0, 1, 0), plane_axis=None, drop_boun
         MP   = | mean over cells of q_i |      "magnitude of average polarity" (Aw Fig. 1B), 0 random, 1 all
                                                cells' complex on one pair of opposite borders
         P_axis_deg = half the angle of mean q_i, the axis of the enriched borders' POSITIONS
+        Mcell = mean over cells of | q_i |     each cell's OWN enrichment, whatever its axis: MP / Mcell is
+                                               the cells' agreement on the axis (1 all agree)
     Cell elongation, the same way from each cell's shape (the second moment of its vertices about the
     centroid, eigenvalues l1 >= l2): e_i = (l1 - l2) / (l1 + l2) exp(2 i theta_i); ME = | mean e_i |,
     E_axis_deg its axis ("magnitude of average cell elongation", Aw Fig. 1B).
@@ -345,7 +347,7 @@ def celsr(T, a="fz", b="vang", deform_axis=(0, 1, 0), plane_axis=None, drop_boun
     d = np.asarray(deform_axis, float)[ax]
     d_ang = np.arctan2(d[1], d[0])
     ts = _rows(T, every)
-    ser = {k: [] for k in ("MP", "P_axis_deg", "ME", "E_axis_deg", "ang_P_deform_deg")}
+    ser = {k: [] for k in ("MP", "Mcell", "P_axis_deg", "ME", "E_axis_deg", "ang_P_deform_deg")}
     for t in ts:
         c = cells(T, t)
         A, B = T.edge_col(a, t), T.edge_col(b, t)
@@ -377,7 +379,8 @@ def celsr(T, a="fz", b="vang", deform_axis=(0, 1, 0), plane_axis=None, drop_boun
             keep &= ~bnd
         mq, me = q[keep].mean(), e[keep].mean()
         pax = 0.5 * np.angle(mq)
-        ser["MP"].append(finite(abs(mq))); ser["P_axis_deg"].append(finite(np.degrees(pax)))
+        ser["MP"].append(finite(abs(mq))); ser["Mcell"].append(finite(np.abs(q[keep]).mean()))
+        ser["P_axis_deg"].append(finite(np.degrees(pax)))
         ser["ME"].append(finite(abs(me))); ser["E_axis_deg"].append(finite(0.5 * np.degrees(np.angle(me))))
         dd = np.degrees(abs(((pax - d_ang) + np.pi / 2) % np.pi - np.pi / 2))
         ser["ang_P_deform_deg"].append(finite(dd))

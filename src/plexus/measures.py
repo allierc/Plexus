@@ -522,14 +522,30 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
         except Exception:                                # noqa: BLE001
             return row
         return row
-    if isinstance(q, str) and q.startswith("block:"):
+    if isinstance(q, str) and q.startswith(("block:", "total:")):
+        # `total:<set>:<block>` -- THE SAME BLOCK SUMMED over the live elements instead of averaged: how much
+        # of a protein the whole tissue holds (exp 11, 2026-09-29), with no spread.
         # THE LEVEL OF A STATE BLOCK, `quantity: block:cell:psi`: the mean and sd of that block's
         # first column over the set's live elements, at the current frame. What a membrane
         # potential, a proton count or a stator's stretch is, as a curve, without a quantity of
         # its own being registered for each -- the block IS the quantity. Bare units; a spec puts
         # a `factor:` on the curve to draw it in mV or in protons.
+        _, name, block = q.split(":", 2)
+        if name not in getattr(H, "levels", {}):
+            # THE CELL SET ON A REPLAY IS NOT A LEVEL OF ITS OWN: its width-1 blocks reach the renderer as
+            # the mesh's cell columns (`cell_cols`, as `phase` does), one value per live face.
+            _m = getattr(lvl, "mesh", None)
+            _nF = int(_m.get("nF", 0) or 0) if _m is not None else 0
+            _cc = cell_cols(H, lvl, _nF) if _nF else {}
+            if block not in _cc:
+                return row
+            v = np.asarray(_np(_cc[block]), float).reshape(-1)[:_nF]
+            if q.startswith("total:"):
+                row[0] = (float(np.nansum(v)), 0.0)
+            elif v.size:
+                row[0] = (float(np.nanmean(v)), float(np.nanstd(v)))
+            return row
         try:
-            _, name, block = q.split(":", 2)
             lv = H.level(name)
             # ON THE REPLAY, FOLLOW THE FRAME THE CURVES ARE AT. The series loop advances `t` on the
             # level the curves read (`lvl`) and on no other, so a replay level asked for its block
@@ -555,7 +571,9 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
             occ = getattr(lv, "occ", None)
         live = _np(occ).astype(bool) if occ is not None else np.ones(val.shape[0], bool)
         v = np.asarray(val, float)[live][:, 0] if val.ndim == 2 else np.asarray(val, float)[live]
-        if v.size:
+        if q.startswith("total:"):
+            row[0] = (float(np.nansum(v)), 0.0)
+        elif v.size:
             row[0] = (float(v.mean()), float(v.std()))
         return row
     if isinstance(q, str) and q.startswith("species:"):

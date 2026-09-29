@@ -348,3 +348,195 @@ def test_lattice_exchange_carry_planted_a_marked_trait_moves_with_its_individual
     assert new != 55                                                     # it moved (the seed of the test above)
     assert abs(float(t[new]) - 0.9) < 1e-7 and float(t[55]) == 0.0
     assert abs(float(t.sum()) - 0.9) < 1e-6                              # the trait is conserved, not copied
+
+
+# ------------------------------------------------------------------ cell_chem_react[rps_lattice] trait.defence:
+TD = {**TRAIT, "defence": {"width": 1, "integration": "none", "boundary": "free"}}
+
+
+def _set_block(lvl, name, value):
+    st = lvl.state.clone(); b0, _ = lvl.state_schema[name]
+    st[:, b0] = value if not torch.is_tensor(value) else value.to(st.dtype)
+    lvl.state = st
+
+
+def test_rps_lattice_defence_identity_zero_defence_is_attack_only():
+    """d = 0 everywhere, m_d = 0, c_d = 0: sigma t / (1 + 0) and mu (1 - c t - 0) are the attack-only
+    probabilities, so the same seeds give the same chem delta and the same trait block."""
+    out = []
+    for dfn in (None, {"block": "defence", "mutation": 0.0, "cost": 0.0}):
+        H, lvl = lattice(L=30, fractions=(0.3, 0.3, 0.3), extra=TD)
+        _set_block(lvl, "trait", 1.3)
+        op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=30)(H, None)
+        tr = {"block": "trait", "mutation": 0.1, "cost": 0.2}
+        if dfn is not None:
+            tr["defence"] = dfn
+        d = op("cell_chem_react", "rps_lattice", a=1.0, rate=5.0, seed=3, trait=tr)(H, None)["cell"]
+        out.append((d, lvl.get("trait").clone(), lvl.get("defence").clone()))
+    assert torch.equal(out[0][0], out[1][0]) and torch.equal(out[0][1], out[1][1])
+    assert torch.count_nonzero(out[1][2]) == 0
+
+
+def test_rps_lattice_defence_planted_unit_defence_halves_kills():
+    """d = 1 on every individual against d = 0: sigma t / (1 + d) is halved, so ~0.5x the kills; a killed
+    site carries d = 0."""
+    H, lvl = lattice(L=100, fractions=(0.3, 0.3, 0.3), extra=TD)
+    op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=100)(H, None)
+    x = lvl.get("chem").clone()
+    kills = {0.0: 0, 1.0: 0}
+    for dv in kills:
+        for k in range(20):
+            _set_block(lvl, "trait", 1.0); _set_block(lvl, "defence", dv)
+            d = op("cell_chem_react", "rps_lattice", a=1.0, rate=5.0, seed=k, trait={"defence": {}})(H, None)["cell"]
+            after = x + H.dt * d
+            kills[dv] += _kills_births(x, after)[0]
+            dead = (x.sum(1) > 0.5) & (after.sum(1) < 0.5)
+            assert torch.all(lvl.get("defence")[dead, 0] == 0)
+    r = kills[1.0] / kills[0.0]
+    print("d=1 / d=0 kills", r, kills)
+    assert 0.45 < r < 0.55, r
+
+
+def test_rps_lattice_defence_planted_cost_half_at_unit_defence_halves_births():
+    H, lvl = lattice(L=100, fractions=(0.2, 0.2, 0.2), extra=TD)
+    op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=100)(H, None)
+    x = lvl.get("chem").clone()
+    births = {0.0: 0, 0.5: 0}
+    for c in births:
+        for k in range(20):
+            _set_block(lvl, "trait", 1.0); _set_block(lvl, "defence", 1.0)
+            d = op("cell_chem_react", "rps_lattice", a=0.0, rate=2.0, seed=k,
+                   trait={"cost": 0.0, "defence": {"cost": c}})(H, None)["cell"]
+            births[c] += _kills_births(x, x + H.dt * d)[1]
+    r = births[0.5] / births[0.0]
+    print("defence cost 0.5 / cost 0 births", r, births)
+    assert 0.45 < r < 0.55, r
+
+
+def test_rps_lattice_defence_planted_daughter_inherits_the_parent_defence():
+    """One individual with t = 0.37, d = 0.61 on an empty lattice: its daughter carries d = 0.61 exactly
+    at m_d = 0, a different value at m_d = 0.1 -- and at m_d = 0.1 its trait is still the parent's at
+    m = 0 (the defence noise has its own generator)."""
+    for md in (0.0, 0.1):
+        H, lvl = lattice(L=10, fractions=(0.0, 0.0, 0.0), extra=TD)
+        c0, _ = lvl.state_schema["chem"]
+        st = lvl.state.clone(); st[55, c0 + 1] = 1.0; lvl.state = st
+        _set_block(lvl, "trait", torch.where(torch.arange(100) == 55, 0.37, 0.0))
+        _set_block(lvl, "defence", torch.where(torch.arange(100) == 55, 0.61, 0.0))
+        op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=10)(H, None)
+        x = lvl.get("chem").clone()
+        for k in range(20):
+            d = op("cell_chem_react", "rps_lattice", a=0.0, rate=40.0, seed=k,
+                   trait={"mutation": 0.0, "defence": {"mutation": md}})(H, None)["cell"]
+            after = x + H.dt * d
+            born = torch.nonzero((x.sum(1) < 0.5) & (after.sum(1) > 0.5)).flatten()
+            if born.numel():
+                break
+        assert born.numel() == 1
+        t, dd = lvl.get("trait")[:, 0], lvl.get("defence")[:, 0]
+        assert abs(float(dd[55]) - 0.61) < 1e-7 and float(t[born[0]]) == float(t[55])
+        if md == 0.0:
+            assert float(dd[born[0]]) == float(dd[55])
+        else:
+            assert float(dd[born[0]]) != float(dd[55]) and float(dd[born[0]]) >= 0.0
+
+
+# ------------------------------------------------------------------ cell_chem_react[rps_lattice] feed.heritable:
+FP = {**FOOD, "pref": {"width": 3, "integration": "none", "boundary": "free"}}
+FMAT = [[0.0, 1.5, 2.5], [3.0, 0.0, 1.0], [0.5, 3.5, 0.0]]              # every row sums to 4
+
+
+def _set_rows(lvl, name, value):
+    st = lvl.state.clone(); b0, b1 = lvl.state_schema[name]
+    st[:, b0:b1] = torch.as_tensor(value, dtype=st.dtype)
+    lvl.state = st
+
+
+def test_rps_lattice_heritable_identity_matrix_init_no_mutation_is_the_matrix_feed():
+    """init "matrix", m_p = 0, B = 4 = every row's sum of F: each p_i is its species' row of F, so
+    mu (1 + p_i . f) is the matrix feed's mu_i and the same seeds give the same chem delta."""
+    out = []
+    for her in (None, {"block": "pref", "mutation": 0.0, "budget": 4.0, "init": "matrix"}):
+        H, lvl = lattice(L=30, fractions=(0.3, 0.3, 0.3), extra=FP)
+        g = torch.Generator().manual_seed(0)
+        _set_rows(lvl, "food", torch.rand(900, 3, generator=g))
+        op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=30)(H, None)
+        fd = {"block": "food", "matrix": FMAT}
+        if her is not None:
+            fd["heritable"] = her
+        out.append(op("cell_chem_react", "rps_lattice", a=1.0, rate=5.0, seed=3, feed=fd)(H, None)["cell"])
+        if her is not None:
+            occ = (lvl.get("chem") + H.dt * out[-1]).sum(1) > 0.5          # after the tick: killed sites hold p = 0
+            p = lvl.get("pref")
+            assert torch.allclose(p[occ].sum(1), torch.full((int(occ.sum()),), 4.0))
+    assert torch.equal(out[0], out[1])
+
+
+def test_rps_lattice_heritable_planted_daughter_inherits_the_parent_preference():
+    """One individual with p = (0.5, 1.0, 2.5), B = 4, on an empty lattice: its daughter carries that p
+    exactly at m_p = 0, a different p summing to B = 4 (all >= 0) at m_p = 0.2."""
+    p0 = torch.tensor([0.5, 1.0, 2.5])
+    for mp in (0.0, 0.2):
+        H, lvl = lattice(L=10, fractions=(0.0, 0.0, 0.0), extra=FP)
+        c0, _ = lvl.state_schema["chem"]
+        st = lvl.state.clone(); st[55, c0 + 1] = 1.0; lvl.state = st     # species 1 at site 55
+        _set_rows(lvl, "pref", torch.where(torch.arange(100)[:, None] == 55, p0, torch.zeros(3)))
+        op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=10)(H, None)
+        x = lvl.get("chem").clone()
+        for k in range(20):
+            d = op("cell_chem_react", "rps_lattice", a=0.0, rate=40.0, seed=k,
+                   feed={"block": "food", "matrix": FMAT,
+                         "heritable": {"mutation": mp, "budget": 4.0}})(H, None)["cell"]
+            after = x + H.dt * d
+            born = torch.nonzero((x.sum(1) < 0.5) & (after.sum(1) > 0.5)).flatten()
+            if born.numel():
+                break
+        assert born.numel() == 1
+        p = lvl.get("pref")
+        assert torch.equal(p[55], p0)                                    # the parent keeps its own
+        if mp == 0.0:
+            assert torch.equal(p[born[0]], p[55])
+        else:
+            assert not torch.equal(p[born[0]], p[55])
+            assert torch.all(p[born[0]] >= 0) and abs(float(p[born[0]].sum()) - 4.0) < 1e-5
+
+
+def test_rps_lattice_heritable_planted_budget_on_a_present_metabolite_is_born_faster():
+    """Species 0 and 1 at equal density, metabolite 2 at concentration 1, metabolite 0 absent. Species 0
+    puts all of B = 1 on metabolite 2 (mu (1 + 1) = 2 mu), species 1 all of it on metabolite 0 (mu): ~(1 + B)
+    = 2x the births over many draws -- the preference, not the species' row of F (F = 0 here), decides."""
+    H, lvl = lattice(L=100, fractions=(0.2, 0.2, 0.0), extra=FP)
+    _set_rows(lvl, "food", [0.0, 0.0, 1.0])
+    op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=100)(H, None)
+    c0, _ = lvl.state_schema["chem"]
+    x = lvl.get("chem").clone()
+    p = torch.zeros(10000, 3)
+    p[x[:, c0] > 0.5, 2] = 1.0
+    p[x[:, c0 + 1] > 0.5, 0] = 1.0
+    births = torch.zeros(3)
+    for k in range(20):
+        _set_rows(lvl, "pref", p)
+        d = op("cell_chem_react", "rps_lattice", a=0.0, rate=2.0, seed=k,
+               feed={"block": "food", "matrix": [[0, 0, 0]] * 3,
+                     "heritable": {"mutation": 0.0, "budget": 1.0}})(H, None)["cell"]
+        births += (d.clamp(min=0) * H.dt).sum(0)
+    r = float(births[0] / births[1])
+    print("budget on present / on absent metabolite births", r)
+    assert 1.8 < r < 2.2, r
+
+
+def test_rps_lattice_heritable_planted_killed_and_empty_sites_carry_no_preference():
+    """Every site starts with p = (1, 1, 1) -- empty ones too; after one tick of killing (a = 1, rate 5),
+    empty sites and the sites just emptied by a kill carry p = 0, occupied sites sum to B = 3."""
+    H, lvl = lattice(L=40, fractions=(0.3, 0.3, 0.3), extra=FP)
+    _set_rows(lvl, "pref", [1.0, 1.0, 1.0])
+    op("radius_graph", None, "periodic_tiles", radius=1.0, tile_side=40)(H, None)
+    x = lvl.get("chem").clone()
+    d = op("cell_chem_react", "rps_lattice", a=1.0, rate=5.0, seed=3,
+           feed={"block": "food", "matrix": FMAT, "heritable": {"budget": 3.0}})(H, None)["cell"]
+    after = x + H.dt * d
+    o0, o1 = x.sum(1) > 0.5, after.sum(1) > 0.5
+    p = lvl.get("pref")
+    assert int((o0 & ~o1).sum()) > 0                                     # some were killed
+    assert torch.all(p[~o1] == 0)                                        # empty and killed: none
+    assert torch.allclose(p[o1].sum(1), torch.full((int(o1.sum()),), 3.0))

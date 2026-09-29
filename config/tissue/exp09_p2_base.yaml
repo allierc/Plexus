@@ -164,3 +164,7 @@ plotting:
     xlabel: frame
     ylabel: cells
     ticks: 4
+  mesh_color_by: node_type
+  label_colors:
+  - '#0072B2'
+  - '#E69F00'

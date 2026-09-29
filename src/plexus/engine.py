@@ -2174,10 +2174,19 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # live list is the declaration list.
     _seen_this_tick = {}
 
+    # THE WARM-UP (2026-09-28): `W` ticks run BEFORE the recorded frames -- see `Spec.warmup`. Frame gates and
+    # multi-rate strides read the RECORDED-FRAME clock f = tick - W, so a spec's `after_frame` / `every` keep
+    # meaning recorded frames; during the warm-up (f < 0) a window reads as frame 0 and a stride as f.
+    _W = [0]
+
+    def _gf(tick):
+        return tick - _W[0]
+
     def _live_ids(tick):
         """Instance indices whose frame gate is open at `tick`, in declaration order."""
+        _f = _gf(tick); _fw = max(_f, 0)
         return tuple(_j for _j, (_nm, _ob, _sel, (_a, _b, _e)) in enumerate(inst)
-                     if _a <= tick < _b and (_e <= 1 or tick % _e == 0))
+                     if _a <= _fw < _b and (_e <= 1 or _f % _e == 0))
 
     def _tokens_live(tick):
         by = {}
@@ -2387,9 +2396,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             # the 1.0 every junction is born with, so the first frame of every movie was a frame of
             # physics presented as the initial condition). It has to come back with the recorders
             # included on tick 0, not excluded, so that both series start together.
-            if not (after_frame <= tick < before_frame):
+            if not (after_frame <= max(_gf(tick), 0) < before_frame):
                 continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
-            if every > 1 and tick % every != 0:
+            if every > 1 and _gf(tick) % every != 0:
                 continue                                 # multi-rate: run this operator only every `every` ticks
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
@@ -2432,7 +2441,19 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             f"integrates it); only structural / derived-readout operators "
                             f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
 
-    ticks = range(sim.n_frames + 1)
+    # THE WARM-UP LENGTH: `general.warmup` when declared, else the longest settle window a seed declared
+    # (`m["ref_frame"]`, written by `seed_mesh`), else 0. The record's keys move by W, so row 0 is tick W.
+    _wd = getattr(sim, "warmup", None)
+    if _wd is None:
+        _wd = max([int((getattr(_l, "_mesh", None) or {}).get("ref_frame", 0) or 0) for _l in H.levels.values()] + [0])
+    _W[0] = W = max(int(_wd), 0)
+    H.warmup = W
+    if W > 0:
+        _shifted = {t + W: i for t, i in rec_index.items()}
+        rec_index.clear(); rec_index.update(_shifted)
+        print(f"[engine] warm-up: {W} tick(s) before frame 0, not recorded -- the settle window runs with the "
+              f"size rules idle and `cell_grow` holding (general.warmup: 0 restores the recorded window)", flush=True)
+    ticks = range(W + sim.n_frames + 1)
     if progress:                                     # live progress bar over the simulated frames
         try:
             from tqdm import tqdm
@@ -2762,7 +2783,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                                   f"the spec -- an undeclared mesh used to be dropped silently.",
                                   flush=True)
                         rec_mesh[name].append(_m.snapshot())
-            if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
+            if H.fields and tick >= W and ((tick - W) % fstride == 0 or tick - W == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
                         continue
@@ -2774,12 +2795,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             # the time it first ran; `anchor_frame` makes that a declared choice instead.
             for _nm, _op, _sel, _g in inst:
                 _af = getattr(_op, "anchor_frame", None)
-                if _af is not None and int(_af) == tick and not getattr(_op, "_armed", False):
+                if _af is not None and int(_af) == tick - W and not getattr(_op, "_armed", False):
                     _op.capture_rest(H)
                     _op._armed = True
-            if on_frame is not None:
-                on_frame(H, tick)
-            frame_ms.append((time.perf_counter() - _t_tick) * 1000.0)
+            if on_frame is not None and tick >= W:
+                on_frame(H, tick - W)
+            if tick >= W:
+                frame_ms.append((time.perf_counter() - _t_tick) * 1000.0)
 
     out = _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, rec_mesh=rec_mesh)
     out["frame_ms"] = np.asarray(frame_ms, np.float32)   # one wall-clock reading per simulated tick

@@ -484,3 +484,55 @@ def test_traits_gain_per_strain(tmp_path):
     assert abs(v["trait_B"] - 1.0) < 1e-6 and abs(v["trait_C"] - 0.5) < 1e-6
     assert abs(v["trait_gain"] - (v["trait_A"] + 1.0 + 1.0) / 3) < 1e-6
     assert v["n_late_A"] == 10
+
+
+def test_traits_escalation_rate_only_while_contested(tmp_path):
+    """Two 4 x 4 lattices, t = 0..100 (dt 1): lattice 0 keeps three strains and its trait rises at 0.01 per
+    time unit (10 per 1,000); lattice 1 is down to one strain from t = 50 and its trait then JUMPS by +5 --
+    the jump is after the contest and must not enter the rate, which reads 10 per 1,000 on both."""
+    from exp_measures.exp15 import traits
+    side, K, n = 4, 2, 101
+    N = side * side
+    chem = np.zeros((n, K * N, 3), np.float32)
+    tr = np.zeros((n, K * N, 1), np.float32)
+    for t in range(n):
+        lab = np.concatenate([np.arange(N) % 3, (np.arange(N) % 3) if t < 50 else np.zeros(N, int)])
+        chem[t, np.arange(K * N), lab] = 1.0
+        tr[t, :, 0] = 1.0 + 0.01 * t
+        if t >= 50:
+            tr[t, N:, 0] += 5.0
+    np.savez(tmp_path / "trajectory.npz", cell__pos=np.zeros((n, K * N, 2), np.float32), cell__chem=chem, cell__trait=tr)
+    spec = {"general": {"name": "t", "n_frames": n - 1, "record_cap": n, "dt": 1.0},
+            "seed": [{"op": "seed_positions", "at": "cell", "model": "tiled_lattice", "side": side, "tiles": K}]}
+    yaml.safe_dump(spec, open(tmp_path / "spec.yaml", "w"))
+    v = traits(open_run(str(tmp_path)))
+    assert v["n_lattices_rate"] == 2
+    assert abs(v["trait_rate_contested"] - 10.0) < 0.2, v["trait_rate_contested"]
+
+
+# ------------------------------------------------------------------ directions 3 x 4: exp15.prefs
+def test_prefs_prey_vs_predator_per_strain(tmp_path):
+    """Budget 4. Strain A (0) moves from an even split (2 on prey's metabolite 2, 2 on predator's 1) to
+    all 4 on its predator's by the last row; B (1) holds 3 on its prey's (0) and 1 on its predator's (2);
+    C (2) holds 1 on its prey's (1), 3 on its predator's (0). Empty sites carry 0 and must not count."""
+    from exp_measures.exp15 import prefs
+    n, N = 50, 30
+    lab = np.arange(N) % 3
+    occ = np.arange(N) < 27                                              # the last 3 sites empty
+    chem = np.zeros((n, N, 3), np.float32); chem[:, np.arange(N)[occ], lab[occ]] = 1.0
+    pr = np.zeros((n, N, 3), np.float32)
+    for t in range(n):
+        a = t / (n - 1)
+        pr[t, (lab == 0) & occ] = [0.0, 2.0 + 2.0 * a, 2.0 - 2.0 * a]
+        pr[t, (lab == 1) & occ] = [3.0, 0.0, 1.0]
+        pr[t, (lab == 2) & occ] = [3.0, 1.0, 0.0]
+    np.savez(tmp_path / "trajectory.npz", cell__pos=np.zeros((n, N, 2), np.float32), cell__chem=chem, cell__pref=pr)
+    yaml.safe_dump({"general": {"name": "t", "n_frames": n - 1, "record_cap": n, "dt": 1.0}}, open(tmp_path / "spec.yaml", "w"))
+    v = prefs(open_run(str(tmp_path)))
+    late = np.mean([2.0 + 2.0 * t / (n - 1) for t in range(40, 50)])     # A's late mean on its predator's
+    assert abs(v["pref_pred_A"] - late) < 1e-5 and abs(v["pref_prey_A"] - (4.0 - late)) < 1e-5
+    assert abs(v["pref_prey_B"] - 3.0) < 1e-6 and abs(v["pref_pred_B"] - 1.0) < 1e-6
+    assert abs(v["pref_prey_C"] - 1.0) < 1e-6 and abs(v["pref_pred_C"] - 3.0) < 1e-6
+    assert abs(v["pref_pred_frac"] - (late / 4.0 + 0.25 + 0.75) / 3) < 1e-6
+    from plexus.measures import MEASURES
+    assert "exp15.prefs" in MEASURES

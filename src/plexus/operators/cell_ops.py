@@ -1574,14 +1574,16 @@ class Protrusion(Lateral):
 LEADER_TRACE: list = []
 
 
-def leader_traction(pos, es, ef, nF, leader, f, zero_net=True, et=None, stall=None, follow=0.0):
+def leader_traction(pos, es, ef, nF, leader, f, zero_net=True, et=None, stall=None, follow=0.0, stall_reach=0):
     """The traction load on a vertex tissue's vertices: f along each leader cell's outward direction,
     on every vertex of that cell; with `zero_net` the total is taken back evenly from every used
     vertex, so the tissue as a whole is not pushed. With `stall` (needs `et`), a leader whose
     perimeter P_c has reached `stall` times the tissue's median perimeter pulls no more:
     f_c = f clamp((stall - P_c/P_med) / (stall - 1), 0, 1). With `follow` > 0, a non-leader cell sharing a
     vertex with a leader pulls too, at `follow` x f along its own outward direction (the stall applies to it
-    as well). float64 [nv, 3]."""
+    as well). With `stall_reach` 1, a pulled cell's stall factor is the SMALLEST among it and every cell
+    sharing a vertex with it, so a leader stops pulling when a neighbour it drags is over the line. float64
+    [nv, 3]."""
     dev = pos.device
     P = pos.to(torch.float64)
     live = ef < nF
@@ -1607,7 +1609,13 @@ def leader_traction(pos, es, ef, nF, leader, f, zero_net=True, et=None, stall=No
         per = torch.zeros(nF, device=dev, dtype=torch.float64).index_add_(
             0, e_f, (P[e_t] - P[e_s]).norm(dim=1))
         pm = per[ok].median().clamp_min(1e-12) if ok.any() else per.new_tensor(1.0)
-        on = on * ((float(stall) - per / pm) / (float(stall) - 1.0)).clamp(0.0, 1.0)
+        sf = ((float(stall) - per / pm) / (float(stall) - 1.0)).clamp(0.0, 1.0)
+        if int(stall_reach) > 0:
+            for _ in range(int(stall_reach)):
+                vmin = torch.ones(P.shape[0], device=dev, dtype=torch.float64).scatter_reduce(
+                    0, e_s, sf[e_f], reduce="amin", include_self=True)   # per vertex: its most stretched cell
+                sf = torch.ones_like(sf).scatter_reduce(0, e_f, vmin[e_s], reduce="amin", include_self=True)
+        on = on * sf
     F = torch.zeros_like(P)
     # A VERTEX ONCE PER CELL IT BELONGS TO: each half-edge's source is one (vertex, cell) incidence.
     F.index_add_(0, e_s, float(f) * on[e_f, None] * u[e_f])
@@ -1646,6 +1654,12 @@ class ProtrusionLeaderTraction(Lateral):
     FOLLOWERS, `follow` (default 0 = leaders only): Cheung's leaders lead TRAILING cells (Fig 4J); a
     cell that shares a vertex with a leader pulls outward too, at `follow` x f along its own direction.
 
+    THE GROUP STALL, `stall_reach` (default 0 = each cell's own shape): a follower caught between the
+    pulled tip and the body is stretched by its NEIGHBOURS' pull, its own long stalled (exp12 batch 13: the
+    worst edge, 15.9x the median, on a follower at 4-7x the median perimeter). With `stall_reach` 1 a
+    pulled cell's factor is the smallest over the cells sharing a vertex with it: the strand stops pulling
+    when any cell it drags is over the line -- the tension a strand can carry, read at its weakest cell.
+
     f is the traction per vertex of a leader, in the tissue's force units. One frame's relaxation
     (relax_iters x eta x mu = 30 x 0.08 x 1 on exp11's working point) moves a free vertex by up to
     2.4 f, so f 0.1 is up to 0.24 world units a frame -- 2.4 um per 10 min, ~14 um/h, the order of
@@ -1673,7 +1687,8 @@ class ProtrusionLeaderTraction(Lateral):
     PARAM_ROLES = {"f": "traction_per_leader_vertex", "leader_block": "leader_flag_block",
                    "cell_set": "leader_owner", "zero_net": "reaction_back_to_the_tissue",
                    "stall": "perimeter_over_median_at_which_traction_stops",
-                   "follow": "follower_traction_fraction_of_f"}
+                   "follow": "follower_traction_fraction_of_f",
+                   "stall_reach": "vertex_rings_over_which_the_stall_is_shared"}
     REFERENCE = ("Cheung, K. J., Gabrielson, E., Werb, Z. & Ewald, A. J. (2013). Collective "
                  "invasion in breast cancer requires a conserved basal epithelial program. Cell "
                  "155:1639-1651.")
@@ -1686,6 +1701,7 @@ class ProtrusionLeaderTraction(Lateral):
         self.leader_block = str(params.get("leader_block", "mutant"))
         self.zero_net = bool(params.get("zero_net", True))
         self.follow = float(params.get("follow", 0.0))
+        self.stall_reach = int(params.get("stall_reach", 0))
         _st = params.get("stall")
         self.stall = None if _st is None else float(_st)
         if self.stall is not None and self.stall <= 1.0:
@@ -1707,7 +1723,8 @@ class ProtrusionLeaderTraction(Lateral):
         b0, _ = clvl.state_schema[self.leader_block]
         leader = clvl.state[:nF, b0] > 0.5
         F = leader_traction(pos, m["E_srce"], m["E_face"], nF, leader, self.f, self.zero_net,
-                            et=m["E_trgt"], stall=self.stall, follow=self.follow)
+                            et=m["E_trgt"], stall=self.stall, follow=self.follow,
+                            stall_reach=self.stall_reach)
         buf = basal_load(m, int(fr), nv, pos.device)
         buf += F
         LEADER_TRACE.append((int(fr), int(leader.sum()), float(F.norm(dim=1).max()) if nv else 0.0))

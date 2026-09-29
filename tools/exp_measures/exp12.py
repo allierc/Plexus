@@ -291,8 +291,23 @@ def spheroid(T, dim=3, plane_axis=2, c_starve=None, c_cycle=None, cycling_age=No
     return out
 
 
+def _wide(x, idx, centre, d, min_width_cd):
+    """Is the cluster of cells `idx` at least `min_width_cd` cell diameters wide ACROSS its own radial
+    axis? The axis is the mean outward direction of its cells from `centre`; the width is the largest
+    distance between two of its cells after projecting out that axis. A single-file chain of stretched
+    cells (a needle) has width ~0; a finger two cells abreast has ~1 diameter."""
+    v = x[idx] - centre
+    a = v.mean(0)
+    a = a / max(np.linalg.norm(a), 1e-12)
+    tr = v - np.outer(v @ a, a)
+    if len(idx) < 2:
+        return False
+    w = np.max(np.linalg.norm(tr[:, None, :] - tr[None, :, :], axis=2))
+    return bool(w >= min_width_cd * d)
+
+
 def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=20, um_per_unit=None, body="filled",
-            **_):
+            min_width_cd=1.0, **_):
     """Clusters of cells more than `beyond_cd` cell diameters outside the body's radius, linked when
     closer than `link` diameters; clusters of at least `min_cells` count as strands.
 
@@ -315,12 +330,12 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
     from scipy.spatial import cKDTree
     s = _um(T, um_per_unit)
     ts = _rows(T, every)
-    counts, reach, ncell = [], [], []
+    counts, reach, ncell, wide = [], [], [], []
     for t in ts:
         c = cells(T, t)
         ncell.append(len(c))
         if len(c) < 8:
-            counts.append(None); reach.append(None)
+            counts.append(None); reach.append(None); wide.append(None)
             continue
         r = _radii(c.x, dim, plane_axis)
         d = _diameter(T, t, c)
@@ -331,12 +346,16 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
             Rb = (float(np.sqrt(np.nansum(area[:, 0]) / np.pi)) if area is not None
                   else float(np.median(r) / 0.5 ** (1.0 / dim)))
         out_i = np.flatnonzero(r > Rb + beyond_cd * d)
-        n = 0
+        n = nw = 0
         if len(out_i) >= min_cells:
             G = cKDTree(c.x[out_i]).sparse_distance_matrix(cKDTree(c.x[out_i]), link * d)
             _, lab = connected_components(G, directed=False)
-            n = int(np.sum(np.bincount(lab) >= min_cells))
+            big = np.flatnonzero(np.bincount(lab) >= min_cells)
+            n = int(len(big))
+            ctr = c.x.mean(0)
+            nw = int(sum(_wide(c.x, out_i[lab == b], ctr, d, min_width_cd) for b in big))
         counts.append(n)
+        wide.append(nw)
         reach.append(finite((r.max() - Rb) / d))
     last = counts[-1]
     # THE CELL COUNT, BESIDE THE STRANDS: an outgrowth that multiplies the tissue is budding, not
@@ -345,7 +364,12 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
     return {"strands_last": last, "strands_max": max((v for v in counts if v is not None), default=None),
             "reach_last_cd": reach[-1], "series": counts, "rows": ts, "um_per_unit": s,
             "cells_first": ncell[0] if ncell else None, "cells_last": ncell[-1] if ncell else None,
-            "cell_gain": (ncell[-1] / ncell[0]) if ncell and ncell[0] else None}
+            "cell_gain": (ncell[-1] / ncell[0]) if ncell and ncell[0] else None,
+            # THE WIDE COUNT: strands at least `min_width_cd` diameters across their own axis. The plain
+            # count also counts a single-file chain along a stretched needle cell (exp12 F74: 8 "strands"
+            # on a run whose movie shows needles to the box edge); Cheung's are multicellular strands.
+            "strands_wide_last": wide[-1], "strands_wide_max": max((v for v in wide if v is not None), default=None),
+            "series_wide": wide}
 
 
 def mesh_sanity(T, every=5, radial_line=True, **_):

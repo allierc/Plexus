@@ -627,6 +627,12 @@ class PairPotential(Exchange):
         law: lj        U = 4 eps [(s/r)^12 - (s/r)^6],  cut at `cutoff` (2.5 s by default)
         law: wca       the same, cut at its minimum 2^(1/6) s: repulsion only (excluded volume)
         law: coulomb   U = k_C q_i q_j exp(-r / debye) / r    (screened, Debye-Hueckel)
+        law: harmonic  U = eps/2 (1 - r/s)^2 for r < s, 0 beyond: SOFT spheres of diameter s that
+                       may overlap (O'Hern et al. 2003) -- the centre-based cell's excluded
+                       volume, where a daughter born half a diameter from its mother must be
+                       pushed apart smoothly (WCA's r^-12 there is a force the guards would cap).
+                       Stiffness eps/s^2 per contact; a velocity mu F, so an overdamped set is
+                       stable while mu (eps/s^2) (contacts per bead) dt stays below ~2.
 
     `law` is one of them or a LIST, summed pair by pair (`[coulomb, wca]`: charged ions with hard
     cores). Side A is `sets: [...]` (default the `at` set alone); side B is `with: <set>` or
@@ -651,7 +657,8 @@ class PairPotential(Exchange):
 
     Reference: Lennard-Jones, J.E. (1924). Proc. R. Soc. A 106:463; Weeks, J.D., Chandler, D. &
     Andersen, H.C. (1971). J. Chem. Phys. 54:5237 (the repulsive core); Debye, P. & Hueckel, E.
-    (1923). Phys. Z. 24:185.
+    (1923). Phys. Z. 24:185; O'Hern, C.S., Silbert, L.E., Liu, A.J. & Nagel, S.R. (2003). Phys. Rev.
+    E 68:011306 (the harmonic soft sphere).
     """
 
     EMIT = "velocity"
@@ -661,9 +668,10 @@ class PairPotential(Exchange):
     OUTPUTS = ["particle", "particle"]
     READS = ["pos"]
     REQUIRES_PARAMS = ["law"]
-    MECHANISM_TAGS = ["lennard_jones", "excluded_volume", "adhesion", "electrostatics", "screened_coulomb"]
+    MECHANISM_TAGS = ["lennard_jones", "excluded_volume", "adhesion", "electrostatics", "screened_coulomb",
+                      "soft_sphere"]
     PARAM_ROLES = {"sets": "side_A_default_the_at_set", "with": "side_B_one_set", "with_sets": "side_B_several_sets",
-                   "law": "lj_wca_coulomb_or_cooke_or_a_list_summed", "epsilon": "well_depth_sim_energy",
+                   "law": "lj_wca_coulomb_cooke_or_harmonic_or_a_list_summed", "epsilon": "well_depth_sim_energy",
                    "sigma": "contact_distance_world_or_per_set_map_lorentz_mixed",
                    "tail": "cooke_cosine_tail_width_world",
                    "cutoff": "range_world", "k_c": "kT_times_bjerrum_length",
@@ -698,8 +706,9 @@ class PairPotential(Exchange):
         _law = params["law"]
         self.laws = [str(l).lower() for l in (_law if isinstance(_law, (list, tuple)) else [_law])]
         for l in self.laws:
-            if l not in ("lj", "wca", "coulomb", "cooke"):
-                raise ValueError(f"pair_potential: law is lj, wca, coulomb or cooke (or a list of them), got {l!r}")
+            if l not in ("lj", "wca", "coulomb", "cooke", "harmonic"):
+                raise ValueError(f"pair_potential: law is lj, wca, coulomb, cooke or harmonic (or a list of them), "
+                                 f"got {l!r}")
         if len(set(self.laws)) != len(self.laws):
             raise ValueError(f"pair_potential: a law listed twice in {self.laws}")
         self.law = "+".join(self.laws)
@@ -724,8 +733,9 @@ class PairPotential(Exchange):
         self.cut_given = {l: (float(_cut[l]) if isinstance(_cut, dict) and l in _cut else
                               None if isinstance(_cut, dict) or _cut is None else float(_cut)) for l in self.laws}
         reach = {"lj": 2.5 * self.sigma, "wca": 2.0 ** (1.0 / 6.0) * self.sigma, "coulomb": 0.25,
-                 "cooke": self.r_c + self.tail}
-        self.cutoff = max((self.cut_given[l] if self.cut_given[l] is not None else reach[l]) if l != "wca"
+                 "cooke": self.r_c + self.tail, "harmonic": self.sigma}
+        self.cutoff = max((self.cut_given[l] if self.cut_given[l] is not None else reach[l])
+                          if l not in ("wca", "harmonic")
                           else min(self.cut_given[l] if self.cut_given[l] is not None else reach[l], reach[l])
                           for l in self.laws)
         self.k_c = float(params.get("k_c", 0.0))
@@ -829,6 +839,8 @@ class PairPotential(Exchange):
                 x = (math.pi / (2.0 * tl)) * (r - r_c)
                 m = core + torch.where((r >= r_c) & (r <= r_c + tl),
                                        -self.eps * (math.pi / (2.0 * tl)) * torch.sin(2.0 * x), torch.zeros_like(r))
+            elif l == "harmonic":                                       # -dU/dr = eps (1 - r/s) / s, r < s
+                m = self.eps * (1.0 - r / s) / s
             else:
                 scr = torch.exp(-r / self.debye) if self.debye > 0 else torch.ones_like(r)
                 m = self.k_c * qa * qb * scr * (1.0 / (r * r) + ((1.0 / (self.debye * r)) if self.debye > 0 else 0.0))
@@ -841,8 +853,8 @@ class PairPotential(Exchange):
                     m = torch.where(inslab, self.k_c * self.slab_r * qa * qb / (r * r), m)
             # THIS LAW'S OWN RANGE, where it is shorter than the search's: WCA's minimum per pair,
             # or a law listed beside a longer-ranged one. One law alone is searched at its own range.
-            if l == "wca":
-                cut = 2.0 ** (1.0 / 6.0) * s
+            if l in ("wca", "harmonic"):
+                cut = 2.0 ** (1.0 / 6.0) * s if l == "wca" else s
                 if self.cut_given[l] is not None:
                     cut = torch.clamp(cut, max=self.cut_given[l]) if per_pair else min(cut, self.cut_given[l])
             elif l == "cooke" and self.cut_given[l] is None:
@@ -1155,6 +1167,94 @@ class BrownianAnneal(Brownian):
         self.kT = self.kT0 + (self.kT1 - self.kT0) * min(1.0, self._step / self.frames)
         self._step += 1
         return super().forward(H, mask)
+
+
+@register_operator("brownian", model="active_cell", family="motion", set="vertex", kind="lateral",
+                   title="Self-propelled cells of a vertex tissue (the active vertex model)",
+                   equation=r"""$$\dot{\mathbf x}_v=v_0\,\langle\mathbf n_c\rangle_{c\ni v},\qquad \mathbf n_c=(\cos\theta_c,\sin\theta_c),\qquad d\theta_c=\sqrt{2D_r}\,dW_c$$""")
+class BrownianActiveCell(Lateral):
+    """The ACTIVE half of a motile cell's equation of motion on a vertex mesh: each cell crawls at a
+    constant speed along its own polarity, and the polarity diffuses.
+
+    vertex -> vertex: reads the mesh (which cells own each vertex), emits a velocity.
+
+        dx_v/dt   = v0 <n_c>_{c owns v}         the mean polarity of the cells meeting at vertex v
+        n_c       = (cos theta_c, sin theta_c)  in the tissue's plane (the two axes other than plane_axis)
+        dtheta_c  = sqrt(2 Dr dt) xi            xi a standard normal, fresh each frame per cell
+
+    v0 (`v0`, world units per unit time) is the crawling speed, Dr (`Dr`, rad^2 per unit time) the
+    rotational diffusion of the polarity: the persistence time is 1/Dr, the persistence length v0/Dr.
+    Added to `cell_mechanics`' velocity (mu F), it is Bi et al. 2016's self-propelled Voronoi / Barton
+    et al. 2017's active vertex model, dr/dt = mu F + v0 n: the forces of the shape energy and the
+    tensions, plus a self-propulsion the forces do not derive from.
+
+    WHY (experiment 16, step 3). A vertex aggregate with the paper's type-pair tensions and a cortical
+    fluctuation makes ~90 T1 flips a frame for 368 cells, yet the median cell moves under one cell width
+    in 72 h: the flips flicker in place. Cerchiari et al. 2015's LEP and MEP crawl; a persistent crawl
+    is what carries a cell across the aggregate so the tensions can choose where it stays. `brownian` is
+    the thermal kick of a bead (white, per vertex); this is its active, persistent, per-cell form.
+    v0 = 0 is no motion at all (the tissue is `cell_mechanics` alone).
+
+    Reference: Bi, D., Yang, X., Marchetti, M.C. & Manning, M.L. (2016). Motility-driven glass and
+    jamming transitions in biological tissues. Phys. Rev. X 6:021011; Barton, D.L., Henkes, S.,
+    Weijer, C.J. & Sknepnek, R. (2017). Active vertex model for cell-resolution description of
+    epithelial tissue mechanics. PLoS Comput. Biol. 13:e1005569.
+    """
+
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    REQUIRES_PARAMS = ["v0"]
+    MECHANISM_TAGS = ["motility", "self_propulsion", "active_vertex_model", "persistent_random_walk"]
+    PARAM_ROLES = {"v0": "crawling_speed_world_per_time", "Dr": "polarity_rotational_diffusion",
+                   "plane_axis": "the_axis_normal_to_the_tissue_plane", "cell_set": "the_mesh_faces_set",
+                   "seed": "rng_seed"}
+    REFERENCE = ("Bi, D. et al. (2016). Phys. Rev. X 6:021011; Barton, D.L. et al. (2017). PLoS Comput. "
+                 "Biol. 13:e1005569.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.v0 = float(params["v0"])
+        self.Dr = float(params.get("Dr", 0.1))
+        self.plane_axis = params.get("plane_axis")
+        self._cat = params.get("cell_set")
+        self.seed = int(params.get("seed", 0))
+        self._gen = None
+        self._theta = None
+
+    def forward(self, H, mask=None):
+        from plexus.operators.vertex_ops import resolve_cell_set
+        lvl = H.level(self.at)
+        X = lvl.get("pos")
+        v = torch.zeros_like(X)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {self.at: v}
+        clvl = H.level(resolve_cell_set(H, self.at, self._cat))
+        n_buf = int(clvl.node_type.shape[0])
+        h = float(getattr(H, "dt", 1.0))
+        if self._theta is None or self._theta.shape[0] != n_buf:
+            self._gen = torch.Generator(device="cpu").manual_seed(self.seed)
+            self._theta = 2.0 * math.pi * torch.rand(n_buf, generator=self._gen, dtype=torch.float64)
+        else:
+            self._theta = self._theta + math.sqrt(2.0 * self.Dr * h) * torch.randn(n_buf, generator=self._gen,
+                                                                                   dtype=torch.float64)
+        if self.v0 == 0.0:
+            return {self.at: v}
+        pa = self.plane_axis if self.plane_axis is not None else (m.get("mech") or {}).get("plane_axis", 2)
+        ax = [a for a in range(X.shape[1]) if a != int(pa)][:2]
+        th = self._theta.to(device=X.device, dtype=X.dtype)
+        n = torch.zeros(n_buf, X.shape[1], device=X.device, dtype=X.dtype)
+        n[:, ax[0]], n[:, ax[1]] = torch.cos(th), torch.sin(th)
+        es, ef = m["E_srce"].long().to(X.device), m["E_face"].long().to(X.device)
+        s = torch.zeros_like(X).index_add_(0, es, n[ef])
+        c = torch.zeros(X.shape[0], device=X.device, dtype=X.dtype).index_add_(0, es, torch.ones_like(es, dtype=X.dtype))
+        v = self.v0 * s / c.clamp_min(1.0)[:, None]
+        v = v * lvl.occ[:, None].to(v.dtype)
+        if mask is not None:
+            v = v * mask[:, None].to(v.dtype)
+        return {self.at: v}
 
 
 @register_operator("tether", family="boundary", set="particle", kind="lateral",

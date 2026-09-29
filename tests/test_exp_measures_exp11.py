@@ -267,3 +267,14 @@ def test_min_over_arms_can_be_restricted():
     M = {("main", 1): {"a": 5.0}, ("explore", 1): {"a": 0.5}}
     assert S.value({"min_over_arms": {"key": "a"}}, M)[0] == 0.5
     assert S.value({"min_over_arms": {"key": "a", "arms": ["main"]}}, M)[0] == 5.0
+
+
+def test_clefts_zero_on_a_sphere_and_seen_on_a_dent():
+    x, tri = sphere_mesh(2000)
+    T = MeshTraj([x], tri)
+    assert exp_measures.run_measure("exp11.clefts", T, every=1)["frac_last"] < 0.01
+    y = x.copy()
+    d = y[:, 2] > 0.9                                  # a pit at the +z pole, pressed inward
+    y[d] *= 0.8
+    T = MeshTraj([y], tri)
+    assert exp_measures.run_measure("exp11.clefts", T, every=1)["frac_last"] > 0.005

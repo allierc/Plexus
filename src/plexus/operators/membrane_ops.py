@@ -396,9 +396,10 @@ def _basal_lookup():
     return geo
 
 
-def _live_basal(H, surface, sep_block, geo, dev, dt_):
+def _live_basal(H, surface, sep_block, geo, dev, dt_, side="basal"):
     """(mesh table, centroid c, lookup M) of the tissue's basal surface `pos - sep` this frame,
-    about its own centroid -- or None before the tissue is seeded."""
+    about its own centroid -- or None before the tissue is seeded. `side="apical"`: the other ring,
+    `pos + sep` (the lumen-facing one of an `apical: in` shell)."""
     tl = H.level(surface)
     m = getattr(tl, "_mesh", None)
     if m is None or not int(m.get("Nv", 0)):
@@ -408,7 +409,10 @@ def _live_basal(H, surface, sep_block, geo, dev, dt_):
     # A MID-SURFACE TISSUE (the default `cell_mechanics` shape energy) HAS NO SEPARATION: its one
     # surface is the one the membrane rests on, and the standoff stands for half the cell thickness.
     if sep_block in tl.state_schema:
-        B = B - tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
+        if side == "apical":
+            B = B + tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
+        else:
+            B = B - tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
     c = B.mean(0)
     V = B - c
     M = geo._build_from(V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev),
@@ -1707,6 +1711,19 @@ class BasementMembraneContactLive(Lateral):
     deficit that gates growth -- counted from the same lookup, so the membrane a cell senses is the
     one holding it.
 
+    THE OTHER SIDE, `side` (default `basal` = all of the above): with `side: apical` the set this
+    operator is placed on -- any particle set, e.g. the INNER CELLS of a stratified bud (exp 11,
+    Wang et al. 2021's surface layer wrapping an interior of packed cells) -- is held INSIDE the
+    tissue: the surface looked up is the apical ring a = pos + sep (the lumen-facing ring of an
+    `apical: in` shell), the normal of each contact is the one pointing INTO the lumen, so a node
+    that crosses into the cell layer is pushed back into the lumen and the layer is pushed outward
+    by the reaction (on a: -F on pos and -F on sep, `cell_mechanics[apicobasal_contact]`). The list
+    carries `side: apical` and sits beside the membrane's in `m["basal_contacts"]`, keyed by this
+    set; the ledger books its pair the same way. An apical list publishes no ligand density and
+    writes no CONTACT_TRACE row (both are the membrane's); its live mask is the set's own occupancy,
+    not `membrane_alive`, and its drag is `overdamped_gamma`, required (no `bm_bond` acts on it).
+    `offset` is then the inner cell's radius -- the distance its centre is held from the apical face.
+
     Reference: Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the
     particle-to-surface contact and its barycentric reaction); Yurchenco, P. D. (2011). Cold Spring
     Harb. Perspect. Biol. 3:a004911 (the membrane sits on the basal cell surface).
@@ -1718,7 +1735,8 @@ class BasementMembraneContactLive(Lateral):
                       "anchorage_sensing"]
     PARAM_ROLES = {"k": "contact_stiffness_per_node", "offset": "standoff_the_sheet_is_held_at",
                    "band": "ligand_reach", "surface": "the_live_vertex_set",
-                   "k_adh": "cell_matrix_tether_stiffness"}
+                   "k_adh": "cell_matrix_tether_stiffness",
+                   "side": "basal_membrane_outside_or_apical_inner_cells_inside"}
     REFERENCE = ("Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Comput. Methods Appl. Mech. Engrg. "
                  "293:1-19; Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911.")
 
@@ -1734,6 +1752,12 @@ class BasementMembraneContactLive(Lateral):
         self.band = float(params.get("band", 0.3))
         self.margin_contact = float(params.get("margin_contact", 0.5))
         self.k_adh = float(params.get("k_adh", 0.0))
+        self.side = str(params.get("side", "basal")).lower()
+        if self.side not in ("basal", "apical"):
+            raise ValueError(f"bm_contact[live]: side is basal or apical, got {self.side!r}")
+        if self.side == "apical" and self.gamma is None:
+            raise ValueError("bm_contact[live]: side apical needs `overdamped_gamma` -- the drag of the "
+                             "set it holds inside the tissue (no `bm_bond` acts on it)")
         if self.k_adh > 0 and self.band > self.margin_contact:
             raise ValueError("bm_contact[live]: the tether's reach `band` must lie inside "
                              "`margin_contact`, or a tethered node could miss the frame's list")
@@ -1741,6 +1765,8 @@ class BasementMembraneContactLive(Lateral):
         self._said = False
 
     def _node_gamma(self, H):
+        if self.side == "apical":                   # its own drag; bm_bond's belongs to the membrane
+            return self.gamma
         bb = H.__dict__.get("_bm_bond_op", None)
         g_b = float(getattr(bb, "gamma", 0.0) or 0.0) if bb is not None else 0.0
         if self.gamma is None:
@@ -1760,13 +1786,15 @@ class BasementMembraneContactLive(Lateral):
         f = getattr(H, "frame", None)
         f = -1 if f is None else int(f)
         vel = torch.zeros_like(pos)
-        got = _live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_)
+        apical = self.side == "apical"
+        got = (_live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_, side="apical") if apical
+               else _live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_))
         if got is None:
             return {self.at: vel}
         m, c, M = got
         nv, nF = M["nv"], int(M["nF"])
         gamma = self._node_gamma(H)
-        alive = getattr(H, "membrane_alive", None)
+        alive = getattr(H, "membrane_alive", None) if not apical else (lvl.occ > 0)
         alive = (torch.ones(pos.shape[0], dtype=torch.bool, device=dev) if alive is None
                  else alive.to(dev))
         if mask is not None:
@@ -1784,6 +1812,8 @@ class BasementMembraneContactLive(Lateral):
         if idx.numel():
             hit, tri, w, n_hat, gap = _nearest_faces(M, c, pos[idx])
             idx, tri, w, n_hat, gap = idx[hit], tri[hit], w[hit], n_hat[hit], gap[hit]
+            if apical:                              # the normal INTO the lumen, the height along it
+                n_hat, gap = -n_hat, -gap
             bound = gap <= (self.offset + self.band)
             lig.index_add_(0, M["ef"][tri][bound], torch.ones_like(gap[bound]))
             if gap.numel():
@@ -1799,6 +1829,14 @@ class BasementMembraneContactLive(Lateral):
         if not isinstance(bc, dict):
             bc = m["basal_contacts"] = {}
         bc[self.at] = C
+        if apical:                                  # the ligand density and the trace are the membrane's
+            C["side"] = "apical"
+            if not self._said:
+                self._said = True
+                print(f"[bm_contact/live] set `{self.at}` held INSIDE the apical surface of "
+                      f"`{self.surface}`: k={self.k:g}, gamma={gamma:g}, offset={self.offset:g}; frame {f}: "
+                      f"{n_list} nodes in the contact list, deepest {pmax:.3g} past the standoff", flush=True)
+            return {self.at: vel}
         # THE LIGAND DENSITY: bound nodes per unit BASAL area of each cell, so a big cell is not
         # read as a well-anchored one.
         area = 0.5 * torch.cross(M["B"] - M["A"], M["C"] - M["A"], dim=1).norm(dim=1)
@@ -2529,6 +2567,12 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
     SUPPORTED_DIMS = [3]
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True
+    # `exclude_block` (default None = unchanged): NOT UNDER THE CELLS THAT DIGEST IT. A candidate whose nearest basal
+    # face belongs to a cell whose width-1 block `exclude_block` (on `cell_set`) is above 0.5 is rejected, as a
+    # candidate in the declared cone is. Without it the sparsest-first rule refills a hole CUT BY CELLS
+    # (`bm_unbond[model: release]`, whose leaders carry `mutant`) as fast as they digest it: exp 11 Finding 70 --
+    # the cell-made hole's bud 0.11 / 0.18 with secretion, 0.41 / 0.38 without. Harunaga 2014: the gland's holes are
+    # dynamic and stay open only while proteases act.
     REQUIRES_PARAMS = ["surface"]
     MECHANISM_TAGS = ["secretion", "material_addition", "areal_density_setpoint", "basal_deposition"]
     PARAM_ROLES = {"rate": "max_fraction_secreted_per_frame", "offset": "standoff_the_sheet_is_held_at",
@@ -2545,6 +2589,8 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
         self.relax_new = int(params.get("relax_new", 4))
         self.jitter = float(params.get("jitter", 0.25))
         self.cand_mult = int(params.get("cand_mult", 12))
+        self.exclude_block = params.get("exclude_block", None)
+        self.cell_set = str(params.get("cell_set", "cell"))
         self.seed = int(params.get("seed", 0))
         self._gen = torch.Generator().manual_seed(self.seed)
         self._geo = _basal_lookup()
@@ -2555,6 +2601,14 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
         """y moved along the nearest face's outward normal to the basal surface + offset; found [n]."""
         found, _, _, nh, gap = _nearest_faces(M, c, y)
         return torch.where(found[:, None], y - (gap - self.offset)[:, None] * nh, y), found, nh
+
+    def _in_excluded(self, M, c, y, excl):
+        """[n] True where y's nearest basal face belongs to an excluded cell (`exclude_block`)."""
+        if excl is None or y.shape[0] == 0:
+            return torch.zeros(y.shape[0], dtype=torch.bool, device=y.device)
+        found, tri, _, _, _ = _nearest_faces(M, c, y)
+        cell = M["ef"][tri]
+        return found & excl[cell.clamp(max=excl.numel() - 1)]
 
     @staticmethod
     def _in_cone(hole, c, y):
@@ -2648,7 +2702,14 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
         Aa = M["A"][ti]
         Q = c + Aa + r[:, 0:1] * (M["B"][ti] - Aa) + r[:, 1:2] * (M["C"][ti] - Aa)
         Y, found, _ = self._onto(M, c, Q)
-        Y = Y[found & ~self._in_cone(hole, c, Y)]
+        excl = None
+        if self.exclude_block:
+            _cl = H.level(self.cell_set)
+            if self.exclude_block not in _cl.state_schema:
+                raise ValueError(f"bm_secrete[live]: exclude_block {self.exclude_block!r} is not a block of "
+                                 f"the {self.cell_set!r} set")
+            excl = (_cl.get(self.exclude_block)[:nF, 0] > 0.5).to(dev)
+        Y = Y[found & ~self._in_cone(hole, c, Y) & ~self._in_excluded(M, c, Y, excl)]
         if Y.shape[0] == 0:
             SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
             return {}
@@ -2672,7 +2733,7 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
             g = torch.randn(add, 3, generator=self._gen, dtype=torch.float64).to(dev, dt_)
             g = g - (g * nh).sum(1, keepdim=True) * nh
             cand, ok, _ = self._onto(M, c, newp + g * (self.jitter * ls))
-            ok = ok & ~self._in_cone(hole, c, cand)
+            ok = ok & ~self._in_cone(hole, c, cand) & ~self._in_excluded(M, c, cand, excl)
             newp = torch.where(ok[:, None], cand, newp)
         for _ in range(self.relax_new):
             allp = torch.cat([P_live, newp])
@@ -2687,7 +2748,7 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
             w_ = (ls - nd).clamp_min(0.0) / ls
             push = (diff / nd[..., None].clamp_min(1e-9) * w_[..., None]).sum(1)
             cand, ok, _ = self._onto(M, c, newp + push * (0.3 * ls))
-            ok = ok & ~self._in_cone(hole, c, cand)
+            ok = ok & ~self._in_cone(hole, c, cand) & ~self._in_excluded(M, c, cand, excl)
             newp = torch.where(ok[:, None], cand, newp)
 
         pos[slots] = newp

@@ -128,6 +128,13 @@ class SeedPositions(Seed):
     The heading is written for every mode, as the engine always did: `glide`, `bounce` and
     `sense` read it, and a set that never moves simply never reads it.
 
+    `centre` (default none = the centre of the world box, as always): where the placement is
+    centred instead -- a point `[x, y(, z)]` in world units, or the NAME OF A SET, whose live
+    centroid at this seed is used (it must be seeded earlier in the `seed:` list). A tissue built by
+    `seed_mesh` sits at the origin, not at the box centre, so the inner cells filling its lumen
+    (exp 11: `mode: ball` inside an `apical: in` shell) are placed with `centre: vertex`. The
+    placement is made about the box centre as before and translated, so the draws do not change.
+
     Reference: Vogel, H. (1979). A better way to construct the sunflower head. Math. Biosci.
     44:179-189, for the golden-angle spiral; Toomre, A. & Toomre, J. (1972). Galactic bridges
     and tails. Astrophys. J. 178:623-666, for the inclined encounter; the rest is Plexus (this
@@ -139,7 +146,8 @@ class SeedPositions(Seed):
     MECHANISM_TAGS = ["initial_condition", "placement"]
     PARAM_ROLES = {"mode": "placement_rule", "radius": "placement_radius", "seed": "rng_seed",
                    "thickness": "out_of_plane_scatter", "separation": "disc_separation",
-                   "offset": "impact_parameter", "tilt": "disc_inclination", "arms": "spiral_arms"}
+                   "offset": "impact_parameter", "tilt": "disc_inclination", "arms": "spiral_arms",
+                   "centre": "placement_centre_point_or_set_centroid_default_box_centre"}
     PARAM_UNITS = {"radius": "length", "thickness": "length", "separation": "length",
                    "offset": "length"}
     REFERENCE = ("Vogel, H. (1979). Math. Biosci. 44:179-189; Toomre, A. & Toomre, J. (1972). "
@@ -156,6 +164,25 @@ class SeedPositions(Seed):
         self.tilt = float(params.get("tilt", 0.0))                # (two_disks) radians about x
         self.arms = params.get("arms", None)                      # (two_disks) {amplitude, m, pitch}
         self.seed = int(params.get("seed", 0))
+        self.centre = params.get("centre", None)                  # a point, or a set's name; None = box centre
+
+    def _centre(self, H, D, dev):
+        """The placement's centre in world units: the declared point, or the named set's live centroid."""
+        if isinstance(self.centre, str):
+            src = H.level(self.centre)
+            live = src.occ > 0
+            m = getattr(src, "_mesh", None)
+            if m is not None and int(m.get("Nv", 0) or 0):          # a mesh set: its seeded vertices
+                live = torch.zeros_like(live)
+                live[: int(m["Nv"])] = True
+            if not bool(live.any()):
+                raise ValueError(f"seed_positions: centre set {self.centre!r} has nothing live to centre on -- "
+                                 f"seed it earlier in the `seed:` list")
+            return src.get("pos")[live].float().mean(0).to(dev)
+        c = torch.as_tensor([float(v) for v in self.centre], device=dev)
+        if c.numel() != D:
+            raise ValueError(f"seed_positions: centre {self.centre} is not a {D}D point")
+        return c
 
     def forward(self, H, mask=None):
         from plexus.engine import _spawn, _spawn3d, _spawn_pair3d   # the engine's own placement rules
@@ -178,6 +205,9 @@ class SeedPositions(Seed):
                                  thickness=float(self.thickness))
         else:
             pos, head = _spawn(self.mode, n, H.world_size, float(self.radius), rng, dev)
+        if self.centre is not None:                               # translated, the draws unchanged
+            box = torch.as_tensor(H.world_size, dtype=pos.dtype, device=dev)[:D]
+            pos = pos - 0.5 * box + self._centre(H, D, dev).to(pos.dtype)
         st = lvl.state.clone()
         st[:n, p0:p1] = pos.to(st.dtype)
         lvl.state = st
@@ -263,6 +293,203 @@ class SeedPositionsTiledLattice(Seed):
         st = lvl.state.clone()
         st[:, p0:p1] = pos.to(st.dtype)
         lvl.state = st
+        return {}
+
+
+@register_operator("seed_positions", family="seed", set="cell", kind="seed", model="packed_ball",
+                   title="Cell centres packed in a ball",
+                   equation=r"""$$\mathbf x_i=\mathbf c+a\,(\mathbf k_i+\boldsymbol\epsilon_i),\qquad \mathbf k_i\in\mathbb Z^3,\ \ |\mathbf k_i|\ \text{the }n\text{ smallest},\ \ \epsilon_{i,a}\sim U(-j,j)$$""")
+class SeedPositionsPackedBall(SeedPositions):
+    """The CENTRES OF A PACKED MASS OF CELLS: the n sites of a cubic lattice of pitch `spacing`
+    closest to `centre`, each jittered by up to `jitter` of a pitch on every axis.
+
+    set -> set: writes `pos` for the set's n live elements.
+
+        x_i = c + a (k_i + eps_i),   k_i the n integer sites nearest the origin,   eps_{i,a} ~ U(-j, j)
+
+    a is `spacing` (world units, the centre-to-centre distance of the packing), j `jitter` (a
+    fraction of a, below 0.5 so no two sites swap), c the `centre` (a point, or a set whose live
+    centroid is read, as `seed_positions` takes it). The ball's radius follows from n: about
+    a (3 n / 4 pi)^(1/3).
+
+    WHY NOT `mode: ball`. Uniform random centres at the packing density of a tissue put two cells
+    closer than a cell diameter in most places; a body built around each (`voronoi_parent` below,
+    or an MPM ball) then starts overlapped and the first frames are an explosion. A jittered lattice
+    keeps every pair at least a (1 - 2j) apart and still reads as irregular. exp 11 sets `spacing`
+    to the 9.4 um nucleus-to-nucleus distance of the gland's interior (Wang et al. 2021 source data,
+    `tools/wang_smg_stats.py`).
+
+    Reference: none -- an initial condition. Plexus (this work).
+    """
+    REQUIRES_PARAMS = ["spacing"]
+    MAY_MUTATE_INTEGRATED_STATE = True
+    PARAM_ROLES = {"spacing": "centre_to_centre_distance", "jitter": "lattice_jitter_fraction",
+                   "centre": "placement_centre_point_or_set_centroid", "seed": "rng_seed"}
+    PARAM_UNITS = {"spacing": "length"}
+
+    def __init__(self, params, device="cpu"):
+        p2 = dict(params); p2.setdefault("mode", "ball")
+        super().__init__(p2, device)
+        self.spacing = float(params["spacing"])
+        self.jitter = float(params.get("jitter", 0.2))
+        if not 0.0 <= self.jitter < 0.5:
+            raise ValueError("seed_positions[packed_ball]: jitter is a fraction of a pitch in [0, 0.5)")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        p0, p1 = lvl.state_schema["pos"]
+        n, D = int(lvl.occ.sum().item()), p1 - p0
+        if D != 3:
+            raise ValueError("seed_positions[packed_ball] is a 3D placement")
+        dev = lvl.state.device
+        k = int(math.ceil((3.0 * n / (4.0 * math.pi)) ** (1.0 / 3.0))) + 2
+        r = torch.arange(-k, k + 1, dtype=torch.float64)
+        g = torch.stack(torch.meshgrid(r, r, r, indexing="ij"), -1).reshape(-1, 3)
+        g = g[torch.argsort((g * g).sum(1), stable=True)][:n]
+        gen = torch.Generator(device="cpu").manual_seed(self.seed)
+        eps = (torch.rand(n, 3, generator=gen, dtype=torch.float64) * 2.0 - 1.0) * self.jitter
+        c = (self._centre(H, D, "cpu").double() if self.centre is not None else
+             0.5 * torch.as_tensor(H.world_size, dtype=torch.float64)[:3])
+        pos = c + self.spacing * (g + eps)
+        st = lvl.state.clone()
+        st[:n, p0:p1] = pos.to(device=dev, dtype=st.dtype)
+        lvl.state = st
+        return {}
+
+
+@register_operator("seed_positions", family="seed", set="particle", kind="seed", model="voronoi_parent",
+                   title="Each cell's material fills its Voronoi cell",
+                   equation=r"""$$\mathbf x_i\sim U\big(\{\mathbf x:\ \arg\min_{c}|\mathbf x-\mathbf x_c|=\pi(i),\ |\mathbf x-\mathbf o|<R\}\big),\qquad v_i=\frac{V_{\pi(i)}}{n_{\pi(i)}}$$""")
+class SeedPositionsVoronoiParent(Seed):
+    """Every contained point placed INSIDE ITS PARENT'S VORONOI CELL, so a mass of cells made of
+    material points is space-filling and its cells are irregular polyhedra, not overlapping balls.
+
+    particle -[containment]-> cell: reads the parent set's live centres; writes the points' `pos`
+    (zero `vel`) and, on an MPM set, each point's `p_vol` and `mass`.
+
+        x_i ~ uniform over { x : its nearest centre is pi(i),  |x - o| < R,  |x - x_pi(i)| < reach }
+        v_i = V_pi(i) / n_pi(i)        V_c the volume of that region, n_c the cell's point count
+
+    pi(i) is point i's parent (the containment map), o and R the clip ball (`centre` -- a point or a
+    set's live centroid -- and `clip_radius`; no clip without them), `reach` the largest distance a
+    point is placed from its own centre (default the median centre-to-centre distance, which a
+    Voronoi cell of a packing never exceeds by much). The region is sampled by rejection and its
+    volume is the accepted fraction of the sampling ball, so a boundary cell clipped by the ball is
+    smaller and its points lighter: the material's density stays the declared one everywhere.
+
+    WHY THE VOLUME IS REWRITTEN. The MPM provision gives every point of a set one volume, from
+    `particle_mass` over the density; Voronoi cells of a jittered packing differ by tens of percent,
+    so equal point volumes would start every cell compressed or stretched against its own rest
+    volume, and the first frames would be that stress relaxing.
+
+    Reference: Voronoi, G. (1908). J. Reine Angew. Math. 134:198-287 (the tessellation); the
+    use -- cells of a packed tissue as the Voronoi cells of their centres -- is Honda, H. (1978).
+    J. Theor. Biol. 72:523-543.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["initial_condition", "voronoi", "space_filling", "encapsulation"]
+    PARAM_ROLES = {"clip_radius": "clip_ball_radius", "centre": "clip_ball_centre_point_or_set",
+                   "reach": "largest_distance_from_own_centre", "seed": "rng_seed"}
+    PARAM_UNITS = {"clip_radius": "length", "reach": "length"}
+    REFERENCE = "Voronoi, G. (1908). J. Reine Angew. Math. 134:198-287; Honda, H. (1978). J. Theor. Biol. 72:523-543."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.clip = params.get("clip_radius")
+        self.centre = params.get("centre")
+        self.reach = params.get("reach")
+        self.seed = int(params.get("seed", 0))
+        # `label: <block>` -- A COLOUR PER CELL: writes (the parent's rank mod 20) into that width-1
+        # block of the points, for `plotting.color_field: <block>` with a 20-colour map. Opt-in.
+        self.label = params.get("label")
+        # `parent_id: <block>` -- THE CELL'S OWN INDEX on each of its points, for `pair_potential ...
+        # exclude: <block>`, which then acts only BETWEEN cells (a contact force), never inside one.
+        self.parent_id = params.get("parent_id")
+
+    def forward(self, H, mask=None):
+        import numpy as np
+        from scipy.spatial import cKDTree
+        lvl = H.level(self.at)
+        pname = getattr(lvl, "parent_name", None)
+        if pname is None or getattr(lvl, "parent", None) is None:
+            raise ValueError(f"seed_positions[voronoi_parent]: {self.at!r} has no `parent:` set")
+        par = H.level(pname)
+        live_c = (par.occ > 0).cpu().numpy()
+        C = par.get("pos").detach().double().cpu().numpy()
+        cid = np.flatnonzero(live_c)
+        tree = cKDTree(C[cid])
+        pidx = lvl.parent.long().cpu().numpy()
+        live_p = (lvl.occ > 0).cpu().numpy()
+        reach = float(self.reach) if self.reach is not None else \
+            float(np.median(tree.query(C[cid], k=2)[0][:, 1]))
+        o = None
+        if self.clip is not None:
+            if isinstance(self.centre, str):
+                src = H.level(self.centre); m = getattr(src, "_mesh", None)
+                lv = (src.occ > 0).cpu().numpy()
+                if m is not None and int(m.get("Nv", 0) or 0):
+                    lv = np.zeros_like(lv); lv[: int(m["Nv"])] = True
+                o = src.get("pos").detach().double().cpu().numpy()[lv].mean(0)
+            else:
+                o = np.asarray(self.centre if self.centre is not None else C[cid].mean(0), float)
+        rng = np.random.default_rng(self.seed)
+        X = lvl.get("pos").detach().double().cpu().numpy().copy()
+        pv = getattr(lvl, "p_vol", None); ms = getattr(lvl, "mass", None)
+        rho = None
+        if pv is not None and ms is not None:
+            _pv = pv.detach().double().cpu().numpy(); _ms = ms.detach().double().cpu().numpy()
+            rho = float(np.median(_ms[live_p] / np.maximum(_pv[live_p], 1e-30)))
+            new_pv = _pv.copy()
+        ball = 4.0 / 3.0 * math.pi * reach ** 3
+        slot = {int(c): np.flatnonzero((pidx == c) & live_p) for c in cid}
+        for rank, c in enumerate(cid):
+            need = slot[int(c)]
+            if need.size == 0:
+                continue
+            got, tried, acc_n = [], 0, 0
+            M = max(8 * need.size, 256)
+            while len(got) < need.size and tried < 40 * need.size + 4096:
+                u = rng.normal(size=(M, 3)); u /= np.linalg.norm(u, axis=1, keepdims=True)
+                cand = C[c] + u * reach * rng.random((M, 1)) ** (1.0 / 3.0)
+                ok = tree.query(cand)[1] == rank
+                if o is not None:
+                    ok &= np.linalg.norm(cand - o, axis=1) < float(self.clip)
+                got.extend(cand[ok][: need.size - len(got)]); acc_n += int(ok.sum()); tried += M
+            if len(got) < need.size:
+                raise ValueError(f"seed_positions[voronoi_parent]: cell {int(c)} holds too little room "
+                                 f"for its {need.size} points (clip too tight or `reach` too small)")
+            X[need] = np.asarray(got[: need.size])
+            if rho is not None:
+                new_pv[need] = (acc_n / max(tried, 1)) * ball / need.size
+        p0, p1 = lvl.state_schema["pos"]
+        st = lvl.state.clone()
+        st[:, p0:p1] = torch.as_tensor(X, dtype=st.dtype, device=st.device)
+        if "vel" in lvl.state_schema:
+            v0, v1 = lvl.state_schema["vel"]
+            st[:, v0:v1] = 0.0
+        if self.label is not None:
+            if str(self.label) not in lvl.state_schema:
+                raise ValueError(f"seed_positions[voronoi_parent]: label block {self.label!r} is not declared "
+                                 f"on {self.at!r} -- add `{self.label}: {{width: 1}}` to its state")
+            l0, l1 = lvl.state_schema[str(self.label)]
+            rank = np.full(C.shape[0], -1); rank[cid] = np.arange(cid.size)
+            lab = np.where(rank[pidx] >= 0, rank[pidx] % 20, 0).astype(float)
+            st[:, l0] = torch.as_tensor(lab, dtype=st.dtype, device=st.device)
+        if self.parent_id is not None:
+            if str(self.parent_id) not in lvl.state_schema:
+                raise ValueError(f"seed_positions[voronoi_parent]: parent_id block {self.parent_id!r} is not "
+                                 f"declared on {self.at!r} -- add `{self.parent_id}: {{width: 1}}` to its state")
+            q0, _q1 = lvl.state_schema[str(self.parent_id)]
+            st[:, q0] = torch.as_tensor(pidx.astype(float), dtype=st.dtype, device=st.device)
+        lvl.state = st
+        if rho is not None:
+            pv.copy_(torch.as_tensor(new_pv, dtype=pv.dtype, device=pv.device))
+            ms.copy_(torch.as_tensor(new_pv * rho, dtype=ms.dtype, device=ms.device))
         return {}
 
 

@@ -25,6 +25,9 @@ the same helpers -- `_live_edges`, `_lookup`, `_scatter_full`, `edge_tension`. S
 files, the shared half of one model would be private to the other.
 """
 from __future__ import annotations
+
+import math
+
 import numpy as np
 import torch
 from plexus.models.base import Rewire, Structural
@@ -1442,7 +1445,8 @@ def pcp_rates(F, V, twin, ef, L, nF, Ftot, Vtot, A, k_on, k_off, g, beta, Kb, Kp
     kern: (a, b, w) from `pcp_side_pairs`, or None for the side-local inhibition; AV: [E] a factor on
     V's unbinding (the elongation coupling), None for 1; hill: (n, K) makes the recruitment by the
     partner across the junction cooperative, x -> (1 + K^n) x^n / (K^n + x^n) (equal to x at x = 1),
-    None for linear (`junction_pcp[cooperative]`).
+    None for linear (`junction_pcp[cooperative]`); (n, K, p) with p [E] in [0, 1] blends the two per
+    side, (1 - p) x + p T(x) (`junction_pcp[primed]`).
     A module function so the two-cell test calls exactly what the operator integrates.
     """
     perim = torch.zeros(nF, dtype=F.dtype, device=F.device).index_add(0, ef, L).clamp_min(1e-12)
@@ -1463,12 +1467,34 @@ def pcp_rates(F, V, twin, ef, L, nF, Ftot, Vtot, A, k_on, k_off, g, beta, Kb, Kp
         Vs = num / den
     B = 1.0 + Kb * Vs.clamp_min(0.0) ** Kp                      # Vang on and near this side blocks Fz binding
     if hill is not None:                                        # cooperative recruitment across the junction
-        n_, K_ = hill
-        Vn = (1 + K_ ** n_) * Vn.clamp_min(0.0) ** n_ / (K_ ** n_ + Vn.clamp_min(0.0) ** n_)
-        Fn = (1 + K_ ** n_) * Fn.clamp_min(0.0) ** n_ / (K_ ** n_ + Fn.clamp_min(0.0) ** n_)
+        n_, K_ = hill[0], hill[1]
+        Tv = (1 + K_ ** n_) * Vn.clamp_min(0.0) ** n_ / (K_ ** n_ + Vn.clamp_min(0.0) ** n_)
+        Tf = (1 + K_ ** n_) * Fn.clamp_min(0.0) ** n_ / (K_ ** n_ + Fn.clamp_min(0.0) ** n_)
+        if len(hill) > 2:                                       # a per-side weight p: (1 - p) x + p T(x)
+            p_ = hill[2]
+            Tv, Tf = (1 - p_) * Vn + p_ * Tv, (1 - p_) * Fn + p_ * Tf
+        Vn, Fn = Tv, Tf
     dF = k_on * cF[ef] * (beta + g * Vn) - k_off * A * B * F
     dV = k_on * cV[ef] * (beta + g * Fn) - k_off * (V if AV is None else AV * V)
     return dF, dV
+
+
+def pcp_celsr_q(P, vi, vj, ef, cen, I, nF):
+    """Each cell's Celsr1-like nematic q_i (complex), Aigouy et al. 2010's angular integral of the border
+    intensity I round the cell: q_i = sum_h I_h int_{phi_a}^{phi_b} exp(2 i phi) dphi / sum_h I_h (phi_b - phi_a),
+    phi_a, phi_b the angles of side h's ends about the centroid -- the same readout as the exp08.celsr
+    ruler (a uniform I reads 0 on any cell shape). Returns (Re q, Im q), each [nF]; the axis of the
+    enriched borders' POSITIONS is half the angle of q.
+    """
+    ra, rb = P[vi] - cen[ef], P[vj] - cen[ef]
+    pa, pb = torch.atan2(ra[:, 1], ra[:, 0]), torch.atan2(rb[:, 1], rb[:, 0])
+    dphi = torch.remainder(pb - pa + math.pi, 2 * math.pi) - math.pi
+    pb = pa + dphi
+    re = torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(0, ef, I * (torch.sin(2 * pb) - torch.sin(2 * pa)) / 2)
+    im = torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(0, ef, I * (torch.cos(2 * pa) - torch.cos(2 * pb)) / 2)
+    den = torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(0, ef, I * dphi)
+    den = torch.where(den.abs() > 1e-30, den, torch.full_like(den, 1e-30))
+    return re / den, im / den
 
 
 def pcp_elongation(P, vi, vj, ef, nF):
@@ -1497,7 +1523,13 @@ class JunctionPCP(Lateral):
     with `color_block: chem`, three colour channels for the movie: the arrow's share along +cue,
     along -cue and across it, each times min(1, 2 * asymmetry) -- the renderers colour a face from
     `chem` only, so a spec drawing them red / blue / green (`plotting.species`, additive) shows an
-    aligned sheet as one red field, a reversed row as blue, a swirl as green.
+    aligned sheet as one red field, a reversed row as blue, a swirl as green. `color_mode: celsr`
+    colours the AXIS instead of the arrow, as Aw et al. 2016 image Celsr1 (on both sides of a junction,
+    so it has no direction): each cell's nematic q_i of F + V round the cell (`pcp_celsr_q`, the
+    exp08.celsr ruler's angular integral) as a colour wheel of its axis theta_i, measured from the
+    cue axis: channel k = max(0, cos(2 theta_i - 2 pi k / 3)) times min(1, 2 |q_i|) -- enrichment on
+    the borders lying along the cue axis lights channel 0 alone, across it channels 1 and 2 equally,
+    the obliques mixtures; an A-P ordered sheet reads one colour whichever way its arrows point.
 
     THE MODEL is Amonlirdviman et al. 2005's feedback loop (SOM, reactions S1-S10 and PDEs S21-S30)
     reduced to the two complexes the minimal model keeps: F, the Fz(-Dsh) complex, and V, the
@@ -1640,6 +1672,9 @@ class JunctionPCP(Lateral):
         self._e0 = None
         self.clone = params.get("clone") or None
         self.color_block = params.get("color_block") or None
+        self.color_mode = str(params.get("color_mode", "arrow"))
+        if self.color_mode not in ("arrow", "celsr"):
+            raise ValueError(f"junction_pcp: color_mode must be 'arrow' or 'celsr', not {self.color_mode!r}")
         self._tot = None
         self._gen = None
         self._said = False
@@ -1735,6 +1770,7 @@ class JunctionPCP(Lateral):
                 if self._e0[0].shape[0] != nF:
                     raise RuntimeError("junction_pcp: elong_ref seed needs a fixed set of cells")
                 e1, e2 = e1 - self._e0[0], e2 - self._e0[1]
+            self._eps = (e1, e2, ef)                                         # read by `junction_pcp[primed]`
             phi = torch.atan2(n[:, 1], n[:, 0])
             AV = torch.exp(-self.elong * (e1[ef] * torch.cos(2 * phi) + e2[ef] * torch.sin(2 * phi)))
             A = A * AV
@@ -1763,7 +1799,13 @@ class JunctionPCP(Lateral):
                 vec[..., :nF, 0:2] = p.to(vec.dtype)
                 if vec.shape[-1] > 2:
                     vec[..., :nF, 2] = asym.to(vec.dtype)
-            if col is not None and col.shape[-1] >= 3:
+            if col is not None and col.shape[-1] >= 3 and self.color_mode == "celsr":
+                qr, qi = pcp_celsr_q(P, vi, vj, ef, cen, F + V, nF)
+                two = torch.atan2(qi, qr) - 2.0 * math.atan2(float(cue[1]), float(cue[0]))   # 2 x the axis, from the cue's
+                w = (2.0 * torch.sqrt(qr * qr + qi * qi)).clamp(max=1.0)
+                for k in range(3):                                     # a colour wheel of the axis
+                    col[..., :nF, k] = (torch.cos(two - 2.0 * math.pi * k / 3).clamp_min(0.0) * w).to(col.dtype)
+            elif col is not None and col.shape[-1] >= 3:
                 u = p / p.norm(dim=1, keepdim=True).clamp_min(1e-12)
                 along = u @ cue
                 w = (2.0 * asym).clamp(max=1.0)
@@ -1822,3 +1864,48 @@ class JunctionPCPCooperative(JunctionPCP):
 
     def _hill(self):
         return (self.hill_n, self.hill_k)
+
+
+@register_operator("junction_pcp", model="primed", family="polarity", set="vertex", kind="lateral",
+                   equation=r"""$$\frac{dF_h}{dt}=k_{\mathrm{on}}c^F_i\big(\beta+g\,[(1-p_i)V_{\bar h}+p_i T(V_{\bar h})]\big)-k_{\mathrm{off}}A_hB_hF_h,\quad p_i=\min\big(1,\max_{t'\le t}|\epsilon_i(t')-\epsilon_i(0)|/\epsilon_*\big)$$""")
+class JunctionPCPPrimed(JunctionPCPCooperative):
+    """`junction_pcp[cooperative]` whose cooperativity a cell ACQUIRES by being stretched: its exchange
+    is the default (linear) model's until its shape has changed, and the cooperative model's once it
+    has changed by `prime_strain`, for good.
+
+        recruitment by the partner x:  (1 - p_i) x + p_i T(x)       T the cooperative model's Hill function
+        p_i = min(1, s_i / prime_strain),   s_i = max over past frames of |eps_i(t) - eps_i(0)|
+
+    eps_i = (e1, e2) is cell i's elongation tensor (`pcp_elongation`, Aigouy et al. 2010), measured from
+    its seeded shape (so `elong_ref: seed` and a non-zero `elong` are required, the coupling that
+    computes it); |.| its magnitude, dimensionless (0 for a cell with its seed shape; ~0.35 for the
+    rig's 20 % stretch). p_i is a memory: it never decreases, so the relaxed tissue keeps the lock.
+
+    WHY (exp08 Phase 2 Findings P8-P13): the linear exchange makes domains on the undeformed sheet
+    (r_c 3-4 cell spacings) but forgets the stretch's axis once the cells relax; the cooperative
+    exchange keeps the axis but freezes an undeformed sheet in its first rows (r_c 0.28) -- the same
+    bistability doing both. Softening it everywhere (Hill n 1.5) lost the memory without making
+    domains. Priming by strain keeps the linear model where nothing has been stretched and the
+    cooperative one where the stretch has set an axis. It stands for a mechanically induced
+    stabilisation of the junctional complexes (Aw et al. 2016 propose the deformation reorganises the
+    junctions); the per-cell max-strain memory is this model's assumption, not a measured law.
+    """
+
+    PARAM_ROLES = dict(JunctionPCPCooperative.PARAM_ROLES,
+                       prime_strain="cell_shape_change_at_which_the_exchange_is_fully_cooperative")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.prime_strain = float(params.get("prime_strain", 0.1))
+        if self.elong == 0.0 or self.elong_ref != "seed":
+            raise ValueError("junction_pcp[primed] reads each cell's strain from the elongation "
+                             "coupling: set elong != 0 and elong_ref: seed")
+        self._eps = None
+        self._smax = None
+
+    def _hill(self):
+        e1, e2, ef = self._eps
+        s = torch.sqrt(e1 * e1 + e2 * e2)
+        self._smax = s if self._smax is None or self._smax.shape != s.shape else torch.maximum(self._smax, s)
+        p = (self._smax / self.prime_strain).clamp(max=1.0)
+        return (self.hill_n, self.hill_k, p[ef])

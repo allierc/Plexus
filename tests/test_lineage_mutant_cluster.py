@@ -40,3 +40,15 @@ def test_default_cluster_1_leaves_the_single_draw_unchanged():
     src = inspect.getsource(SeedMeshLineage.forward)
     assert "if k > 0 and self.mutant_cluster == 1:" in src
     assert "mut[np.random.default_rng(self.seed + 211).choice(pool, size=k, replace=False)] = 1.0" in src
+
+
+def test_mutant_centre_places_one_patch_on_the_declared_side():
+    """`mutant_centre` (exp 11): all k mutants in one patch around the cell nearest the declared direction; without it
+    the draw is the default one, identical to before (same rng, same result)."""
+    m, P, nF = grid()
+    a = mutant_patches(m, P, nF, np.arange(nF), 6, 6, np.random.default_rng(0))
+    b = mutant_patches(m, P, nF, np.arange(nF), 6, 6, np.random.default_rng(0), centre=None)
+    assert np.array_equal(a, b)
+    got = mutant_patches(m, P, nF, np.arange(nF), 6, 6, np.random.default_rng(0), centre=[1.0, 0.0, 0.0])
+    xy = np.stack([got // 10, got % 10], 1)
+    assert len(got) == 6 and xy[:, 0].min() >= 7              # all on the +x edge of the 10 x 10 grid

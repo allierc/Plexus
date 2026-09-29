@@ -372,3 +372,13 @@ def test_strands_reports_the_cell_gain_of_a_growing_shell():
         E.cells, E._rows, E._diameter, E._um = old_cells, old_rows, old_d, old_um
     assert out["cells_first"] == 200 and out["cells_last"] == 500 and abs(out["cell_gain"] - 2.5) < 1e-12
     assert out["strands_max"] == 0
+
+
+def test_a_single_file_needle_is_not_a_wide_strand_and_a_two_abreast_finger_is():
+    import numpy as np
+    from exp_measures.exp12 import _wide
+    d = 1.0
+    needle = np.array([[5.0 + 4 * k, 0.0, 0.0] for k in range(4)])            # four cells in single file along +x
+    finger = np.array([[5.0 + k, dy, 0.0] for k in range(3) for dy in (-0.5, 0.5)])   # three rows of two, abreast
+    assert not _wide(needle, np.arange(4), np.zeros(3), d, 1.0)
+    assert _wide(finger, np.arange(6), np.zeros(3), d, 1.0)
