@@ -83,7 +83,7 @@ _KEYS = {
                   "prior"},
     "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask"},
     "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
-                  "recording", "beats"},
+                  "recording", "beats", "points"},
     "drive": {"set", "block", "prescribe", "width"},
     "observe": {"set", "block", "channel", "unit", "measure", "grid", "of"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
@@ -98,7 +98,7 @@ _LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_ms
 PRIORS = ("shrink", "shrink_to_mean", "smooth", "l1", "l2", "group_l1", "sign")
 # THE EVIDENCE TERMS each reference kind can score, by name. `task.loss` is one name or a list of
 # {term, weight, reduction}; the loop computes the quantities, `_objective` weighs and records them.
-TERMS = {"corpus": ("mse",), "shape": ("log_mse", "volume"),
+TERMS = {"corpus": ("mse",), "shape": ("log_mse", "volume", "point_mse"),
          "recording": ("affine_mse", "affine_A", "affine_u")}
 REDUCTIONS = ("mean", "norm2", "huber", "relative_l2")
 OPTIMIZERS = ("adam",)
@@ -246,6 +246,9 @@ def load(path_or_name) -> dict:
         if t["observe"].get("measure") != "grid_mass" or t["observe"].get("grid") not in (raw.get("fields") or {}):
             raise ValueError(f"{path}: a shape task observes `measure: grid_mass` on a `grid:` field "
                              f"of the model ({sorted(raw.get('fields') or {})})")
+        if any(x["term"] == "point_mse" for x in _loss_terms(t, kind)) and "/" not in str(ref.get("points", "")):
+            raise ValueError(f"{path}: the `point_mse` term scores each particle against ITS OWN target, "
+                             f"so task.reference needs `points: <shape>/<part>` (same order as the seed)")
         for k in ("size", "centre"):
             if k not in ref:
                 raise ValueError(f"{path}: task.reference needs `{k}:` -- where the shape sits and "
@@ -348,6 +351,13 @@ class Learnables:
                     term = x.pow(2).mean()
                 elif kind == "shrink_to_mean":
                     term = (x - x.mean()).pow(2).mean()
+                elif kind == "smooth" and e.get("with") == "lattice":
+                    # IN SPACE, not across components: a lattice is stored flat as [K^3, width], so
+                    # the last axis is the rate's six entries. Steps between neighbouring NODES along
+                    # x, y and z of the [K, K, K, width] view (found by the exp04 session).
+                    K = int(e["K"])
+                    g = x.reshape(K, K, K, -1)
+                    term = sum((g.narrow(ax, 1, K - 1) - g.narrow(ax, 0, K - 1)).pow(2).sum() for ax in range(3))
                 elif kind == "smooth":
                     term = (x[..., 1:] - x[..., :-1]).pow(2).sum()
                 elif kind == "l1":
@@ -957,6 +967,34 @@ def _shape_target(spec, n, rng):
     return pts, path
 
 
+def _point_targets(spec, set_name, n, device):
+    """Each particle's own target, for `point_mse`: the part `reference.points` names, put through
+    EXACTLY the placement the model's `cloud_seed` gives the seeded part -- x = origin + scale q,
+    every `every`-th point -- so particle i and target i are the same atom in the same frame.
+    A contained (one copy per parent) or rotated cloud is refused: its placement is not built here."""
+    from plexus import shapes
+    raw = yaml.safe_load(open(spec["model"]))
+    seeds = [o for o in (raw.get("seed") or []) + (raw.get("operators") or [])
+             if o.get("op") == "cloud_seed" and o.get("at") == set_name]
+    if len(seeds) != 1:
+        raise ValueError(f"point_mse: {set_name!r} is not placed by exactly one `cloud_seed` "
+                         f"({len(seeds)}), so its particles have no order to match targets against")
+    cs = seeds[0]
+    if (raw.get("sets", {}).get(set_name) or {}).get("parent") or cs.get("rotate"):
+        raise ValueError("point_mse: a contained or rotated cloud is not supported yet")
+    shape, part = str(spec["task"]["reference"]["points"]).split("/", 1)
+    path = next((os.path.join(r, shape, "points.npz") for r in shapes.roots()
+                 if os.path.exists(os.path.join(r, shape, "points.npz"))), None)
+    if path is None:
+        raise FileNotFoundError(f"point_mse: no shapes/{shape}/points.npz")
+    with np.load(path) as z:
+        q = np.asarray(z[part], np.float64)[:: max(1, int(cs.get("every", 1)))]
+    if len(q) != n:
+        raise ValueError(f"point_mse: {shape}/{part} gives {len(q)} targets for {n} particles")
+    x = np.asarray(cs.get("origin") or [0.5, 0.5, 0.5], float) + float(cs.get("scale", 1.0)) * q
+    return torch.as_tensor(x, dtype=torch.float32, device=device)
+
+
 def _grid_mass(sim, X, grid):
     """Unit-weight nodal counts on the model's own `grid` field, at its current resolution."""
     from plexus.morph import mass_grid
@@ -1009,6 +1047,8 @@ def _train_shape(spec, device="cpu", root=None):
         n, iters = int(sim.sets[obs["set"]]["n"]), int(st["iters"])
         tgt_np, mesh = _shape_target(spec, n, rng)
         tgt = torch.as_tensor(tgt_np, dtype=torch.float32, device=device)
+        T_pts = (_point_targets(spec, obs["set"], n, device)
+                 if spec["task"]["reference"].get("points") else None)
         with torch.no_grad():
             m_ref = _grid_mass(sim, tgt, obs["grid"])
             if not learn.p:                            # the first rollout makes the parameters
@@ -1027,7 +1067,10 @@ def _train_shape(spec, device="cpu", root=None):
                 "log_mse": lambda red: _log_mse(_grid_mass(sim, X, obs["grid"]), m_ref),
                 # THE REALISED VOLUME, sum(p_vol det F), against the stage's first rollout: the mass
                 # loss alone is gameable by imploding onto a dense target (morph.py, --vol-weight).
-                "volume": lambda red: (vol / vol0 - 1.0) ** 2}, len(hist), parts)
+                "volume": lambda red: (vol / vol0 - 1.0) ** 2,
+                # EACH PARTICLE AGAINST ITS OWN TARGET, when the targets are known (exp04: the atoms
+                # shared by two deposited structures). An outline loss cannot tell which atom went where.
+                "point_mse": lambda red: ((X - T_pts) ** 2).sum(-1).mean()}, len(hist), parts)
             if not torch.isfinite(loss) and guard == "restore_and_halve":
                 learn.restore(last_ok)
                 for g in opt.param_groups:
@@ -1085,9 +1128,16 @@ def _test_shape(spec, device="cpu", root=None):
                                      learn, obs["set"], device, grad=False)
         _, X, vol = _shape_rollout(sim, learn, obs["set"], device, grad=False)
         loss = float(_log_mse(_grid_mass(sim, X, obs["grid"]), _grid_mass(sim, tgt, obs["grid"])))
+    if spec["task"]["reference"].get("points"):
+        Tp = _point_targets(spec, obs["set"], int(sim.sets[obs["set"]]["n"]), device)
+        rms = float(((X - Tp) ** 2).sum(-1).mean().sqrt())
+        rms0 = float(((X0 - Tp) ** 2).sum(-1).mean().sqrt())
+        print(f"[test] point RMS to own target: start {rms0 * (um or 1):.4f} -> end {rms * (um or 1):.4f}"
+              + (" um" if um else " (world)"))
     res = {"name": spec["name"], "shape": spec["task"]["reference"]["shape"], "mesh": mesh,
            "loss": loss, "shape_extent": _extent(X, um), "target_extent": _extent(tgt, um),
-           "unit": "um" if um else None, "volume_ratio": float(vol) / float(vol0)}
+           "unit": "um" if um else None, "volume_ratio": float(vol) / float(vol0),
+           **({"point_rms_start": rms0, "point_rms_end": rms} if spec["task"]["reference"].get("points") else {})}
     p = os.path.join(out, "results", f"{spec['name']}_test.json")
     json.dump(res, open(p, "w"), indent=2)
     print(f"[test] loss {loss:.6f} against a fresh draw of the target; shape {res['shape_extent']} vs "

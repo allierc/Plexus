@@ -85,3 +85,28 @@ def test_the_objective_weighs_and_records_each_term():
     tot = T._objective(s, L, {"mse": lambda red: T._reduce(r, red)}, 0, parts)
     assert float(tot) == pytest.approx(3.0 * 1.0 + 5.0)
     assert parts == {"loss.mse": pytest.approx(3.0), "prior.s.b.l2": pytest.approx(5.0)}
+
+
+def test_point_mse_needs_its_targets_named():
+    """A correspondence term without `points:` would have nothing to match each particle against."""
+    d = yaml.safe_load(open("config/training/morph/cow.yaml"))
+    d["task"]["loss"] = [{"term": "log_mse"}, {"term": "point_mse", "weight": 1.0}]
+    f = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
+    yaml.safe_dump(d, f)
+    f.close()
+    with pytest.raises(ValueError, match="points"):
+        T.load(f.name)
+    os.unlink(f.name)
+
+
+def test_smooth_on_a_lattice_differences_neighbouring_nodes_not_components():
+    """A lattice is [K^3, width]; `smooth` must step between nodes along x, y, z of [K, K, K, width]."""
+    K = 3
+    L = T.Learnables([{"block": "rate", "of": "p", "with": "lattice", "over": "material", "K": K,
+                       "extent": [0, 0, 0, 1], "prior": {"smooth": 1.0}}])
+    g = torch.zeros(K, K, K, 6)
+    g[..., 0] = torch.arange(K).float()[:, None, None]          # a ramp along x in component 0
+    L.p["p.rate"] = torch.nn.Parameter(g.reshape(K ** 3, 6))
+    assert float(L.prior()) == pytest.approx((K - 1) * K * K)   # (K-1)*K*K unit steps along x
+    L.p["p.rate"] = torch.nn.Parameter(torch.ones(K ** 3, 6) * torch.arange(6.0))   # varies only across components
+    assert float(L.prior()) == pytest.approx(0.0)
