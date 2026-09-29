@@ -1084,8 +1084,9 @@ def _recording_setup(spec, device):
     return box
 
 
-def _recording_rollout(sim, learn, spec, box, bi, device, grad):
-    """One beat: prescribe the band from the recording each frame, record every cell's affine map."""
+def _recording_rollout(sim, learn, spec, box, bi, device, grad, watch=None):
+    """One beat: prescribe the band from the recording each frame, record every cell's affine map.
+    `watch(H, tick)` is called at the same moment, for a caller that needs more of the state."""
     from plexus.tasks import recording as R
     set_name = spec["task"]["drive"]["set"]
     ub, band, C = box["pres"][bi], box["band"], box["C"]
@@ -1106,6 +1107,8 @@ def _recording_rollout(sim, learn, spec, box, bi, device, grad):
         A, u = R.cell_affine(q.get("pos"), st["X0"], box["cid"], C)
         As.append(A)
         us.append(u)
+        if watch is not None:
+            watch(H, tick)
 
     engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook,
                on_seeded=learn.inject, on_ready=learn.ready)
