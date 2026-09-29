@@ -31,15 +31,27 @@ import cluster as C                                                   # noqa: E4
 from plexus.paths import training_specs                              # noqa: E402
 
 
-def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda:0"):
+def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda:0", queue=None):
     hits = training_specs(name)
     if len(hits) != 1:
         print(f"  {name:<30} {'NO SUCH RUN SPEC' if not hits else f'IN {len(hits)} MODEL FOLDERS'}")
         return None
     cfg = hits[0]
     run = yaml.safe_load(open(cfg))
-    mod = "plexus.tasks.spec_trainer" if "spec" in run else "plexus.tasks.trainer"
-    ph = phases if "spec" in run else phases.replace("analyse", "plot")
+    if "model" in run:
+        # A THREE-PART TRAINING SPEC goes through the one entry point, which hands it to
+        # `plexus.trainer`; its own `analyse` phase writes the figure and, for a shape, the movie.
+        body = [f"conda run -n {C.ENV} python -u Plexus_Main.py -o {'_'.join(phases.split())} "
+                f"{name} --device {device}"]
+    else:
+        mod = "plexus.tasks.spec_trainer" if "spec" in run else "plexus.tasks.trainer"
+        ph = phases if "spec" in run else phases.replace("analyse", "plot")
+        body = [f"conda run -n {C.ENV} python -u -m {mod} --device {device} "
+                f"-o {ph} {os.path.relpath(cfg, ROOT)}",
+                # THE ROLLOUT MOVIES ARE A SECOND CALL, not a phase of the trainer: a fit that
+                # lands without them is still a fit, so a failure here must not take it with it.
+                f"conda run -n {C.ENV} python -u -m plexus.tasks.plot_trainer {name} "
+                f"--what movie figure --device {device} || true"]
     out = os.path.join(ROOT, "log", "runs", name)
     os.makedirs(out, exist_ok=True)
     sh = os.path.join(out, "run.sh")
@@ -50,19 +62,14 @@ def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda
             f"export PYTHONPATH={C.cpath(os.path.join(ROOT, 'src'))}",
             "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
             "export MPLBACKEND=Agg",
-            f"conda run -n {C.ENV} python -u -m {mod} --device {device} "
-            f"-o {ph} {os.path.relpath(cfg, ROOT)}",
-            # THE ROLLOUT MOVIES ARE A SECOND CALL, not a phase of the trainer: one module owns
-            # every figure and movie (`plot_trainer`), and a fit that lands without them is still
-            # a fit -- so a failure here must not take the training result with it.
-            f"conda run -n {C.ENV} python -u -m plexus.tasks.plot_trainer {name} "
-            f"--what movie figure --device {device} || true",
+            "export PYVISTA_OFF_SCREEN=true", "unset DISPLAY",     # the glass render is headless
+            *body,
         ]) + "\n")
     os.chmod(sh, 0o755)
     o = C.cpath(os.path.join(out, "run.out"))
     gpu = "-gpu num=1 " if C.GPU != "0" else ""
     excl = "".join(f'-R "hname!={h}" ' for h in C.EXCLUDE_HOSTS if h)
-    cmd = (f"bsub -n {C.NCPUS} {gpu}{excl}-q {C.QUEUE} -W {wall or C.WALL} -J run_{name} "
+    cmd = (f"bsub -n {C.NCPUS} {gpu}{excl}-q {queue or C.QUEUE} -W {wall or C.WALL} -J run_{name} "
            f"-o {o} -e {o[:-4]}.err bash -l {C.cpath(sh)}")
     if dry:
         print(f"  [dry] {cmd}")
@@ -85,6 +92,8 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--phases", default="train test analyse")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--queue", default=None, help="LSF queue; default cluster.QUEUE (the L4s). A "
+                    "50,000-point morph stage needs an A100: its tape peaks near 28 GB")
     a = ap.parse_args()
     names = list(a.names)
     if a.glob:
@@ -93,8 +102,8 @@ def main():
     names = list(dict.fromkeys(names))
     if not names:
         ap.error("no run specs named")
-    print(f"[submit] {len(names)} run(s) -> {C.QUEUE} as {C.SSH}")
-    ok = [submit(n, a.dry_run, a.wall, a.phases, a.device) for n in names]
+    print(f"[submit] {len(names)} run(s) -> {a.queue or C.QUEUE} as {C.SSH}")
+    ok = [submit(n, a.dry_run, a.wall, a.phases, a.device, a.queue) for n in names]
     print(f"[submit] {sum(1 for x in ok if x)} of {len(names)} submitted")
 
 
