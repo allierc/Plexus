@@ -14,8 +14,11 @@ loads  config/interaction/attraction_repulsion.yaml  and writes the trajectory t
 explicitly. The data root defaults to the shared GraphData area; override with
 --output_root or $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT.
 
-Only `generate` is implemented today (the forward simulator); train/test/plot are
-stubbed for the inverse-problem stages and fail until built.
+`train` / `test` / `analyse` take a TRAINING spec instead, found by name under
+config/training/<model>/, and run in `plexus.trainer` -- the engine simulates, the
+trainer trains:
+
+    python Plexus_Main.py -o train_test_analyse t1_integrator_perfect_zf285
 """
 from __future__ import annotations
 
@@ -116,10 +119,14 @@ def main():
     if config_name is None:
         parser.error("a config name is required: -o <task> <config_name>")
 
-    for stage in ("train", "test"):
-        if stage in task:
-            raise NotImplementedError(
-                f"task stage {stage!r} is not built yet (inverse-problem stage).")
+    # TRAINING IS A SEPARATE MODULE WITH A SEPARATE SPEC. A training spec names a model, what is
+    # learnable, the task and the scheme; `plexus.trainer` owns the parameters and calls the engine
+    # once per rollout. Nothing below this block knows training exists.
+    phases = [p for p in ("train", "test", "analyse") if p in task]
+    if phases:
+        from plexus.trainer import run_phases
+        run_phases(config_name, phases, device=args.device)    # --output_root already set the root
+        return
 
     # THE PIPELINE IS ONE FUNCTION AND THIS IS ITS COMMAND LINE. `plexus.pipeline.generate` is what
     # runs here and what the web page's RUN button runs, so a run started from a terminal and one

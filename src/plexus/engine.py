@@ -2036,8 +2036,14 @@ def apply_learnable_blocks(H, sim) -> list:
 
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False,
-        grad: bool = False, batch: int = 1) -> tuple[Hierarchy, dict]:
+        grad: bool = False, batch: int = 1, on_seeded=None) -> tuple[Hierarchy, dict]:
     """Forward-simulate `sim`. Returns (Hierarchy, recorded trajectory).
+
+    `on_seeded(H)` is called ONCE, after the set-up is seeded and before the batch axis exists and
+    the first tick runs: the one moment a caller may write the starting state. `on_frame` cannot
+    stand in for it, because it fires at the END of each tick, after that tick's step -- a value
+    written there reaches the dynamics one step late. The engine attaches no meaning to what the
+    caller writes; `plexus.trainer` uses it to put its learnables into the state.
 
     `grad=True` keeps the autograd tape across the whole rollout, so a loss on the FINAL state
     differentiates back to the initial state and to any operator parameter stored as a tensor.
@@ -2067,6 +2073,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             st = lvl.state.clone(); st[:vel.shape[0], vx0:vx1] = vel; lvl.state = st
             lvl._vel_init = None
     apply_learnable_blocks(H, sim)            # 1.7) `learnable: {block:, of:}` -> tensor leaves
+    if on_seeded is not None:                 # 1.75) the caller's write into x_0 (see the docstring)
+        on_seeded(H)
     expand_batch(H, int(batch))               # 1.8) [N, W] -> [B, N, W], after every seeding path
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
