@@ -235,6 +235,18 @@ widened `READS`, a relational substitution with no edge set. A live substitution
 **R4** (`5c78e63c`, `39f4f88b`) — `learnable:` in the spec language, both forms, plus
 `spec_trainer` and the eye rig.
 
+**R2 undone (2026-09-29).** `src/plexus/learnables/` is deleted, with `tests/test_learnables.py`.
+Only that test ever imported it: the engine never called `build_substitution`, so a
+`{replaces:, with:}` entry passed the schema and then ran the original operator without a word.
+That form is now refused by `schema._parse_learnable`, by `engine.apply_learnable_blocks`, and in
+run specs, which `spec_trainer.build` now sends through the same check. Decided the same day:
+the ENGINE ONLY SIMULATES AND THE TRAINER TRAINS. The trainer owns every learnable's parameters
+and hands them to each rollout, since `engine.run` builds its operators fresh on every call; the
+rule `apply_learnable_blocks` applies to blocks moves to the trainer. Representations of a value
+(lattice, SIREN, the Instant-NGP hash grid of `models/hashgrid.py`) belong to the trainer, not to
+the operator library. `check_substitution` and the MLP/SIREN/table cores are recoverable from
+`3a5e70cf`.
+
 **R0** — the batch axis. `Level.state` is `[B, N, W]`, created by `expand_batch` *after* build and
 seed so not one of the dozens of seeding paths that write `state[:, a:b]` had to change. Every
 state read moved to the right (`state[..., a:b]`), and so did `Level.n`, which was

@@ -1996,7 +1996,13 @@ def apply_learnable_blocks(H, sim) -> list:
         held = sim.fitted = {}
     for e in getattr(sim, "learnable", []):
         if "block" not in e:
-            continue                                   # an operator substitution; handled at instantiation
+            # REFUSED, NOT SKIPPED. This line used to `continue` with the comment "an operator
+            # substitution; handled at instantiation", and nothing handled it: the run went ahead
+            # with the original operator and said nothing. `schema._parse_learnable` refuses the
+            # same entry; this catches a caller that sets `sim.learnable` without going through it.
+            raise ValueError(
+                f"learnable: {e} has no `block:`. Only {{block:, of:}} is fitted; a law "
+                f"substitution ({{replaces:, with:}}) is not implemented.")
         lvl = H.level(e["of"])
         blk = e["block"]
         if blk not in lvl.state_schema:

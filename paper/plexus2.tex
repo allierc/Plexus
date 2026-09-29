@@ -2,6 +2,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{xcolor}
 \usepackage{graphicx}
 \usepackage{parskip}        % no paragraph indent; separate paragraphs by vertical space
@@ -28,6 +29,7 @@
 }
 
 \newcommand{\code}[1]{\texttt{#1}}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
 
 % GitHub repository as a clickable, line-breakable typewriter link: \ghrepo{org}{name}
 \newcommand{\ghrepo}[2]{\href{https://github.com/#1/#2}{\texttt{#1/\allowbreak#2}}}
@@ -79,8 +81,8 @@ about mechanisms. \emph{Philosophy of Science} 67:1--25, p.\,3.
 C.\,F.\ (2007), \emph{Explaining the Brain}, Oxford University Press, and Craver \&
 Darden (2013), \emph{In Search of Mechanisms}, University of Chicago Press.} We
 introduce \emph{Plexus}, a language for writing a mechanism down in exactly those
-terms, so that the description can be run, fitted to observations, and shown to be
-missing an activity. A model is stated in two halves. \emph{What exists}: the
+terms, so that the description can be run, trained for a task, and shown to be missing
+an activity. A model is stated in two halves. \emph{What exists}: the
 entities, of as many kinds as the hypothesis needs, the states they carry, the
 relations between them and the levels that organize them. \emph{What happens}: the
 activities acting on them. Neither half is subordinate to the other. An activity such
@@ -97,7 +99,9 @@ be separated from the interpreter that executes it. The Plexus research program 
 three objectives. First, to define an algebra of activities over these organized
 entities. Second, to decompose the existing corpus of simulation models into this
 common language. Third, to construct differentiable implementations of these
-activities so that mechanistic models can be directly inferred from biological data.
+activities so that a mechanistic model can be trained for a task, whether fitting
+biological data, reaching a shape or computing a function, while every trained value
+remains a property of a named entity or activity.
 
 \end{abstract}
 
@@ -129,8 +133,8 @@ sketch} is a description with gaps, black boxes that no known activity yet fills
 \emph{mechanism schema} is an abstract description whose placeholders can all be
 filled with known parts and activities. A complete description exhibits
 \emph{productive continuity without gaps} from set-up to termination conditions, and
-the continuity lies in the arrows. The sketch cannot be run, cannot be fitted to data,
-and cannot be shown to be missing an arrow.
+the continuity lies in the arrows. The sketch cannot be run, cannot be trained against
+data, and cannot be shown to be missing an arrow.
 
 Plexus takes that account literally. Instead of treating simulation frameworks as
 fundamental, we treat entities and activities as the primary objects, and the
@@ -176,9 +180,15 @@ biological simulation models. Rather than viewing current frameworks as competin
 simulators, we regard them as repositories of reusable entities and activities. By
 decomposing these models into a common language, we seek to identify a compact
 vocabulary capable of expressing a wide range of biological dynamics across scales.
-Third, Plexus constructs differentiable counterparts of these compositions.
-Differentiability allows mechanistic models to be fitted directly to biological data,
-residuals to be interpreted mechanistically, and missing activities to be intuited.
+Third, Plexus constructs differentiable counterparts of these compositions, so that a
+model can be trained for a task (Section~\ref{sec:training}). As in differentiable
+visual computing, the loss is what specifies the task. Fitting biological data is one
+task; designing a set-up that grows into a given shape and teaching a circuit to compute
+a function are others. All of them are one differentiable rollout with different
+quantities left free. Because only named states, activity parameters and activity slots
+may be learnable, a trained model is still a mechanistic model, its residuals can be read
+mechanistically, and a residual that persists after training points to a missing
+activity.
 
 Finally, because mechanisms are represented in a formal language rather than embedded
 in simulator-specific code, they become amenable to automated reasoning. The explicit
@@ -501,7 +511,7 @@ biological organization itself rather than only its state, and they are what mak
 tissue different from any inert material.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Composition}
+\section{Composition}\label{sec:composition}
 
 A biological model is built by composition, and composition happens in four
 distinct ways. Each answers a different question, and a model is complete only
@@ -625,63 +635,317 @@ biological explanations therefore becomes a search over model structures rather 
 simulator implementations.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Mechanistic inverse modelling}
+\section{Training differentiable models}\label{sec:training}
 
-One of the primary motivations for introducing a formal language of biological
-mechanisms is to identify mechanistic models directly from experimental observations.
-Rather than calibrating simulations manually, the objective is to infer the
-parameters, spatial organization and constitutive laws governing biological systems
-from imaging data.
+A differentiable model can be trained as well as run. Differentiable visual computing
+composes geometry, animation and rendering into one program whose output is scored by a
+loss, and differentiates the whole program end to end.\footnote{Spielberg, A., Zhong, F.,
+Rematas, K., Jatavallabhula, K.\,M., Oztireli, C., Li, T.-M.\ \& Nowrouzezahrai, D.\ (2023).
+Differentiable visual computing for inverse problems and machine learning. \emph{Nature
+Machine Intelligence} 5:1189--1199. \url{https://doi.org/10.1038/s42256-023-00743-0}. For
+differentiable models in biology specifically: AlQuraishi, M.\ \& Sorger, P.\,K.\ (2021).
+Differentiable biology: using deep learning for biophysics-based and data-driven modeling of
+molecular mechanisms. \emph{Nature Methods} 18:1169--1180.} A Plexus model has the same
+three stages:
 
-Plexus makes this possible by associating every activity with one or more
-differentiable implementations satisfying the same typed signature. Differentiability
-therefore becomes a property of the language rather than of a particular simulator.
-Regardless of the numerical backend, gradients propagate through compositions of
-explicit activities rather than through monolithic simulation code.
+\[
+x_0 = \mathcal G(\xi),
+\qquad
+x_{t+1} = \Phi(x_t;\theta),
+\qquad
+y_t = \mathcal M(x_t;\eta),
+\qquad
+\ell = L\big(\{y_t\}_{t\in W},\ \hat y\big).
+\]
 
-This distinction fundamentally changes the role of inverse modelling. Traditional
-approaches assume that the underlying mechanism is already correct and seek the
-parameter values that best reproduce the observations. Such parameter optimization is
-effective when the forward model is complete, but it becomes misleading when important
-activities are absent. Optimizing existing parameters may improve the fit while merely
-compensating for missing activities.
+The \emph{set-up} $\mathcal G$ places the entities and gives them their initial states,
+geometry included: a ball of material points, a segmented sheet of cells, a connectome
+read from a file. Its parameters are $\xi$. The \emph{schedule}
+$\Phi=\mathcal O_n\circ\cdots\circ\mathcal O_1$ of Section~\ref{sec:composition} advances
+the state, and $\theta$ are the parameters of its activities. The \emph{observation}
+$\mathcal M$ turns the hierarchy into something a task can score: the state of a readout
+entity, a quantity aggregated over a containment map, a field, or an image. Its own
+parameters are $\eta$, for example a point-spread function or a calcium kernel. The loss
+$L$ compares the observations over a window $W$ of frames with a reference $\hat y$. When
+there is no reference, $L$ scores the observations against a goal instead.
 
-In Plexus, parameters remain attached to explicit activities rather than to opaque
-numerical models. Mechanical properties belong to mechanical activities, reaction
-rates to biochemical activities, conductances to signalling activities, and spatial
-fields to the mechanisms generating them. Parameter estimation therefore preserves the
-mechanistic interpretation of the model.
+\textbf{The loss is what specifies the task.} Fitting the model to a recording, the
+inverse problem, is one task. Others include designing a set-up that grows into a given
+shape, controlling a tissue, and teaching a circuit to compute a function. All of them are
+the same computation, a rollout of the schedule differentiated end to end. They differ only
+in which of $\xi$, $\theta$ and $\eta$ are free and in what $L$ scores. Plexus therefore
+has one trainer, and a training run is a \emph{declaration} rather than a program. It
+names three things and nothing else:
 
-Residuals likewise acquire a mechanistic interpretation. A persistent mismatch between
-simulation and experiment no longer indicates only poor parameter values; it may also
-indicate that the current composition of activities is unable to explain the
-observations. In the terms of Machamer, Darden and Craver, a residual that will not go
-away is the mark of a sketch: a black box where an activity belongs. Differentiability
-thus provides more than efficient optimization: it enables quantitative comparison
-between competing mechanistic models while preserving their explicit biological
-structure.
+\begin{enumerate}
+\item \textbf{what is learnable}, and in which representation;
+\item \textbf{the task}: what is observed, against what reference, driven by what, and
+where and when the loss is placed;
+\item \textbf{the training scheme}: how the gradient is obtained and how it is used.
+\end{enumerate}
 
-Crucially, because the composition is differentiable end to end, the objective need not
-span the entire system: a loss may be \emph{local} in both space and time. It can be
-evaluated on a chosen \emph{subset of entities}, a region of interest such as the
-extrusion front where activated and quiescent cells meet, over a \emph{short rollout}
-of a few tens of steps, rather than on every cell across the whole trajectory.
-Gradients still propagate through the shared composition, so a \emph{local} objective
-fine-tunes precisely the mechanism responsible for a local behaviour, the shape of a
-growth front, the sharpness of a domain boundary, the timing of a rearrangement,
-without the averaging-out of a global fit and, decisively, without the prohibitive cost
-of differentiating a long, whole-system rollout. This last point is what makes the
-approach practical at all: a loss spanning every cell over hundreds of frames unrolls,
-under reverse-mode differentiation, into a backpropagation graph whose memory and
-compute scale as cells~$\times$~steps and quickly become intractable, whereas a loss
-confined to a few entities over a short window keeps that gradient graph small.
-\emph{Locality} is therefore the enabling property of differentiable refinement on
-large, long-lived tissues: the mechanism is global and shared, but the \emph{evidence}
-constraining any single activity is usually confined to a small, transient region, and
-the loss should be placed exactly there.
+\begin{lstlisting}[style=yaml]
+model: morph_ball
+learnable:
+  - {param: rate, op: deform_control, with: lattice, over: material, K: 12}
+task:
+  observe: {grid_mass: mpm_grid}
+  reference: {shape: bunny}
+  loss: log_mse
+training:
+  optimizer: {adam: {lr: 3.0}, schedule: cosine}
+  stages:
+    - {resolution: {mpm_particle: 5000, mpm_grid: 24}, iters: 80}
+    - {resolution: {mpm_particle: 12500, mpm_grid: 32}, iters: 80}
+    - {resolution: {mpm_particle: 50000, mpm_grid: 40}, iters: 120}
+\end{lstlisting}
+
+The declaration sits beside the model, never inside it. A training run starts from the
+same model file the forward simulator runs, unchanged. The trained values are written
+back as values of that model's own entities and activities, so the trained model and the
+stated one can always be run against each other. The first two parts of the declaration
+are scientific claims: what is unknown, and what counts as evidence. The third is
+numerical, in the sense that an implementation is numerical. Changing the scheme may change
+how well or how fast a run trains, but it must not change what the run claims.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Agentic mechanistic discovery}
+\subsection{What is learnable}
+
+\textbf{Nothing is learnable that the language cannot name.} A learnable is addressed
+through the model's own objects, in one of three ways, and each way is a different claim.
+
+\begin{itemize}
+\item \emph{A state of a kind of entity}: a synaptic weight on each synapse, a fibre gain
+and a stiffness on each cell, an initial position. The mechanism is stated; the values it
+acts on are not. The set-up parameters $\xi$ are of this kind.
+\item \emph{A parameter of an activity}: the stiffness of a substrate anchor, the rate of
+a rest-shape change, the kernel of an observation. The activity is stated; its constant
+is not. Parameters therefore stay attached to the mechanism they belong to, a stiffness to
+a mechanical activity and a rate to a biochemical one, and a trained value keeps its
+mechanistic meaning.
+\item \emph{An activity itself}, replaced by a learned approximator. Here the law is not
+stated. The approximator must honour the signature of the activity it replaces. It acts
+on the same entities, produces the same increments, reads a subset of the states the
+activity read (never more), and traverses the same relations. An approximator standing
+in for synaptic transmission therefore learns what a message \emph{is} while keeping the
+connectome it is sent along. One that was free to ignore the relation would satisfy every
+other clause of the signature and silently discard the measured wiring. This is the
+learning-based simulator of differentiable physics, confined to one slot of the schedule,
+with the rest of the composition left explicit.
+\end{itemize}
+
+A quantity written into the state from outside the model, such as a tensor injected by a
+callback, is refused. A result about it would be a result about no entity and no activity.
+
+\textbf{The kind of learnable is a representation, declared separately.} The learnable
+says \emph{which} quantity is unknown; the representation says \emph{how it is
+parameterised}. Choosing a representation is a numerical decision, as choosing an
+implementation is. It changes what can be fitted and at what cost, not what is claimed.
+The representations follow the axes along which differentiable visual computing
+classifies geometry: discrete or continuous, explicit or implicit.
+
+\begin{center}
+\small
+\begin{tabular}{P{2.6cm}P{6.6cm}P{4.6cm}}
+\toprule
+representation & form & typical use \\
+\midrule
+tensor & one free value per element (discrete, explicit) & synaptic weights, per-cell
+gains \\
+lattice & values on a coarse grid of control nodes, interpolated between them (continuous,
+explicit) & a rate field for a rest-shape change \\
+MLP, SIREN & a network of a coordinate (continuous, implicit) & a stiffness field, a
+fibre-angle field \\
+hash encoding & a multiresolution hash grid read by a small network (continuous,
+implicit) & a finely resolved field at low cost \\
+edge MLP, table, GNN & a message function over the edges of a relation & a replaced
+relational activity \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The SIREN and the hash encoding are the periodic-activation network and the
+multiresolution hash grid of neural rendering.\footnote{Sitzmann, V., Martel, J.\,N.\,P.,
+Bergman, A.\,W., Lindell, D.\,B.\ \& Wetzstein, G.\ (2020). Implicit neural
+representations with periodic activation functions. \emph{NeurIPS} 33.
+\url{https://arxiv.org/abs/2006.09661}. M\"uller, T., Evans, A., Schied, C.\ \& Keller, A.\
+(2022). Instant neural graphics primitives with a multiresolution hash encoding. \emph{ACM
+Transactions on Graphics} 41(4):102. \url{https://doi.org/10.1145/3528223.3530127}.} A
+continuous representation is a function of a coordinate, and which coordinate it is
+belongs to the declaration. Over an element's \emph{material coordinate}, its position at
+set-up, a field is Lagrangian: each material point carries its own instruction as it
+moves, and the field means the same thing at any number of points. This is what lets a
+model be trained coarse and run fine. A lattice of $12^3$ control nodes trained on 5{,}000
+material points drives 50{,}000 of them unchanged. Differentiable geometry already
+practises the same separation, training on one representation and deploying on another.
+A tensor is the limiting case: one value per element, indexed by the element itself, and
+tied to one resolution.
+
+\textbf{Every learnable starts at the value the model states.} That value may be a
+measured connectome or a published constant. For a replaced activity, the approximator is
+first fitted to the law it replaces and departs from it only under training. Training
+then reads as a departure from a stated model. A random start discards the only reference
+that makes a trained value interpretable. Bounds and priors are declared with the
+learnable, because they are claims about the unknown rather than about the evidence: for
+example, that a stiffness is positive and within a factor of ten of its nominal value.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{The task}
+
+The task is the loss together with everything the loss needs. It has four parts.
+
+\textbf{The observable} is a differentiable measure of the running hierarchy: the state of
+a readout entity, a quantity aggregated along a containment map, a field, or an image
+rendered from the tissue. Many observables are Aggregates in the sense of
+Section~\ref{sec:hierarchy}. The affine deformation of a cell, fitted over the material
+points the cell contains, is $\sum_\pi$ from points to cells. When the reference is a
+recording, the same function computes the observable on the model and on the data, so the
+two are compared in one currency.
+
+\textbf{The reference} is what the observable is compared with. A task may have none.
+\begin{itemize}
+\item A \emph{recording}: tracked motion, a segmented movie, calcium traces.
+\item A \emph{corpus generated from a stated law}. It has a stimulus process, a teacher
+applied to the stimulus so that the target is \emph{computed}, $\hat y=\text{teacher}(u)$,
+a grid of conditions crossed so that the task is a family of problems, and seeded splits
+that are disjoint by construction.
+\item A \emph{geometry}: a shape to be reached. It is compared as occupancy on a grid,
+because a shape has no point-to-point correspondence to match.\footnote{Xu, M., Song,
+C.\,Y., Levin, D.\,I.\,W.\ \& Hyde, D.\ (2025). A differentiable material point method
+framework for shape morphing. \emph{IEEE Transactions on Visualization and Computer
+Graphics} 31(10):9140--9153.}
+\item A \emph{planted truth}: the same model run forward with known values, with the
+recording's own noise added.
+\item \emph{No reference}: a design or control goal scored directly, such as a shape as
+round as possible or a gait as fast as possible.
+\end{itemize}
+A planted truth is how a task is qualified before it is trusted. A family of learnables is
+claimed on a recording only after it has been recovered from planted data at the
+recording's noise level. Recovery can fail in the joint fit even when each family is
+determined on its own, and only the planted test can tell that kind of entanglement from
+noise.
+
+\textbf{The drive} is data that enters the rollout rather than being scored. Examples are
+a stimulus written into a sensory state at each step, or the boundary of a field of view
+prescribed from the recording because the tissue beyond it is unobserved. A drive enters
+through the state of a named entity, never by editing the model, and that is what lets one
+model be trained against several tasks.
+
+\textbf{Where and when} the loss is placed are part of the task. Because the composition is
+differentiable end to end, the objective need not span the whole system. It may be
+evaluated on a chosen subset of entities, a region such as the front where activated and
+quiescent cells meet, over a short window of a few tens of steps. Gradients still reach
+every shared mechanism through the composition. A local objective therefore refines the
+activity responsible for a local behaviour, such as the shape of a growth front or the
+timing of a rearrangement, without the averaging-out of a global fit. Locality is also
+what makes training affordable. Reverse-mode differentiation of a rollout keeps every
+intermediate state, so its memory scales as entities~$\times$~steps. A loss confined to a
+few entities over a short window keeps that graph small. The mechanism is global, but the
+evidence constraining any one activity is usually local, and the loss belongs where the
+evidence is.
+
+This redefines what a task is in Plexus. A corpus of stimulus and teacher is one kind of
+reference, not the definition of training. Fitting a circuit to it is a task whose drive
+is the stimulus, whose observable is the readout state and whose loss is the squared error
+over trials. It is the same declaration, with the same three parts, as morphing a ball into
+a shape or fitting a cardiac sheet to its recording (Table~\ref{tab:tasks}).
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{P{2.2cm}P{3.9cm}P{3.9cm}P{3.9cm}}
+\toprule
+ & a circuit learns a function & a ball morphs into a shape & a cardiac sheet fits its
+recording \\
+\midrule
+learnable & synaptic weights (states of synapses), neuron time constants (states of
+neurons) & rate of rest-shape change (parameter of the growth activity) & fibre gain,
+fibre axis and stiffness (states of cells), one activation clock \\
+representation & tensor & lattice of $12^3$ nodes over material coordinates & tensor \\
+observable & state of the readout entity & material mass deposited on the grid & affine
+deformation of each cell, aggregated from its material points \\
+reference & corpus: stimulus, teacher, condition grid, disjoint splits & a surface mesh,
+as occupancy & tracked motion of the sheet, preceded by a planted truth \\
+drive & stimulus into the sensory state & none & edge band prescribed from the
+recording \\
+scheme & 128 trials per step; horizon grows from a quarter of the trial to all of it &
+material points grow from 5{,}000 to 50{,}000 over three stages & one rollout per beat,
+gradients summed over beats; a step size per learnable \\
+\bottomrule
+\end{tabular}
+\caption{Three tasks, one declaration. Each column is a training run of the same trainer;
+the columns differ only in what the three parts of the declaration say.}
+\label{tab:tasks}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{The training scheme}
+
+The scheme says how the gradient is obtained and how it is used. It is the only part of a
+training run that is not a claim, and it is declared for that reason: a conclusion that
+changes when the scheme changes was a property of the scheme.
+
+\textbf{Obtaining the gradient.} The default is reverse mode through the rollout. The
+schedule is run forward with each step's state kept, and the gradient of the loss is
+propagated back to every learnable. Training selects the differentiable implementation
+of each activity, and deployment selects the fastest one. Because the implementations
+share one signature, the run that trains and the run that is shown are the same model.
+Differentiable physics has already mapped the two costs of reverse mode. Gradients vanish
+over long horizons; the remedy is to train on a short prefix of the trajectory and
+lengthen it, or on sub-sequences. Memory grows with the horizon; the remedies are
+checkpointing, reduced precision and the locality described above. Other activities call
+for other modes. When the learnables are few, such as a four-number activation clock,
+forward mode is the better choice: it carries the derivative along with the state and
+stores nothing. When an activity is quasi-static, a force balance solved to equilibrium
+at every step as in vertex models, the implicit function theorem differentiates the
+solution without unrolling the solver. Discrete events such as division, rearrangement
+and contact have no derivative as written. They need either a smoothed variant of the
+activity or an observable that is smooth in them.
+
+\textbf{Using the gradient.} The rest of the scheme is conventional, and it is declared
+rather than coded:
+\begin{itemize}
+\item the optimiser and its step-size schedule, with a separate step size per learnable
+when their scales differ by orders of magnitude;
+\item trials per step: $B$ trials of the same world run side by side on a leading axis,
+so that one step averages $B$ gradients for the price of one rollout;
+\item \emph{stages}: a curriculum is a list of stages, each overriding the rollout's
+horizon, its resolution (the number of elements, the size of the grid), or which
+learnables are free. Coarse-to-fine training is sound only for representations over
+material coordinates, which mean the same thing at every resolution;
+\item guards: a rollout that diverges restores the last finite values and reduces the
+step size, rather than ending the run;
+\item selection: the checkpoint kept is the one that scores best on held-out data, never
+on the training data.
+\end{itemize}
+
+Three programs answer three separate questions, and each can fail independently.
+\emph{Train} fits the model and records the loss history. \emph{Test} scores the kept
+checkpoint on held-out data, per condition and never only in aggregate. \emph{Analyse}
+compares the recovered quantities with the truth whenever the task has one, such as the
+poles of a linear teacher or the planted values of a sheet.
+
+Two properties of differentiable simulation limit what a training run may claim. First,
+scatter operations accumulate in a nondeterministic order on a GPU, so repeated runs of
+one configuration differ. On shape morphing, repeats of one configuration moved the final
+loss by 18 to 44 per cent, and any ordering of configurations inside that spread is
+noise. An ordering is therefore claimed only over repeated seeds. Second, chaotic dynamics
+give loss landscapes with many local minima, and gradient descent from one start finds
+only one of them. This is why exploration and gradients are combined.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{What a trained model means}
+
+Every learnable is a named state, an activity parameter or an activity slot. A trained
+Plexus model is therefore still a mechanistic model: every trained value belongs to an
+entity or an activity and keeps its biological reading. The residual acquires a reading
+too. A mismatch that persists after training no longer indicates only poor values. It may
+indicate that the composition cannot express the observations. In the terms of Machamer,
+Darden and Craver, a residual that will not go away is the mark of a sketch, a black box
+where an activity belongs. Loop~III of Section~\ref{sec:agentic} picks it up from there.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Agentic mechanistic discovery}\label{sec:agentic}
 
 \begin{quote}
 \emph{``What I cannot create, I do not understand.''} \\
@@ -736,7 +1000,9 @@ catalogued, and what later tells Loop~III which lever the model \emph{lacks}.
 The second loop estimates the parameters, spatial fields and set-up conditions of the
 resulting mechanistic model by fitting it directly to experimental observations.
 Because every activity admits a differentiable implementation, optimization preserves
-an explicit correspondence between parameters and biological mechanisms.
+an explicit correspondence between parameters and biological mechanisms. Each fit is
+a training run in the sense of Section~\ref{sec:training} whose reference is a
+recording.
 
 \paragraph{Loop III: Discovery.}
 

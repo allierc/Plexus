@@ -1,9 +1,9 @@
 """`learnable: {block: w, of: recurrent}` -- fitting a stated mechanism's constants.
 
-The other form of learnable, and the one connectome work actually needs: the mechanism is stated
-and its numbers are not. A synaptic weight, a time constant, a conductance. Distinct from an
-operator substitution, which says the LAW is unknown -- and the schema refuses to confuse them,
-because they are different claims about what is wrong with the model.
+The one form of learnable anything fits, and the one connectome work actually needs: the mechanism
+is stated and its numbers are not. A synaptic weight, a time constant, a conductance. An operator
+substitution -- the LAW unknown -- is fitted by nothing yet, so it is refused rather than allowed to
+run as the original operator, which is what it silently did while the schema accepted it.
 
 What must hold, and each is asserted rather than assumed:
 
@@ -85,7 +85,7 @@ def test_a_forward_spec_declares_nothing_learnable():
     assert load(SPEC).learnable == [], "training must not leak into the forward description"
 
 
-def test_the_two_forms_may_not_be_mixed_and_must_name_real_things():
+def test_only_the_block_form_is_accepted_and_it_must_name_real_things():
     import yaml
     raw = yaml.safe_load(open(SPEC))
 
@@ -93,12 +93,22 @@ def test_the_two_forms_may_not_be_mixed_and_must_name_real_things():
         from plexus.schema import _parse_learnable
         return _parse_learnable([entry], raw)
 
-    with pytest.raises(ValueError, match="EITHER"):
+    with pytest.raises(ValueError, match="law substitution"):
+        _load({"replaces": "neuron_signal", "with": "mlp"})
+    with pytest.raises(ValueError, match="law substitution"):
         _load({"block": "w", "of": "recurrent", "replaces": "neuron_signal"})
-    with pytest.raises(ValueError, match="EITHER"):
+    with pytest.raises(ValueError, match="needs `block:`"):
         _load({"with": "mlp"})
+    with pytest.raises(ValueError, match="nothing reads"):
+        _load({"block": "w", "of": "recurrent", "with": "siren"})
     with pytest.raises(ValueError, match="not a declared set"):
         _load({"block": "w", "of": "nonexistent"})
-    with pytest.raises(ValueError, match="no operator line declares"):
-        _load({"replaces": "telepathy", "with": "mlp"})
     assert _load({"block": "w", "of": "recurrent"})[0]["of"] == "recurrent"
+
+
+def test_the_engine_refuses_an_entry_it_cannot_fit_rather_than_skipping_it():
+    """THE SILENT NO-OP THIS REPLACES. A `{replaces:, with:}` entry set on `sim.learnable` directly
+    -- past the schema -- used to be skipped, and the run went ahead with the original operator."""
+    with pytest.raises(ValueError, match="no `block:`"):
+        engine.run(_sim([{"replaces": "neuron_signal", "with": "mlp"}]), device="cpu",
+                   progress=False, grad=True)

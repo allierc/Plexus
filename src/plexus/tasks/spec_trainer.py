@@ -39,7 +39,7 @@ import yaml
 
 import plexus.operators                                          # noqa: F401  self-registers
 from plexus import engine
-from plexus.schema import load
+from plexus.schema import _parse_learnable, load
 from plexus.tasks.generate import task_dir
 from plexus.tasks.trainer import load_split, log_dir, n_condition_cells, with_context
 
@@ -59,7 +59,11 @@ def load_run(path) -> dict:
 def build(run, device="cpu"):
     """The Spec with its `learnable:` injected. The forward file itself is never edited."""
     sim = load(run["spec"])
-    sim.learnable = list(run["learnable"])
+    # THE CHECK A FORWARD SPEC'S OWN `learnable:` GETS. Injected as a bare list, a run spec's entry
+    # naming a set the model does not declare, or a law substitution nothing runs, reached the
+    # engine unrefused -- and the engine used to skip the second without a word.
+    with open(run["spec"]) as f:
+        sim.learnable = _parse_learnable(run["learnable"], yaml.safe_load(f))
     sim.n_frames = int(run.get("n_frames", sim.n_frames))
     return sim
 

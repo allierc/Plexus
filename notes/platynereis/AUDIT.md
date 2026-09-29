@@ -30,7 +30,7 @@ operator is missing, and it is small. Everything else is composition.
 | | a metachronal wave | `activation_pulse` with `delay_from:` | `field_ops.py:676` |
 | R6 water | cilia push fluid | **two particle sets sharing one `mpm_grid`** | `mpm_ops.py:717` |
 | | water behaving as water | `mpm_viscosity`, `bulk_modulus` on a liquid type | `mpm_ops.py:1764` |
-| R7 tune | fit the drive | `tasks/spec_trainer.py` + `learnables/` | already batched and differentiable |
+| R7 tune | fit the drive | `tasks/spec_trainer.py` with `learnable: {block:, of:}` | already batched and differentiable |
 
 ## 2. The four things that are NOT there
 
