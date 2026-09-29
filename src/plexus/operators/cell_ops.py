@@ -3110,6 +3110,53 @@ class DeformControl(Lateral):
         return {}
 
 
+@register_operator("deform_control", implementation="block", family="motility", set="particle",
+                   kind="lateral",
+                   equation=r"""$$\mathbf F_p\leftarrow\big(\mathbf I-\mathbf A_p\Delta t+\tfrac12(\mathbf A_p\Delta t)^2\big)\,\mathbf F_p,\quad \mathbf A_p=\mathrm{sym}(\mathbf a_p)$$""")
+class DeformControlBlock(DeformControl):
+    """The same rest-shape rate, read PER PARTICLE from a state block of the set.
+
+        a_p = state[p, rate]  (six numbers: a_xx, a_yy, a_zz, a_xy, a_xz, a_yz)
+        F_p <- G_p F_p,   G_p = I + (-A_p dt) + (1/2)(-A_p dt)^2      once a frame
+
+    `field:` reads an optimised cube from a file and caches G after the first call. This variant
+    reads the block EVERY call and caches nothing, because the block is where a trainer writes a
+    learnable rate field: whatever wrote the block at set-up, the tape runs from it to every F.
+    G is the second-order expansion `plexus.morph` optimised with and `field:` applies, so the
+    three paths compute one law. Place it OUTSIDE the substep block, so `H.dt` is the frame step,
+    and gate it with `after_frame: 1` to act on the same frames `plexus.morph` did.
+    """
+    REQUIRES_PARAMS = []
+
+    def __init__(self, params, device="cpu"):
+        params = {**params, "rate": params.get("rate", [0.0] * 6)}   # the parent needs one of rate/field
+        super().__init__(params, device)
+        self.block = str(params.get("block", "rate"))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        if self.over and int(getattr(H, "frame", 0) or 0) >= self.over:
+            return {}
+        a = p.get(self.block)
+        if a.shape[-1] != 6:
+            raise ValueError(f"deform_control[block]: block {self.block!r} of {self.at!r} has width "
+                             f"{a.shape[-1]}; a symmetric rate is six numbers")
+        dt = float(getattr(H, "dt", 0.002))
+        A = torch.diag_embed(a[..., :3])
+        off = torch.zeros_like(A)
+        off[..., 0, 1] = off[..., 1, 0] = a[..., 3]
+        off[..., 0, 2] = off[..., 2, 0] = a[..., 4]
+        off[..., 1, 2] = off[..., 2, 1] = a[..., 5]
+        Adt = -(A + off) * dt
+        G = torch.eye(3, device=a.device, dtype=a.dtype) + Adt + 0.5 * (Adt @ Adt)
+        F = G @ p.F
+        if torch.is_grad_enabled():
+            p.F = F
+        else:
+            p.F.copy_(F)
+        return {}
+
+
 # ---------------------------------------------------------------------------------------------
 # `polar_active_stress [model: driven]` MOVED HERE from `cilia_ops.py`, which was deleted.
 #

@@ -68,6 +68,7 @@ import yaml
 
 import plexus.operators                                          # noqa: F401  self-registers
 from plexus import engine
+from plexus.models.registry import get_contract
 from plexus.paths import get_repo_root, log_path, training_spec
 from plexus.schema import load as load_model
 from plexus.tasks.generate import task_dir
@@ -77,15 +78,18 @@ from plexus.tasks.trainer import load_split, n_condition_cells, with_context
 # ============================================================================== the declaration
 _KEYS = {
     "top": {"name", "model", "learnable", "task", "training"},
-    "learnable": {"block", "of", "with", "lr", "bounds"},
+    "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent"},
     "task": {"reference", "drive", "observe", "loss", "settle_s"},
-    "reference": {"corpus", "n_train", "n_val", "n_test", "context"},
+    "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre"},
     "drive": {"set", "block"},
-    "observe": {"set", "block", "channel", "unit"},
-    "training": {"optimizer", "lr", "schedule", "clip", "epochs", "batch", "seed", "horizon",
-                 "horizon_min", "snapshot_every", "guard"},
+    "observe": {"set", "block", "channel", "unit", "measure", "grid"},
+    "training": {"optimizer", "lr", "lr_min", "schedule", "clip", "epochs", "batch", "seed",
+                 "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render"},
+    "stage": {"resolution", "iters"},
 }
-REPRESENTATIONS = ("tensor",)
+REPRESENTATIONS = ("tensor", "lattice")
+REFERENCES = ("corpus", "shape")
+_LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",)}
 OPTIMIZERS = ("adam",)
 SCHEDULES = ("cosine", "none")
 GUARDS = ("restore_and_halve", "none")
@@ -121,28 +125,65 @@ def load(path_or_name) -> dict:
         if e["of"] not in sets:
             raise ValueError(f"{path}: learnable[{i}] fits `{e['of']}.{e['block']}`, but "
                              f"`{e['of']}` is not a set of {s['model']} ({sorted(sets)})")
-        if e.get("with", "tensor") not in REPRESENTATIONS:
-            raise ValueError(f"{path}: learnable[{i}] asks for representation {e['with']!r}; "
+        rep = e.get("with", "tensor")
+        if rep not in REPRESENTATIONS:
+            raise ValueError(f"{path}: learnable[{i}] asks for representation {rep!r}; "
                              f"implemented: {list(REPRESENTATIONS)}.")
+        if rep == "lattice":
+            if e.get("over") != "material":
+                raise ValueError(f"{path}: learnable[{i}] is a lattice, which is read at each "
+                                 f"element's MATERIAL coordinate -- say `over: material`")
+            if "K" not in e or len(e.get("extent") or []) != 4:
+                raise ValueError(f"{path}: learnable[{i}] lattice needs `K:` (nodes per axis) and "
+                                 f"`extent: [cx, cy, cz, half_width]` in world units")
+        elif any(k in e for k in ("over", "K", "extent")):
+            raise ValueError(f"{path}: learnable[{i}] sets lattice keys on a {rep!r} representation")
     t = s["task"]
     _refuse_unread(f"{path}: task", t, _KEYS["task"])
-    for k in ("reference", "drive", "observe"):
+    ref = t.get("reference") or {}
+    kinds = [k for k in REFERENCES if k in ref]
+    if len(kinds) != 1:
+        raise ValueError(f"{path}: task.reference must name exactly one of {list(REFERENCES)} -- a "
+                         f"corpus under graphs_data/task/ or a shape from the library; it names {kinds}")
+    kind = kinds[0]
+    parts = ("drive", "observe") if kind == "corpus" else ("observe",)
+    for k in ("reference",) + parts:
         if k not in t:
             raise ValueError(f"{path}: task needs `{k}:`")
         _refuse_unread(f"{path}: task.{k}", t[k], _KEYS[k])
-    if "corpus" not in t["reference"]:
-        raise ValueError(f"{path}: task.reference needs `corpus:` -- the only reference "
-                         f"implemented is a corpus under graphs_data/task/")
-    for part in ("drive", "observe"):
+    for part in parts:
         for k in ("set", "block"):
             if k not in t[part]:
                 raise ValueError(f"{path}: task.{part} needs `{k}:`")
         if t[part]["set"] not in sets:
             raise ValueError(f"{path}: task.{part}.set {t[part]['set']!r} is not a set of the model")
-    if t.get("loss", "mse") not in LOSSES:
-        raise ValueError(f"{path}: task.loss {t['loss']!r}; registered: {sorted(LOSSES)}")
+    loss = t.get("loss", _LOSS_FOR[kind][0])
+    if loss not in _LOSS_FOR[kind]:
+        raise ValueError(f"{path}: task.loss {loss!r} does not score a {kind} reference; "
+                         f"implemented for it: {list(_LOSS_FOR[kind])}")
     tr = s["training"]
     _refuse_unread(f"{path}: training", tr, _KEYS["training"])
+    if kind == "shape":
+        if "drive" in t:
+            raise ValueError(f"{path}: a shape task has no drive -- nothing is fed in while it grows")
+        if t["observe"].get("measure") != "grid_mass" or t["observe"].get("grid") not in (raw.get("fields") or {}):
+            raise ValueError(f"{path}: a shape task observes `measure: grid_mass` on a `grid:` field "
+                             f"of the model ({sorted(raw.get('fields') or {})})")
+        for k in ("size", "centre"):
+            if k not in ref:
+                raise ValueError(f"{path}: task.reference needs `{k}:` -- where the shape sits and "
+                                 f"how long its longest axis is, in world units")
+        if not tr.get("stages"):
+            raise ValueError(f"{path}: a shape task trains in `stages:` -- a list of {{resolution, iters}}")
+        for j, st in enumerate(tr["stages"]):
+            _refuse_unread(f"{path}: training.stages[{j}]", st, _KEYS["stage"])
+            for name in (st.get("resolution") or {}):
+                if name not in sets and name not in (raw.get("fields") or {}):
+                    raise ValueError(f"{path}: training.stages[{j}].resolution names {name!r}, "
+                                     f"which is neither a set nor a field of the model")
+    elif any(k in tr for k in ("stages", "render", "lr_min")):
+        raise ValueError(f"{path}: `stages`, `render` and `lr_min` belong to a shape task's scheme")
+    s["_kind"] = kind
     for k, allowed in (("optimizer", OPTIMIZERS), ("schedule", SCHEDULES), ("guard", GUARDS)):
         if k in tr and tr[k] not in allowed:
             raise ValueError(f"{path}: training.{k} {tr[k]!r}; implemented: {list(allowed)}")
@@ -170,6 +211,7 @@ class Learnables:
         self.entries = [dict(e) for e in entries]
         self.device = device
         self.p: dict[str, nn.Parameter] = {}
+        self.scale = 1.0               # a DISPLAY rollout may spread one deformation over more frames
 
     @staticmethod
     def key(e) -> str:
@@ -183,11 +225,51 @@ class Learnables:
                                  f"{e['block']!r} (it has {sorted(lvl.state_schema)})")
             a, b = lvl.state_schema[e["block"]]
             par = self.p.get(self.key(e))
-            if par is None:
-                par = self.p[self.key(e)] = nn.Parameter(lvl.state[:, a:b].detach().clone())
+            if e.get("with", "tensor") == "lattice":
+                if par is None:
+                    # A LATTICE STARTS WHERE THE MODEL DOES ONLY WHEN THE MODEL SAYS "NOTHING": a
+                    # uniform zero block is exactly the zero lattice, and anything else would need
+                    # a fit to reproduce it, which is not implemented and so is refused.
+                    if float(lvl.state[:, a:b].abs().max()) > 0:
+                        raise ValueError(f"learnable `{self.key(e)}`: a lattice starts from a zero "
+                                         f"block; the model seeds a non-zero one")
+                    K = int(e["K"])
+                    par = self.p[self.key(e)] = nn.Parameter(
+                        torch.zeros(K ** 3, b - a, device=lvl.state.device, dtype=lvl.state.dtype))
+                val = self._lattice(e, par, lvl.get("pos").detach())
+            else:
+                if par is None:
+                    par = self.p[self.key(e)] = nn.Parameter(lvl.state[:, a:b].detach().clone())
+                val = par
             st = lvl.state.clone()
-            st[:, a:b] = par
+            st[:, a:b] = val if self.scale == 1.0 else val * self.scale
             lvl.state = st
+
+    @staticmethod
+    def _lattice(e, par, X0):
+        """The block's value at each element: trilinear in a K^3 cube of control nodes, read at the
+        element's MATERIAL coordinate X0 -- its position at set-up, so the field is Lagrangian and
+        means the same thing at any number of elements.
+
+            a(X0) = sum_c w_c(X0) theta_c        w = trilinear weights, c = the 8 corners
+        """
+        K = int(e["K"])
+        cx, cy, cz, half = (float(v) for v in e["extent"])
+        c = torch.tensor([cx, cy, cz], device=X0.device, dtype=X0.dtype)
+        u = (((X0 - c) / (2.0 * half) + 0.5) * (K - 1)).clamp(0.0, K - 1.001)
+        b = u.floor().long()
+        f = u - b.to(u.dtype)
+        val = 0.0
+        for dx in (0, 1):
+            for dy in (0, 1):
+                for dz in (0, 1):
+                    w = (((1 - f[:, 0]) if dx == 0 else f[:, 0])
+                         * ((1 - f[:, 1]) if dy == 0 else f[:, 1])
+                         * ((1 - f[:, 2]) if dz == 0 else f[:, 2]))
+                    i = (((b[:, 0] + dx).clamp(0, K - 1) * K + (b[:, 1] + dy).clamp(0, K - 1)) * K
+                         + (b[:, 2] + dz).clamp(0, K - 1))
+                    val = val + w[:, None] * par[i]
+        return val
 
     def parameters(self) -> list:
         return [self.p[self.key(e)] for e in self.entries]
@@ -278,7 +360,17 @@ def _mse(y, target, ch):
     return ((y[..., :n, ch] - target[..., :n, 0]) ** 2).mean()
 
 
-LOSSES = {"mse": _mse}
+def _log_mse(m, m_ref):
+    """Squared error of log(1 + nodal count) on the grid -- the Eulerian shape loss.
+
+    A target shape has no particle correspondence, so a position loss has nothing to match where
+    the two shapes differ; comparing where material IS on a grid does. `log` because the two
+    fields differ by orders of magnitude between "material" and "none".
+    """
+    return ((torch.log1p(m) - torch.log1p(m_ref)) ** 2).mean()
+
+
+LOSSES = {"mse": _mse, "log_mse": _log_mse}
 
 
 def _corpus(spec):
@@ -295,18 +387,46 @@ def _data(spec, split, n_cond, device):
     return with_context(U, c, n_cond), Y, c
 
 
-def _model(spec, n_frames=None):
+def _model(spec, train=True, resolution=None, n_frames=None):
+    """The model, as TRAINING or as DISPLAY runs it. Same file, same law, two numerical choices.
+
+    TRAINING picks each operator's `differentiable` implementation where the model pins none --
+    the default MPM bodies write in place, which a captured CUDA graph needs and autograd cannot
+    have. DISPLAY leaves the choice to the engine, which picks its fastest bodies (warp on CUDA).
+
+    SUBSTEP CAPTURE IS OFF IN BOTH, for two measured reasons. Under a tape, a replayed graph writes
+    its static buffers in place, so a tensor autograd saved at tick 0 is a different tensor at
+    backward time ("[5000] ... at version 2; expected version 1"). And with warp bodies, a captured
+    substep does not see a deformation gradient written by an operator OUTSIDE the block: the same
+    trained morph ended as the untouched ball (10.85 x 10.67 x 10.65 um) with capture and as the
+    trained cow (14.13 x 7.00 x 4.32 um) without it, or with the torch bodies. That is an engine
+    defect, not fixed here; `resolution` resizes sets (`n`) and fields (`n_grid`) for a stage.
+    """
     sim = load_model(spec["model"])
     if sim.learnable:
         raise ValueError(f"{spec['model']} declares `learnable:` itself. What is learnable belongs "
                          f"to the training spec; the model file stays the forward description.")
+    for name, v in (resolution or {}).items():
+        if name in sim.sets:
+            sim.sets[name]["n"] = int(v)
+        else:
+            sim.fields[name]["n_grid"] = int(v)
     if n_frames is not None:
         sim.n_frames = int(n_frames)
+    if train:
+        for o in sim.operators:
+            if o.impl is None and "differentiable" in get_contract(o.op).implementations:
+                o.impl = "differentiable"
+    for blk in sim.schedule:
+        if isinstance(blk, dict) and "steps" in blk:
+            blk["capture"] = False
     return sim
 
 
 # ============================================================================== train
 def train(spec, device="cpu", root=None):
+    if spec.get("_kind") == "shape":
+        return _train_shape(spec, device, root)
     tr, task = spec["training"], spec["task"]
     ref = task["reference"]
     torch.manual_seed(int(tr.get("seed", 0)))
@@ -432,6 +552,8 @@ def _restore(spec, device="cpu", root=None):
 # ============================================================================== test
 def test(spec, device="cpu", root=None):
     """Roll the kept checkpoint out on held-out trials. One number per trial, never only a mean."""
+    if spec.get("_kind") == "shape":
+        return _test_shape(spec, device, root)
     engine.quiet(True)
     sim, learn, ck, out = _restore(spec, device, root)
     task, corpus = spec["task"], _corpus(spec)
@@ -533,6 +655,8 @@ def circuit_poles(H, fitted, slope=None):
 
 def analyse(spec, device="cpu", root=None):
     """Did it recover the law, or only reduce the error? The figure, and the poles."""
+    if spec.get("_kind") == "shape":
+        return _analyse_shape(spec, device, root)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -635,6 +759,194 @@ def analyse(spec, device="cpu", root=None):
     print(f"[analyse] wrote {p}")
     return p
 
+
+
+# ============================================================================== shape tasks
+# ONE WORLD, NO TRIALS: the model starts from its set-up, grows for `n_frames`, and its final
+# state is scored against a shape. So there is no batch, no validation split and no horizon --
+# the scheme is a list of resolution STAGES, coarse to fine, each with its own Adam and its own
+# cosine from `lr` to `lr_min`. It works only because a lattice over MATERIAL coordinates means
+# the same thing at 5,000 points as at 50,000: a cheap stage buys the parameters a dear one needs.
+def _shape_target(spec, n, rng):
+    """`n` points uniform inside the reference mesh, centred and scaled as the task says."""
+    from plexus import shapes
+    from plexus.morph import sample_inside
+    ref = spec["task"]["reference"]
+    path, _part = shapes.resolve(ref["shape"])
+    if os.path.isdir(path):
+        objs = sorted(glob.glob(os.path.join(path, "*.obj")))
+        if not objs:
+            raise FileNotFoundError(f"shape {ref['shape']!r}: {path} holds no .obj")
+        path = objs[0]
+    pts = sample_inside(path, n, np.asarray(ref["centre"], float), float(ref["size"]), rng)
+    return pts, path
+
+
+def _grid_mass(sim, X, grid):
+    """Unit-weight nodal counts on the model's own `grid` field, at its current resolution."""
+    from plexus.morph import mass_grid
+    return mass_grid(X, torch.ones(X.shape[0], device=X.device, dtype=X.dtype),
+                     float(sim.world_size[0]), int(sim.fields[grid]["n_grid"]), X.device, torch)
+
+
+def _shape_rollout(sim, learn, set_name, device, grad, keep=None):
+    """Run the model once; return (H, final positions, realised volume sum(p_vol det F))."""
+    hook = None
+    if keep is not None:
+        def hook(H, frame):
+            keep.append(H.level(set_name).get("pos").detach().cpu().numpy().copy())
+    H, _ = engine.run(sim, device=device, progress=False, grad=grad, on_seeded=learn.inject,
+                      on_frame=hook)
+    q = H.level(set_name)
+    vol = (q.p_vol * torch.linalg.det(q.F)).sum() if hasattr(q, "F") else torch.tensor(float("nan"))
+    return H, q.get("pos"), vol
+
+
+def _extent(X, um):
+    e = (X.max(0).values - X.min(0).values).detach().cpu().numpy() * (um or 1.0)
+    return [round(float(v), 2) for v in e]
+
+
+def _train_shape(spec, device="cpu", root=None):
+    tr, task = spec["training"], spec["task"]
+    obs = task["observe"]
+    seed = int(tr.get("seed", 0))
+    torch.manual_seed(seed)
+    rng = np.random.default_rng(seed)
+    torch.backends.cuda.matmul.allow_tf32 = True          # measured free on morph: 0.015% of the loss
+    torch.backends.cudnn.allow_tf32 = True
+    out = out_dir(spec, root)
+    os.makedirs(os.path.join(out, "models"), exist_ok=True)
+    os.makedirs(os.path.join(out, "results"), exist_ok=True)
+    shutil.copyfile(spec["_path"], os.path.join(out, "config.yaml"))
+    shutil.copyfile(spec["model"], os.path.join(out, "model.yaml"))
+    print(f"[run] {spec['name']} -> {out}")
+    engine.quiet(True)
+    learn = Learnables(spec["learnable"], device)
+    lr = float(tr.get("lr", 1.0))
+    lr_min = float(tr.get("lr_min", lr / 20.0))
+    clip = tr.get("clip")
+    guard = tr.get("guard", "restore_and_halve")
+    hist, stages, t_all = [], [], time.time()
+    for si, st in enumerate(tr["stages"]):
+        sim = _model(spec, train=True, resolution=st.get("resolution"))
+        um = getattr(sim.units, "length_um", None) if getattr(sim.units, "declared", False) else None
+        n, iters = int(sim.sets[obs["set"]]["n"]), int(st["iters"])
+        tgt_np, mesh = _shape_target(spec, n, rng)
+        tgt = torch.as_tensor(tgt_np, dtype=torch.float32, device=device)
+        with torch.no_grad():
+            m_ref = _grid_mass(sim, tgt, obs["grid"])
+            if not learn.p:                            # the first rollout makes the parameters
+                _shape_rollout(sim, learn, obs["set"], device, grad=False)
+        opt = torch.optim.Adam(learn.groups(lr), lr=lr)
+        sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(iters, 1), eta_min=lr_min)
+        last_ok, vol0, t_st = learn.snapshot(), None, time.time()
+        print(f"  stage {si}: {n:,} points, grid {sim.fields[obs['grid']]['n_grid']}, {iters} iterations, "
+              f"target {os.path.basename(mesh)}")
+        for it in range(iters):
+            opt.zero_grad()
+            _, X, vol = _shape_rollout(sim, learn, obs["set"], device, grad=True)
+            loss = _log_mse(_grid_mass(sim, X, obs["grid"]), m_ref)
+            if not torch.isfinite(loss) and guard == "restore_and_halve":
+                learn.restore(last_ok)
+                for g in opt.param_groups:
+                    g["lr"] *= 0.5
+                print(f"    iter {it:3d}  loss not finite -- restored, step sizes halved", flush=True)
+                continue
+            loss.backward()
+            if clip:
+                torch.nn.utils.clip_grad_norm_(learn.parameters(), float(clip))
+            opt.step()
+            sch.step()
+            learn.clamp_()
+            last_ok = learn.snapshot()
+            vol0 = vol0 if vol0 is not None else float(vol.detach())
+            hist.append({"stage": si, "iter": it, "loss": float(loss.detach()),
+                         "volume_ratio": float(vol.detach()) / vol0})
+            if it % 20 == 0 or it == iters - 1:
+                # VOLUME BESIDE THE EXTENT: a body can approach the target's box while the material
+                # it is made of quietly disappears, and the extent alone would not say so.
+                print(f"    iter {it:3d}  loss {float(loss):.6f}  vol {hist[-1]['volume_ratio']:.3f}x  "
+                      f"shape {_extent(X, um)}  target {_extent(tgt, um)}"
+                      + (" um" if um else ""), flush=True)
+        stages.append({"stage": si, "n": n, "iters": iters, "final_loss": hist[-1]["loss"],
+                       "seconds": round(time.time() - t_st, 1)})
+        print(f"  stage {si}: {iters} iterations in {(time.time() - t_st) / 60:.1f} min", flush=True)
+    torch.save({"fitted": learn.snapshot(), "model": spec["model"], "task": task,
+                "learnable": spec["learnable"]}, os.path.join(out, "models", "best.pt"))
+    rep = {"name": spec["name"], "model": spec["model"], "shape": task["reference"]["shape"],
+           "final_loss": hist[-1]["loss"], "stages": stages, "history": hist,
+           "n_params": sum(p.numel() for p in learn.parameters()),
+           "seconds": round(time.time() - t_all, 1)}
+    json.dump(rep, open(os.path.join(out, "results", "report.json"), "w"), indent=2)
+    print(f"[done] final loss {rep['final_loss']:.6f} in {rep['seconds'] / 60:.1f} min")
+    return out
+
+
+def _last_resolution(spec):
+    return spec["training"]["stages"][-1].get("resolution")
+
+
+def _test_shape(spec, device="cpu", root=None):
+    """The trained learnables at the last stage's resolution, scored once more without a tape."""
+    engine.quiet(True)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    obs = spec["task"]["observe"]
+    sim = _model(spec, train=True, resolution=_last_resolution(spec))
+    um = getattr(sim.units, "length_um", None) if getattr(sim.units, "declared", False) else None
+    rng = np.random.default_rng(int(spec["training"].get("seed", 0)) + 1)   # a FRESH target draw
+    tgt_np, mesh = _shape_target(spec, int(sim.sets[obs["set"]]["n"]), rng)
+    tgt = torch.as_tensor(tgt_np, dtype=torch.float32, device=device)
+    with torch.no_grad():
+        _, X0, vol0 = _shape_rollout(_model(spec, train=True, resolution=_last_resolution(spec), n_frames=0),
+                                     learn, obs["set"], device, grad=False)
+        _, X, vol = _shape_rollout(sim, learn, obs["set"], device, grad=False)
+        loss = float(_log_mse(_grid_mass(sim, X, obs["grid"]), _grid_mass(sim, tgt, obs["grid"])))
+    res = {"name": spec["name"], "shape": spec["task"]["reference"]["shape"], "mesh": mesh,
+           "loss": loss, "shape_extent": _extent(X, um), "target_extent": _extent(tgt, um),
+           "unit": "um" if um else None, "volume_ratio": float(vol) / float(vol0)}
+    p = os.path.join(out, "results", f"{spec['name']}_test.json")
+    json.dump(res, open(p, "w"), indent=2)
+    print(f"[test] loss {loss:.6f} against a fresh draw of the target; shape {res['shape_extent']} vs "
+          f"target {res['target_extent']} {res['unit'] or ''}; volume {res['volume_ratio']:.3f}x of the start")
+    return res
+
+
+def _analyse_shape(spec, device="cpu", root=None):
+    """The trained growth, rendered as glass by `plexus.morph`'s own renderer.
+
+    A DISPLAY ROLLOUT MAY RUN LONGER THAN THE TRAINED ONE: `render.frames` spreads the SAME total
+    rest-shape change over more frames (every rate multiplied by trained_frames / render_frames),
+    so the material grows more slowly for longer and the movie is smoother. It is not the trained
+    trajectory sampled finer -- the mechanics get more time -- which is why it is said here.
+    """
+    from plexus.morph import render_movie
+    engine.quiet(True)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    obs = spec["task"]["observe"]
+    rd = spec["training"].get("render") or {}
+    base = _model(spec, train=False, resolution=_last_resolution(spec))
+    rf = int(rd.get("frames", base.n_frames))
+    sim = _model(spec, train=False, resolution=_last_resolution(spec), n_frames=rf)
+    learn.scale = float(base.n_frames) / float(rf)
+    frames = []
+    with torch.no_grad():
+        _shape_rollout(sim, learn, obs["set"], device, grad=False, keep=frames)
+    rng = np.random.default_rng(int(spec["training"].get("seed", 0)) + 2)
+    tgt_np, _mesh = _shape_target(spec, int(sim.sets[obs["set"]]["n"]), rng)
+    d = os.path.join(out, "results")
+    stats = render_movie(d, np.stack(frames), tgt_np, float(sim.world_size[0]), spec["name"],
+                         px=int(rd.get("px", 1100)))
+    np.savez_compressed(os.path.join(d, f"{spec['name']}_frames.npz"), frames=np.stack(frames),
+                        target=tgt_np, scale=learn.scale)
+    print(f"[analyse] {len(frames)} frames rendered into {d} ({stats.get('s_per_frame_total', float('nan')):.2f} s a frame)")
+    return d
 
 # ============================================================================== entry points
 PHASES = {"train": train, "test": test, "analyse": analyse}
