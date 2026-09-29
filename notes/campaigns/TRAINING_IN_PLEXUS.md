@@ -420,3 +420,35 @@ silently and a training run launched against a spec that was never written.
 
 A command piped through `grep` reports **grep's** exit code. A run that crashed was recorded as
 successful, and the traceback was filtered out by the pattern meant to summarise it.
+
+## plexus.trainer: the circuit, the morph (2026-09-29)
+
+One trainer (`src/plexus/trainer.py`) beside the engine, driven by three-part training specs in
+`config/training/<model>/` and launched as `Plexus_Main.py -o train_test_analyse <name>`.
+
+Parity with the old `spec_trainer` at today's code, CPU: t1 (3 epochs x 64 trials) fitted tensors
+equal to 6e-7 relative, the eye rig (1 epoch x 256 trials) to 1.4e-7 -- float32 rounding.
+
+t1_integrator_perfect_zf285, full run against 09-18: test mse / target variance 0.00067 -> 0.00056,
+mean |err| 0.0167 -> 0.0156. The fixed analyser puts the slowest pole at -0.0033 1/s (teacher 0);
+the old one read tau from an UNTRAINED copy of the model and put it at -1.81 1/s, so every earlier
+pole panel of a run with learnable tau (all `_zf285`, the eye rigs) is wrong.
+
+Morph (`config/training/morph/<shape>.yaml`, model `config/si_material/morph_ball.yaml`), A100,
+stages 5,000 / 12,500 / 50,000 points x 80 iterations, final loss against morph200 of 09-08:
+
+| shape | previous | new | ratio |
+|---|---|---|---|
+| cow | 0.002184 | 0.002344 | 1.07 |
+| bunny | 0.010737 | 0.011067 | 1.03 |
+| spot | 0.002501 | 0.002431 | 0.97 |
+| armadillo | 0.008346 | 0.007992 | 0.96 |
+| teapot | 0.001950 | 0.002023 | 1.04 |
+| platynereis_body | -- | 0.006869 | new |
+
+All inside the 18-44% repeat spread morph.py measured. Renders in
+`log/training/morph/<shape>/results/`.
+
+Engine defect found on the way, handled in the trainer, not fixed in the engine: with warp bodies,
+a captured substep does not see F written by an operator outside the block -- the trained cow
+rendered as the untouched ball with capture on. deform_control's `field:` path is exposed the same way.
