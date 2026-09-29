@@ -2036,8 +2036,14 @@ def apply_learnable_blocks(H, sim) -> list:
 
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False,
-        grad: bool = False, batch: int = 1, on_seeded=None) -> tuple[Hierarchy, dict]:
+        grad: bool = False, batch: int = 1, on_seeded=None,
+        on_ready=None) -> tuple[Hierarchy, dict]:
     """Forward-simulate `sim`. Returns (Hierarchy, recorded trajectory).
+
+    `on_ready(H)` is called ONCE, after every operator is instantiated (`H.operators`,
+    `H.operator_names`) and before the first tick: the moment a caller may set an operator's own
+    parameters, which do not exist yet at `on_seeded`. `plexus.trainer` uses it for learnables that
+    are parameters of an activity rather than state of a set.
 
     `on_seeded(H)` is called ONCE, after the set-up is seeded and before the batch axis exists and
     the first tick runs: the one moment a caller may write the starting state. `on_frame` cannot
@@ -2115,6 +2121,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # changes nothing at all.
     H.operators = nn.ModuleList([ob for _nm, ob, _sel, _g in inst])
     H.operator_names = [nm for nm, _ob, _sel, _g in inst]
+    if on_ready is not None:                  # the caller's write into operator parameters (docstring)
+        on_ready(H)
 
     # WHICH SCATTER CLEARS THE SHARED GRID, decided once, here, instead of every substep.
     #

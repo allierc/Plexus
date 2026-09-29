@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import shutil
 import time
@@ -78,18 +79,22 @@ from plexus.tasks.trainer import load_split, n_condition_cells, with_context
 # ============================================================================== the declaration
 _KEYS = {
     "top": {"name", "model", "learnable", "task", "training"},
-    "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent"},
-    "task": {"reference", "drive", "observe", "loss", "settle_s"},
-    "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre"},
-    "drive": {"set", "block"},
-    "observe": {"set", "block", "channel", "unit", "measure", "grid"},
-    "training": {"optimizer", "lr", "lr_min", "schedule", "clip", "epochs", "batch", "seed",
-                 "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render"},
+    "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
+                  "prior"},
+    "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask"},
+    "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
+                  "recording", "beats"},
+    "drive": {"set", "block", "prescribe", "width"},
+    "observe": {"set", "block", "channel", "unit", "measure", "grid", "of"},
+    "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
+                 "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
+                 "iters", "save_every"},
     "stage": {"resolution", "iters"},
 }
 REPRESENTATIONS = ("tensor", "lattice")
-REFERENCES = ("corpus", "shape")
-_LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",)}
+REFERENCES = ("corpus", "shape", "recording")
+_LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_mse",)}
+PRIORS = ("shrink", "shrink_to_mean", "smooth")
 OPTIMIZERS = ("adam",)
 SCHEDULES = ("cosine", "none")
 GUARDS = ("restore_and_halve", "none")
@@ -117,8 +122,21 @@ def load(path_or_name) -> dict:
         s["model"] = os.path.join(get_repo_root(), s["model"])
     raw = yaml.safe_load(open(s["model"]))
     sets = raw.get("sets") or {}
+    ops = {o.get("op") for o in (raw.get("operators") or [])}
     for i, e in enumerate(s["learnable"]):
         _refuse_unread(f"{path}: learnable[{i}]", e, _KEYS["learnable"])
+        for k in (e.get("prior") or {}):
+            if k not in PRIORS:
+                raise ValueError(f"{path}: learnable[{i}] prior {k!r}; implemented: {list(PRIORS)}")
+        if "param" in e or "op" in e:
+            # A PARAMETER OF AN ACTIVITY: the operator is stated, one of its constants is free.
+            if "param" not in e or "op" not in e or "block" in e or "of" in e:
+                raise ValueError(f"{path}: learnable[{i}] is EITHER {{block:, of:}} (a state of a "
+                                 f"set) OR {{param:, op:}} (a parameter of an activity)")
+            if e["op"] not in ops:
+                raise ValueError(f"{path}: learnable[{i}] frees `{e['op']}.{e['param']}`, but no "
+                                 f"operator line of the model is `{e['op']}` ({sorted(ops)})")
+            continue
         for k in ("block", "of"):
             if k not in e:
                 raise ValueError(f"{path}: learnable[{i}] needs `{k}:`")
@@ -146,13 +164,14 @@ def load(path_or_name) -> dict:
         raise ValueError(f"{path}: task.reference must name exactly one of {list(REFERENCES)} -- a "
                          f"corpus under graphs_data/task/ or a shape from the library; it names {kinds}")
     kind = kinds[0]
-    parts = ("drive", "observe") if kind == "corpus" else ("observe",)
+    parts = ("drive", "observe") if kind in ("corpus", "recording") else ("observe",)
     for k in ("reference",) + parts:
         if k not in t:
             raise ValueError(f"{path}: task needs `{k}:`")
         _refuse_unread(f"{path}: task.{k}", t[k], _KEYS[k])
     for part in parts:
-        for k in ("set", "block"):
+        # THE EDGE BAND PRESCRIBES A SET'S POSITIONS AND VELOCITIES, so it names the set only.
+        for k in (("set",) if (kind == "recording" and part == "drive") else ("set", "block")):
             if k not in t[part]:
                 raise ValueError(f"{path}: task.{part} needs `{k}:`")
         if t[part]["set"] not in sets:
@@ -181,6 +200,17 @@ def load(path_or_name) -> dict:
                 if name not in sets and name not in (raw.get("fields") or {}):
                     raise ValueError(f"{path}: training.stages[{j}].resolution names {name!r}, "
                                      f"which is neither a set nor a field of the model")
+    elif kind == "recording":
+        if not ref.get("beats"):
+            raise ValueError(f"{path}: task.reference names the `beats:` it is fitted on")
+        if t.get("drive", {}).get("prescribe") != "edge_band" or "width" not in t["drive"]:
+            raise ValueError(f"{path}: a recording task drives its `edge_band` of `width:` from the "
+                             f"recording -- the tissue beyond the field of view enters there")
+        if t["observe"].get("measure") != "cell_affine" or t["observe"].get("of") not in sets:
+            raise ValueError(f"{path}: a recording task observes `measure: cell_affine` of the "
+                             f"points' parent set `of:`")
+        if "iters" not in tr:
+            raise ValueError(f"{path}: a recording task trains for `iters:` steps")
     elif any(k in tr for k in ("stages", "render", "lr_min")):
         raise ValueError(f"{path}: `stages`, `render` and `lr_min` belong to a shape task's scheme")
     s["_kind"] = kind
@@ -215,10 +245,51 @@ class Learnables:
 
     @staticmethod
     def key(e) -> str:
-        return f"{e['of']}.{e['block']}"
+        return f"{e['op']}.{e['param']}" if "param" in e else f"{e['of']}.{e['block']}"
+
+    def ready(self, H):
+        """Parameters of ACTIVITIES, set on the operator instances once they exist (`on_ready`).
+        Made the first time from the value the model gave the operator -- its `fit:` file or its
+        inline numbers -- and handed to every later instance, so each rollout reads the same leaf."""
+        for e in self.entries:
+            if "param" not in e:
+                continue
+            insts = [o for n, o in zip(H.operator_names, H.operators) if n == e["op"]]
+            if len(insts) != 1:
+                raise ValueError(f"learnable `{self.key(e)}`: {len(insts)} instances of {e['op']!r}")
+            par = self.p.get(self.key(e))
+            if par is None:
+                v = getattr(insts[0], e["param"], None)
+                if not torch.is_tensor(v):
+                    raise ValueError(f"learnable `{self.key(e)}`: the operator holds no tensor "
+                                     f"{e['param']!r} to start from (it has {type(v).__name__})")
+                par = self.p[self.key(e)] = nn.Parameter(v.detach().clone().to(self.device))
+            setattr(insts[0], e["param"], par)
+
+    def prior(self):
+        """The priors declared WITH the learnables -- claims about the unknown, not the evidence.
+            shrink: l          l * mean(x^2)                   toward zero
+            shrink_to_mean: l  l * mean((x - mean x)^2)        toward uniform
+            smooth: l          l * sum of squared steps along the last axis
+        """
+        tot = None
+        for e in self.entries:
+            x = self.p.get(self.key(e))
+            for kind, lam in (e.get("prior") or {}).items():
+                lam = float(lam)
+                if kind == "shrink":
+                    term = x.pow(2).mean()
+                elif kind == "shrink_to_mean":
+                    term = (x - x.mean()).pow(2).mean()
+                else:
+                    term = (x[..., 1:] - x[..., :-1]).pow(2).sum()
+                tot = lam * term if tot is None else tot + lam * term
+        return tot
 
     def inject(self, H):
         for e in self.entries:
+            if "param" in e:
+                continue
             lvl = H.level(e["of"])
             if e["block"] not in lvl.state_schema:
                 raise ValueError(f"learnable `{self.key(e)}`: {e['of']!r} has no block "
@@ -282,8 +353,8 @@ class Learnables:
     def clamp_(self):
         for e in self.entries:
             if "bounds" in e:
-                lo, hi = (float(v) for v in e["bounds"])
-                self.p[self.key(e)].clamp_(lo, hi)
+                lo, hi = (None if v is None else float(v) for v in e["bounds"])
+                self.p[self.key(e)].clamp_(min=lo, max=hi)
 
     def snapshot(self) -> dict:
         return {k: v.detach().clone() for k, v in self.p.items()}
@@ -427,6 +498,8 @@ def _model(spec, train=True, resolution=None, n_frames=None):
 def train(spec, device="cpu", root=None):
     if spec.get("_kind") == "shape":
         return _train_shape(spec, device, root)
+    if spec.get("_kind") == "recording":
+        return _train_recording(spec, device, root)
     tr, task = spec["training"], spec["task"]
     ref = task["reference"]
     torch.manual_seed(int(tr.get("seed", 0)))
@@ -554,6 +627,8 @@ def test(spec, device="cpu", root=None):
     """Roll the kept checkpoint out on held-out trials. One number per trial, never only a mean."""
     if spec.get("_kind") == "shape":
         return _test_shape(spec, device, root)
+    if spec.get("_kind") == "recording":
+        return _test_recording(spec, device, root)
     engine.quiet(True)
     sim, learn, ck, out = _restore(spec, device, root)
     task, corpus = spec["task"], _corpus(spec)
@@ -657,6 +732,9 @@ def analyse(spec, device="cpu", root=None):
     """Did it recover the law, or only reduce the error? The figure, and the poles."""
     if spec.get("_kind") == "shape":
         return _analyse_shape(spec, device, root)
+    if spec.get("_kind") == "recording":
+        print("[analyse] recording tasks: the per-beat scores are the analysis (see test)")
+        return None
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -947,6 +1025,199 @@ def _analyse_shape(spec, device="cpu", root=None):
                         target=tgt_np, scale=learn.scale)
     print(f"[analyse] {len(frames)} frames rendered into {d} ({stats.get('s_per_frame_total', float('nan')):.2f} s a frame)")
     return d
+
+
+# ============================================================================== recording tasks
+# A TISSUE AGAINST ITS OWN RECORDING, beat by beat. Each beat is its own rollout from its own rest,
+# its own length, with its own edge band prescribed from what that beat did -- the tissue beyond
+# the field of view enters there -- and the loss is the per-cell affine mismatch of POSITIONS
+# (plexus.tasks.recording.cell_affine: A_j the cell's mean deformation, u_j its centroid
+# displacement), each channel scaled by the recording's own spread. Gradients of all beats are
+# summed before one step and the priors are added once, so memory is one beat's and the cost is
+# one rollout per beat. This is prototype/cardio_mpm/strain/fit.py's scheme, run by the trainer.
+def _affine_mse(A, u, A_ref, u_ref, w_A, w_u, cells=None):
+    if cells is not None:
+        A, u, A_ref, u_ref = A[:, cells], u[:, cells], A_ref[:, cells], u_ref[:, cells]
+    return w_A * ((A - A_ref) ** 2).mean() + w_u * ((u - u_ref) ** 2).mean()
+
+
+LOSSES["affine_mse"] = _affine_mse
+
+
+def _r2(pred, ref):
+    return float(1.0 - ((pred - ref) ** 2).sum() / ((ref - ref.mean()) ** 2).sum())
+
+
+def _recording_setup(spec, device):
+    """The recording, its beat windows with their affine maps, and the model's rest layout: the
+    material points' positions X0 after seeding, their cell index, the edge band and the interior
+    cells (none of whose points lie in the band) -- which the loss is restricted to, because a
+    cell with points in the band has part of its motion dictated rather than modelled."""
+    from plexus.tasks import recording as R
+    task = spec["task"]
+    ref, obs, drv = task["reference"], task["observe"], task["drive"]
+    rec = R.load(ref["recording"], device=device)
+    wins = [R.beat_window(rec, int(b)) for b in ref["beats"]]
+    for w in wins:
+        if (w["onset"] - w["span"][0]) - R.PRE != 0:
+            raise ValueError(f"beat {w['k']} opens {w['onset'] - w['span'][0]} frames before its "
+                             f"onset, not {R.PRE}: a truncated window shifts the clock, which this "
+                             f"trainer does not re-align")
+    refs = [R.window_affine(rec, w) for w in wins]
+    box = {}
+    rest = _model(spec, train=False, n_frames=0)
+    with torch.no_grad():
+        H, _ = engine.run(rest, device=device, progress=False)
+    q = H.level(drv["set"])
+    X0 = q.get("pos").detach().clone()
+    cid = H.lift_index(drv["set"], obs["of"]).long() + 1
+    C = rec["n_cells"]
+    if int(cid.max()) > C:
+        raise ValueError(f"the model has {int(cid.max())} cells, the recording {C}")
+    wd = float(drv["width"])
+    band = ((X0[:, 0] < R.DOM_LO + wd) | (X0[:, 0] > R.DOM_HI - wd)
+            | (X0[:, 1] < R.DOM_LO + wd) | (X0[:, 1] > R.DOM_HI - wd))
+    interior = R.interior_cells(cid, band, C) if task.get("mask", "interior") == "interior" else None
+    pres = [R.band_prescription(A, u, X0, cid, band) for A, u in refs]
+    box.update(rec=rec, wins=wins, refs=refs, X0=X0, cid=cid, band=band, interior=interior,
+               pres=pres, C=C)
+    return box
+
+
+def _recording_rollout(sim, learn, spec, box, bi, device, grad):
+    """One beat: prescribe the band from the recording each frame, record every cell's affine map."""
+    from plexus.tasks import recording as R
+    set_name = spec["task"]["drive"]["set"]
+    ub, band, C = box["pres"][bi], box["band"], box["C"]
+    As, us, st = [], [], {}
+
+    def hook(H, tick):
+        q = H.level(set_name)
+        if tick == 0:
+            st["X0"] = q.get("pos").detach().clone()
+        p0, p1 = q.state_schema["pos"]
+        v0, v1 = q.state_schema["vel"]
+        S0 = q.state
+        S = S0.clone()
+        m = band[:, None]
+        S[:, p0:p1] = torch.where(m, st["X0"] + ub[min(tick, ub.shape[0] - 1)], S0[:, p0:p1])
+        S[:, v0:v1] = torch.where(m, torch.zeros_like(S0[:, v0:v1]), S0[:, v0:v1])
+        q.state = S
+        A, u = R.cell_affine(q.get("pos"), st["X0"], box["cid"], C)
+        As.append(A)
+        us.append(u)
+
+    engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook,
+               on_seeded=learn.inject, on_ready=learn.ready)
+    return torch.stack(As), torch.stack(us)
+
+
+def _train_recording(spec, device="cpu", root=None):
+    tr, task = spec["training"], spec["task"]
+    torch.manual_seed(int(tr.get("seed", 0)))
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    out = out_dir(spec, root)
+    os.makedirs(os.path.join(out, "models"), exist_ok=True)
+    os.makedirs(os.path.join(out, "results"), exist_ok=True)
+    shutil.copyfile(spec["_path"], os.path.join(out, "config.yaml"))
+    shutil.copyfile(spec["model"], os.path.join(out, "model.yaml"))
+    print(f"[run] {spec['name']} -> {out}")
+    engine.quiet(True)
+    box = _recording_setup(spec, device)
+    eye = torch.eye(2, device=device)
+    A0, u0 = box["refs"][0]
+    w_A = 1.0 / ((A0 - eye) ** 2).mean()                      # the first beat's spread, as fit.py
+    w_u = float(task.get("u_weight", 1.0)) / (u0 ** 2).mean()
+    sims = [_model(spec, train=True, n_frames=len(w["frames"]) - 1) for w in box["wins"]]
+    n_int = int(box["interior"].sum()) if box["interior"] is not None else box["C"]
+    print(f"[data] {task['reference']['recording']}: beats {task['reference']['beats']} "
+          f"({', '.join(str(len(w['frames'])) for w in box['wins'])} frames), {box['X0'].shape[0]:,} "
+          f"points, {int(box['band'].sum()):,} in the band, {n_int} of {box['C']} cells in the loss")
+    learn = Learnables(spec["learnable"], device)
+    with torch.no_grad():                                     # the first rollout makes the parameters
+        _recording_rollout(_model(spec, train=True, n_frames=1), learn, spec, box, 0, device, False)
+    params = learn.parameters()
+    print(f"[fit] {len(params)} tensor(s), {sum(p.numel() for p in params)} values: " + ", ".join(learn.p))
+    iters = int(tr["iters"])
+    lr = float(tr.get("lr", 1e-2))
+    frac = float(tr.get("lr_min_frac", 0.05))
+    opt = torch.optim.Adam(learn.groups(lr), lr=lr)
+    # COSINE FROM 1x TO `lr_min_frac` OF EACH GROUP'S OWN STEP SIZE, so twelve families whose
+    # natural steps differ fifty-fold all anneal in proportion.
+    sch = torch.optim.lr_scheduler.LambdaLR(
+        opt, lambda i: frac + (1 - frac) * 0.5 * (1 + math.cos(math.pi * min(i, iters) / max(iters, 1))))
+    guard = tr.get("guard", "restore_and_halve")
+    save_every = int(tr.get("save_every", 25))
+    last_ok, log, t_all = learn.snapshot(), [], time.time()
+    for it in range(iters):
+        t0 = time.time()
+        opt.zero_grad()
+        loss_v, finite = 0.0, True
+        for bi, sim in enumerate(sims):
+            A_b, u_b = box["refs"][bi]
+            A, u = _recording_rollout(sim, learn, spec, box, bi, device, True)
+            loss_b = _affine_mse(A, u, A_b, u_b, w_A, w_u, box["interior"]) / len(sims)
+            if bi == len(sims) - 1:
+                pr = learn.prior()
+                if pr is not None:
+                    loss_b = loss_b + pr
+            if torch.isfinite(loss_b):
+                loss_b.backward()
+            else:
+                finite = False
+            loss_v += float(loss_b.detach())
+        if not finite and guard == "restore_and_halve":
+            learn.restore(last_ok)
+            for g in opt.param_groups:
+                g["lr"] *= 0.5
+            sch.step()
+            print(f"  it {it:4d} loss not finite -- restored the last finite values, step sizes halved", flush=True)
+            continue
+        opt.step()
+        sch.step()
+        learn.clamp_()
+        last_ok = learn.snapshot()
+        log.append({"it": it, "loss": loss_v, "seconds": time.time() - t0})
+        if it % 5 == 0 or it == iters - 1:
+            print(f"  it {it:4d} loss {loss_v:.5f}  {log[-1]['seconds']:.1f} s", flush=True)
+        if (it + 1) % save_every == 0 or it == iters - 1:
+            torch.save({"fitted": learn.snapshot(), "model": spec["model"], "task": task,
+                        "learnable": spec["learnable"]}, os.path.join(out, "models", "best.pt"))
+    rep = {"name": spec["name"], "model": spec["model"], "recording": task["reference"]["recording"],
+           "beats": task["reference"]["beats"], "final_loss": log[-1]["loss"], "history": log,
+           "n_params": sum(p.numel() for p in params), "cells_in_loss": n_int,
+           "seconds": round(time.time() - t_all, 1),
+           "peak_mem_gb": (torch.cuda.max_memory_allocated(device) / 2 ** 30
+                           if str(device).startswith("cuda") else None)}
+    json.dump(rep, open(os.path.join(out, "results", "report.json"), "w"), indent=2)
+    print(f"[done] final loss {rep['final_loss']:.5f} in {rep['seconds'] / 60:.1f} min")
+    return out
+
+
+def _test_recording(spec, device="cpu", root=None):
+    """Every fitted beat, rolled out again without a tape and scored as the prototype scored it:
+    R^2 of A - I over (frames, cells, 4 components) and of u over (frames, cells, 2), interior cells."""
+    engine.quiet(True)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    box = _recording_setup(spec, device)
+    eye = torch.eye(2, device=device)
+    cells = box["interior"] if box["interior"] is not None else slice(None)
+    res = {"name": spec["name"], "beats": {}}
+    for bi, w in enumerate(box["wins"]):
+        sim = _model(spec, train=False, n_frames=len(w["frames"]) - 1)
+        with torch.no_grad():
+            A, u = _recording_rollout(sim, learn, spec, box, bi, device, False)
+        A_ref, u_ref = box["refs"][bi]
+        r = {"window": list(w["span"]), "r2_A": _r2(A[:, cells] - eye, A_ref[:, cells] - eye),
+             "r2_u": _r2(u[:, cells], u_ref[:, cells])}
+        res["beats"][str(w["k"])] = r
+        print(f"[test] beat {w['k']} window {tuple(w['span'])}: R2(A) {r['r2_A']:.4f}  R2(u) {r['r2_u']:.4f}")
+    json.dump(res, open(os.path.join(out, "results", f"{spec['name']}_test.json"), "w"), indent=2)
+    return res
 
 # ============================================================================== entry points
 PHASES = {"train": train, "test": test, "analyse": analyse}
