@@ -88,13 +88,19 @@ _KEYS = {
     "observe": {"set", "block", "channel", "unit", "measure", "grid", "of"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
                  "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
-                 "iters", "save_every"},
+                 "iters", "save_every", "anneal"},
+    "term": {"term", "weight", "reduction"},
     "stage": {"resolution", "iters"},
 }
 REPRESENTATIONS = ("tensor", "lattice")
 REFERENCES = ("corpus", "shape", "recording")
 _LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_mse",)}
-PRIORS = ("shrink", "shrink_to_mean", "smooth")
+PRIORS = ("shrink", "shrink_to_mean", "smooth", "l1", "l2", "group_l1", "sign")
+# THE EVIDENCE TERMS each reference kind can score, by name. `task.loss` is one name or a list of
+# {term, weight, reduction}; the loop computes the quantities, `_objective` weighs and records them.
+TERMS = {"corpus": ("mse",), "shape": ("log_mse", "volume"),
+         "recording": ("affine_mse", "affine_A", "affine_u")}
+REDUCTIONS = ("mean", "norm2", "huber", "relative_l2")
 OPTIMIZERS = ("adam",)
 SCHEDULES = ("cosine", "none")
 GUARDS = ("restore_and_halve", "none")
@@ -106,6 +112,48 @@ def _refuse_unread(where, d, allowed):
         raise ValueError(f"{where}: key(s) {extra} are read by nothing; the keys read here are "
                          f"{sorted(allowed)}. An unread key would be dropped and the run would "
                          f"train something other than what the spec says.")
+
+
+def _loss_terms(task, kind):
+    """`task.loss` as a list of {term, weight, reduction}: one name is one term of weight 1."""
+    L = task.get("loss", _LOSS_FOR[kind][0])
+    if isinstance(L, str):
+        return [{"term": L}]
+    if not isinstance(L, list) or not all(isinstance(x, dict) and "term" in x for x in L):
+        raise ValueError("task.loss is a term name or a list of {term, weight, reduction}")
+    return [dict(x) for x in L]
+
+
+def _anneal(spec, t):
+    """1 - exp(-rate t), the factor every prior carries; 1 when nothing is annealed."""
+    an = spec["training"].get("anneal")
+    return 1.0 if an is None else float(1.0 - math.exp(-float(an["rate"]) * float(t)))
+
+
+def _objective(spec, learn, evidence, t, parts, prior=True):
+    """THE ONE PLACE A LOSS IS ASSEMBLED: the task's weighted evidence terms plus the learnables'
+    priors (annealed by `t`), every term written into `parts` under its own name so the history
+    shows what entered the gradient. `evidence` maps a term name to a function of its reduction."""
+    tot = None
+    for term in _loss_terms(spec["task"], spec["_kind"]):
+        v = evidence[term["term"]](term.get("reduction", "mean"))
+        w = float(term.get("weight", 1.0))
+        v = v if w == 1.0 else w * v
+        parts[f"loss.{term['term']}"] = float(v.detach())
+        tot = v if tot is None else tot + v
+    pr = learn.prior(scale=_anneal(spec, t), parts=parts) if prior else None
+    return tot if pr is None else tot + pr
+
+
+def _reduce(r, reduction, target=None):
+    """A residual to a scalar -- connectome-gnn's fit_residual_loss reductions."""
+    if reduction == "mean":
+        return (r ** 2).mean()
+    if reduction == "norm2":
+        return r.norm(2)
+    if reduction == "huber":
+        return torch.nn.functional.huber_loss(r, torch.zeros_like(r), reduction="mean", delta=1.0)
+    return r.norm(2) / (target.norm(2) + 1e-8)
 
 
 def load(path_or_name) -> dict:
@@ -123,6 +171,11 @@ def load(path_or_name) -> dict:
     raw = yaml.safe_load(open(s["model"]))
     sets = raw.get("sets") or {}
     ops = {o.get("op") for o in (raw.get("operators") or [])}
+    an = s["training"].get("anneal")
+    if an is not None and (not isinstance(an, dict) or set(an) - {"rate", "per"} or "rate" not in an
+                           or an.get("per", "epoch") not in ("epoch", "iter")):
+        raise ValueError(f"{path}: training.anneal is {{rate: r, per: epoch|iter}} -- every prior is "
+                         f"multiplied by 1 - exp(-r t) so the fit leads and the priors follow")
     for i, e in enumerate(s["learnable"]):
         _refuse_unread(f"{path}: learnable[{i}]", e, _KEYS["learnable"])
         for k in (e.get("prior") or {}):
@@ -176,10 +229,15 @@ def load(path_or_name) -> dict:
                 raise ValueError(f"{path}: task.{part} needs `{k}:`")
         if t[part]["set"] not in sets:
             raise ValueError(f"{path}: task.{part}.set {t[part]['set']!r} is not a set of the model")
-    loss = t.get("loss", _LOSS_FOR[kind][0])
-    if loss not in _LOSS_FOR[kind]:
-        raise ValueError(f"{path}: task.loss {loss!r} does not score a {kind} reference; "
-                         f"implemented for it: {list(_LOSS_FOR[kind])}")
+    for j, term in enumerate(_loss_terms(t, kind)):
+        _refuse_unread(f"{path}: task.loss[{j}]", term, _KEYS["term"])
+        if term["term"] not in TERMS.get(kind, _LOSS_FOR[kind]):
+            raise ValueError(f"{path}: task.loss term {term['term']!r} does not score a {kind} "
+                             f"reference; implemented for it: {list(TERMS.get(kind, _LOSS_FOR[kind]))}")
+        if term.get("reduction", "mean") not in REDUCTIONS or (term.get("reduction", "mean") != "mean"
+                                                                and term["term"] != "mse"):
+            raise ValueError(f"{path}: task.loss term {term['term']!r}: reduction "
+                             f"{term.get('reduction')!r}; only `mse` takes one of {list(REDUCTIONS)}")
     tr = s["training"]
     _refuse_unread(f"{path}: training", tr, _KEYS["training"])
     if kind == "shape":
@@ -241,6 +299,7 @@ class Learnables:
         self.entries = [dict(e) for e in entries]
         self.device = device
         self.p: dict[str, nn.Parameter] = {}
+        self._pre: dict[str, torch.Tensor] = {}   # sender index of an edge-set block, for `sign`
         self.scale = 1.0               # a DISPLAY rollout may spread one deformation over more frames
 
     @staticmethod
@@ -266,24 +325,51 @@ class Learnables:
                 par = self.p[self.key(e)] = nn.Parameter(v.detach().clone().to(self.device))
             setattr(insts[0], e["param"], par)
 
-    def prior(self):
+    def prior(self, scale=1.0, parts=None):
         """The priors declared WITH the learnables -- claims about the unknown, not the evidence.
-            shrink: l          l * mean(x^2)                   toward zero
-            shrink_to_mean: l  l * mean((x - mean x)^2)        toward uniform
+
+            shrink: l          l * mean(x^2)                        toward zero
+            shrink_to_mean: l  l * mean((x - mean x)^2)             toward uniform
             smooth: l          l * sum of squared steps along the last axis
+            l1: l              l * ||x||_1                          sparse (connectome-gnn coeff_*_L1)
+            l2: l              l * ||x||_2                          small (coeff_*_L2) -- a NORM, not a mean
+            group_l1: l        l * sum_c ||x[..., c]||_2            whole columns to zero (group lasso)
+            sign: l            l * ||std_i tanh(10 x_e)||_2         Dale: one sign per sender i, over
+                                                                    the edges it sends (edge-set blocks)
+
+        `scale` is the annealing factor; `parts`, a dict, receives every term by name.
         """
         tot = None
         for e in self.entries:
             x = self.p.get(self.key(e))
             for kind, lam in (e.get("prior") or {}).items():
-                lam = float(lam)
+                lam = float(lam) * float(scale)
                 if kind == "shrink":
                     term = x.pow(2).mean()
                 elif kind == "shrink_to_mean":
                     term = (x - x.mean()).pow(2).mean()
-                else:
+                elif kind == "smooth":
                     term = (x[..., 1:] - x[..., :-1]).pow(2).sum()
+                elif kind == "l1":
+                    term = x.abs().sum()
+                elif kind == "l2":
+                    term = x.norm(2)
+                elif kind == "group_l1":
+                    term = x.reshape(-1, x.shape[-1]).norm(2, dim=0).sum()
+                else:
+                    pre = self._pre.get(self.key(e))
+                    if pre is None:
+                        raise ValueError(f"prior `sign` on `{self.key(e)}`: it groups an edge set's "
+                                         f"weights by sender, and `{e.get('of')}` is not an edge set")
+                    v = torch.tanh(10.0 * x.reshape(-1))
+                    n = int(pre.max()) + 1
+                    cnt = torch.zeros(n, device=v.device).index_add(0, pre, torch.ones_like(v))
+                    mu = torch.zeros(n, device=v.device).index_add(0, pre, v) / cnt.clamp(min=1)
+                    m2 = torch.zeros(n, device=v.device).index_add(0, pre, v * v) / cnt.clamp(min=1)
+                    term = ((m2 - mu * mu).clamp(min=0) * (cnt > 1)).sqrt().norm(2)
                 tot = lam * term if tot is None else tot + lam * term
+                if parts is not None:
+                    parts[f"prior.{self.key(e)}.{kind}"] = float((lam * term).detach())
         return tot
 
     def inject(self, H):
@@ -296,6 +382,9 @@ class Learnables:
                                  f"{e['block']!r} (it has {sorted(lvl.state_schema)})")
             a, b = lvl.state_schema[e["block"]]
             par = self.p.get(self.key(e))
+            if "sign" in (e.get("prior") or {}) and self.key(e) not in self._pre \
+                    and getattr(lvl, "is_edge_set", False):
+                self._pre[self.key(e)] = lvl.incidence("pre").detach().long()
             if e.get("with", "tensor") == "lattice":
                 if par is None:
                     # A LATTICE STARTS WHERE THE MODEL DOES ONLY WHEN THE MODEL SAYS "NOTHING": a
@@ -549,7 +638,7 @@ def train(spec, device="cpu", root=None):
            if tr.get("schedule", "cosine") == "cosine" else None)
     clip = float(tr.get("clip", 1.0))
     guard = tr.get("guard", "restore_and_halve")
-    loss_fn = LOSSES[task.get("loss", "mse")]
+    loss_fn = _mse                                         # the validation METRIC; the loss is _objective
     ch = int(task["observe"].get("channel", 0))
     U1, U2 = _unit(spec)
     hist, best, best_state, t0 = [], np.inf, None, time.time()
@@ -559,11 +648,18 @@ def train(spec, device="cpu", root=None):
         h = horizon[min(len(horizon) - 1, int(len(horizon) * ep / max(epochs, 1)))]
         sim.n_frames = h
         perm = torch.randperm(n_tr)
-        tot, n_step, n_bad = 0.0, 0, 0
+        tot, n_step, n_bad, terms = 0.0, 0, 0, {}
         for k in range(0, n_tr - batch + 1, batch):
             idx = perm[k:k + batch]
             _, y = rollout(sim, learn, U[idx], task, device, grad=True)
-            loss = loss_fn(y, Y[idx], ch)
+            Yb = Y[idx]
+            nf = min(y.shape[-2], Yb.shape[-2])
+            r = y[..., :nf, ch] - Yb[..., :nf, 0]
+            parts = {}
+            loss = _objective(spec, learn, {"mse": lambda red: _reduce(r, red, Yb[..., :nf, 0])},
+                              ep, parts)
+            for kk, vv in parts.items():
+                terms[kk] = terms.get(kk, 0.0) + vv
             if not torch.isfinite(loss) and guard == "restore_and_halve":
                 # A DIVERGED ROLLOUT ENDS THE STEP, NOT THE RUN: the last finite values come back
                 # and every step size halves. Without it one NaN poisons Adam's moments for good.
@@ -593,7 +689,8 @@ def train(spec, device="cpu", root=None):
                         title=f"{spec['name']}  epoch {ep}")
         tr_mse = tot / max(n_step, 1)
         hist.append({"epoch": ep, "horizon": h, "train_mse": tr_mse, "val_mse": v,
-                     "diverged_steps": n_bad})
+                     "diverged_steps": n_bad,
+                     "terms": {kk: vv / max(n_step, 1) for kk, vv in terms.items()}})
         print(f"  ep {ep:3d}  horizon {h:4d}  train {tr_mse:10.5f}  val {v:10.5f}{U2}"
               f"   (|err| {np.sqrt(v):.4f}{U1} rms)" + (f"  [{n_bad} diverged]" if n_bad else ""))
         if v < best:
@@ -924,7 +1021,13 @@ def _train_shape(spec, device="cpu", root=None):
         for it in range(iters):
             opt.zero_grad()
             _, X, vol = _shape_rollout(sim, learn, obs["set"], device, grad=True)
-            loss = _log_mse(_grid_mass(sim, X, obs["grid"]), m_ref)
+            vol0 = vol0 if vol0 is not None else float(vol.detach())
+            parts = {}
+            loss = _objective(spec, learn, {
+                "log_mse": lambda red: _log_mse(_grid_mass(sim, X, obs["grid"]), m_ref),
+                # THE REALISED VOLUME, sum(p_vol det F), against the stage's first rollout: the mass
+                # loss alone is gameable by imploding onto a dense target (morph.py, --vol-weight).
+                "volume": lambda red: (vol / vol0 - 1.0) ** 2}, len(hist), parts)
             if not torch.isfinite(loss) and guard == "restore_and_halve":
                 learn.restore(last_ok)
                 for g in opt.param_groups:
@@ -938,9 +1041,8 @@ def _train_shape(spec, device="cpu", root=None):
             sch.step()
             learn.clamp_()
             last_ok = learn.snapshot()
-            vol0 = vol0 if vol0 is not None else float(vol.detach())
             hist.append({"stage": si, "iter": it, "loss": float(loss.detach()),
-                         "volume_ratio": float(vol.detach()) / vol0})
+                         "volume_ratio": float(vol.detach()) / vol0, "terms": parts})
             if it % 20 == 0 or it == iters - 1:
                 # VOLUME BESIDE THE EXTENT: a body can approach the target's box while the material
                 # it is made of quietly disappears, and the extent alone would not say so.
@@ -1156,15 +1258,21 @@ def _train_recording(spec, device="cpu", root=None):
     for it in range(iters):
         t0 = time.time()
         opt.zero_grad()
-        loss_v, finite = 0.0, True
+        loss_v, finite, terms = 0.0, True, {}
         for bi, sim in enumerate(sims):
             A_b, u_b = box["refs"][bi]
             A, u = _recording_rollout(sim, learn, spec, box, bi, device, True)
-            loss_b = _affine_mse(A, u, A_b, u_b, w_A, w_u, box["interior"]) / len(sims)
-            if bi == len(sims) - 1:
-                pr = learn.prior()
-                if pr is not None:
-                    loss_b = loss_b + pr
+            c, nb = box["interior"], len(sims)
+            Ac, uc, Abc, ubc = ((A, u, A_b, u_b) if c is None else (A[:, c], u[:, c], A_b[:, c], u_b[:, c]))
+            parts = {}
+            # EVERY BEAT'S EVIDENCE, THE PRIORS ONCE, on the last beat's graph -- fit.py's order.
+            loss_b = _objective(spec, learn, {
+                "affine_mse": lambda red: _affine_mse(A, u, A_b, u_b, w_A, w_u, c) / nb,
+                "affine_A": lambda red: w_A * ((Ac - Abc) ** 2).mean() / nb,
+                "affine_u": lambda red: ((uc - ubc) ** 2).mean() / (u0 ** 2).mean() / nb},
+                it, parts, prior=(bi == nb - 1))
+            for kk, vv in parts.items():
+                terms[kk] = terms.get(kk, 0.0) + vv
             if torch.isfinite(loss_b):
                 loss_b.backward()
             else:
@@ -1181,7 +1289,7 @@ def _train_recording(spec, device="cpu", root=None):
         sch.step()
         learn.clamp_()
         last_ok = learn.snapshot()
-        log.append({"it": it, "loss": loss_v, "seconds": time.time() - t0})
+        log.append({"it": it, "loss": loss_v, "seconds": time.time() - t0, "terms": terms})
         if it % 5 == 0 or it == iters - 1:
             print(f"  it {it:4d} loss {loss_v:.5f}  {log[-1]['seconds']:.1f} s", flush=True)
         if (it + 1) % save_every == 0 or it == iters - 1:

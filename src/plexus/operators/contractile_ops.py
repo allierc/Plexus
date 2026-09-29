@@ -499,6 +499,12 @@ class ActiveStrainCoupled(ActiveStrain):
     as the default exactly and whatever the fit does to W2 is the coupling the data asked for.
     W1 starts at seeded random values so the hidden units are not all alike.
 
+    `embedding: <block>` names a learnable LATENT block of the parent set (width d, typically 2),
+    and the message then reads it too: m(x_i, x_j) = W2 tanh(W1 [a_i, a_j, e_i, e_j]), W1 being
+    [hidden, 2 + 2d]. One shared message, and each cell may differ in what it sends and how it
+    takes its neighbours' -- connectome-gnn's per-neuron a_i, which lets one g_phi be 65 cell
+    types. Without `embedding:` the input is [a_i, a_j] exactly as before.
+
     W1 and W2 are PARAMETERS OF THE ACTIVITY, held as tensors on the instance, so a training spec
     frees them as `{param: W1, op: active_strain}` and the trainer hands its own leaves to every
     rollout through `on_ready`. The message reads last frame's activations, which the parent's
@@ -515,13 +521,17 @@ class ActiveStrainCoupled(ActiveStrain):
     for quantum chemistry. ICML.
     """
     PARAM_ROLES = {**ActiveStrain.PARAM_ROLES, "hidden": "message_network_width",
-                   "seed": "message_network_init_seed"}
+                   "seed": "message_network_init_seed",
+                   "embedding": "latent_block_of_the_parent_read_by_the_message",
+                   "embedding_dim": "width_of_that_block"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         h = int(params.get("hidden", 8))
+        self.embedding = params.get("embedding")
+        d = int(params.get("embedding_dim", 2)) if self.embedding else 0
         gen = torch.Generator().manual_seed(int(params.get("seed", 0)))
-        self.W1 = torch.randn(h, 2, generator=gen) / np.sqrt(2.0)
+        self.W1 = torch.randn(h, 2 + 2 * d, generator=gen) / np.sqrt(2.0 + 2 * d)
         self.W2 = torch.zeros(1, h)
 
     def gamma(self, cell, frame, dev, dt):
@@ -532,6 +542,12 @@ class ActiveStrainCoupled(ActiveStrain):
         a = cell.get("gam_prev")                                         # a(t-1), [C, 1]
         src, dst = ei[0].to(a.device), ei[1].to(a.device)
         x = torch.cat([a[src], a[dst]], -1)                              # [E, 2]
+        if self.embedding:
+            e = cell.get(self.embedding)                                 # [C, d]
+            if e.shape[-1] * 2 + 2 != self.W1.shape[1]:
+                raise ValueError(f"active_strain[coupled]: embedding {self.embedding!r} has width "
+                                 f"{e.shape[-1]}, but `embedding_dim` said {(self.W1.shape[1] - 2) // 2}")
+            x = torch.cat([x, e[src], e[dst]], -1)                       # [E, 2 + 2d]
         m = torch.tanh(x @ self.W1.to(device=dev, dtype=dt).T) @ self.W2.to(device=dev, dtype=dt).T
         msg = torch.zeros_like(a).index_add(0, dst, m)                   # sum over each cell's contacts
         return (gam + msg).clamp(min=0.0, max=1.5)
