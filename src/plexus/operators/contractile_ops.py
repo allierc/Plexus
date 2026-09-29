@@ -430,3 +430,52 @@ class MaterialFromCell(Lateral):
         lvl.mu = E / (2 * (1 + nu))
         lvl.la = E * nu / ((1 + nu) * (1 - 2 * nu))
         return {}
+
+
+from plexus.operators.mpm_ops import MPMAnchor                          # noqa: E402
+
+
+@register_operator("mpm_anchor", model="per_cell", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_p=k\,e^{\log\kappa_{j(p)}}\,(\mathbf x^{\mathrm{rest}}_p-\mathbf x_p)$$""")
+class MPMAnchorPerCell(MPMAnchor):
+    """The substrate spring with a stiffness PER CELL: how firmly each cell is held by its gel.
+
+    cell -> mpm_particle: reads the parent's `logkappa` block through the containment map.
+
+        a_p = k exp(logkappa_j) (x_p^rest - x_p),      j = the cell particle p belongs to
+
+    `mpm_anchor` states one k for the whole sheet; this is the different hypothesis that adhesion
+    differs cell to cell, and how firmly a cell is held sets how much of its own contraction it
+    realises and how much it hands to its neighbours. k is the sheet's stiffness in inverse time
+    squared and logkappa_j a dimensionless log-factor on it, 0 meaning "the shared spring", so a
+    sheet with no `logkappa` block is `mpm_anchor` exactly. The rest state and `applies_to` are
+    the parent's; `applies_to` defaults to `substrate` here, every particle anchored.
+
+    Reference: prototype/cardio_mpm/strain `anchor_percell` (Plexus, this work), the per-cell
+    adhesion of the cardiomyocyte reporting fits.
+    """
+    READS = ["logkappa"]
+    PARAM_ROLES = {**MPMAnchor.PARAM_ROLES, "parent": "the_set_carrying_logkappa",
+                   "block": "per_cell_log_stiffness_block"}
+
+    def __init__(self, params, device="cpu"):
+        params = {"applies_to": "substrate", **params}
+        super().__init__(params, device)
+        self.parent = str(params.get("parent", "cell"))
+        self.block = str(params.get("block", "logkappa"))
+        self._idx = None
+
+    def forward(self, H, mask=None):
+        lvl, cell = H.level(self.at), H.level(self.parent)
+        if self._rest is None:
+            self._init(lvl, H)
+        if self._idx is None:
+            self._idx = H.lift_index(lvl.name, self.parent)
+        k = self.k
+        if self.block in cell.state_schema:
+            k = self.k * cell.get(self.block)[..., 0].exp()[..., self._idx]
+            k = k[..., None]
+        acc = k * (self._rest - lvl.get("pos")) * (self._sel * lvl.occ)[:, None].float()
+        if mask is not None:
+            acc = acc * mask[:, None].float()
+        return {self.at: acc}
