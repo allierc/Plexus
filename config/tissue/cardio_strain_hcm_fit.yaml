@@ -17,7 +17,7 @@ schedule:
 - seed_from_segmentation
 - drag
 - mpm_anchor
-- compile: false
+- compile: true
   steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
   substep_dt: 0.0002
 - material_from_cell

@@ -50,7 +50,7 @@ schedule:
 - drag
 - mpm_anchor
 - substep_dt: 0.0002
-  compile: false
+  compile: true
   steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
 - material_from_cell
 - active_strain
