@@ -33,7 +33,7 @@ def compile_once(deck: str) -> str:
     THIS folder on TEXINPUTS so it finds the same Janelia theme, logo and icons without a copy."""
     env = dict(os.environ, TEXINPUTS=f".:{THEME}//:" + os.environ.get("TEXINPUTS", ""))
     subprocess.run(["pdflatex", "-interaction=nonstopmode", deck],
-                   cwd=HERE, capture_output=True, text=True, env=env)
+                   cwd=HERE, capture_output=True, text=True, errors="replace", env=env)
     with open(os.path.join(HERE, os.path.splitext(deck)[0] + ".log"), errors="ignore") as f:
         return f.read()
 

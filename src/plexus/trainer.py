@@ -95,7 +95,8 @@ _KEYS = {
 REPRESENTATIONS = ("tensor", "lattice")
 REFERENCES = ("corpus", "shape", "recording", "trace_recording")
 _LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_mse",), "trace_recording": ("trace_mse",)}
-PRIORS = ("shrink", "shrink_to_mean", "smooth", "l1", "l2", "group_l1", "sign")
+PRIORS = ("shrink", "shrink_to_mean", "smooth", "l1", "l2", "group_l1", "row_l1", "sign",
+          "monotone", "pin", "input_group_l1")      # the last three: computed by the operator (`prior_term`)
 # THE EVIDENCE TERMS each reference kind can score, by name. `task.loss` is one name or a list of
 # {term, weight, reduction}; the loop computes the quantities, `_objective` weighs and records them.
 TERMS = {"corpus": ("mse",), "shape": ("log_mse", "volume", "point_mse"),
@@ -237,7 +238,7 @@ def load(path_or_name) -> dict:
             raise ValueError(f"{path}: task.loss term {term['term']!r} does not score a {kind} "
                              f"reference; implemented for it: {list(TERMS.get(kind, _LOSS_FOR[kind]))}")
         if term.get("reduction", "mean") not in REDUCTIONS or (term.get("reduction", "mean") != "mean"
-                                                                and term["term"] != "mse"):
+                                                                and term["term"] not in ("mse", "trace_mse", "trace_increment")):
             raise ValueError(f"{path}: task.loss term {term['term']!r}: reduction "
                              f"{term.get('reduction')!r}; only `mse` takes one of {list(REDUCTIONS)}")
     tr = s["training"]
@@ -333,6 +334,7 @@ class Learnables:
         self.device = device
         self.p: dict[str, nn.Parameter] = {}
         self._pre: dict[str, torch.Tensor] = {}   # sender index of an edge-set block, for `sign`
+        self._ops: dict = {}                       # the operator holding each {param, op} learnable
         self.scale = 1.0               # a DISPLAY rollout may spread one deformation over more frames
 
     @staticmethod
@@ -357,6 +359,7 @@ class Learnables:
                                      f"{e['param']!r} to start from (it has {type(v).__name__})")
                 par = self.p[self.key(e)] = nn.Parameter(v.detach().clone().to(self.device))
             setattr(insts[0], e["param"], par)
+            self._ops[self.key(e)] = insts[0]                  # for the priors the operator computes itself
 
     def prior(self, scale=1.0, parts=None):
         """The priors declared WITH the learnables -- claims about the unknown, not the evidence.
@@ -367,6 +370,9 @@ class Learnables:
             l1: l              l * ||x||_1                          sparse (connectome-gnn coeff_*_L1)
             l2: l              l * ||x||_2                          small (coeff_*_L2) -- a NORM, not a mean
             group_l1: l        l * sum_c ||x[..., c]||_2            whole columns to zero (group lasso)
+            row_l1: l          l * sum_i ||x[i, :]||_2              whole rows (elements) to zero: a set block's
+                                                                    element loses all of it (exp17: most neurons
+                                                                    lose their stimulus input, Cedric)
             sign: l            l * ||std_i tanh(10 x_e)||_2         Dale: one sign per sender i, over
                                                                     the edges it sends (edge-set blocks)
 
@@ -396,6 +402,15 @@ class Learnables:
                     term = x.norm(2)
                 elif kind == "group_l1":
                     term = x.reshape(-1, x.shape[-1]).norm(2, dim=0).sum()
+                elif kind == "row_l1":
+                    term = x.reshape(x.shape[0], -1).norm(2, dim=1).sum()
+                elif kind in ("monotone", "pin", "input_group_l1"):
+                    # A PRIOR ONLY THE MODEL CAN EVALUATE (connectome-gnn's g_phi_diff, g_phi_norm, input-group
+                    # lasso): the activity that holds the parameter computes it from its own current values.
+                    op = self._ops.get(self.key(e))
+                    if op is None or not hasattr(op, "prior_term"):
+                        raise ValueError(f"prior `{kind}` on `{self.key(e)}`: the operator computes no such prior")
+                    term = op.prior_term(e["param"], kind)
                 else:
                     pre = self._pre.get(self.key(e))
                     if pre is None:
@@ -1493,8 +1508,11 @@ def _trace_rollout(sim, learn, spec, box, o, K, device, grad):
     def ready(H):
         learn.ready(H)
         for op in H.operators:
-            if hasattr(op, "norm") and hasattr(op, "theta"):
+            if getattr(op, "NORM_FROM_REFERENCE", False):
                 op.norm = box["norm"]
+        for op in H.operators:             # a latent state inferred from the recorded frames (calcium_indicator)
+            if hasattr(op, "init_latent"):
+                op.init_latent(H)
 
     engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook, on_seeded=seeded, on_ready=ready)
     return torch.stack(frames[:K])
@@ -1515,6 +1533,10 @@ def _trace_evidence(pred, box, o):
     def ev(term):
         def f(reduction):
             r, tgt = _trace_residual(pred, box, o, term)
+            if reduction == "norm2":
+                # CONNECTOME-GNN'S SCALE: its fit term is ||r / ynorm||_2, the residual in units of the one-step
+                # change's spread, so its regulariser coefficients (coeff_*) keep their balance with the fit.
+                r = r / box["norm"][2]
             return sum(_reduce(r[k], reduction, tgt[k]) for k in range(r.shape[0])) / r.shape[0]
         return f
     return {"trace_mse": ev("trace_mse"), "trace_increment": ev("trace_increment")}
@@ -1529,7 +1551,7 @@ def _trace_eval(spec, learn, box, device, origins, hmax=32):
     with torch.no_grad():
         for i, o in enumerate(origins):
             p = _trace_rollout(sim, learn, spec, box, int(o), hmax, device, False)
-            m[:, i] = ((p - X[o + 1:o + hmax + 1]) ** 2).mean(1).cpu().numpy()
+            m[:, i] = ((p - X[o + 1:o + hmax + 1]) ** 2).double().mean(1).cpu().numpy()   # float64, as the baselines
     ot = torch.as_tensor(np.asarray(origins), device=X.device)
     base = np.stack([TR.mse_per_origin(lambda oo, h, W=W: TR.mean_pred(X, oo, W), X, ot, range(1, hmax + 1))
                      for W in range(1, TR.W_MAX + 1)], 0)                             # [W, h, origin]
@@ -1573,6 +1595,11 @@ def _train_trace(spec, device="cpu", root=None):
     print(f"[fit] {len(params)} tensor(s), {n_par} values; lr {lr} ({'constant' if sch is None else 'cosine'}), "
           f"batch {batch}, {iters} updates")
     ev_o = np.linspace(origins[0], T - 34, 16).astype(int)           # 16 fixed origins, the live evaluation
+    # THE STIMULUS LOOKUP ON THOSE ORIGINS, once: the live figure draws its per-step skill beside the model's.
+    rec_ = box["rec"]
+    look = TR.stimulus_lookup(box["X"], TR.stimulus_keys(rec_["stimulus"], rec_["condition"]))
+    lk_mse = TR.mse_per_origin(lambda oo, h: look[oo + h], box["X"], torch.as_tensor(ev_o, device=box["X"].device)).mean(1)
+    del look
     save_every = int(tr.get("save_every", 500))
     hist_p = os.path.join(out, "results", "history.jsonl")
     open(hist_p, "w").close()
@@ -1612,16 +1639,22 @@ def _train_trace(spec, device="cpu", root=None):
                 m, base = _trace_eval(spec, learn, box, device, ev_o)
                 bm = base.mean(2).min(0)
                 sk = 1 - m.mean(1) / bm
+                lk = 1 - lk_mse / bm
                 row.update({"eval_skill_short": float(sk[0:3].mean()), "eval_skill_long": float(sk[15:32].mean()),
                             "eval_skill": sk.tolist()})
                 torch.save({"fitted": learn.snapshot(), "model": spec["model"], "task": spec["task"],
                             "learnable": spec["learnable"], "it": it}, os.path.join(out, "models", "best.pt"))
-                _trace_live(out, log + [row], sk)
+                _trace_live(out, log + [row], sk, lk)
                 print(f"  it {it:6d} stage {si} K {K}  loss {loss_v:.6f}  eval skill short {row['eval_skill_short']:+.3f} "
                       f"long {row['eval_skill_long']:+.3f}  {row['seconds']:.2f} s/it", flush=True)
             log.append(row)
             with open(hist_p, "a") as fh:
                 fh.write(json.dumps(row) + "\n")
+        # one checkpoint per curriculum stage, named by its horizon K (Cedric, 2026-09-30): the full test can then
+        # be run on any stage, to see whether training stopped at a given horizon forecasts better than the last
+        torch.save({"fitted": learn.snapshot(), "model": spec["model"], "task": spec["task"],
+                    "learnable": spec["learnable"], "it": it, "stage": si, "horizon": K},
+                   os.path.join(out, "models", f"stage_{K:02d}.pt"))
     # THE LAST CHECKPOINT IS KEPT (`select: last`, Cedric): no frame is held out to pick one on.
     torch.save({"fitted": learn.snapshot(), "model": spec["model"], "task": spec["task"],
                 "learnable": spec["learnable"], "it": it, "select": "last"}, os.path.join(out, "models", "best.pt"))
@@ -1635,29 +1668,63 @@ def _train_trace(spec, device="cpu", root=None):
     return out
 
 
-def _trace_live(out, log, sk):
-    """`results/live.png`, rewritten at every evaluation so the watcher sees the run while it trains."""
+def _trace_live(out, log, sk, lk=None):
+    """`results/live.png`, rewritten at every evaluation so the watcher sees the run while it trains (black, as every
+    exp17 figure): left, the training loss per update (one update = one Adam step over `batch` random origins);
+    middle, the MSE skill over the mean baseline at the evaluations (16 fixed origins), short and long; right, as the
+    deck's curves (panel b): the LAST SAVED model's skill per step ahead h = 1..32, beside the stimulus lookup and
+    ZAPBench's best published model, the short and long windows shaded."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4))
-    a.plot([r["it"] for r in log], [r["loss"] for r in log], lw=0.6, color="0.4")
-    a.set_yscale("log")
-    a.set_xlabel("update")
-    a.set_ylabel("loss")
-    ev = [r for r in log if "eval_skill_short" in r]
-    b.plot([r["it"] for r in ev], [r["eval_skill_short"] for r in ev], "o-", ms=3, label="short (h 1-3)")
-    b.plot([r["it"] for r in ev], [r["eval_skill_long"] for r in ev], "o-", ms=3, label="long (h 16-32)")
-    b.axhline(0, color="k", lw=0.7)
-    b.set_xlabel("update")
-    b.set_ylabel("MSE skill over the mean baseline (16 origins)")
-    b.legend(frameon=False, fontsize=8)
-    for ax in (a, b):
-        for s in ("top", "right"):
-            ax.spines[s].set_visible(False)
-    fig.tight_layout()
-    fig.savefig(os.path.join(out, "results", "live.png"), dpi=110)
-    plt.close(fig)
+    with plt.style.context("dark_background"):
+        fig, (a, b, c) = plt.subplots(1, 3, figsize=(16, 4.3), facecolor="black")
+        a.plot([r["it"] for r in log], [r["loss"] for r in log], lw=0.6, color="0.75")
+        a.set_yscale("log")
+        a.set_xlabel("training updates (Adam steps, 4 origins each)")
+        a.set_ylabel("training loss (MSE over the rollout's steps)")
+        ks = sorted({r["horizon"] for r in log})
+        for k in ks:                                       # where each curriculum stage starts
+            first = next(r["it"] for r in log if r["horizon"] == k)
+            a.axvline(first, color="0.25", lw=0.5)
+        ev = [r for r in log if "eval_skill_short" in r]
+        b.plot([r["it"] for r in ev], [r["eval_skill_short"] for r in ev], "o-", ms=3, color="#e07b39",
+               label="short (h 1-3)")
+        b.plot([r["it"] for r in ev], [r["eval_skill_long"] for r in ev], "o-", ms=3, color="#7aa6ff",
+               label="long (h 16-32)")
+        b.axhline(0, color="0.6", lw=0.7)
+        # THE AIM: ZAPBench's best published model (graphs_data/zebrafish/zapbench_published.json, U-Net context 4)
+        from plexus.paths import graphs_data_path
+        pub_p = graphs_data_path("zebrafish", "zapbench_published.json")
+        if os.path.exists(pub_p):
+            bs = np.asarray(json.load(open(pub_p))["best_ctx4"]["skill"])
+            for v, col, lab in ((bs[0:3].mean(), "#e07b39", "published best, short"),
+                                (bs[15:32].mean(), "#7aa6ff", "published best, long")):
+                b.axhline(v, color=col, lw=1.2, ls=":", label=f"{lab} ({v:.3f})")
+        b.set_xlabel("training updates")
+        b.set_ylabel("MSE skill over the mean baseline (16 origins)")
+        b.legend(frameon=False, fontsize=8)
+        # right: the last saved model, per step ahead (the deck's panel b)
+        hh = np.arange(1, len(sk) + 1)
+        c.axvspan(0.5, 3.5, color="0.22", lw=0)
+        c.axvspan(15.5, 32.5, color="0.14", lw=0)
+        if lk is not None:
+            c.plot(hh, lk, color="#c44e52", lw=1.2, ls="--", label="stimulus lookup")
+        if os.path.exists(pub_p):
+            c.plot(hh, bs[:len(hh)], color="#7aa6ff", lw=1.6, ls="-.", label="ZAPBench best, U-Net ctx 4 (published)")
+        c.plot(hh, sk, color="white", lw=2.2, label=f"this law, update {ev[-1]['it'] if ev else 0}")
+        c.axhline(0, color="0.6", lw=0.7)
+        lo_ = min(float(np.min(sk)), -0.2)
+        c.set_ylim(max(lo_ - 0.05, -1.0), 0.6)
+        c.set_xlabel("steps ahead h (0.914 s each)")
+        c.set_ylabel("MSE skill over the mean baseline")
+        c.legend(frameon=False, fontsize=7, loc="lower right")
+        for ax in (a, b, c):
+            for s_ in ("top", "right"):
+                ax.spines[s_].set_visible(False)
+        fig.tight_layout()
+        fig.savefig(os.path.join(out, "results", "live.png"), dpi=110, facecolor="black")
+        plt.close(fig)
 
 
 def _test_trace(spec, device="cpu", root=None):
@@ -1676,7 +1743,10 @@ def _test_trace(spec, device="cpu", root=None):
     X, T, rec = box["X"], box["T"], box["rec"]
     H_ = TR.H_MAX
     stride = int(spec["task"]["reference"].get("test_stride", 8))
-    origins = np.arange(max(box["n_in"], 6) - 1, T - H_ - 1, stride)
+    # one grid for every arm (from frame 5, the 6-frame base's first origin); a longer history only drops the
+    # origins without enough frames behind them, so arms of different history are scored on the same frames
+    origins = np.arange(5, T - H_ - 1, stride)
+    origins = origins[origins >= box["n_in"] - 1]
     t0 = time.time()
     m, base = _trace_eval(spec, learn, box, device, origins, H_)
     ot = torch.as_tensor(origins, device=X.device)
@@ -1787,9 +1857,24 @@ def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred):
     def ready(H):
         learn.ready(H)
         for op in H.operators:
-            if hasattr(op, "norm") and hasattr(op, "theta"):
+            if getattr(op, "NORM_FROM_REFERENCE", False):
                 op.norm = box["norm"]
+        for op in H.operators:             # a latent state inferred from the recorded frames (calcium_indicator)
+            if hasattr(op, "init_latent"):
+                op.init_latent(H)
     engine.run(sim, device=device, progress=False, grad=False, on_frame=hook, on_seeded=seeded, on_ready=ready)
+
+
+def _law_name(spec) -> str:
+    """The movie's label for the learned law: the `model:` of the spec's state_diffuse line."""
+    import re
+    try:
+        txt = open(spec["model"]).read()
+    except OSError:
+        return "learned law"
+    m = re.search(r"op:\s*state_diffuse,\s*model:\s*(\w+)", txt)
+    return {"graphcast": "GraphCast law", "connectome": "connectome law", "known_ode": "known ODE"}.get(
+        m.group(1) if m else "", "learned law")
 
 
 def _analyse_trace(spec, device="cpu", root=None):
@@ -1805,10 +1890,21 @@ def _analyse_trace(spec, device="cpu", root=None):
     gates = {"short_full": 0.206, "long_full": 0.438, "published": rec.get("published")}
     TR.render_curves(res, os.path.join(out, "results", f"{name}_test.png"), res["names"], gates)
     ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location="cpu")
-    emb, labels, clus = None, None, {}
+    emb, labels, clus, src = None, None, {}, "embedding"
+    N = rec["dff"].shape[1]
     for k, v in ck["fitted"].items():
-        if "embedding" in k and v.ndim == 2 and v.shape[0] == rec["dff"].shape[1]:
+        if "embedding" in k and v.ndim == 2 and v.shape[0] == N:
             emb = v.detach().float().numpy()
+    fit = ck["fitted"]
+    have = [b for b in ("tau", "rest", "gain", "input") if f"neuron.{b}" in fit]
+    if emb is None and len(have) >= 2:
+        # a law with no embedding (the known ODE): cluster each neuron's own learned constants instead (Cedric,
+        # 2026-09-30) -- its rate 1/tau (softplus, per frame), rest V, gain on the mesh g and stimulus weights B (22).
+        # Each block is z-scored and weighted to unit total variance, so B's 22 columns count as much as tau's one.
+        blocks = [torch.nn.functional.softplus(fit[f"neuron.{b}"].float()) if b == "tau" else fit[f"neuron.{b}"].float()
+                  for b in have]
+        emb = torch.cat([((b - b.mean(0)) / b.std(0).clamp(min=1e-9)) / b.shape[1] ** 0.5 for b in blocks], 1).numpy()
+        src = "parameters (" + ", ".join({"tau": "1/tau", "rest": "V", "gain": "g", "input": "B"}[b] for b in have) + ")"
     if emb is not None and emb.shape[1] > 0:
         from sklearn.cluster import KMeans
         from sklearn.metrics import adjusted_mutual_info_score
@@ -1821,7 +1917,9 @@ def _analyse_trace(spec, device="cpu", root=None):
         prof = ((prof - prof.mean(0)) / prof.std(0).clamp(min=1e-6)).T.cpu().numpy()     # [N, keys]
         u, s, vt = np.linalg.svd(prof[::10], full_matrices=False)
         tun = KMeans(8, n_init=4, random_state=0).fit_predict(prof @ vt[:16].T)
-        clus = {"k": 8, "ami_tuning": float(adjusted_mutual_info_score(tun, labels)),
+        ami = float(adjusted_mutual_info_score(tun, labels))
+        # the parameters' AMI is kept apart: B IS a stimulus tuning, so it would score G-embedding circularly
+        clus = {"k": 8, "source": src, ("ami_tuning" if src == "embedding" else "ami_tuning_params"): ami,
                 "sizes": np.bincount(labels, minlength=8).tolist()}
         del X
     json.dump(clus, open(os.path.join(out, "results", f"{name}_clusters.json"), "w"), indent=1)
@@ -1830,9 +1928,12 @@ def _analyse_trace(spec, device="cpu", root=None):
     TR.render_movie(rec["dff"][frames], mv["pred"].astype(np.float32), frames, rec["pos_um"],
                     mv["r2_raw"], mv["r2_denoised"], 0.914, rec["condition"][frames], rec["names"],
                     os.path.join(out, "results", "movie.mp4"), emb=emb, labels=labels,
-                    mean_obs=mv["mean_obs"], mean_pred=mv["mean_pred"])
+                    mean_obs=mv["mean_obs"], mean_pred=mv["mean_pred"],
+                    emb_name="embedding" if src == "embedding" else "neuron constants " + src[len("parameters "):],
+                    inputs=(fit["neuron.input"].float().norm(dim=1).numpy() if "neuron.input" in fit else None),
+                    law=_law_name(spec))
     print(f"[plot] {name}: {name}_test.png, movie.mp4 ({len(frames)} frames)" +
-          (f", embedding AMI with tuning {clus['ami_tuning']:.3f}" if clus else ""))
+          (f", {src} AMI with tuning {clus.get('ami_tuning', clus.get('ami_tuning_params')):.3f}" if clus else ""))
     return clus
 
 

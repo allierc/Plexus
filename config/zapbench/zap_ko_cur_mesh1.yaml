@@ -1,0 +1,42 @@
+general:
+  name: zap_ko_cur_mesh1
+  seed: 0
+  n_frames: 1
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: false
+sets:
+  brain: {n: 1}
+  neuron:
+    parent: brain
+    per_parent: 71721
+    grow_reserve: 0
+    title: "the 71,721 segmented neurons of the ZAPBench fish, at their soma centroids"
+    state:
+      dff: {width: 1, role: coordinate, integration: first_order, boundary: free, title: "dF/F now"}
+      xyz: {width: 3, integration: none, boundary: free, record: false, title: "soma centroid, um"}
+      tau: {width: 1, integration: none, boundary: free, record: false, title: "raw rate, 1/tau = softplus"}
+      rest: {width: 1, integration: none, boundary: free, record: false, title: "rest value, normalised dF/F"}
+      gain: {width: 1, integration: none, boundary: free, record: false, title: "gain on the mesh's input"}
+      input: {width: 22, integration: none, boundary: free, record: false, title: "weights on the 22 stimulus features"}
+  stimulus:
+    parent: brain
+    per_parent: 22
+    grow_reserve: 0
+    title: "the 22 known stimulus features of ZAPBench"
+    state:
+      u: {width: 1, integration: none, boundary: free, record: false, title: "each feature at frame t"}
+fields: {}
+seed:
+- {op: seed_state_from_file, at: neuron, file: zebrafish/zapbench_recording.npz, blocks: {xyz: pos_um}}
+- {op: seed_state_random, at: neuron, block: tau, lo: -2.97, hi: -2.97}
+- {op: seed_state_random, at: neuron, block: rest, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: neuron, block: gain, lo: 0.1, hi: 0.1}
+- {op: seed_state_random, at: neuron, block: input, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: stimulus, block: u, lo: 0.0, hi: 0.0}
+operators:
+- {op: state_diffuse, model: known_ode, synapse: current, at: neuron, block: dff, positions: xyz, positions_file: zebrafish/zapbench_recording.npz, mesh_spacing: 16.0, mesh_mirror_axis: 0, mesh_levels: 1, substeps: 8, inputs: 1, forcing: stimulus.u, forcing_dim: 22, seed: 0, checkpoint: true, title: "each neuron's dF/F through a known ODE on the multi-level mesh: leak, rest, one weight per mesh edge, the stimulus"}
+schedule: [state_diffuse]
+plotting: {renderer: none, max_frames: 0}

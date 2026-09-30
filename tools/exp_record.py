@@ -226,7 +226,13 @@ def build(number: int) -> str:
         if not _link(os.path.join(run, "spec.yaml"), p("spec")):
             _link(os.path.join(ROOT, "config", r["_group"], r["_run"] + ".yaml"), p("spec"))
         with open(p("why"), "w") as fh:
-            fh.write(f"step   {n}  =  {'run ' + r['_v'] if grid else 'iteration v' + r['_v']} of experiment {number}\n")
+            # a `batch` column (`3.4` = batch 3, arm 4) leads the line: the watcher shows this line beside its
+            # position, so a step can be matched to the deck's batch slides (Cedric, exp17, 2026-09-30)
+            bt = next((v for h, v in r.items() if h.lower() == "batch" and v), "")
+            bl = (f"batch {bt.split('.')[0]} · arm {bt.split('.')[1]} · " if re.fullmatch(r"\d+\.\d+", bt)
+                  else f"batch {bt} · " if bt else "")
+            fh.write(f"step   {n}  =  {bl}{os.path.basename(r['_run']) + ' (' if bl else ''}"
+                     f"{'run ' + r['_v'] if grid else 'iteration v' + r['_v']}{')' if bl else ''} of experiment {number}\n")
             fh.write(f"spec   {r['_group']}/{r['_run']}\n")
             fh.write(f"run    graphs_data/{r['_group']}/{r['_run']}/\n\n")
             for h, v in r.items():
@@ -243,6 +249,9 @@ def build(number: int) -> str:
         verdict = next((v for h, v in r.items() if h.lower() == "verdict"), "")
         changed = next((v for h, v in r.items() if h.lower() == "what changed"), "")
         tag = r["_v"] if grid else f"v{r['_v']}"
+        bt = next((v for h, v in r.items() if h.lower() == "batch" and v), "")
+        if bt:
+            tag = f"{tag} [{bt}]"
         journal.append(f"{n}  {tag:<5} {r['_group']}/{r['_run']:<14} {verdict}  -- {changed}"
                        + ("" if got["mp4"] else "   [no movie yet]"))
     for k, ext in KINDS.items():                                 # steps no row backs any more

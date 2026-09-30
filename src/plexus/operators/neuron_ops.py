@@ -1005,3 +1005,104 @@ class PaintChildren(Exchange):
         st[:, b0:b1] = v[lvl.parent]
         lvl.state = st
         return {}
+
+
+# --------------------------------------------------------------------------- #
+#  the calcium indicator -- what a calcium recording sees of a neuron's activity
+# --------------------------------------------------------------------------- #
+@register_operator("calcium_indicator", family="signalling", set="neuron", kind="lateral",
+                   title="A calcium indicator: the recorded fluorescence follows a latent activity through a first-order kernel",
+                   equation=r"""$$c_i(t+1)=c_i(t)+k\,\big(v_i(t)-c_i(t)\big),\quad k=1-e^{-\Delta t/\tau_{ca}};\qquad
+v_i(t_0)=\textstyle\sum_{j=0}^{H-1}a_j\,c_i(t_0-j)$$""")
+class CalciumIndicator(Lateral):
+    """THE FORWARD MODEL OF A CALCIUM RECORDING (exp17, Cedric 2026-09-30): the recorded dF/F `c` is not the
+    neuron's activity but the indicator's slow read-out of it. A latent activity `v` (the `latent` block, one per
+    neuron, advanced by whatever law runs on it -- the known ODE on the neuron graph) drives the indicator, and the
+    indicator relaxes toward it with one time constant tau_ca:
+
+        c_i(t+1) = c_i(t) + k (v_i(t) - c_i(t)),     k = 1 - exp(-dt / tau_ca) = sigmoid(`rate`)
+
+    Unit gain, so v is in the units of c (dF/F) and there is no gain for W to trade against: the kernel has a SHAPE
+    only (its time constant), which the data can pin. `block` is the recorded dF/F with its history, newest first
+    (width H); the tick writes the new value in column 0 and shifts the rest, as `state_diffuse[graphcast]` does.
+
+    THE LATENT AT THE START OF A ROLLOUT is not observed, so it is inferred from the H recorded frames the rollout
+    starts from, by a linear inverse of the kernel shared by every neuron (`init_latent`, called by the trainer once
+    the learned values are in place):
+
+        v_i(t0) = sum_j a_j c_i(t0 - j)
+
+    `encoder_init: inverse` starts the taps at the kernel's exact one-step inverse held one frame (v(t0-1) =
+    c(t0-1) + (c(t0) - c(t0-1)) / k, i.e. a_0 = 1/k, a_1 = 1 - 1/k); `identity` starts at v = c (a_0 = 1). The taps are
+    learned by the forecast loss, which chooses how much to invert against how much noise that amplifies -- the
+    blind criterion the deconvolution lacked (connectome-gnn calcium note, 2026-09-22: lambda was picked on the true
+    derivative).
+
+    The kernel of H2B-GCaMP7f (ZAPBench: nuclear-targeted, "optimized for the slower kinetics of calcium in the
+    nucleus", Lueckmann et al. 2025 sec. 6) is not given in the paper: `tau_s` is a starting value, learned.
+    """
+    EMIT = "velocity"
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = ["block", "latent"]
+    WRITES = ["block"]
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["block", "latent"]
+    MECHANISM_TAGS = ["calcium_indicator", "observation_model", "first_order_kernel"]
+    PARAM_ROLES = {"block": "the recorded dF/F block, newest first (its width = the frames the latent is inferred from)",
+                   "latent": "the latent activity block, width 1",
+                   "tau_s": "the indicator's starting time constant, s", "frame_s": "seconds per recorded frame",
+                   "encoder_init": "inverse (the kernel's one-step inverse) or identity (v = c)",
+                   "rate": "raw indicator rate, k = sigmoid(rate) (learnable)",
+                   "taps": "the start-of-rollout inverse, one weight per recorded frame (learnable)",
+                   "width": "the recorded block's width (the number of taps)"}
+    REFERENCE = ("Lueckmann, J.-M. et al. (2025) ZAPBench, ICLR (H2B-GCaMP7f); Dana, H. et al. (2019) Nat. Methods "
+                 "(jGCaMP7).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import math
+        self.at = params.get("_at", "neuron")
+        self.block = str(params["block"])
+        self.latent = str(params["latent"])
+        self.frame_s = float(params.get("frame_s", 0.914))
+        self.tau_s = float(params.get("tau_s", 2.0))
+        self.width = int(params.get("width", 6))
+        k = 1.0 - math.exp(-self.frame_s / self.tau_s)
+        self.rate = torch.tensor([math.log(k / (1.0 - k))], device=device)
+        a = torch.zeros(self.width, device=device)
+        init = str(params.get("encoder_init", "inverse"))
+        if init == "inverse":
+            a[0], a[1] = 1.0 / k, 1.0 - 1.0 / k
+        elif init == "identity":
+            a[0] = 1.0
+        else:
+            raise ValueError(f"calcium_indicator `encoder_init:` is inverse or identity, got {init!r}")
+        self.taps = a
+
+    def k(self):
+        return torch.sigmoid(self.rate)
+
+    def init_latent(self, H):
+        """Write v(t0) = sum_j a_j c(t0 - j) into the latent block: the trainer calls this at `on_ready`, after the
+        recorded frames are seeded and the learned taps are set."""
+        lvl = H.level(self.at)
+        a, b = lvl.state_schema[self.block]
+        la, lb = lvl.state_schema[self.latent]
+        if b - a != self.taps.numel():
+            raise ValueError(f"calcium_indicator: `{self.block}` is {b - a} wide, the taps {self.taps.numel()} "
+                             "(`width:` must be the recorded block's width)")
+        v0 = (lvl.state[..., a:b] * self.taps).sum(-1, keepdim=True)      # read the recorded frames first:
+        st = lvl.state.clone()                                             # the write must not touch what the
+        st[..., la:la + 1] = v0                                            # gradient of v0 still needs
+        lvl.state = st
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        a, b = lvl.state_schema[self.block]
+        la, _ = lvl.state_schema[self.latent]
+        c = lvl.state[..., a:b]
+        v = lvl.state[..., la:la + 1]
+        d0 = self.k() * (v - c[..., :1])
+        return {(lvl.name, self.block): torch.cat([d0, c[..., :-1] - c[..., 1:]], -1)}

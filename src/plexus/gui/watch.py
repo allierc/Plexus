@@ -660,7 +660,11 @@ async function tick(){
                              : `${movies.length} movies`) : 'no movies yet';
  document.getElementById('livebtn').className = (idx < 0) ? 'on' : '';
  document.getElementById('pos').textContent =
-   total ? (idx < 0 ? `live — ${total} of ${total}` : `${j.index + 1} of ${total}`) : '';
+   (total ? (idx < 0 ? `live — ${total} of ${total}` : `${j.index + 1} of ${total}`) : '')
+   // the why's first line after "step NNNN =": which run this is (for exp17, "batch 3 · arm 4 · <run>"), so a step
+   // can be matched to the deck without opening the why pane
+   + ((j.why || '').split(String.fromCharCode(10))[0].replace(/^step\\s+\\d+\\s+=\\s+/, '').trim()
+      ? '   ' + (j.why || '').split(String.fromCharCode(10))[0].replace(/^step\\s+\\d+\\s+=\\s+/, '').trim() : '');
  document.getElementById('meta').innerHTML =
    j.shot ? `${j.shot_name} &nbsp;&middot;&nbsp; ${j.shot_age}s ago`
           + (j.mp4 ? ' &nbsp;&middot;&nbsp; showing the movie' : '') : 'no picture yet';

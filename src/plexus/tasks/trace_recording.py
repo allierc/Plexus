@@ -39,7 +39,9 @@ def mean_pred(X: torch.Tensor, o: torch.Tensor, W: int) -> torch.Tensor:
 
 def mse_per_origin(pred_fn, X: torch.Tensor, o: torch.Tensor, hs=range(1, H_MAX + 1)) -> np.ndarray:
     """[len(hs), len(o)]: the MSE over elements of `pred_fn(o, h)` against X[o + h]."""
-    return np.stack([((X[o + h] - pred_fn(o, h)) ** 2).mean(1).cpu().numpy() for h in hs], 0)
+    # ACCUMULATED IN FLOAT64: a float32 mean over 71,721 elements carries ~1e-7 of relative rounding, which two
+    # identical forecasts summed in a different order already disagree by (the identity gate's own resolution).
+    return np.stack([((X[o + h] - pred_fn(o, h)) ** 2).double().mean(1).cpu().numpy() for h in hs], 0)
 
 
 def stimulus_keys(S: np.ndarray, cond: np.ndarray, cap: int = 64) -> np.ndarray:
@@ -182,14 +184,35 @@ def _pca_rgb(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     u, s, vt = np.linalg.svd(a[:: max(1, len(a) // 20000)], full_matrices=False)
     pc = a @ vt[:3].T
     lo, hi = np.percentile(pc, 2, 0), np.percentile(pc, 98, 0)
-    return pc, np.clip((pc - lo) / np.maximum(hi - lo, 1e-9), 0, 1)
+    rgb = np.clip((pc - lo) / np.maximum(hi - lo, 1e-9), 0, 1)
+    # an embedding narrower than 3 gives fewer than 3 channels (a 2-wide one crashed every zap_cn plot, 2026-09-30):
+    # the missing channels are held at mid-grey
+    return pc, np.concatenate([rgb, np.full((len(rgb), 3 - rgb.shape[1]), 0.5)], 1)
+
+
+def _ffmpeg() -> str:
+    """An ffmpeg that exists HERE: on the PATH, else imageio-ffmpeg's own, else the devcontainer's (a cluster job has no
+    /workspace, and a hard-coded devcontainer path crashed every exp17 plot phase there, 2026-09-30)."""
+    import shutil
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:                                                     # noqa: BLE001
+        return "/workspace/.conda_envs/MPM-pytorch/bin/ffmpeg"
+
+
+INPUT_ON = 0.01          # |B_i| above which a neuron counts as a stimulus input (normalised activity per unit feature)
 
 
 def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.ndarray, r2_raw: np.ndarray,
                  r2_den: np.ndarray, frame_s: float, cond_of: np.ndarray, names, path: str,
                  emb: np.ndarray | None = None, labels: np.ndarray | None = None, fps: int = 25,
                  mean_obs: np.ndarray | None = None, mean_pred: np.ndarray | None = None,
-                 ffmpeg: str = "/workspace/.conda_envs/MPM-pytorch/bin/ffmpeg"):
+                 ffmpeg: str | None = None, emb_name: str = "embedding", law: str = "GraphCast law",
+                 inputs: np.ndarray | None = None):
     """TWO PANELS, recorded LEFT and learned RIGHT: every neuron a point at its position (dorsal view, deeper
     drawn first) coloured by dF/F on one scale; black background, labels inside; `R2 raw` and `R2 denoised`, mean
     +- SD over the frames so far, top right; under the recorded panel the brain-mean dF/F, recorded and learned, with
@@ -203,11 +226,25 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    ffmpeg = ffmpeg or _ffmpeg()
     order = np.argsort(pos[:, 2])
     P = pos[order]
     vmax = float(np.percentile(obs, 97))
     tmp = tempfile.mkdtemp(prefix="trace_movie_")
     ins = emb is not None
+    # THE INPUT MAP (Cedric, 2026-09-30): which neurons the stimulus enters -- |B_i|, the norm of each neuron's row of
+    # stimulus weights, bright where it is large; a row the lasso zeroed is dark. A law with no per-neuron stimulus
+    # weights (GraphCast, connectome: u enters every element's update) draws every neuron as an input, uniformly.
+    if inputs is not None:
+        nrm = np.asarray(inputs, dtype=np.float64)
+        on = nrm > INPUT_ON
+        lv = np.clip(np.log10(np.maximum(nrm, 1e-4)) + 4, 0, None) / max(np.log10(nrm.max() + 1e-12) + 4, 1e-9)
+        inp_col = plt.get_cmap("magma")(0.08 + 0.92 * lv)[:, :3]
+        inp_title = (f"stimulus input |B_i| per neuron (log)\n{on.sum():,} of {len(nrm):,} above {INPUT_ON:g} "
+                     f"({100 * on.mean():.0f} %)")
+    else:
+        inp_col = np.tile(np.array([[0.93, 0.55, 0.25]]), (len(pos), 1))
+        inp_title = "stimulus input: every neuron\n(no per-neuron input weights)"
     if ins:
         pc, rgb = _pca_rgb(emb)
         cm = plt.get_cmap("tab10")
@@ -215,7 +252,7 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
     for k in range(len(frames)):
         fig = plt.figure(figsize=(12, 8.6 if ins else 7.0), facecolor="black")
         top = 0.40 if ins else 0.16
-        for j, (img, lab) in enumerate(((obs[k], "recorded (ZAPBench)"), (pred[k], "learned (GraphCast law)"))):
+        for j, (img, lab) in enumerate(((obs[k], "recorded (ZAPBench)"), (pred[k], f"learned ({law})"))):
             ax = fig.add_axes([0.5 * j, top, 0.5, 0.88 - top])       # the labels sit above, never on the brain
             ax.set_facecolor("black")
             ax.axis("off")
@@ -245,19 +282,24 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
             fig.text(0.05, top - 0.02, "brain-mean dF/F: recorded (green), learned (white)", color="0.7", fontsize=8,
                      va="bottom")
         if ins:
-            for j, (title, kind) in enumerate((("embedding PC1-PC2, by cluster", "scatter"),
-                                               ("embedding on the brain (PCA as RGB)", "rgb"),
-                                               ("its clusters on the brain", "labels"))):
-                ax = fig.add_axes([0.02 + 0.33 * j, 0.01, 0.29, 0.22])
+            for j, (title, kind) in enumerate(((f"{emb_name} PC1-PC2, by cluster", "scatter"),
+                                               (f"{emb_name} on the brain (PCA as RGB)", "rgb"),
+                                               ("its clusters on the brain", "labels"),
+                                               (inp_title, "inputs"))):
+                ax = fig.add_axes([0.01 + 0.25 * j, 0.01, 0.23, 0.19])   # below its title, never under it
                 ax.set_facecolor("black")
                 ax.axis("off")
                 if kind == "scatter":
                     ax.scatter(pc[::7, 0], pc[::7, 1], s=0.4, c=lab_rgb[::7], linewidths=0)
+                elif kind == "inputs":
+                    ax.scatter(P[:, 0], P[:, 1], s=0.2, c=inp_col[order], linewidths=0)
+                    ax.set_aspect("equal")
                 else:
                     col = (rgb if kind == "rgb" else lab_rgb)[order]
                     ax.scatter(P[:, 0], P[:, 1], s=0.2, c=col, linewidths=0)
                     ax.set_aspect("equal")
-                fig.text(0.02 + 0.33 * j + 0.145, 0.245, title, color="0.8", fontsize=8, ha="center", va="bottom")
+                fig.text(0.01 + 0.25 * j + 0.115, 0.215, title, color="0.8", fontsize=7, ha="center", va="bottom",
+                         linespacing=1.1)
         fig.savefig(os.path.join(tmp, f"{k:05d}.png"), dpi=90, facecolor="black")
         plt.close(fig)
     subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
