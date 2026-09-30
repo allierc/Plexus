@@ -23,12 +23,17 @@ import re
 import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+THEME = HERE                    # where beamerthemeJanelia.sty, the logo and icons/ live
 
 
 def compile_once(deck: str) -> str:
-    """Run pdflatex and return the log text (the run is never allowed to stop for input)."""
+    """Run pdflatex and return the log text (the run is never allowed to stop for input).
+
+    A deck in another folder (`--dir`, e.g. an experiment's own presentation/) compiles there, with
+    THIS folder on TEXINPUTS so it finds the same Janelia theme, logo and icons without a copy."""
+    env = dict(os.environ, TEXINPUTS=f".:{THEME}//:" + os.environ.get("TEXINPUTS", ""))
     subprocess.run(["pdflatex", "-interaction=nonstopmode", deck],
-                   cwd=HERE, capture_output=True, text=True)
+                   cwd=HERE, capture_output=True, text=True, env=env)
     with open(os.path.join(HERE, os.path.splitext(deck)[0] + ".log"), errors="ignore") as f:
         return f.read()
 
@@ -50,12 +55,17 @@ def overfull(log: str) -> list[tuple[int, str]]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--deck", default="plexus_oct_26.tex")
+    ap.add_argument("--dir", default=None,
+                    help="the deck's folder, if not this one (it keeps its own slides/fit.tex)")
     ap.add_argument("--check-only", action="store_true", help="do not write slides/fit.tex")
     ap.add_argument("--floor", type=float, default=0.45,
                     help="refuse a size below this: past it the column is unreadable")
     ap.add_argument("--outlier", type=float, default=0.75,
                     help="a slide needing less than this share of the median sets its own size")
     a = ap.parse_args()
+    if a.dir:
+        global HERE
+        HERE = os.path.abspath(a.dir)
 
     log = compile_once(a.deck)
     found = scales(log)

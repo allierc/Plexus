@@ -123,6 +123,10 @@ def main():
     # learnable, the task and the scheme; `plexus.trainer` owns the parameters and calls the engine
     # once per rollout. Nothing below this block knows training exists.
     phases = [p for p in ("train", "test", "analyse") if p in task]
+    # `-o train_test_plot <training spec>` (the one cluster job of a training experiment, INSTRUCTION.md): for a
+    # TRAINING spec, `plot` is the trainer's plotting phase (figures and movie), which it calls `analyse`.
+    if phases and "plot" in task and "analyse" not in phases:
+        phases.append("analyse")
     if phases:
         from plexus.trainer import run_phases
         run_phases(config_name, phases, device=args.device)    # --output_root already set the root

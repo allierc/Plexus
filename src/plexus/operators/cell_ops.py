@@ -1354,6 +1354,364 @@ class StateDiffuse(Lateral):
         return {(lvl.name, self.block): self.D * d}
 
 
+# THE MESH OF A POINT CLOUD, cached by content: `engine.run` builds its operators fresh on every call (one call per
+# training rollout), and the neurons never move, so the graph is built once per (positions, spacing, levels).
+_GC_MESH_CACHE: dict = {}
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="graphcast",
+                   title="Learned dynamics of a set's scalar (GraphCast message passing on a point cloud)",
+                   equation=r"""$$g_i=\phi_g(v_i),\; m_k\!\leftarrow\! m_k+\chi\big(m_k,\textstyle\sum_{i}\psi(e_{ik},g_i,m_k)\big),\;
+m_l\!\leftarrow\! m_l+\chi^{l}\big(m_l,\textstyle\sum_{k}e_{kl}\big),\; x_i\!\leftarrow\! x_i+\delta(g_i)$$""")
+class StateDiffuseGraphCast(Lateral):
+    """A set's scalar block, its dynamics LEARNED: GraphCast's encoder-processor-decoder with the ELEMENTS as the
+    grid (exp17, ZAPBench: the 71,721 neurons of a larval zebrafish brain, one dF/F each).
+
+    set -> set: reads `block` (the value and its history), the element positions (`xyz`), an optional per-element
+    `embedding` block, and an optional FORCING block of another set (`forcing: <set>.<block>`, the known stimulus
+    the task drives, plexus2.tex "the drive"); emits d(block)/dt. It is a MODEL of `state_diffuse` for the reason
+    exp16's `diffuse[model: graphcast]` is a model of `diffuse`: the contract is the same -- a set's value updated
+    from the others, written as its derivative -- and the graph Laplacian is one law it can represent. What
+    differs is that the law is whatever the data say.
+
+    ONE STEP, GraphCast (Lam et al. 2023, Science 382:1416, supplement sections 3.1-3.7), with the elements as its
+    grid nodes and a multi-level MESH over their bounding box as its mesh:
+
+        v_i   = [ (x_i - mu)/sd  (history, newest first),  p_i,  a_i,  u ]      grid-node features
+        encoder    g_i = phi_g(v_i),  m_k = phi_m(q_k),  e_ik = phi_e(d_ik)       grid2mesh edges
+                   e_ik <- e_ik + psi(e_ik, g_i, m_k);  m_k <- m_k + chi(m_k, sum_i e_ik);  g_i <- g_i + xi(g_i)
+        processor  L unshared layers on the merged multi-mesh:
+                   e_kl <- e_kl + psi_l(e_kl, m_k, m_l);  m_l <- m_l + chi_l(m_l, sum_k e_kl)
+        decoder    e_ki <- e_ki + psi'(e_ki, m_k, g_i);  g_i <- g_i + chi'(g_i, sum_k e_ki)
+        step       x_i(t+1) = x_i(t) + dsd * delta(g_i)
+
+    x_i is element i's value (the block's column 0) and its `inputs - 1` past values (columns 1..), mu / sd /
+    dsd the recording's mean, standard deviation and standard deviation of the ONE-STEP difference (GraphCast's
+    input and output normalisation, supplement 3.7) set by the trainer from its reference (`norm`, default
+    0 / 1 / 1); p_i the position divided by the half-extent of the cloud; a_i the embedding; u the forcing block,
+    flattened, THE SAME for every element (GraphCast appends its forcings to every grid node); q_k a mesh node's
+    scaled position; d the vector sender -> receiver in units of the finest mesh spacing, with its length.
+    Every MLP is Linear -> SiLU -> Linear then LayerNorm (none on delta), residual added after it; delta's last
+    layer STARTS AT ZERO, so the untrained law is exactly persistence.
+
+    THE MESH ON A POINT CLOUD: GraphCast's multi-mesh on a cubic lattice centred on the cloud -- mesh nodes at the
+    lattice VERTICES, level k made of the occupied cells of side 2^k L0 (L0 = `mesh_spacing`), its nodes their corners
+    and its edges their edges, every coarse vertex a vertex of every finer level (nested, as M0 c ... c M6), all levels'
+    edges ONE graph; each element sends to the corners of its level-0 cell within sqrt(3)/2 L0 (GraphCast's radius
+    query) and receives from all 8 (its containing cell, as GraphCast's containing triangle) (`mesh`).
+
+    THE HISTORY IS STATE, NOT A HIDDEN MEMORY. The block holds the element's last `inputs` values, newest first
+    (`inputs: 6` = t-5 .. t); the derivative emitted moves column 0 by the learned increment and every older column
+    to its newer neighbour's value, so after one tick of dt = 1 the block is the next window. Nothing is carried
+    that the recording does not contain (Cedric: "I do not want RNN").
+
+    THE WEIGHTS ARE ONE FLAT TENSOR, `theta` (`{param: theta, op: state_diffuse}`), as exp16's; `checkpoint: true`
+    recomputes the step during backward instead of storing it.
+
+    Reference: Lam, R. et al. (2023). Learning skillful medium-range global weather forecasting. Science
+    382:1416-1421; Battaglia, P. W. et al. (2018). arXiv:1806.01261.
+    """
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["block", "positions", "mesh_spacing"]
+    INPUTS = ["set"]; OUTPUTS = ["set"]; READS = ["block"]; WRITES = ["block"]
+    MECHANISM_TAGS = ["message_passing", "learned_law", "graphcast"]
+    PARAM_ROLES = {"theta": "GraphCast model to learn the set's dynamics", "block": "state_block",
+                   "positions": "the elements' positions block, um", "mesh_spacing": "finest mesh spacing, um",
+                   "mesh_levels": "multi-mesh levels", "latent": "latent width", "layers": "processor layers, unshared",
+                   "inputs": "values read per element (the block's width): now and the past",
+                   "embedding": "the per-element embedding block", "embedding_dim": "its width",
+                   "forcing": "<set>.<block> of the known forcing (the task's drive)", "seed": "the initial weights' seed",
+                   "mesh_mirror_axis": "make the mesh mirror-symmetric across the plane through the cloud's centre normal to this axis",
+                   "checkpoint": "recompute each tick during backward instead of storing it"}
+    REFERENCE = ("Lam, R. et al. (2023). Learning skillful medium-range global weather forecasting. "
+                 "Science 382:1416-1421; Battaglia, P. W. et al. (2018). arXiv:1806.01261.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "compartment")
+        self.block = str(params["block"])
+        self.positions = str(params["positions"])
+        self.L0 = float(params["mesh_spacing"])
+        self.levels = int(params.get("mesh_levels", 1))
+        m = params.get("mesh_mirror_axis")
+        self.mirror = None if m is None else int(m)
+        self.latent = int(params.get("latent", 32))
+        self.layers = int(params.get("layers", 4))
+        self.inputs = int(params.get("inputs", 1))
+        self.embedding = params.get("embedding")
+        self.embedding_dim = int(params.get("embedding_dim", 0)) if self.embedding else 0
+        if self.embedding and not self.embedding_dim:
+            raise ValueError("state_diffuse[graphcast] `embedding:` needs `embedding_dim:`")
+        f = params.get("forcing")
+        self.forcing = tuple(str(f).split(".")) if f else None
+        if self.forcing is not None and len(self.forcing) != 2:
+            raise ValueError(f"state_diffuse[graphcast] `forcing:` is <set>.<block>, got {f!r}")
+        self.forcing_dim = int(params.get("forcing_dim", 0)) if self.forcing else 0
+        if self.forcing and not self.forcing_dim:
+            raise ValueError("state_diffuse[graphcast] `forcing:` needs `forcing_dim:`, the forcing block's size "
+                             "(elements x width) -- the encoder's width depends on it")
+        if self.levels < 1:
+            raise ValueError("state_diffuse[graphcast] needs `mesh_levels:` >= 1 (level 0 is the finest mesh)")
+        self.seed = int(params.get("seed", 0))
+        self.checkpoint = bool(params.get("checkpoint", False))
+        self.norm = (0.0, 1.0, 1.0)                 # mu, sd, dsd: set by the trainer from its reference
+        self.device_ = device
+        self.theta = self.init_theta()
+
+    # ------------------------------------------------------------------ the weights, flat
+    def layout(self):
+        """[(name, shape)] of every tensor in `theta`, in order; Linear weights are [out, in]."""
+        H, F = self.latent, 4                                   # edge features: the step (3) and its length
+        nin = self.inputs + 3 + self.embedding_dim + self.forcing_dim
+        out = []
+
+        def mlp(name, n_in, n_out, norm=True):
+            out.extend([(f"{name}.w1", (H, n_in)), (f"{name}.b1", (H,)),
+                        (f"{name}.w2", (n_out, H)), (f"{name}.b2", (n_out,))])
+            if norm:
+                out.extend([(f"{name}.g", (n_out,)), (f"{name}.beta", (n_out,))])
+        for name, n_in in (("enc_g", nin), ("enc_m", 3), ("enc_e_g2m", F), ("enc_e_mm", F), ("enc_e_m2g", F)):
+            mlp(name, n_in, H)
+        mlp("g2m_edge", 3 * H, H)
+        mlp("g2m_node", 2 * H, H)
+        mlp("g2m_grid", H, H)
+        for layer in range(self.layers):
+            mlp(f"mm_edge{layer}", 3 * H, H)
+            mlp(f"mm_node{layer}", 2 * H, H)
+        mlp("m2g_edge", 3 * H, H)
+        mlp("m2g_node", 2 * H, H)
+        mlp("dec", H, 1, norm=False)
+        return out
+
+    def init_theta(self):
+        """PyTorch's Linear initialisation, LayerNorm gain 1 / bias 0, the decoder's last layer 0 (persistence)."""
+        g = torch.Generator().manual_seed(self.seed)
+        lay = self.layout()
+        shapes = dict(lay)
+        parts = []
+        for name, shape in lay:
+            if name.startswith("dec.") and name.endswith(("w2", "b2")):
+                t = torch.zeros(shape)
+            elif name.endswith(".g"):
+                t = torch.ones(shape)
+            elif name.endswith(".beta"):
+                t = torch.zeros(shape)
+            else:
+                t = (torch.rand(shape, generator=g) * 2 - 1) / math.sqrt(shapes[name.replace(".b", ".w")][1])
+            parts.append(t.reshape(-1))
+        return torch.cat(parts).to(self.device_)
+
+    def _views(self):
+        views, k = {}, 0
+        for name, shape in self.layout():
+            n = math.prod(shape)
+            views[name] = self.theta[k:k + n].view(shape)
+            k += n
+        if k != self.theta.numel():
+            raise ValueError(f"state_diffuse[graphcast]: theta has {self.theta.numel()} values, the layout {k}")
+        return views
+
+    @staticmethod
+    def _mlp(W, name, x, norm=True):
+        """GraphCast's MLP: Linear -> SiLU -> Linear, then LayerNorm (none on the decoder), read from views of theta."""
+        import torch.nn.functional as Fnn
+        y = Fnn.linear(Fnn.silu(Fnn.linear(x, W[f"{name}.w1"], W[f"{name}.b1"])), W[f"{name}.w2"], W[f"{name}.b2"])
+        return Fnn.layer_norm(y, y.shape[-1:], W[f"{name}.g"], W[f"{name}.beta"]) if norm else y
+
+    # ------------------------------------------------------------------ the graph
+    def mesh(self, xyz):
+        """The multi-mesh and its two bipartite graphs for positions `xyz` [N, 3] (um), cached by content:
+        {n_mesh, q (mesh positions, scaled), pscale, g2m / mm / m2g: (senders, receivers, features), centre_um,
+        level_nodes, lattice, stats}.
+
+        THE MESH IS GRAPHCAST'S, ON A CUBIC LATTICE (2026-09-30, Cedric: the multi-mesh design is essential).
+        GraphCast refines an icosahedron M0 -> M6 and every vertex of a coarse mesh is a vertex of every finer one.
+        Here the mesh nodes are the VERTICES of a cubic lattice of spacing L0 = `mesh_spacing`:
+          level k   the cells of side 2^k L0 that hold at least one element; its nodes are their corners, its
+                    edges their edges (corner to corner, 2^k L0 long) -- so level k's nodes lie on the stride-2^k
+                    sub-lattice and are EXACTLY vertices of every finer level (a coarse corner is added to the finer
+                    levels' node sets where no occupied finer cell touches it: nested by construction, as M0 c M6);
+          the multi-mesh  the edges of every level in ONE graph on the level-0 nodes;
+          grid2mesh  each element to the corners of its own level-0 cell within sqrt(3)/2 L0 of it (GraphCast: the
+                    mesh nodes within 0.6 x its finest edge -- the radius that reaches at least one node);
+          mesh2grid  each element from the 8 corners of its cell (GraphCast: the 3 vertices of its triangle).
+        The lattice is CENTRED on the cloud: its centre (the midpoint of the 0.5-99.5 % extent) is a vertex of the
+        coarsest level, so a brain's midline runs through a column of vertices at every level, the mesh is
+        mirror-symmetric about it and the head's coarse node sits on it. (First written with nodes at the centres of
+        occupied cells: a coarse node then had to be one of the finer cell centres, drifted up to 56 um off the
+        midline, and level 4's nodes had no level-3 edges -- measured 2026-09-30.)"""
+        import numpy as np
+        P = xyz.detach().double().cpu().numpy()
+        key = ("vertex", P.shape[0], float(P.sum()), float((P * P).sum()), self.L0, self.levels, self.mirror,
+               str(xyz.device))
+        if key in _GC_MESH_CACHE:
+            return _GC_MESH_CACHE[key]
+        L0, K = self.L0, self.levels
+        Lc = L0 * 2 ** (K - 1)
+        cmid = (np.percentile(P, 0.5, 0) + np.percentile(P, 99.5, 0)) / 2
+        Q = P
+        if self.mirror is not None:                                   # the cloud and its mirror image
+            Pm = P.copy()
+            Pm[:, self.mirror] = 2 * cmid[self.mirror] - P[:, self.mirror]
+            Q = np.concatenate([P, Pm])
+        lo = cmid - np.ceil((cmid - Q.min(0)) / Lc) * Lc              # cmid is a coarsest-level vertex; lo <= Q.min
+        cell = np.floor((P - lo) / L0).astype(np.int64)               # each element's level-0 cell
+        occ_cells = cell
+        if self.mirror is not None:
+            # A BILATERAL MESH (`mesh_mirror_axis:`): the occupied cells and their mirror images across the plane
+            # through the centre -- a vertex plane -- so the mesh is exactly symmetric even where the cloud is not
+            # (a few somata beyond the other side's extent added a whole column of coarse cells on one side).
+            a = self.mirror
+            mm_ = int(round((cmid[a] - lo[a]) / L0))
+            mc = cell.copy()
+            mc[:, a] = 2 * mm_ - cell[:, a] - 1
+            occ_cells = np.concatenate([cell, mc])
+        corners = np.array(np.meshgrid([0, 1], [0, 1], [0, 1], indexing="ij")).reshape(3, -1).T
+        dims = occ_cells.max(0) + 2 ** K + 2
+
+        def code(v):                                                  # a vertex (in level-0 units) -> one integer
+            return (v[:, 0] * dims[1] + v[:, 1]) * dims[2] + v[:, 2]
+        # each level: its occupied cells, their corner vertices and their edges, in level-0 vertex units
+        lv_vert, lv_edge = [], []
+        for k in range(K):
+            s = 2 ** k
+            cc = np.unique(occ_cells // s, axis=0)                    # occupied level-k cells
+            vert = np.unique((cc[:, None, :] + corners[None]).reshape(-1, 3), axis=0) * s
+            ed = []
+            for ax in range(3):                                       # the 4 edges of each cell along each axis
+                others = [a for a in range(3) if a != ax]
+                for c1 in (0, 1):
+                    for c2 in (0, 1):
+                        off = np.zeros(3, np.int64)
+                        off[others[0]], off[others[1]] = c1, c2
+                        a = (cc + off) * s
+                        b = a.copy()
+                        b[:, ax] += s
+                        ed.append(np.stack([code(a), code(b)], 1))
+            ed = np.unique(np.concatenate(ed), axis=0)
+            lv_vert.append(vert)
+            lv_edge.append(ed)
+        # NESTED: every coarse vertex is a node of every finer level
+        for k in range(K - 2, -1, -1):
+            lv_vert[k] = np.unique(np.concatenate([lv_vert[k], lv_vert[k + 1]]), axis=0)
+        nodes = lv_vert[0]
+        ncode = code(nodes)
+        order = np.argsort(ncode)
+        sc = ncode[order]
+
+        def index(cd):
+            at = np.searchsorted(sc, cd)
+            if not (sc[np.minimum(at, len(sc) - 1)] == cd).all():
+                raise RuntimeError("state_diffuse[graphcast]: a mesh vertex is missing from the node set")
+            return order[at]
+        centre = lo + nodes * L0                                      # mesh node positions, um
+        level_nodes = [index(code(v)) for v in lv_vert]
+        mm = np.concatenate([np.concatenate([index(e[:, 0])[:, None], index(e[:, 1])[:, None]], 1) for e in lv_edge])
+        mm = np.unique(np.concatenate([mm, mm[:, ::-1]]), axis=0)     # both directions, a pair joined once
+        mm_s, mm_r = mm[:, 0], mm[:, 1]
+        own = (cell[:, None, :] + corners[None]).reshape(-1, 3)       # the 8 corners of each element's cell
+        m_nodes = index(code(own))
+        elem = np.repeat(np.arange(len(P)), 8)
+        # GRID2MESH AS GRAPHCAST'S, A RADIUS QUERY: each element sends to the mesh nodes within r of it. GraphCast
+        # takes r = 0.6 x the finest edge, which on its sphere reaches at least one node; on a cube lattice the
+        # smallest radius that does is sqrt(3)/2 L0 (an element at a cell's centre is that far from all 8 corners),
+        # so r = sqrt(3)/2 L0 -- 1 to 8 nodes per element, the corners of its own cell nearest to it.
+        # MESH2GRID keeps the 8 corners of the containing cell (GraphCast: the 3 vertices of the containing triangle).
+        r = math.sqrt(3) / 2 * L0 * (1 + 1e-6)
+        dist = np.linalg.norm(P[elem] - (lo + nodes[m_nodes] * L0), axis=1)
+        near = dist <= r
+        g_s, g_r = elem[near], m_nodes[near]
+        m_s, m_r = m_nodes, elem
+        half = np.maximum(np.ptp(P, 0) / 2, 1e-9)
+        mid = (P.max(0) + P.min(0)) / 2
+        dev = xyz.device
+        t = lambda a, dt=torch.float32: torch.as_tensor(a, dtype=dt, device=dev)   # noqa: E731
+
+        def feat(ps, pr):
+            d = (ps - pr) / L0
+            return t(np.concatenate([d, np.linalg.norm(d, axis=1, keepdims=True)], 1))
+        G = {"n_mesh": len(nodes), "q": t((centre - mid) / half), "pscale": (t(mid), t(half)),
+             "g2m": (t(g_s, torch.long), t(g_r, torch.long), feat(P[g_s], centre[g_r])),
+             "mm": (t(mm_s, torch.long), t(mm_r, torch.long), feat(centre[mm_s], centre[mm_r])),
+             "m2g": (t(m_s, torch.long), t(m_r, torch.long), feat(centre[m_s], P[m_r])),
+             "centre_um": centre, "level_nodes": level_nodes,
+             "lattice": {"origin_um": lo, "coarsest_um": Lc, "mid_um": cmid},
+             "stats": {"mesh_nodes": int(len(nodes)), "mm_edges": int(len(mm_s)), "g2m_edges": int(len(g_s)),
+                       "m2g_edges": int(len(m_s)), "nodes_per_level": [int(len(x)) for x in level_nodes],
+                       "edges_per_level": [int(2 * len(e)) for e in lv_edge]}}
+        _GC_MESH_CACHE[key] = G
+        return G
+
+    # ------------------------------------------------------------------ one tick
+    def step(self, x, xyz, a=None, u=None):
+        """x [N, inputs] (newest first) -> the derivative of the block over one tick of dt = 1: column 0 the
+        learned increment, column j >= 1 the move of the older value to its newer neighbour's."""
+        if x.shape[1] != self.inputs:
+            raise ValueError(f"state_diffuse[graphcast] reads {self.inputs} value(s) per element; the block is "
+                             f"{x.shape[1]} wide (`inputs:` must equal the block's width)")
+        G = self.mesh(xyz)
+        W = self._views()
+        mu, sd, dsd = self.norm
+        mid, half = G["pscale"]
+        feats = [(x - mu) / sd, (xyz.to(x.dtype) - mid) / half]
+        if self.embedding_dim:
+            feats.append(a)
+        if self.forcing_dim:
+            uf = u.reshape(1, -1)
+            if uf.shape[1] != self.forcing_dim:
+                raise ValueError(f"state_diffuse[graphcast]: forcing has {uf.shape[1]} values, "
+                                 f"`forcing_dim:` says {self.forcing_dim}")
+            feats.append(uf.expand(x.shape[0], -1))
+        v = torch.cat(feats, 1)
+        H, Nm, Ng = self.latent, G["n_mesh"], x.shape[0]
+
+        def agg(rc, e, n):
+            return torch.zeros(n, H, device=e.device, dtype=e.dtype).index_add(0, rc, e)
+        g = self._mlp(W, "enc_g", v)
+        m = self._mlp(W, "enc_m", G["q"])
+        sn, rc, f = G["g2m"]
+        e = self._mlp(W, "enc_e_g2m", f)
+        e = e + self._mlp(W, "g2m_edge", torch.cat([e, g[sn], m[rc]], -1))
+        m = m + self._mlp(W, "g2m_node", torch.cat([m, agg(rc, e, Nm)], -1))
+        g = g + self._mlp(W, "g2m_grid", g)
+        sn, rc, f = G["mm"]
+        e = self._mlp(W, "enc_e_mm", f)
+        for layer in range(self.layers):
+            e = e + self._mlp(W, f"mm_edge{layer}", torch.cat([e, m[sn], m[rc]], -1))
+            m = m + self._mlp(W, f"mm_node{layer}", torch.cat([m, agg(rc, e, Nm)], -1))
+        sn, rc, f = G["m2g"]
+        e = self._mlp(W, "enc_e_m2g", f)
+        e = e + self._mlp(W, "m2g_edge", torch.cat([e, m[sn], g[rc]], -1))
+        g = g + self._mlp(W, "m2g_node", torch.cat([g, agg(rc, e, Ng)], -1))
+        d0 = dsd * self._mlp(W, "dec", g, norm=False)                   # [N, 1]
+        if self.inputs == 1:
+            return d0
+        return torch.cat([d0, x[:, :-1] - x[:, 1:]], 1)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        b0, b1 = lvl.state_schema[self.block]
+        x = lvl.state[:, b0:b1]
+        p0, p1 = lvl.state_schema[self.positions]
+        xyz = lvl.state[:, p0:p1]
+        a = None
+        if self.embedding_dim:
+            e0, e1 = lvl.state_schema[self.embedding]
+            a = lvl.state[:, e0:e1]
+        u = None
+        if self.forcing:
+            fl = H.level(self.forcing[0])
+            f0, f1 = fl.state_schema[self.forcing[1]]
+            u = fl.state[:, f0:f1]
+        run = self.step
+        if self.checkpoint and torch.is_grad_enabled():
+            from torch.utils.checkpoint import checkpoint
+            run = lambda *q: checkpoint(self.step, *q, use_reentrant=False)   # noqa: E731
+        return {(lvl.name, self.block): run(x, xyz, a, u)}
+
+
 # --------------------------------------------------------------------------- motility
 #
 # HOW AN ADHERENT CELL MOVES: by gripping the substrate and pulling, not by being pushed.

@@ -31,7 +31,7 @@ import cluster as C                                                   # noqa: E4
 from plexus.paths import training_specs                              # noqa: E402
 
 
-def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda:0", queue=None):
+def submit(name, dry=False, wall=None, phases="train test plot", device="cuda:0", queue=None):
     hits = training_specs(name)
     if len(hits) != 1:
         print(f"  {name:<30} {'NO SUCH RUN SPEC' if not hits else f'IN {len(hits)} MODEL FOLDERS'}")
@@ -45,7 +45,7 @@ def submit(name, dry=False, wall=None, phases="train test analyse", device="cuda
                 f"{name} --device {device}"]
     else:
         mod = "plexus.tasks.spec_trainer" if "spec" in run else "plexus.tasks.trainer"
-        ph = phases if "spec" in run else phases.replace("analyse", "plot")
+        ph = phases.replace("plot", "analyse") if "spec" in run else phases.replace("analyse", "plot")
         body = [f"conda run -n {C.ENV} python -u -m {mod} --device {device} "
                 f"-o {ph} {os.path.relpath(cfg, ROOT)}",
                 # THE ROLLOUT MOVIES ARE A SECOND CALL, not a phase of the trainer: a fit that
@@ -90,7 +90,7 @@ def main():
     ap.add_argument("--glob", default=None, help="run-spec glob under config/training/<model>/")
     ap.add_argument("--wall", default=None, help="minutes; default cluster.WALL")
     ap.add_argument("--device", default="cuda:0")
-    ap.add_argument("--phases", default="train test analyse")
+    ap.add_argument("--phases", default="train test plot")     # the one cluster job: -o train_test_plot (INSTRUCTION.md)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--queue", default=None, help="LSF queue; default cluster.QUEUE (the L4s). A "
                     "50,000-point morph stage needs an A100: its tape peaks near 28 GB")
