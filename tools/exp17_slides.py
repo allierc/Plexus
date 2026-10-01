@@ -566,29 +566,37 @@ def figure_mesh(P, M, path):
     ax.imshow(plt.imread(still))
     fig.text(0.02, 0.985, "the multi-mesh in 3-D: all levels' edges are ONE graph", color="white", fontsize=12, va="top")
     lo, hi = P.min(0) - 20, P.max(0) + 20
-    for k in range(len(cols)):
-        a = fig.add_axes([0.02 + 0.245 * k, 0.005, 0.22, 0.27])
+    n_p = len(cols) + 1                              # the levels one by one, then all of them on top of each other
+    dx, w = 0.98 / n_p, 0.98 / n_p - 0.02
+    for k in range(n_p):
+        a = fig.add_axes([0.01 + dx * k, 0.005, w, 0.27])
         _black(a)
         a.scatter(P[::5, 0], P[::5, 1], s=0.03, c="0.3", linewidths=0)
-        sel = lev == k
-        a.add_collection(LineCollection(np.stack([C[mm_s[sel], :2], C[mm_r[sel], :2]], 1), colors=cols[k],
-                                        linewidths=0.2 if k == 0 else 0.4 + 0.25 * k))
-        nk = M["level_nodes"][k]
-        if k >= 1:
-            a.scatter(C[nk, 0], C[nk, 1], s=1 + 3 * k, c=cols[k], linewidths=0)
+        for kk in (range(len(cols)) if k == len(cols) else (k,)):   # the overlay: finest first, coarse on top
+            sel = lev == kk
+            a.add_collection(LineCollection(np.stack([C[mm_s[sel], :2], C[mm_r[sel], :2]], 1), colors=cols[kk],
+                                            linewidths=0.2 if kk == 0 else 0.4 + 0.25 * kk))
+            nk = M["level_nodes"][kk]
+            if kk >= 1:
+                a.scatter(C[nk, 0], C[nk, 1], s=1 + 3 * kk, c=cols[kk], linewidths=0)
         a.axvline(M["mid"][0], color="0.35", lw=0.5, ls=":")
         a.set_aspect("equal")
         a.set_xlim(lo[0], hi[0])
         a.set_ylim(lo[1], hi[1])
-        fig.text(0.02 + 0.245 * k + 0.11, 0.325, f"level {k}: {L * 2 ** k:.0f} \u00b5m", color=cols[k], fontsize=10,
-                 ha="center", va="top")
-        fig.text(0.02 + 0.245 * k + 0.11, 0.298, f"{M['nodes_per_level'][k]:,} nodes, {M['edges_per_level'][k]:,} edges",
-                 color="0.75", fontsize=7, ha="center", va="top")
+        if k < len(cols):
+            fig.text(0.01 + dx * k + w / 2, 0.325, f"level {k}: {L * 2 ** k:.0f} \u00b5m", color=cols[k], fontsize=10,
+                     ha="center", va="top")
+            fig.text(0.01 + dx * k + w / 2, 0.298, f"{M['nodes_per_level'][k]:,} nodes, {M['edges_per_level'][k]:,} edges",
+                     color="0.75", fontsize=7, ha="center", va="top")
+        else:
+            fig.text(0.01 + dx * k + w / 2, 0.325, "all levels", color="white", fontsize=10, ha="center", va="top")
+            fig.text(0.01 + dx * k + w / 2, 0.298, f"{sum(M['nodes_per_level'][:1]):,} nodes, "
+                     f"{sum(M['edges_per_level']):,} edges", color="0.75", fontsize=7, ha="center", va="top")
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
 
 
-DECK_TITLE = "GraphCast on ZAPBench"        # Cedric, 2026-09-30: every slide carries the deck's one title
+DECK_TITLE = "multi-level GNN on ZAPBench"  # Cedric, 2026-09-30: every slide carries the deck's one title (was "GraphCast on ZAPBench")
 
 
 def frame(title, left, right, src, left_gap=False, deck_title=None):
@@ -630,21 +638,29 @@ def results_rows() -> list[dict]:
     return out
 
 
+def _tex(t: str) -> str:
+    """A markdown cell as LaTeX TEXT: every character LaTeX would read as markup escaped (a `^2` in a row's
+    "what changed" stopped Kile's pdflatex, 2026-09-30; fit_deck's nonstop run had hidden it)."""
+    rep = {"\\": r"\textbackslash{}", "_": r"\_", "%": r"\%", "&": r"\&", "#": r"\#", "$": r"\$",
+           "^": r"\^{}", "~": r"\~{}", "{": r"\{", "}": r"\}", "\u00b7": r"$\cdot$"}
+    return "".join(rep.get(c, c) for c in t)
+
+
 def slides_run(r):
     """Two slides per landed run: its movie (recorded left, learned right) and its curves against the baselines."""
     import shutil
     n, t, rep = r["name"], r["test"], r["report"]
     bt = r["row"].get("batch", "")
     tag = (f"batch {bt.split('.')[0]}, arm {bt.split('.')[1]}" if "." in bt else f"batch {bt}" if bt else str(r["v"]))
-    dt = DECK_TITLE + (f" \u00b7 batch {bt.split('.')[0]}, arm {bt.split('.')[1]}" if "." in bt
-                       else f" \u00b7 {bt}" if bt else "")          # Cedric: the batch in the slide's title
+    dt = DECK_TITLE + (f" $\\cdot$ batch {bt.split('.')[0]}, arm {bt.split('.')[1]}" if "." in bt
+                       else f" $\\cdot$ {_tex(bt)}" if bt else "")          # Cedric: the batch in the slide's title
     mv = os.path.join(r["dir"], "results", "movie.mp4")
     out = []
     stages = rep.get("stages") or []
     tr = [("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "0"),
           ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]
     num = (head(f"{tag}: {n.replace('_', chr(92) + '_')}") +
-           "{\\scriptsize " + r["row"].get("what changed", "").replace("_", "\\_").replace("%", "\\%") + "\\par}\\vspace{6pt}\n"
+           "{\\scriptsize " + _tex(r["row"].get("what changed", "")) + "\\par}\\vspace{6pt}\n"
            + head("skill over the mean baseline (MSE)") + rows([
                ("short, h 1-3", f"{t['skill_short']:+.3f}"), ("long, h 16-32", f"{t['skill_long']:+.3f}"),
                ("vs stimulus lookup", f"{t['skill_long_minus_lookup']:+.3f}"),
@@ -703,6 +719,10 @@ BATCHES = (
 )
 
 
+SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
+HIDDEN_BATCHES: set = set()   # Cedric hid batch 4 while one arm had landed (2026-09-30); back with all 8 (2026-10-01)
+
+
 def figure_batch(arms, landed, path, band=()):
     """Short and long skill over the mean baseline per arm (bars), the base's two seeds as a band, ZAPBench's best
     published model dotted and the stimulus lookup dashed (long only). Black, labels above."""
@@ -748,20 +768,149 @@ def figure_batch(arms, landed, path, band=()):
     plt.close(fig)
 
 
+LAWS = (("zap_gc_", "GraphCast law (MLP, mesh)", "#9ecae1"), ("zap_cn_", "connectome law (MLP, mesh)", "#6baed6"),
+        ("zap_ko_", "known ODE, mesh", "#fdae6b"), ("zap_ng_", "known ODE, neuron graph", "#e6550d"),
+        ("zap_ca_ko", "known ODE, mesh + calcium", "#c7a0e8"), ("zap_ca_ng", "known ODE, neuron graph + calcium", "#9467bd"))
+
+
+def _law(n):
+    for pre, lab, col in sorted(LAWS, key=lambda x: -len(x[0])):        # longest prefix first (zap_ca_ko before zap_)
+        if n.startswith(pre):
+            return lab, col
+    return None, None
+
+
+def figure_pool(landed, path):
+    """Every landed run of batches 1-6: long skill against short skill, coloured by law; a hollow marker where the
+    2 h free rollout left the finite numbers. ZAPBench's best published dotted, the stimulus lookup dashed."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    sk = np.array(json.load(open(os.path.join(GD, "graphs_data", "zebrafish", "zapbench_published.json")))["best_ctx4"]["skill"])
+    fig, ax = plt.subplots(figsize=(8.6, 6.2), facecolor="black")
+    ax.set_facecolor("black")
+    for sd in ("top", "right"):
+        ax.spines[sd].set_visible(False)
+    for sd in ("left", "bottom"):
+        ax.spines[sd].set_color("0.6")
+    ax.tick_params(colors="0.8", labelsize=9)
+    seen = set()
+    lu = None
+    for n, r in landed.items():
+        lab, col = _law(n)
+        if lab is None or n in ("zap_gc_smoke", "zap_gc_persist"):
+            continue
+        t = r["test"]
+        lu = t["lookup_skill_long"]
+        fin = bool(t["free"]["finite"])
+        ax.scatter(t["skill_short"], t["skill_long"], s=46, facecolors=col if fin else "none", edgecolors=col, lw=1.4,
+                   label=lab if lab not in seen else None, zorder=3)
+        seen.add(lab)
+    ax.axhline(float(sk[15:32].mean()), color="white", ls=":", lw=1.1)
+    ax.axvline(float(sk[:3].mean()), color="white", ls=":", lw=1.1)
+    if lu is not None:
+        ax.axhline(lu, color="#ff7f0e", ls="--", lw=1.0)
+    ax.text(0.005, float(sk[15:32].mean()) + 0.004, "ZAPBench best published (U-Net ctx 4)", color="white", fontsize=8)
+    if lu is not None:
+        ax.text(0.005, lu - 0.014, "stimulus lookup", color="#ff7f0e", fontsize=8)
+    ax.set_xlabel("short skill, h 1-3 (over the mean baseline, MSE)", color="0.85", fontsize=10)
+    ax.set_ylabel("long skill, h 16-32", color="0.85", fontsize=10)
+    ax.set_xlim(0.0, 0.23)
+    ax.set_ylim(0.25, 0.64)
+    ax.legend(frameon=False, labelcolor="white", fontsize=8, loc="lower right")
+    fig.text(0.01, 0.985, "every landed run, batches 1-6 (hollow: the 2 h free rollout is not finite)", color="white",
+             fontsize=10, va="top")
+    fig.savefig(path, dpi=160, facecolor="black", bbox_inches="tight")
+    plt.close(fig)
+
+
+LADDER = (("per-neuron floor: stimulus + leak, no coupling", "zap_ng_now"),
+          ("+ mesh pooling (known ODE on the mesh)", "zap_ko_long"),
+          ("+ neuron graph, W prior", "zap_ng_base"),
+          ("+ neuron graph, no W prior (diverges)", "zap_ng_nol1"),
+          ("  same + calcium indicator (finite)", "zap_ca_ng_nol1"),
+          ("GraphCast law, curriculum 1..20", "zap_gc_base"),
+          ("GraphCast law, curriculum 1..40", "zap_gc_cur40"))
+
+
+def slides_pool(landed):
+    figure_pool(landed, os.path.join(PRES, "figs", "pool_all_runs.png"))
+    best = []
+    for pre, lab, _ in LAWS:
+        runs = [(n, r) for n, r in landed.items() if _law(n)[0] == lab and n not in ("zap_gc_smoke", "zap_gc_persist")]
+        if runs:
+            n, r = max(runs, key=lambda x: x[1]["test"]["skill_long"])
+            t = r["test"]
+            best.append((lab, n, r["row"].get("batch", ""), t["skill_short"], t["skill_long"],
+                         t["free"]["r2_denoised"] if t["free"]["finite"] else None))
+    tab = "".join(f"{_tex(lab)} & {_tex(b)} & {ss:+.3f} & {sl:+.3f} & {'%+.2f' % fr if fr is not None else 'diverges'} \\\\\n"
+                  for lab, n, b, ss, sl, fr in best)
+    n_runs = sum(1 for n in landed if _law(n)[0] and n not in ("zap_gc_smoke", "zap_gc_persist"))
+    right = (head("the best run of each law") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+             "law & run & short & long & free R$^2$ \\\\\n\\hline\n" + tab + "\\end{tabular}\\par}\\vspace{6pt}\n"
+             + "{\\scriptsize " + f"{n_runs} runs. " + "Skill over the mean baseline (MSE), in sample: trained and scored on all"
+             " frames, where ZAPBench's 0.206 / 0.438 are held out. Free R$^2$: the whole 2 h rollout against the denoised"
+             " recording.\\par}\n")
+    s1 = ("pool_all_runs", frame("all runs pooled", "\\panel{figs/pool_all_runs.png}", right, "every landed _test.json",
+                                 left_gap=True, deck_title=f"{DECK_TITLE} $\\cdot$ batches 1-6 pooled"))
+    rows_ = []
+    for lab, n in LADDER:
+        if n in landed:
+            t = landed[n]["test"]
+            rows_.append((lab, landed[n]["row"].get("batch", ""), t["skill_long"], t["skill_short"]))
+    tab2 = "".join(f"{_tex(l)} & {_tex(b)} & {sl:+.3f} & {ss:+.3f} \\\\\n" for l, b, sl, ss in rows_)
+    right2 = (head("what carries the long skill") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+              "step & run & long & short \\\\\n\\hline\n" + tab2 + "\\end{tabular}\\par}\\vspace{6pt}\n"
+              + head("read") + "{\\scriptsize the stimulus and each neuron's own leak give $\\sim$0.53 alone; coupling between"
+              " real neurons adds up to +0.08 (the mesh's W added nothing); the indicator is learned away (k$\\to$1) but keeps the"
+              " long rollout finite; for the GraphCast law the curriculum's reach is the lever (1..40: +0.49). Seed spread"
+              " (GraphCast, 3 seeds): $\\pm$0.02 long\\par}\n")
+    figure_ladder(rows_, os.path.join(PRES, "figs", "pool_ladder.png"))
+    s2 = ("pool_ladder", frame("what carries the long skill", "\\panel{figs/pool_ladder.png}", right2,
+                               "every landed _test.json", left_gap=True, deck_title=f"{DECK_TITLE} $\\cdot$ batches 1-6 pooled"))
+    return [s1, s2]
+
+
+def figure_ladder(rows_, path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8.6, 5.4), facecolor="black")
+    ax.set_facecolor("black")
+    for sd in ("top", "right"):
+        ax.spines[sd].set_visible(False)
+    for sd in ("left", "bottom"):
+        ax.spines[sd].set_color("0.6")
+    ax.tick_params(colors="0.8", labelsize=9)
+    y = np.arange(len(rows_))[::-1]
+    for yy, (lab, b, sl, ss) in zip(y, rows_):
+        col = "#9ecae1" if lab.startswith("GraphCast") else ("#9467bd" if "calcium" in lab else "#e6550d")
+        ax.barh(yy, sl, color=col, height=0.6)
+        ax.text(sl + 0.004, yy, f"{sl:+.3f}", color="white", va="center", fontsize=9)
+    ax.axvline(0.438, color="white", ls=":", lw=1.1)
+    ax.text(0.438, len(rows_) - 0.35, " ZAPBench best published", color="white", fontsize=8)
+    ax.set_yticks(y)
+    ax.set_yticklabels([f"{lab}  [{b}]" for lab, b, _, _ in rows_], color="white", fontsize=9)
+    ax.set_xlim(0.3, 0.66)
+    ax.set_xlabel("long skill, h 16-32 (over the mean baseline, MSE)", color="0.85", fontsize=10)
+    fig.savefig(path, dpi=160, facecolor="black", bbox_inches="tight")
+    plt.close(fig)
+
+
 def slide_batch(title, arms, landed, band=()):
     stem = title.split(":")[0].replace(" ", "_")
     figure_batch(arms, landed, os.path.join(PRES, "figs", f"{stem}_levers.png"), band)
     tab = "".join(
-        (f"{i + 1} {a} & {landed[n]['test']['skill_short']:+.3f} & {landed[n]['test']['skill_long']:+.3f} & "
-         f"{landed[n]['test']['free']['r2_denoised']:+.2f} \\\\\n") if n in landed else f"{i + 1} {a} & \\multicolumn{{3}}{{l}}{{running}} \\\\\n"
+        (f"{i + 1} {_tex(a)} & {landed[n]['test']['skill_short']:+.3f} & {landed[n]['test']['skill_long']:+.3f} & "
+         f"{landed[n]['test']['free']['r2_denoised']:+.2f} \\\\\n") if n in landed else f"{i + 1} {_tex(a)} & \\multicolumn{{3}}{{l}}{{running}} \\\\\n"
         for i, (a, n) in enumerate(arms))
-    right = (head(title.split(": ")[1]) + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
+    right = (head(_tex(title.split(": ")[1])) + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
              "arm & short & long & free R$^2$ \\\\\n\\hline\n" + tab + "\\end{tabular}\\par}\\vspace{6pt}\n"
              + "{\\scriptsize one change per arm from the base; skill over the mean baseline (MSE), free R$^2$ of the "
              "whole 2 h rollout against the denoised recording. In sample: trained and scored on all frames.\\par}\n")
     return (f"{stem}_levers", frame(f"{title}: every lever against the base", f"\\panel{{figs/{stem}_levers.png}}",
                                     right, "the landed runs' _test.json", left_gap=True,
-                                    deck_title=f"{DECK_TITLE} \u00b7 {title.split(':')[0]}"))
+                                    deck_title=f"{DECK_TITLE} $\\cdot$ {title.split(':')[0]}"))
 
 
 def main():
@@ -863,9 +1012,9 @@ def main():
         ("state", "dF/F now only: a first-order ODE")])
         + head("why tanh") + "{\\scriptsize the normalised activity is signed (mean 0);\\\\ relu would drop every below-mean value\\par}\n")
     s_cn = frame("One step of the connectome law", "\\panel{figs/05_one_step_current.png}", right_cn,
-                 "state_diffuse[model: connectome]", left_gap=True, deck_title="GraphCast\\_current")
+                 "state_diffuse[model: connectome]", left_gap=True, deck_title="multi-level GNN\\_current")
     s_ko = frame("One step of the known ODE", "\\panel{figs/06_one_step_known_ode.png}", right_ko,
-                 "state_diffuse[model: known_ode]", left_gap=True, deck_title="GraphCast-known\\_ODE")
+                 "state_diffuse[model: known_ode]", left_gap=True, deck_title="multi-level GNN-known\\_ODE")
     st = figure_neuron_graph(P, os.path.join(PRES, "figs", "07_neuron_graph.png"))
     right_ng = (head("a known ODE between the neurons (no mesh)") + rows([
         ("one tick", r"$z_i \mathrel{+}= \frac{1}{M}(-z_i + V_i + m_i + B_i \cdot u)/\tau_i$"),
@@ -912,12 +1061,16 @@ def main():
     step = {"02a_one_step": s2a, "05_one_step_current": s_cn, "06_one_step_known_ode": s_ko, "07_neuron_graph": s_ng,
             "08_latent_calcium": s_lc}
     for title, one_step, arms, band in BATCHES:            # each law's one-step slide, then its batch
+        if title.split(":")[0] in HIDDEN_BATCHES:
+            continue
         if one_step:
             deck.append((one_step, step[one_step]))
         if any(n in landed for _, n in arms):
             deck.append(slide_batch(title, arms, landed, band))
-            base = next(n for _, n in arms if n in landed)       # the base, or the first arm landed before it
+            pick = SHOW_RUN.get(title.split(":")[0])
+            base = pick if pick in landed else next(n for _, n in arms if n in landed)   # the base, or the first landed
             deck += slides_run(landed[base])
+    deck += slides_pool(landed)                         # the pooled summary closes the deck
     for name, body in deck:
         open(os.path.join(PRES, "slides", name + ".tex"), "w").write(body)
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(

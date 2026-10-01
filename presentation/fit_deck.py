@@ -93,6 +93,10 @@ def main() -> None:
         log = compile_once(a.deck)
         print(f"  every column now drawn at {worst:.4f}, the densest slide's own size")
 
+    # LaTeX ERRORS, not only overfull boxes: the nonstop run compiles past them to a pdf, which hid a `^2` in text
+    # mode that stopped Kile's pdflatex (exp17, 2026-09-30)
+    errs = [l for l in log.splitlines() if l.startswith("! ")]
+    print(f"  latex errors: {len(errs)}" + "".join(f"\n    {e}" for e in errs[:5]))
     bad = overfull(log)
     print(f"  overfull boxes: {len(bad)}")
     for page, msg in bad[:10]:

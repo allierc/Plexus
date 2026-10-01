@@ -165,9 +165,14 @@ def render_curves(res: dict, path: str, names, gates: dict | None = None):
     c.plot(t, res["free_r2_raw"], color="0.6", lw=0.6, label="R$^2$ raw")
     c.plot(t, res["free_r2_denoised"], color="#4c72b0", lw=0.8, label="R$^2$ denoised")
     c.axhline(0, color="0.6", lw=0.7)
-    lo = np.nanpercentile(res["free_r2_denoised"], 2)
+    r2d = np.asarray(res["free_r2_denoised"], dtype=float)
+    fin = r2d[np.isfinite(r2d)]                    # a diverged rollout's -inf / nan frames must not set the axis
+    lo = np.percentile(fin, 2) if len(fin) else -3.0
     c.set_ylim(max(lo - 0.1, -3), 1)
-    c.set_xlabel("time, min (free rollout from the first 6 frames)")
+    if len(fin) < len(r2d):
+        c.text(0.99, 0.04, f"not finite from frame {int(np.argmax(~np.isfinite(r2d)))}", color="#d62728", fontsize=8,
+               ha="right", transform=c.transAxes)
+    c.set_xlabel("time, min (free rollout from the law's own context frames)")
     c.set_ylabel("R$^2$ per frame over neurons")
     c.legend(frameon=False, fontsize=8, loc="lower left")
     c.text(0.0, 1.08, "c", transform=c.transAxes, fontsize=12)
@@ -263,7 +268,7 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
                 t = frames[k] * frame_s
                 fig.text(0.03, 0.945, f"{names[cond_of[k]]}   t = {t / 60:5.1f} min", color="0.7", fontsize=9, va="top")
             else:
-                fig.text(0.97, 0.985, f"R2 raw {np.mean(r2_raw[:k + 1]):+.3f} +- {np.std(r2_raw[:k + 1]):.3f}\n"
+                fig.text(0.97, 0.955, f"R2 raw {np.mean(r2_raw[:k + 1]):+.3f} +- {np.std(r2_raw[:k + 1]):.3f}\n"
                          f"R2 denoised {np.mean(r2_den[:k + 1]):+.3f} +- {np.std(r2_den[:k + 1]):.3f}",
                          color="white", fontsize=9, va="top", ha="right")
         if mean_obs is not None:

@@ -1545,8 +1545,11 @@ class StateDiffuseGraphCast(Lateral):
         midline, and level 4's nodes had no level-3 edges -- measured 2026-09-30.)"""
         import numpy as np
         P = xyz.detach().double().cpu().numpy()
-        key = ("vertex", P.shape[0], float(P.sum()), float((P * P).sum()), self.L0, self.levels, self.mirror,
-               str(xyz.device))
+        import hashlib
+        # keyed on the positions' own bytes: a count + sum + sum-of-squares key let a shuffled or axis-swapped cloud
+        # fetch another cloud's mesh (review, 2026-09-30)
+        key = ("vertex", P.shape, hashlib.sha1(np.ascontiguousarray(P).tobytes()).hexdigest(), self.L0, self.levels,
+               self.mirror, str(xyz.device))
         if key in _GC_MESH_CACHE:
             return _GC_MESH_CACHE[key]
         L0, K = self.L0, self.levels
@@ -1948,6 +1951,8 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
         G = self.mesh(xyz)
         if int(G["mm"][0].numel()) != self.W.numel():
             raise ValueError("state_diffuse[known_ode]: the elements' positions are not those of `positions_file`")
+        if x.shape[1] != 1:                           # a wider block would get this [N, 1] increment broadcast
+            raise ValueError(f"state_diffuse[known_ode] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
         mu, sd, _ = self.norm
         z = (x[:, :1] - mu) / sd
         Nm = G["n_mesh"]
@@ -2121,6 +2126,8 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         if x.shape[0] != self.n_elements:
             raise ValueError(f"state_diffuse[neuron_graph]: {x.shape[0]} elements, the graph was built on "
                              f"{self.n_elements} (`positions_file`)")
+        if x.shape[1] != 1:                           # a wider block would get this [N, 1] increment broadcast
+            raise ValueError(f"state_diffuse[neuron_graph] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
         mu, sd, _ = self.norm
         z0 = (x[:, :1] - mu) / sd
         z = z0

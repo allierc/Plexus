@@ -1594,7 +1594,9 @@ def _train_trace(spec, device="cpu", root=None):
           f"{len(origins)} origins; stages {stages}")
     print(f"[fit] {len(params)} tensor(s), {n_par} values; lr {lr} ({'constant' if sch is None else 'cosine'}), "
           f"batch {batch}, {iters} updates")
-    ev_o = np.linspace(origins[0], T - 34, 16).astype(int)           # 16 fixed origins, the live evaluation
+    # 16 fixed origins, the live evaluation; from frame 5 at the earliest, or the mean baseline's W = 6 reads X[-1..]
+    # (the recording's end) for a 1-frame law (review, 2026-09-30)
+    ev_o = np.linspace(max(int(origins[0]), 5), T - 34, 16).astype(int)
     # THE STIMULUS LOOKUP ON THOSE ORIGINS, once: the live figure draws its per-step skill beside the model's.
     rec_ = box["rec"]
     look = TR.stimulus_lookup(box["X"], TR.stimulus_keys(rec_["stimulus"], rec_["condition"]))
@@ -1643,7 +1645,8 @@ def _train_trace(spec, device="cpu", root=None):
                 row.update({"eval_skill_short": float(sk[0:3].mean()), "eval_skill_long": float(sk[15:32].mean()),
                             "eval_skill": sk.tolist()})
                 torch.save({"fitted": learn.snapshot(), "model": spec["model"], "task": spec["task"],
-                            "learnable": spec["learnable"], "it": it}, os.path.join(out, "models", "best.pt"))
+                            "learnable": spec["learnable"], "it": it, "select": "interim"},
+                           os.path.join(out, "models", "best.pt"))
                 _trace_live(out, log + [row], sk, lk)
                 print(f"  it {it:6d} stage {si} K {K}  loss {loss_v:.6f}  eval skill short {row['eval_skill_short']:+.3f} "
                       f"long {row['eval_skill_long']:+.3f}  {row['seconds']:.2f} s/it", flush=True)
@@ -1736,7 +1739,9 @@ def _test_trace(spec, device="cpu", root=None):
     from plexus.tasks import trace_recording as TR
     engine.quiet(True)
     out = out_dir(spec, root)
-    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    ckn = spec.get("_checkpoint")                 # a per-stage checkpoint (`--checkpoint stage_05`), or the run's own
+    stem = f"{spec['name']}_{ckn}" if ckn else spec["name"]
+    ck = torch.load(os.path.join(out, "models", f"{ckn or 'best'}.pt"), weights_only=False, map_location=device)
     learn = Learnables(spec["learnable"], device)
     learn.restore(ck["fitted"])
     box = _trace_setup(spec, device)
@@ -1785,7 +1790,7 @@ def _test_trace(spec, device="cpu", root=None):
         _trace_rollout_stream(sim, learn, spec, box, o0, n, device, on_pred)
     free = {"r2_raw": float(np.nanmean(r2r)), "r2_raw_sd": float(np.nanstd(r2r)), "r2_denoised": float(np.nanmean(r2d)),
             "r2_denoised_sd": float(np.nanstd(r2d)), "finite": 1.0 if finite else 0.0, "origin": o0, "frames": n}
-    np.savez_compressed(os.path.join(out, "results", f"{spec['name']}_free.npz"), r2_raw=r2r, r2_denoised=r2d)
+    np.savez_compressed(os.path.join(out, "results", f"{stem}_free.npz"), r2_raw=r2r, r2_denoised=r2d)
     # THE MOVIE'S ROLLOUT: 200 consecutive frames, free from the recorded frames before them, at the recording's own
     # pace (slide 2's movie: the flash condition, 20 frames in) -- one frame per movie frame, not a sample of 2 h.
     names_ = list(rec["names"])
@@ -1800,7 +1805,7 @@ def _test_trace(spec, device="cpu", root=None):
     fr_m = om + 1 + np.arange(nm)
     obs_m = X[fr_m].cpu().numpy()
     Pm = torch.as_tensor(mvp, device=X.device)
-    np.savez_compressed(os.path.join(out, "results", f"{spec['name']}_movie.npz"), frames=fr_m,
+    np.savez_compressed(os.path.join(out, "results", f"{stem}_movie.npz"), frames=fr_m,
                         pred=mvp.astype(np.float16), r2_raw=TR.r2_frames(Pm, X[fr_m]),
                         r2_denoised=TR.r2_frames(Pm, Xd[fr_m]), mean_obs=obs_m.mean(1), mean_pred=mvp.mean(1))
     print(f"[test] free rollout of {n} frames in {time.time() - t1:.0f} s: R2 raw {free['r2_raw']:+.3f} +- "
@@ -1817,7 +1822,8 @@ def _test_trace(spec, device="cpu", root=None):
              "noise_sigma2": sigma2, "one_step_msd": D1, "free": free,
              "free_t_s": ((o0 + 1 + np.arange(n)) * 0.914).tolist(), "free_r2_raw": r2r.tolist(),
              "free_r2_denoised": r2d.tolist(), "it": ck.get("it"), "select": ck.get("select", "last")}
-    json.dump(out_j, open(os.path.join(out, "results", f"{spec['name']}_test.json"), "w"))
+    out_j["checkpoint"] = ckn or "best"
+    json.dump(out_j, open(os.path.join(out, "results", f"{stem}_test.json"), "w"))
     return out_j
 
 
@@ -1873,8 +1879,10 @@ def _law_name(spec) -> str:
     except OSError:
         return "learned law"
     m = re.search(r"op:\s*state_diffuse,\s*model:\s*(\w+)", txt)
-    return {"graphcast": "GraphCast law", "connectome": "connectome law", "known_ode": "known ODE"}.get(
-        m.group(1) if m else "", "learned law")
+    ind = " + calcium indicator" if re.search(r"op:\s*calcium_indicator", txt) else ""
+    return {"graphcast": "GraphCast law", "connectome": "connectome law", "known_ode": "known ODE on the mesh",
+            "neuron_graph": "known ODE on the neuron graph"}.get(
+        m.group(1) if m else "", "learned law") + ind
 
 
 def _analyse_trace(spec, device="cpu", root=None):
@@ -1884,12 +1892,13 @@ def _analyse_trace(spec, device="cpu", root=None):
     embedding's clusters against the neurons' stimulus tuning (adjusted mutual information)."""
     from plexus.tasks import trace_recording as TR
     out = out_dir(spec, root)
-    name = spec["name"]
+    ckn = spec.get("_checkpoint")                 # a per-stage checkpoint: its own <name>_<checkpoint>_* files
+    name = f"{spec['name']}_{ckn}" if ckn else spec["name"]
     res = json.load(open(os.path.join(out, "results", f"{name}_test.json")))
     rec = TR.load(spec["task"]["reference"]["trace_recording"])
     gates = {"short_full": 0.206, "long_full": 0.438, "published": rec.get("published")}
     TR.render_curves(res, os.path.join(out, "results", f"{name}_test.png"), res["names"], gates)
-    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location="cpu")
+    ck = torch.load(os.path.join(out, "models", f"{ckn or 'best'}.pt"), weights_only=False, map_location="cpu")
     emb, labels, clus, src = None, None, {}, "embedding"
     N = rec["dff"].shape[1]
     for k, v in ck["fitted"].items():
@@ -1927,12 +1936,12 @@ def _analyse_trace(spec, device="cpu", root=None):
     frames = mv["frames"]
     TR.render_movie(rec["dff"][frames], mv["pred"].astype(np.float32), frames, rec["pos_um"],
                     mv["r2_raw"], mv["r2_denoised"], 0.914, rec["condition"][frames], rec["names"],
-                    os.path.join(out, "results", "movie.mp4"), emb=emb, labels=labels,
+                    os.path.join(out, "results", f"movie_{ckn}.mp4" if ckn else "movie.mp4"), emb=emb, labels=labels,
                     mean_obs=mv["mean_obs"], mean_pred=mv["mean_pred"],
                     emb_name="embedding" if src == "embedding" else "neuron constants " + src[len("parameters "):],
                     inputs=(fit["neuron.input"].float().norm(dim=1).numpy() if "neuron.input" in fit else None),
                     law=_law_name(spec))
-    print(f"[plot] {name}: {name}_test.png, movie.mp4 ({len(frames)} frames)" +
+    print(f"[plot] {name}: {name}_test.png, {f'movie_{ckn}.mp4' if ckn else 'movie.mp4'} ({len(frames)} frames)" +
           (f", {src} AMI with tuning {clus.get('ami_tuning', clus.get('ami_tuning_params')):.3f}" if clus else ""))
     return clus
 
@@ -1940,9 +1949,14 @@ def _analyse_trace(spec, device="cpu", root=None):
 PHASES = {"train": train, "test": test, "analyse": analyse}
 
 
-def run_phases(name_or_path, phases, device="cpu", root=None):
-    """`Plexus_Main.py -o train_test_analyse <name>` lands here."""
+def run_phases(name_or_path, phases, device="cpu", root=None, checkpoint=None):
+    """`Plexus_Main.py -o train_test_analyse <name>` lands here. `checkpoint` (a trace run's test/analyse only):
+    score models/<checkpoint>.pt, e.g. `stage_05`, and write its results under <name>_<checkpoint>_*."""
     spec = load(name_or_path)
+    if checkpoint:
+        if "train" in phases:
+            raise ValueError("--checkpoint scores a saved checkpoint: test / plot only, not train")
+        spec["_checkpoint"] = str(checkpoint)
     for ph in phases:
         PHASES[ph](spec, device=device, root=root)
 

@@ -57,6 +57,9 @@ def main():
     parser.add_argument("--output_root", default=None,
                         help="root for graphs_data/ and log/ (default: $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT / shared GraphData)")
     parser.add_argument("--device", default="cuda:0", help="cuda:N (default) or cpu")
+    parser.add_argument("--checkpoint", default=None,
+                        help="training spec, test/plot: score models/<name>.pt (e.g. stage_05, the end of the horizon-5 "
+                             "stage) instead of best.pt; its results are written as <run>_<name>_* beside the run's own")
     parser.add_argument("--force", action="store_true",
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
@@ -129,7 +132,7 @@ def main():
         phases.append("analyse")
     if phases:
         from plexus.trainer import run_phases
-        run_phases(config_name, phases, device=args.device)    # --output_root already set the root
+        run_phases(config_name, phases, device=args.device, checkpoint=args.checkpoint)    # --output_root set the root
         return
 
     # THE PIPELINE IS ONE FUNCTION AND THIS IS ITS COMMAND LINE. `plexus.pipeline.generate` is what
