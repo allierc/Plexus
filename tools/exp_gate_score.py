@@ -83,12 +83,11 @@ def load_gates(n):
 
 
 def run_exists(spec):
-    from exp_measures.common import run_dir
+    from exp_measures.common import landed_file
     try:
-        d = run_dir(spec)
+        return os.path.exists(landed_file(spec))
     except Exception:                                                        # noqa: BLE001
         return False
-    return os.path.exists(os.path.join(d, "trajectory.npz"))
 
 
 def _kw_key(kw):
@@ -106,7 +105,7 @@ def measure_all(G, n, recompute=False, cache_only=False):
     import exp_measures
     cache_f = os.path.join(EXP, "specs", f"exp{int(n):02d}", "measures.jsonl")
     os.makedirs(os.path.dirname(cache_f), exist_ok=True)
-    from exp_measures.common import CHANGED, run_dir
+    from exp_measures.common import CHANGED, landed_file
     cache, at = {}, {}
     if os.path.exists(cache_f) and not recompute:
         for line in open(cache_f):
@@ -131,7 +130,7 @@ def measure_all(G, n, recompute=False, cache_only=False):
         if ck[1] in CHANGED and t < _t(CHANGED[ck[1]]):
             return False
         try:
-            tj = os.path.join(run_dir(ck[0]), "trajectory.npz")
+            tj = landed_file(ck[0])
             return not (os.path.exists(tj) and os.path.getmtime(tj) > t + 60)
         except Exception:                                                    # noqa: BLE001
             return True
@@ -297,7 +296,7 @@ def lint(G, M):
 
 def stale(n, G):
     """Runs of this experiment whose trajectory landed after the last card, with the card's time."""
-    from exp_measures.common import run_dir
+    from exp_measures.common import landed_file
     gf = os.path.join(EXP, "specs", f"exp{int(n):02d}", "gate_scores.jsonl")
     last = None
     if os.path.exists(gf):
@@ -312,7 +311,7 @@ def stale(n, G):
         for sd in (G.get("seeds") or [None]):
             run = pat.format(seed=sd) if sd is not None else pat
             try:
-                tj = os.path.join(run_dir(run), "trajectory.npz")
+                tj = landed_file(run)
             except Exception:                                                # noqa: BLE001
                 continue
             if os.path.exists(tj) and os.path.getmtime(tj) > t_last + 60:

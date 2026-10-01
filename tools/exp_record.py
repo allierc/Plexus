@@ -221,10 +221,23 @@ def build(number: int) -> str:
         keep.add(n)
         run = os.path.join(GD, r["_group"], r["_run"])
         p = lambda k: os.path.join(folder, k, n + KINDS[k])      # noqa: E731
-        got = {"mp4": _link(os.path.join(run, "movie.mp4"), p("mp4")),
-               "png": _link(os.path.join(run, "3d.png"), p("png"))}
-        if not _link(os.path.join(run, "spec.yaml"), p("spec")):
-            _link(os.path.join(ROOT, "config", r["_group"], r["_run"] + ".yaml"), p("spec"))
+        if r["_group"] == "training":
+            # A TRAINING RUN (`training/<model>/<name>` in the spec cell) lands in
+            # log/training/<model>/<name>/, beside graphs_data. Its still is the analysis figure once
+            # `analyse` has written it, and until then `results/live.png`, which the trainer rewrites
+            # at every validation -- so the watcher shows a run while it trains.
+            run = os.path.join(os.path.dirname(os.path.realpath(GD)), "log", "training", r["_run"])
+            name = os.path.basename(r["_run"])
+            fig = os.path.join(run, "results", f"{name}_test.png")
+            got = {"mp4": _link(os.path.join(run, "results", "movie.mp4"), p("mp4")),
+                   "png": _link(fig if os.path.exists(fig) else os.path.join(run, "results", "live.png"), p("png"))}
+            if not _link(os.path.join(run, "config.yaml"), p("spec")):
+                _link(os.path.join(ROOT, "config", "training", r["_run"] + ".yaml"), p("spec"))
+        else:
+            got = {"mp4": _link(os.path.join(run, "movie.mp4"), p("mp4")),
+                   "png": _link(os.path.join(run, "3d.png"), p("png"))}
+            if not _link(os.path.join(run, "spec.yaml"), p("spec")):
+                _link(os.path.join(ROOT, "config", r["_group"], r["_run"] + ".yaml"), p("spec"))
         with open(p("why"), "w") as fh:
             # a `batch` column (`3.4` = batch 3, arm 4) leads the line: the watcher shows this line beside its
             # position, so a step can be matched to the deck's batch slides (Cedric, exp17, 2026-09-30)
@@ -234,7 +247,8 @@ def build(number: int) -> str:
             fh.write(f"step   {n}  =  {bl}{os.path.basename(r['_run']) + ' (' if bl else ''}"
                      f"{'run ' + r['_v'] if grid else 'iteration v' + r['_v']}{')' if bl else ''} of experiment {number}\n")
             fh.write(f"spec   {r['_group']}/{r['_run']}\n")
-            fh.write(f"run    graphs_data/{r['_group']}/{r['_run']}/\n\n")
+            fh.write(f"run    {run}/\n\n" if r["_group"] == "training"
+                     else f"run    graphs_data/{r['_group']}/{r['_run']}/\n\n")
             for h, v in r.items():
                 if not h.startswith("_") and h.lower() not in ("v", "spec"):
                     fh.write(f"{h}: {v}\n")

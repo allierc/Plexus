@@ -1,0 +1,12 @@
+name: hlo_ko_noI
+model: config/redox/hlo_ko.yaml
+learnable:
+- {field: rest, with: tensor, title: "metabolic set point r* per voxel"}
+- {field: rate, with: tensor, bounds: [0.0, 2.0], title: "relaxation rate 1/tau per voxel"}
+- {field: embedding, with: hash, levels: 3, features: 2, base: [2, 4, 4], scale: 2.0, log2_table: 16, title: "embedding whose distances set the exchange between voxels"}
+- {param: kappa, op: diffuse, bounds: [0.0, 0.3], title: "exchange rate kappa between neighbouring voxels"}
+task:
+  reference: {field_recording: hlo_washout, coarsen: 4, split: all, n_val: 6, normalise: true}
+  observe: {field: ratio}
+  loss: masked_mse
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 2000, horizon: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], batch: 4, seed: 0, save_every: 200}

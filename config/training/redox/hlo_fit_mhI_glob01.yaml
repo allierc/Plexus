@@ -1,0 +1,11 @@
+name: hlo_fit_mhI_glob01
+model: config/redox/hlo_graphcast_in4_mesh3_emb8_I.yaml
+learnable:
+- {param: theta, op: diffuse, title: GraphCast model to learn redox dynamics}
+- {field: embedding, with: hash, levels: 4, features: 2, base: [2, 8, 8], scale: 2.0, log2_table: 16, title: embedding to learn heterogeneity per voxel}
+- {param: I, op: diffuse, prior: {smooth: 1.0}, title: I(t) to learn global external cue}
+task:
+  reference: {field_recording: hlo_washout, coarsen: 4, split: all, n_val: 6}
+  observe: {field: ratio}
+  loss: [{term: masked_mse}, {term: global_mse, weight: 0.1}]
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 1800, horizon: [1, 2, 4, 8, 16, 32], batch: 4, seed: 0, save_every: 100}

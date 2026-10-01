@@ -31,17 +31,47 @@ from plexus.measures import CoreTraj, ParticleTraj, open_traj, register  # noqa:
 
 # ============================================================================ opening a run
 def run_dir(spec: str) -> str:
-    """`group/name` under graphs_data, or a directory path as given."""
+    """`group/name` under graphs_data, `training/<model>/<name>` under log/ (a trainer's run, exp16),
+    or a directory path as given."""
     if os.path.isdir(spec):
         return spec
-    from plexus.paths import graphs_data_path
+    from plexus.paths import graphs_data_path, log_path
     group, name = spec.split("/", 1)
+    if group == "training":
+        return log_path("training", name)
     return graphs_data_path(group, name)
 
 
-def open_run(spec: str):
-    """A `Traj` over the run, with `.dir` and `.spec` (the spec as run, or {}) attached."""
+def landed_file(spec: str) -> str:
+    """The file whose existence says a run has landed, and whose age says when: a simulation's
+    `trajectory.npz`; a training run's held-out result, `results/<name>_test.json` (it has no trajectory)."""
     d = run_dir(spec)
+    if spec.startswith("training/") or os.path.exists(os.path.join(d, "models")):
+        return os.path.join(d, "results", f"{os.path.basename(d.rstrip('/'))}_test.json")
+    return os.path.join(d, "trajectory.npz")
+
+
+class TrainingRun:
+    """A trainer's run as a ruler reads it: `.dir`, `.name`, `.spec` (the training spec as run),
+    `.model` (the forward spec it trained) and `.results` (every `results/*.json`, by file stem)."""
+
+    def __init__(self, d):
+        import glob as _glob
+        import json as _json
+        import yaml
+        self.dir, self.name = d, os.path.basename(d.rstrip("/"))
+        self.spec = yaml.safe_load(open(os.path.join(d, "config.yaml"))) or {}
+        self.model = yaml.safe_load(open(os.path.join(d, "model.yaml"))) or {}
+        self.results = {os.path.splitext(os.path.basename(f))[0]: _json.load(open(f))
+                        for f in _glob.glob(os.path.join(d, "results", "*.json"))}
+
+
+def open_run(spec: str):
+    """A `Traj` over the run, with `.dir` and `.spec` (the spec as run, or {}) attached -- or, for a
+    trainer's run (no trajectory), a `TrainingRun`."""
+    d = run_dir(spec)
+    if not os.path.exists(os.path.join(d, "trajectory.npz")) and os.path.exists(os.path.join(d, "config.yaml")):
+        return TrainingRun(d)
     T = open_traj(d)
     T.dir = d
     try:

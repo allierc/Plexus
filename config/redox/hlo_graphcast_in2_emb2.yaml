@@ -1,0 +1,17 @@
+general:
+  name: hlo_graphcast_in2_emb2
+  seed: 0
+  n_frames: 6
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [0.109375, 1.0, 1.0]
+  save_data: false
+sets: {}
+fields:
+  ratio: {frame: grid, res: 128, components: 2, title: "the redox ratio NADH/FAD of each voxel, now and one interval before"}
+  embedding: {frame: grid, res: 128, components: 2, title: "each voxel's learned embedding, 2 numbers"}
+operators:
+- {op: diffuse, model: graphcast, at: ratio, latent: 16, layers: 2, inputs: 2, embedding: embedding, embedding_dim: 2, spacing: [5.0, 3.3146, 3.3146], seed: 0,
+   title: the voxels' own dynamics, learned by message passing between lattice neighbours}
+schedule: [diffuse]

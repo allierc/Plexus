@@ -522,12 +522,24 @@ def state_labels(raw: dict, r: dict, max_blocks: int = 6) -> list[str]:
     return out
 
 
+def _grid_shape(raw: dict, f: dict) -> str:
+    """A `grid` field's shape: `res` cells per world unit on every axis, axis 0 spanning the world's
+    first width (`plexus.operators.field_ops.ScalarField`) -- e.g. 14 x 128 x 128 -- and its channels."""
+    g = raw.get("general") or {}
+    w = g.get("world", 1.0)
+    w = w if isinstance(w, (list, tuple)) else [w] + [1.0] * (int(g.get("dim", 2)) - 1)
+    R = int(f["res"])
+    shp = [int(round(float(w[0]) * R))] + [R] * (len(w) - 1)
+    c = int(f.get("components", 1))
+    return " x ".join(str(n) for n in shp) + (f", {c} channels" if c > 1 else "")
+
+
 def read_fields(raw: dict) -> list[dict]:
     out = []
     for name, f in (raw.get("fields") or {}).items():
         f = f or {}
         out.append(dict(name=name, title=str(f.get("title") or ""), frame=f.get("frame", ""),
-                        n_grid=f.get("n_grid") or f.get("n") or "",
+                        n_grid=f.get("n_grid") or f.get("n") or (_grid_shape(raw, f) if "res" in f else ""),
                         params={k: v for k, v in f.items() if k not in ("frame", "n_grid", "title")}))
     return out
 
@@ -621,9 +633,130 @@ def human_time(seconds: float) -> str:
     return f"{fmt_num(seconds)} s"
 
 
+TRAINING_KEYS = {"model", "learnable", "task", "training"}
+
+
+def is_training(raw: dict) -> bool:
+    """A TRAINING spec: `plexus.trainer`'s three-part declaration (model + learnable + task + training),
+    or the older run spec of `plexus.tasks.spec_trainer` (spec + task + learnable + training, `io:`).
+    Neither has sets of its own."""
+    if not isinstance(raw, dict):
+        return False
+    return TRAINING_KEYS <= set(raw) or ({"spec", "task", "learnable", "training"} <= set(raw))
+
+
+def _model_path(path: str, raw: dict) -> str:
+    """The forward spec a training spec trains. A run folder keeps the exact model it trained as
+    `model.yaml` beside `config.yaml` (`plexus.trainer.train` copies both), so that copy wins over
+    the repo path, which may have moved on since."""
+    beside = os.path.join(os.path.dirname(os.path.abspath(path)), "model.yaml")
+    if os.path.basename(path) == "config.yaml" and os.path.exists(beside):
+        return beside
+    m = raw.get("model") or raw["spec"]
+    return m if os.path.isabs(m) else os.path.join(ROOT, m)
+
+
+def read_training(raw: dict, ops: list[dict], fields: dict | None = None) -> dict:
+    """The THIRD part of a training declaration, beside entities and activities (plexus2.tex, "Training
+    differentiable models"): what is learnable and in which representation, the task (reference,
+    observable, drive, loss), and the scheme. Plain lines, read from the spec and nothing else."""
+    title = {o["name"]: o["title"] for o in ops}
+
+    def fmt(v):
+        return ", ".join(fmt_num(x) for x in v) if isinstance(v, (list, tuple)) else fmt_num(v)
+    learn = []
+    for e in raw.get("learnable") or []:
+        rep = e.get("with", "tensor")
+        if "field" in e:
+            what = f"the field {e['field']}"
+            if rep == "hash":
+                how = (f"Instant-NGP hash, {e.get('levels')} levels x {e.get('features')} features"
+                       + (f", coarsest {fmt(e['base'])} cells" if "base" in e else "")
+                       + (f", x{fmt_num(e['scale'])} per level" if "scale" in e else ""))
+            else:
+                how = "one free value per voxel"
+        elif "param" in e:
+            what = f"{e['param']} of {lower_first(title.get(e['op'], e['op']))} ({e['op']})"
+            how = "tensor"
+        else:
+            what = f"the state {e['block']} of {e['of']}"
+            how = ("lattice, K " + fmt_num(e["K"]) + " nodes per axis") if rep == "lattice" else "one free value per element"
+        extra = []
+        if e.get("prior"):
+            extra.append("prior " + ", ".join(f"{k} {fmt_num(v)}" for k, v in e["prior"].items()))
+        if "bounds" in e:
+            extra.append("bounds [" + ", ".join("-" if b is None else fmt_num(b) for b in e["bounds"]) + "]")
+        if "lr" in e:
+            extra.append(f"lr {fmt_num(e['lr'])}")
+        # THE LINE A READER NEEDS IS WHAT THE LEARNABLE IS FOR: the entry's own `title:` when the training
+        # spec gives one, else the operator's declared role for that parameter (`PARAM_ROLES`), else the
+        # field's title -- read, never typed here.
+        role = e.get("title")
+        if not role and "param" in e:
+            try:
+                from plexus.models.registry import get_contract
+                c = get_contract(e["op"])
+                mdl = next((o.get("impl") for o in ops if o["name"] == e["op"]), None)
+                cls = c.implementations.get(mdl) if mdl else None
+                role = (getattr(cls, "PARAM_ROLES", {}) or {}).get(e["param"]) if cls else None
+            except Exception:                                           # noqa: BLE001
+                role = None
+        if not role and "field" in e:
+            role = next((f.get("title") for n, f in (fields or {}).items() if n == e["field"]), None)
+        learn.append(dict(what=what, how=how, extra="; ".join(extra), role=role or what))
+    t = raw.get("task") or {}
+    if isinstance(t, str):                        # the older run spec: `task:` names a corpus, `io:` the lines
+        io = raw.get("io") or {}
+        t = {"reference": {"corpus": t}, "loss": "mse",
+             "observe": {k[5:]: v for k, v in io.items() if k.startswith("read_")},
+             "drive": {k[6:]: v for k, v in io.items() if k.startswith("drive_")}}
+    ref = dict(t.get("reference") or {})
+    kind = next((k for k in ("corpus", "shape", "recording", "field_recording") if k in ref), "?")
+    name = ref.pop(kind, "")
+    ref_line = (f"{kind.replace('_', ' ')} {name}"
+                + ("" if not ref else " (" + ", ".join(f"{k} {fmt(v)}" for k, v in ref.items()) + ")"))
+    obs = t.get("observe") or {}
+    drv = t.get("drive") or {}
+    L = t.get("loss", "")
+    terms = [{"term": L}] if isinstance(L, str) else list(L)
+    loss = " + ".join((f"{fmt_num(x['weight'])} x " if x.get("weight", 1) != 1 else "") + x["term"]
+                      + (f" [{x['reduction']}]" if x.get("reduction") else "") for x in terms if x.get("term"))
+    tr = raw.get("training") or {}
+    sch = [f"{tr.get('optimizer', 'adam')} lr {fmt_num(tr['lr'])}" if "lr" in tr else tr.get("optimizer", "adam")]
+    if "lr_min_frac" in tr:
+        sch[-1] += f" -> {fmt_num(100 * float(tr['lr_min_frac']))} % (cosine)"
+    elif tr.get("schedule"):
+        sch[-1] += f" ({tr['schedule']})"
+    for k, lab in (("iters", "iterations"), ("epochs", "epochs"), ("batch", "batch")):
+        if k in tr:
+            sch.append(f"{lab} {fmt_num(tr[k])}" if k == "batch" else f"{fmt_num(tr[k])} {lab}")
+    if tr.get("horizon"):
+        sch.append("horizon curriculum " + fmt(tr["horizon"]))
+    if tr.get("curriculum"):
+        sch.append("horizon curriculum " + fmt(tr["curriculum"]) + " of the trial")
+    if "n_trials" in tr:
+        sch.append(f"{fmt_num(tr['n_trials'])} trials")
+    if tr.get("stages"):
+        sch.append(f"{len(tr['stages'])} stages")
+    if "clip" in tr:
+        sch.append(f"clip {fmt_num(tr['clip'])}")
+    if tr.get("anneal"):
+        sch.append(f"priors annealed at rate {fmt_num(tr['anneal'].get('rate'))} per {tr['anneal'].get('per', 'epoch')}")
+    return dict(name=raw.get("name", ""), learnable=learn, reference=ref_line,
+                observe=", ".join(f"{k} {fmt(v)}" for k, v in obs.items()),
+                drive=", ".join(f"{k} {fmt(v)}" for k, v in drv.items()), loss=loss, scheme=", ".join(sch))
+
+
 def summarise(path: str) -> dict:
-    """The whole summary: header, entities, fields, operators."""
+    """The whole summary: header, entities, fields, operators -- and, for a TRAINING spec, the model it
+    trains summarised the same way, with a third part, `training`."""
     raw = yaml.safe_load(open(path)) or {}
+    if is_training(raw):
+        mp = _model_path(path, raw)
+        s = summarise(mp)
+        s["training"] = read_training(raw, s["operators"], (yaml.safe_load(open(mp)) or {}).get("fields"))
+        s["path"] = os.path.relpath(path, ROOT) if os.path.abspath(path).startswith(ROOT) else path
+        return s
     with contextlib.redirect_stdout(sys.stderr):        # the loader's `[units]` note is not output
         sp = schema.load(path)                          # validates; raises on a malformed spec
     g = raw.get("general") or {}
@@ -737,6 +870,15 @@ def render_text(s: dict, max_ops: int | None = None) -> str:
                 for p in o["params"]))
     if max_ops and len(s["operators"]) > max_ops:
         out.append(f"  ... and {len(s['operators']) - max_ops} more")
+    t = s.get("training")
+    if t:
+        out.append(f"\nTRAINING  {t['name']}")
+        for e in t["learnable"]:
+            out.append(f"  learnable  {e['role']}   [{e['what']} -- {e['how']}" + (f"; {e['extra']}" if e["extra"] else "") + "]")
+        for lab, key in (("reference", "reference"), ("observe", "observe"), ("drive", "drive"),
+                         ("loss", "loss"), ("scheme", "scheme")):
+            if t.get(key):
+                out.append(f"  {lab:<10} {t[key]}")
     return "\n".join(out)
 
 
@@ -906,7 +1048,18 @@ def render_html(s: dict, icon_url, eq_url, max_ops: int | None = None,
                 L.append(f'<tr><td></td><td class="ps-q">'
                          f'<img src="{eq_url(neq[0])}" alt="equation"></td></tr>')
                 neq[0] += 1
-    L.append("</table></div>")
+    L.append("</table>")
+    t = s.get("training")
+    if t:
+        # THE THIRD PART, for a training spec: what is learnable, the task, the scheme.
+        L.append(f'<div class="ps-h">training <span class="ps-g" style="font-size:85%">{esc(t["name"])}</span></div>')
+        # ONE LINE PER LEARNABLE: what it is for (Cedric: "three lines"). The representation, reference,
+        # loss and scheme are in the text rendering and the spec tab.
+        L.append('<table class="ps-a">')
+        for e in t["learnable"]:
+            L.append(f'<tr><td></td><td class="ps-t">{esc(e["role"])}</td></tr>')
+        L.append("</table>")
+    L.append("</div>")
     return "\n".join(L)
 
 

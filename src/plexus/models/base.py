@@ -638,6 +638,11 @@ class Hierarchy(nn.Module):
         """Reset every level's delta accumulator to zeros (called once per tick). Each
         level's delta is sized to its coordinate block (pos for a spatial set, voltage
         for a neuron), not a global spatial dim."""
+        if not self.levels:
+            # A WORLD OF FIELDS ONLY (a recorded volume whose voxels are the state, exp16) has no
+            # set to integrate: nothing accumulates, and the fields' own operators do the dynamics.
+            self._delta, self._delta_blocks = {}, {}
+            return
         dev = next(iter(self.levels.values())).state.device
         # A DELTA IS SHAPED LIKE THE STATE IT INTEGRATES INTO, batch axis included -- otherwise
         # `add_delta` would broadcast a [N, W] accumulator against a [B, N, W] contribution and

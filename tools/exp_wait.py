@@ -77,6 +77,28 @@ def _state(arm, run, n, need_movie):
     return m.get("state", "queued"), m
 
 
+def _train_state(run):
+    """A TRAINER'S run, `training/<model>/<name>` (exp16): LANDED when its analysis figure
+    `results/<name>_test.png` exists (analyse is the last phase, after test); DIED when its job's
+    `log/runs/<name>/run.out` (where `tools/submit_runs.py` sends LSF's stdout, and a local run.sh its own)
+    reports an LSF TERM_ reason or a non-zero exit code."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from exp_measures.common import run_dir
+    d = run_dir(run)
+    name = os.path.basename(d.rstrip("/"))
+    if os.path.exists(os.path.join(d, "results", f"{name}_test.png")):
+        return "landed", {}
+    ro = os.path.join(ROOT, "log", "runs", name, "run.out")
+    if os.path.isfile(ro):
+        txt = open(ro, errors="ignore").read()
+        m = re.search(r"Exited with exit code (\d+)|^exit code ([1-9]\d*)", txt, re.M)
+        t = re.search(r"(TERM_\w+)", txt)
+        if m or t:
+            return "died", {"died": (f"exit code {m.group(1) or m.group(2)}" if m else t.group(1))}
+        return "running", {}
+    return "queued", {}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("n", type=int)
@@ -87,7 +109,30 @@ def main():
     ap.add_argument("--no-movie", action="store_true", help="landed = trajectory only, do not wait for the movie")
     ap.add_argument("--spec", nargs="*", default=[], help="<group>/<name> runs not in the markdown's arms")
     ap.add_argument("--no-land", action="store_true", help="do not run tools/exp_land.py when the batch is decided")
+    ap.add_argument("--train", nargs="*", default=[], help="training/<model>/<name> runs of the trainer (exp16)")
     a = ap.parse_args()
+    if a.train:
+        print(f"[wait] exp{a.n:02d}: {len(a.train)} training run(s), a check every {a.every} s: "
+              + " ".join(a.train), flush=True)
+        t0 = time.time()
+        while True:
+            st = {r: _train_state(r) for r in a.train}
+            if all(v[0] in ("landed", "died") for v in st.values()) or time.time() - t0 > a.timeout:
+                break
+            time.sleep(a.every)
+        el = int(time.time() - t0)
+        for r, (s_, m) in st.items():
+            print(f"  {s_:9s} {r}  {m.get('died', '')}")
+        died = [r for r, v in st.items() if v[0] == "died"]
+        left = [r for r, v in st.items() if v[0] not in ("landed", "died")]
+        landed = [r for r, v in st.items() if v[0] == "landed"]
+        summary = (f"waited {el} s: {len(landed)} landed, {len(died)} died" + (f" ({', '.join(died)})" if died else "")
+                   + (f", {len(left)} still open" if left else ""))
+        print(f"[wait] exp{a.n:02d}: {summary}")
+        if landed and not a.no_land:
+            import exp_land
+            print(exp_land.land(a.n, landed, waited=summary), flush=True)
+        return 2 if left else (1 if died else 0)
     fm, _ = exp.load(exp.exp_path(a.n))
     todo = []
     for sp in a.spec:

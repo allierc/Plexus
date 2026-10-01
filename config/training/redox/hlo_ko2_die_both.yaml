@@ -1,0 +1,18 @@
+name: hlo_ko2_die_both
+model: config/redox/hlo_ko2_die_both.yaml
+learnable:
+- {field: rest, with: tensor, title: "metabolic set point r* per voxel"}
+- {field: rate, with: tensor, bounds: [0.0, 2.0], title: "relaxation rate 1/tau per voxel"}
+- {field: beta, with: tensor, title: "sensitivity beta to the global forcing per voxel"}
+- {field: barrier, with: tensor, bounds: [0.0, 10.0], title: "barrier b to exchange per voxel (membranes)"}
+- {param: kappa, op: diffuse, bounds: [0.0, 0.3], title: "exchange rate kappa between neighbouring voxels"}
+- {param: I, op: diffuse, prior: {smooth: 1.0}, title: "I(t) the global forcing"}
+- {param: k, op: decay, bounds: [0.0, 1.0], title: "death rate k of an exposed voxel, per 10 min"}
+- {param: rc, op: decay, bounds: [-0.3, 0.3], title: "stress threshold r_c on the ratio, offset from its start"}
+- {param: w, op: decay, bounds: [0.005, 0.5], title: "width w of the stress threshold"}
+- {param: h, op: decay, prior: {smooth: 1.0}, title: "h(t) the global stress time course"}
+task:
+  reference: {field_recording: hlo_washout, coarsen: 4, split: all, n_val: 6, normalise: true}
+  observe: {field: ratio, alive: alive}
+  loss: [{term: masked_mse}, {term: mask_iou, weight: 0.01}]
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 2000, horizon: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], batch: 4, seed: 0, save_every: 200}

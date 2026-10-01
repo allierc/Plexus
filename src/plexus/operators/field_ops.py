@@ -280,6 +280,597 @@ class DiffuseSpectral(FieldUpdate):
         return {}
 
 
+@register_operator("diffuse", family="fields", set="field", kind="field", model="graphcast",
+                   title="Learned neighbour dynamics of a field (GraphCast message passing)",
+                   equation=r"""$$h_i=\phi_v(s_i),\;\; e_{ij}\!\leftarrow e_{ij}+\psi^{l}(e_{ij},h_i,h_j),\;\;
+h_i\!\leftarrow h_i+\chi^{l}\big(h_i,\textstyle\sum_{j\in N(i)}e_{ij}\big),\;\; s_i\!\leftarrow s_i+\delta(h_i)$$""")
+class DiffuseGraphCast(FieldUpdate):
+    """The field's own neighbour dynamics, LEARNED: a GraphCast processor on the grid's lattice.
+
+    field -> field, like the two implementations above: one tick moves every voxel's value by an
+    amount that depends on it and on its lattice neighbours. `diffuse` fixes that dependence to a
+    Laplacian; this model lets a message-passing network learn it from a recording, and a zero
+    network leaves the field unchanged (persistence). It is a MODEL of `diffuse`, not a new
+    operator, because the contract is the same -- a field's value, updated from its neighbours,
+    written in place -- and a diffusion law is one of the laws it can represent (a message
+    D (s_j - s_i), summed). What differs is the biology claimed: none. The law is whatever the
+    data say, and reading it is the analysis.
+
+    ONE STEP, encode -> process -> decode (Lam et al. 2023, Science 382:1416, "GraphCast", its
+    supplementary section 3), on the graph whose nodes are the voxels and whose edges join each
+    voxel to its 2D lattice neighbours along each axis (4 in 2D, 6 in 3D):
+
+        h_i    = phi_v(s_i)                                   node latent, from the voxel's value
+        e_ij   = phi_e(d_ij)                                  edge latent, from the step d_ij in um
+        for l in 1..L (unshared layers):
+          e_ij <- e_ij + psi_l(e_ij, h_i, h_j)                edge update, RESIDUAL: e persists
+          h_i  <- h_i + chi_l(h_i, sum_{j in N(i)} e_ij)      node update, from RECEIVED edges only
+        s_i    <- s_i + delta(h_i)                            the increment, one recorded interval
+
+    s_i is the field's value at voxel i (C channels), h_i its latent (width `latent`), e_ij the
+    latent of the edge from j to i, and d_ij the vector from i to j in um (`spacing` per grid
+    axis), so an anisotropic voxel (5 um in z against 3.3 um in x and y) is an edge feature and
+    not an assumption. Every MLP is Linear -> SiLU -> Linear followed by a LayerNorm, the residual
+    added after it (GraphCast's post-norm), except `delta`, which has no norm and whose last layer
+    STARTS AT ZERO -- so an untrained model is exactly persistence, s(t+1) = s(t), and the first run
+    must reproduce the persistence baseline to the last bit. A neighbour outside the box has no
+    edge: its message is dropped, never wrapped around (the recording's 14 z-planes are not a
+    torus).
+
+    THE WEIGHTS ARE ONE FLAT TENSOR, `theta`. The trainer owns every parameter and hands it to
+    each rollout through `on_ready` (`plexus.trainer.Learnables`, `{param: theta, op: diffuse}`),
+    because `engine.run` builds fresh operators on every call. A flat leaf is the one shape that
+    mechanism already carries; the MLPs below are read from views of it, functionally. `theta` is
+    built in the constructor from `seed`, `channels` and `spacing` -- so a spec rolled out without a
+    trainer is the untrained (persistence) model, and a trained one is this spec plus the trainer's
+    `theta`.
+
+    THE MULTI-MESH, `mesh_levels: L_m` (> 0; GraphCast's own architecture). The processor above runs on
+    the grid itself, so a layer carries information one voxel. GraphCast instead encodes the grid
+    onto a coarser MESH, processes on a multi-mesh whose long edges cross the domain in one layer,
+    and decodes back (supplement sections 3.1-3.6; `weathernext1_graph/graphcast.py`). On a lattice:
+
+        mesh nodes     one per block of `mesh_stride` voxels (e.g. [1, 2, 2]: 14 x 64 x 64 for a
+                       14 x 128 x 128 grid), at the block's centre
+        multi-mesh     level k = 0 .. L_m - 1 joins the nodes on the stride-2^k sub-lattice to their
+                       neighbours 2^k mesh steps away along each axis; the edges of every level are
+                       ONE graph, as GraphCast merges its refinements M0..M6
+        grid2mesh      each voxel sends to its block's node
+        mesh2grid      each voxel receives from the (up to) 2 nearest nodes along every strided axis
+
+        encoder   g_i = phi_g(s_i),  m_a = phi_m(0),  e_ia = phi_e(d_ia)                grid, mesh, edges
+                  e_ia <- e_ia + psi(e_ia, g_i, m_a);  m_a <- m_a + chi(m_a, sum_i e_ia);  g_i <- g_i + xi(g_i)
+        processor e_ab = phi_e'(d_ab);  L layers of the edge and node updates above, on the multi-mesh
+        decoder   e_ai = phi_e''(d_ai);  e_ai <- e_ai + psi'(e_ai, m_a, g_i);  g_i <- g_i + chi'(g_i, sum_a e_ai)
+                  s_i <- s_i + delta(g_i)
+
+    g_i is voxel i's latent, m_a mesh node a's, e the latent of an edge, d its step from sender to
+    receiver in um divided by the finest mesh edge's length, with that length appended. Mesh nodes
+    carry no input of their own (GraphCast gives them only their position; this law is
+    translation-invariant, so they carry nothing). `mesh_levels: 0` is the grid processor above,
+    unchanged.
+
+    A PER-VOXEL EMBEDDING, `embedding: <field>` (`embedding_dim: k`). The law stays ONE law, shared by
+    every voxel, but each voxel's encoder also reads k numbers of its own from another field of the
+    model -- connectome-gnn's per-neuron a_i, and the place GraphCast puts its static grid features
+    (land-sea mask, orography), here learned instead of given. The trainer owns that field and its
+    representation (`{field: embed, with: tensor | hash}`); this operator only reads it. What the
+    embedding is FOR is the analysis: voxels the law must treat differently -- one cell against its
+    neighbour, a lumen against cytoplasm -- can only be told apart there, so cells, which the
+    recording does not segment, may appear as clusters of voxels in the embedding.
+
+    TRANSPORT, `transport: true` (exp16, Cedric 2026-09-29: "GraphCast is not able to learn a simple
+    translation rule"). A second decoder head writes a VELOCITY per voxel, v_i = max_speed tanh(delta_v(h_i)),
+    in voxels per tick, and the tick first MOVES the field by it -- semi-Lagrangian: each voxel takes the value
+    at its own position minus v, trilinear from the 2^D voxels around it (0 past the box) -- then adds the
+    local increment: s <- advect(s, v) + delta(h). The interpolation is written out rather than
+    `grid_sample`, so at v = 0 it returns its input exactly: the velocity head starts at 0 and the untrained
+    law stays persistence. `transport_embedding: true` moves the per-voxel embedding by the same v each
+    tick, so a voxel's identity rides with the tissue instead of staying where it was at t0 (the embedding is
+    then state of the rollout, seeded by the trainer). `max_speed` (default 1 voxel per tick) bounds v.
+
+    CHECKPOINTED, `checkpoint: true`: under a tape each tick is recomputed during backward instead of
+    stored (`torch.utils.checkpoint`), so a 68-step rollout costs one step's activations, not 68 --
+    the same numbers, slower by about one extra forward.
+
+    ONE GLOBAL FORCING, `forcing: T` (exp16, Cedric 2026-09-29). GraphCast feeds its forcings -- solar
+    radiation, time of day -- to every grid node beside the state; here one learned number per recorded
+    volume, I(t), `self.I` [T], is appended to EVERY voxel's encoder input at the tick that advances
+    volume t. It is the one learnable allowed to vary with time, and it is allowed because it is GLOBAL:
+    one number per volume for 229,376 voxels can move the organoid-wide level (the washout's source) but
+    cannot draw a single spatial pattern -- a per-voxel or per-region time course would be a leak that
+    explains the recording by storing it. The rollout's absolute volume index is `t_origin + tick`,
+    `t_origin` set by the caller at `on_ready` (the trainer). `forcing: 0` (default) is no forcing.
+
+    Reference: Battaglia, P. W. et al. (2018). Relational inductive biases, deep learning, and
+    graph networks. arXiv:1806.01261; Lam, R. et al. (2023). Learning skillful medium-range global
+    weather forecasting. Science 382:1416-1421.
+    """
+
+    EMIT = None                                  # field->field: writes the grid in place
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["message_passing", "learned_law", "graphcast"]
+    PARAM_ROLES = {"theta": "GraphCast model to learn the field's dynamics", "latent": "latent width",
+                   "layers": "message-passing layers, unshared", "spacing": "voxel size per axis, um",
+                   "channels": "the observed channels", "inputs": "past states read (GraphCast: 2)",
+                   "seed": "the initial weights' seed", "mesh_levels": "multi-mesh levels (0: none)",
+                   "mesh_stride": "voxels per mesh node, per axis",
+                   "embedding": "the field holding each voxel's learned embedding",
+                   "embedding_dim": "its width k",
+                   "forcing": "length of the global forcing I(t), one per recorded volume (0: none)",
+                   "I": "I(t) to learn a global external cue",
+                   "checkpoint": "recompute each tick during backward instead of storing it",
+                   "transport": "move the field by a learned velocity each tick",
+                   "transport_embedding": "move the embedding with the same velocity",
+                   "max_speed": "largest velocity, voxels per tick"}
+    REFERENCE = ("Lam, R. et al. (2023). Learning skillful medium-range global weather forecasting. "
+                 "Science 382:1416-1421; Battaglia, P. W. et al. (2018). arXiv:1806.01261.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")
+        self.latent = int(params.get("latent", 16))
+        self.layers = int(params.get("layers", 2))
+        self.spacing = [float(v) for v in (params.get("spacing") or [])]
+        self.seed = int(params.get("seed", 0))
+        self.channels = int(params.get("channels", 1))
+        # GRAPHCAST READS TWO STATES, x(t - 1) and x(t) (Lam et al. 2023, supplement section 3): with
+        # `inputs: k` the field holds k copies of its channels, newest first, the law reads them all,
+        # updates the newest and shifts it down. `inputs: 1` is the one-state law.
+        self.inputs = int(params.get("inputs", 1))
+        self.mesh_levels = int(params.get("mesh_levels", 0))
+        self.mesh_stride = [int(v) for v in (params.get("mesh_stride") or [])]
+        self.embedding = params.get("embedding")
+        self.embedding_dim = int(params.get("embedding_dim", 0)) if self.embedding else 0
+        if self.embedding and not self.embedding_dim:
+            raise ValueError("diffuse[graphcast] `embedding:` needs `embedding_dim:`, the field's width")
+        self.checkpoint = bool(params.get("checkpoint", False))
+        self.transport = bool(params.get("transport", False))
+        self.transport_embedding = bool(params.get("transport_embedding", False))
+        self.max_speed = float(params.get("max_speed", 1.0))
+        if self.transport and self.inputs > 1:
+            raise ValueError("diffuse[graphcast]: `transport:` moves one state; it excludes `inputs:` > 1")
+        if self.transport_embedding and not (self.transport and self.embedding):
+            raise ValueError("diffuse[graphcast]: `transport_embedding:` needs `transport: true` and `embedding:`")
+        self.forcing = int(params.get("forcing", 0))
+        self.I = torch.zeros(self.forcing, device=device) if self.forcing else None
+        self.t_origin = 0                          # the rollout's first volume, set by the caller
+        # GRAPHCAST'S INPUT AND OUTPUT NORMALISATION (supplement 3.7; exp17's `state_diffuse[graphcast]`):
+        # mu, sd, dsd = the recording's mean, standard deviation and SD of the ONE-STEP difference, set by the
+        # trainer at `on_ready` when the task asks (`reference.normalise: true`). The law reads (s - mu) / sd and
+        # its increment is dsd x delta. (0, 1, 1) -- the default -- is no normalisation, every earlier run.
+        self.norm = (0.0, 1.0, 1.0)
+        self._tick = 0
+        self.device_ = device
+        if not self.spacing:
+            raise ValueError("diffuse[graphcast] needs `spacing:` -- the voxel size along each grid "
+                             "axis in um, one entry per dimension (it is the edges' feature)")
+        if self.mesh_levels and len(self.mesh_stride) != len(self.spacing):
+            raise ValueError("diffuse[graphcast] with `mesh_levels:` needs `mesh_stride:`, the voxels per "
+                             "mesh node along each grid axis (e.g. [1, 2, 2])")
+        # BUILT HERE, not at the first step: the trainer's `on_ready` reads `theta` before any tick.
+        self.theta = self.init_theta(self.channels, len(self.spacing))
+        self._graph = None
+
+    # ------------------------------------------------------------------ the weights, flat
+    def layout(self, C, D):
+        """[(name, shape)] of every tensor inside `theta`, in order. Linear weights are [out, in].
+        The encoder reads all `inputs` states of the C channels; the decoder writes C."""
+        H = self.latent
+        out = []
+
+        def mlp(name, n_in, n_out, norm=True):
+            out.extend([(f"{name}.w1", (H, n_in)), (f"{name}.b1", (H,)),
+                        (f"{name}.w2", (n_out, H)), (f"{name}.b2", (n_out,))])
+            if norm:
+                out.extend([(f"{name}.g", (n_out,)), (f"{name}.beta", (n_out,))])
+        if self.mesh_levels:
+            F = D + 1                                               # the step d, and its length
+            nin = C * self.inputs + self.embedding_dim + (self.forcing > 0)
+            for name, n_in, n_out in (("enc_g", nin, H), ("enc_m", nin, H),
+                                      ("enc_e_g2m", F, H), ("g2m_edge", 3 * H, H), ("g2m_node", 2 * H, H),
+                                      ("g2m_grid", H, H), ("enc_e_mm", F, H)):
+                mlp(name, n_in, n_out)
+            for layer in range(self.layers):
+                mlp(f"mm_edge{layer}", 3 * H, H)
+                mlp(f"mm_node{layer}", 2 * H, H)
+            mlp("enc_e_m2g", F, H)
+            mlp("m2g_edge", 3 * H, H)
+            mlp("m2g_node", 2 * H, H)
+            mlp("dec", H, C, norm=False)
+            if self.transport:
+                mlp("dec_v", H, D, norm=False)
+            return out
+        mlp("enc_v", C * self.inputs + self.embedding_dim + (self.forcing > 0), H)
+        mlp("enc_e", D, H)
+        for layer in range(self.layers):
+            mlp(f"edge{layer}", 3 * H, H)
+            mlp(f"node{layer}", 2 * H, H)
+        mlp("dec", H, C, norm=False)
+        if self.transport:
+            mlp("dec_v", H, D, norm=False)
+        return out
+
+    def init_theta(self, C, D):
+        """PyTorch's own Linear initialisation (uniform in +-1/sqrt(fan_in)), LayerNorm gain 1 and
+        bias 0, and the decoder's last layer 0 -- the persistence start."""
+        g = torch.Generator().manual_seed(self.seed)
+        lay = self.layout(C, D)
+        shapes = dict(lay)
+        parts = []
+        for name, shape in lay:
+            if name.split(".")[0] in ("dec", "dec_v") and name.endswith(("w2", "b2")):
+                t = torch.zeros(shape)
+            elif name.endswith(".g"):
+                t = torch.ones(shape)
+            elif name.endswith(".beta"):
+                t = torch.zeros(shape)
+            else:
+                fan_in = shapes[name.replace(".b", ".w")][1]        # a bias takes its weight's fan-in
+                t = (torch.rand(shape, generator=g) * 2 - 1) / math.sqrt(fan_in)
+            parts.append(t.reshape(-1))
+        return torch.cat(parts).to(self.device_)
+
+    def _views(self, C, D):
+        views, k = {}, 0
+        for name, shape in self.layout(C, D):
+            n = math.prod(shape)
+            views[name] = self.theta[k:k + n].view(shape)
+            k += n
+        if k != self.theta.numel():
+            raise ValueError(f"diffuse[graphcast]: theta has {self.theta.numel()} values, the layout "
+                             f"{k} (latent {self.latent}, layers {self.layers}, {C} channel(s))")
+        return views
+
+    @staticmethod
+    def _mlp(W, name, x, norm=True):
+        y = Fnn.linear(Fnn.silu(Fnn.linear(x, W[f"{name}.w1"], W[f"{name}.b1"])),
+                       W[f"{name}.w2"], W[f"{name}.b2"])
+        return Fnn.layer_norm(y, y.shape[-1:], W[f"{name}.g"], W[f"{name}.beta"]) if norm else y
+
+    # ------------------------------------------------------------------ the lattice graph
+    def graph(self, shape, device):
+        """Per direction: the flat index of each voxel's neighbour, whether it exists, and the step."""
+        if self._graph is not None and self._graph[0] == shape:
+            return self._graph[1]
+        D = len(shape)
+        sp = self.spacing or [1.0] * D
+        if len(sp) != D:
+            raise ValueError(f"diffuse[graphcast]: spacing has {len(sp)} entries for a {D}-D field")
+        idx = torch.arange(math.prod(shape), device=device).view(shape)
+        dirs = []
+        for ax in range(D):
+            for sgn in (1, -1):
+                nb = torch.roll(idx, -sgn, ax)            # the voxel one step along +-ax
+                ok = torch.ones(shape, dtype=torch.bool, device=device)
+                edge = [slice(None)] * D
+                edge[ax] = -1 if sgn == 1 else 0          # no neighbour past the box
+                ok[tuple(edge)] = False
+                step = torch.zeros(D, device=device)
+                step[ax] = sgn * sp[ax]
+                dirs.append((nb.reshape(-1), ok.reshape(-1, 1).float(), step / max(sp)))
+        self._graph = (shape, dirs)
+        return dirs
+
+    def mesh(self, shape, device):
+        """The multi-mesh and its two bipartite graphs, as (senders, receivers, features) index
+        triples: `g2m` grid -> mesh, `mm` the merged multi-mesh, `m2g` mesh -> grid; and the node count."""
+        key = ("mesh", shape)
+        if self._graph is not None and self._graph[0] == key:
+            return self._graph[1]
+        D = len(shape)
+        sp = torch.tensor(self.spacing, dtype=torch.float32, device=device)
+        st = torch.tensor(self.mesh_stride, device=device)
+        gsz = torch.tensor(shape, device=device)
+        msh = [-(-n // k) for n, k in zip(shape, self.mesh_stride)]
+
+        def coords(shp):
+            return torch.stack(torch.meshgrid(*[torch.arange(n, device=device) for n in shp],
+                                              indexing="ij"), -1).reshape(-1, D)
+
+        def flat(ix, shp):
+            f = torch.zeros(ix.shape[0], dtype=torch.long, device=device)
+            for a in range(D):
+                f = f * shp[a] + ix[:, a]
+            return f
+
+        def centre(blk):                          # a block's centre, in voxel units (a partial block too)
+            return (blk * st).float() + (torch.minimum(st, gsz - blk * st).float() - 1) / 2
+
+        gi, mi = coords(shape), coords(msh)
+        gpos, mpos = gi.float() * sp, centre(mi) * sp
+        L0 = float(max(sp[a] * st[a] for a in range(D) if msh[a] > 1))   # the finest mesh edge
+
+        def feat(ps, pr):
+            d = (ps - pr) / L0
+            return torch.cat([d, d.norm(dim=-1, keepdim=True)], -1)
+
+        blk = gi // st
+        g_all = torch.arange(gi.shape[0], device=device)
+        m_of = flat(blk, msh)
+        out = {"n_mesh": mi.shape[0], "g2m": (g_all, m_of, feat(gpos, mpos[m_of]))}
+        snd, rcv = [], []
+        for k in range(self.mesh_levels):
+            sk = 2 ** k
+            nodes = mi[(mi % sk == 0).all(-1)]
+            for a in range(D):
+                for sgn in (1, -1):
+                    nb = nodes.clone()
+                    nb[:, a] += sgn * sk
+                    ok = (nb[:, a] >= 0) & (nb[:, a] < msh[a])
+                    rcv.append(flat(nodes[ok], msh))
+                    snd.append(flat(nb[ok], msh))
+        sn, rc = torch.cat(snd), torch.cat(rcv)
+        out["mm"] = (sn, rc, feat(mpos[sn], mpos[rc]))
+        cands = [blk]
+        c = centre(blk)
+        for a in range(D):
+            if self.mesh_stride[a] == 1:
+                continue
+            side = torch.where(gi[:, a].float() > c[:, a], 1, -1)   # the nearer neighbouring block
+            more = []
+            for b in cands:
+                b2 = b.clone()
+                b2[:, a] += side
+                more.append(b2)
+            cands = cands + more
+        snd, rcv = [], []
+        for b in cands:
+            ok = ((b >= 0) & (b < torch.tensor(msh, device=device))).all(-1)
+            snd.append(flat(b[ok], msh))
+            rcv.append(g_all[ok])
+        sn, rc = torch.cat(snd), torch.cat(rcv)
+        out["m2g"] = (sn, rc, feat(mpos[sn], gpos[rc]))
+        self._graph = (key, out)
+        return out
+
+    def _step_mesh(self, s, W, C, shape, a=None):
+        """encode (grid -> mesh) -> process (multi-mesh) -> decode (mesh -> grid), one tick."""
+        G = self.mesh(shape, s.device)
+        H, Nm = self.latent, G["n_mesh"]
+        mu, sd, _ = self.norm
+        x = ((s - mu) / sd).reshape(s.shape[0], -1).T               # [Ng, C * inputs], normalised
+        if a is not None:
+            x = torch.cat([x, a.reshape(a.shape[0], -1).T], -1)     # + the voxel's own embedding
+        Ng = x.shape[0]
+
+        def agg(rc, e, n):
+            return torch.zeros(n, H, device=e.device, dtype=e.dtype).index_add(0, rc, e)
+
+        g = self._mlp(W, "enc_g", x)
+        m = self._mlp(W, "enc_m", torch.zeros(1, x.shape[1], device=x.device, dtype=x.dtype)).expand(Nm, H)
+        sn, rc, f = G["g2m"]
+        e = self._mlp(W, "enc_e_g2m", f)
+        e = e + self._mlp(W, "g2m_edge", torch.cat([e, g[sn], m[rc]], -1))
+        m = m + self._mlp(W, "g2m_node", torch.cat([m, agg(rc, e, Nm)], -1))
+        g = g + self._mlp(W, "g2m_grid", g)
+        sn, rc, f = G["mm"]
+        e = self._mlp(W, "enc_e_mm", f)
+        for layer in range(self.layers):
+            e = e + self._mlp(W, f"mm_edge{layer}", torch.cat([e, m[sn], m[rc]], -1))
+            m = m + self._mlp(W, f"mm_node{layer}", torch.cat([m, agg(rc, e, Nm)], -1))
+        sn, rc, f = G["m2g"]
+        e = self._mlp(W, "enc_e_m2g", f)
+        e = e + self._mlp(W, "m2g_edge", torch.cat([e, m[sn], g[rc]], -1))
+        g = g + self._mlp(W, "m2g_node", torch.cat([g, agg(rc, e, Ng)], -1))
+        return self._mlp(W, "dec", g, norm=False), g                # [Ng, C], and the grid latents
+
+    # ------------------------------------------------------------------ one tick
+    @staticmethod
+    def _advect(x, v):
+        """x [C, *shape] moved by v [D, *shape] (voxels): out(i) = x(i - v(i)), trilinear over the 2^D voxels
+        around i - v, weight 0 for a voxel past the box. Exact at v = 0 (one corner of weight 1)."""
+        import itertools
+        C, shape = x.shape[0], tuple(x.shape[1:])
+        D = len(shape)
+        ax = torch.meshgrid(*[torch.arange(n, device=x.device, dtype=x.dtype) for n in shape], indexing="ij")
+        p = [ax[d] - v[d] for d in range(D)]
+        f0 = [torch.floor(q) for q in p]
+        fr = [q - q0 for q, q0 in zip(p, f0)]
+        i0 = [q0.long() for q0 in f0]
+        xf = x.reshape(C, -1)
+        out = torch.zeros_like(x)
+        for corner in itertools.product((0, 1), repeat=D):
+            w = torch.ones_like(fr[0])
+            ok = torch.ones(shape, dtype=torch.bool, device=x.device)
+            idx = torch.zeros(shape, dtype=torch.long, device=x.device)
+            for d in range(D):
+                i = i0[d] + corner[d]
+                w = w * (fr[d] if corner[d] else 1 - fr[d])
+                ok = ok & (i >= 0) & (i < shape[d])
+                idx = idx * shape[d] + i.clamp(0, shape[d] - 1)
+            out = out + (w * ok) * xf[:, idx.reshape(-1)].reshape(C, *shape)
+        return out
+
+    def step(self, s, a=None, t=None, return_v=False):
+        """s [C * inputs, *shape] -> the newest state plus delta, the older ones shifted down.
+        `a` [embedding_dim, *shape], each voxel's embedding, when the law reads one; `t` the absolute
+        volume index this tick advances FROM, when the law reads the global forcing I(t)."""
+        C, shape = self.channels, tuple(s.shape[1:])
+        D = len(shape)
+        if s.shape[0] != C * self.inputs or D != len(self.spacing):
+            raise ValueError(f"diffuse[graphcast] was built for {C} channel(s) x {self.inputs} input state(s) "
+                             f"in {len(self.spacing)}-D (`channels:`, `inputs:`, `spacing:`); the field is "
+                             f"{s.shape[0]} x {shape}")
+        W = self._views(C, D)
+        if (a is None) != (not self.embedding_dim) or (a is not None and tuple(a.shape) != (self.embedding_dim,) + tuple(s.shape[1:])):
+            raise ValueError(f"diffuse[graphcast] reads an embedding of {self.embedding_dim} per voxel; "
+                             f"it was given {None if a is None else tuple(a.shape)}")
+        if self.forcing:
+            if t is None:
+                raise ValueError("diffuse[graphcast] with `forcing:` needs the volume index t of each tick")
+            f = self.I[min(max(int(t), 0), self.forcing - 1)].reshape(1, *([1] * D)).expand(1, *shape)
+            a = f if a is None else torch.cat([a, f], 0)   # a global input, beside the embedding
+        if self.mesh_levels:
+            ds, h = self._step_mesh(s, W, C, shape, a)
+        else:
+            dirs = self.graph(shape, s.device)
+            mu, sd, _ = self.norm
+            x = ((s - mu) / sd).reshape(s.shape[0], -1).T           # [N, C * inputs], normalised
+            if a is not None:
+                x = torch.cat([x, a.reshape(a.shape[0], -1).T], -1)
+            h = self._mlp(W, "enc_v", x)                            # [N, H]
+            e = [self._mlp(W, "enc_e", d[2][None]).expand(h.shape[0], -1) for d in dirs]
+            for layer in range(self.layers):
+                agg = 0.0
+                for k, (nb, ok, _) in enumerate(dirs):
+                    e[k] = e[k] + self._mlp(W, f"edge{layer}", torch.cat([e[k], h, h[nb]], -1))
+                    agg = agg + e[k] * ok                           # a missing neighbour sends nothing
+                h = h + self._mlp(W, f"node{layer}", torch.cat([h, agg], -1))
+            ds = self._mlp(W, "dec", h, norm=False)                 # [N, C]
+        ds = self.norm[2] * ds                                      # the increment in the field's units
+        if self.transport:
+            v = (self.max_speed * torch.tanh(self._mlp(W, "dec_v", h, norm=False))).T.reshape((D,) + shape)
+            new = self._advect(s[:C], v) + ds.T.reshape((C,) + shape)
+            return (new, v) if return_v else new
+        new = s[:C] + ds.T.reshape((C,) + shape)
+        return torch.cat([new, s[:-C]], 0) if self.inputs > 1 else new
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        a = H.fields[self.embedding].grid if self.embedding else None
+        t = self.t_origin + int(getattr(H, "frame", self._tick))
+        run = self.step
+        if self.checkpoint and torch.is_grad_enabled():
+            from torch.utils.checkpoint import checkpoint
+            run = lambda *q, **k: checkpoint(self.step, *q, use_reentrant=False, **k)   # noqa: E731
+        if self.transport_embedding:
+            fld.grid, v = run(fld.grid, a, t, return_v=True)
+            # THE EMBEDDING RIDES WITH THE TISSUE: moved by the same velocity as the field it describes.
+            H.fields[self.embedding].grid = self._advect(H.fields[self.embedding].grid, v)
+        else:
+            fld.grid = run(fld.grid, a, t)
+        self._tick += 1
+        return {}
+
+
+@register_operator("diffuse", family="fields", set="field", kind="field", model="known_ode",
+                   title="Per-voxel relaxation, exchange between neighbours and a global drive (known ODE)",
+                   equation=r"""$$\frac{dr_i}{dt}=\frac{r^*_i-r_i}{\tau_i}+\sum_{j\in N(i)}\kappa_{ij}\,(r_j-r_i)+\beta_i\,I(t),
+\qquad \kappa_{ij}=\kappa_{\rm axis}\,e^{-\lVert a_i-a_j\rVert^2}$$""")
+class DiffuseKnownODE(FieldUpdate):
+    """The INTERPRETABLE RIVAL of `diffuse[model: graphcast]` (exp16, Cedric 2026-10-01): exp17's known ODE (a leak
+    toward a rest value, coupling, stimulus weights) translated into the metabolism of a voxel of tissue.
+
+        dr_i/dt = (r*_i - r_i) / tau_i  +  sum_{j in N(i)} kappa_ij (r_j - r_i)  +  beta_i I(t)
+
+    r_i is voxel i's redox ratio (NADH / FAD); r*_i its METABOLIC SET POINT, the ratio its cell returns to at rest;
+    1/tau_i its RELAXATION RATE back to it (`rate`, per tick); kappa_ij the EXCHANGE between neighbouring voxels i, j
+    (the 2D lattice neighbours, no wrap), beta_i its SENSITIVITY to the washout and I(t) the washout's GLOBAL time
+    course, one number per recorded volume (the one time-varying learnable allowed). The exchange is
+
+        kappa_ij = kappa_axis  exp(-|a_i - a_j|^2)
+
+    with a_i voxel i's learned embedding and kappa_axis one rate per grid axis (z planes are 5 um apart, x and y
+    3.3 um). Inside a cell the cytoplasm mixes NADH within seconds, so two voxels of one cell should share an
+    embedding and exchange at kappa_axis; across a membrane only gap junctions connect hepatocytes (connexin-32), so
+    their embeddings should differ and the exchange vanish: THE CELLS, IF THE DATA HOLD THEM, ARE THE SURFACES OF LOW
+    kappa. The coupling conserves the total sum r over the box (kappa_ij = kappa_ji), so it moves NADH/FAD balance
+    between voxels and never creates it.
+
+    r*_i = mu + rest_i: the `rest` field is an OFFSET from the tissue's mean ratio mu (the trainer's `normalise: true`),
+    so set points start at the mean. The per-voxel constants are FIELDS of the model (`rest`, `rate`, `beta`, `embedding`), learned by the trainer as
+    fields (`{field: rest, with: tensor | hash}`); kappa_axis (`kappa`) and I(t) (`I`) are tensors of this operator,
+    learned as `{param: kappa, op: diffuse}` and `{param: I, op: diffuse}`. All rates start at 0 and beta at 0, so the
+    untrained law is EXACTLY persistence. Explicit Euler with `substeps` per tick; the trainer bounds rates >= 0.
+
+    Not a variant of `diffuse[graphcast]`'s options: no MLP, no latent -- every learned number has a name above.
+    Reference: Skala, M. C. et al. (2007) PNAS 104:19494 and Walsh, A. J. et al. (2014) Cancer Res 74:5184 (the
+    NADH/FAD optical redox ratio); exp17's known ODE, `state_diffuse[model: known_ode]` (cell_ops.py).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["relaxation", "exchange", "global_drive", "known_ode"]
+    PARAM_ROLES = {"kappa": "exchange rate between neighbouring voxels, per axis", "I": "I(t) the washout's global time course",
+                   "rest": "the field of metabolic set points r*", "rate": "the field of relaxation rates 1/tau",
+                   "beta": "the field of sensitivities to the washout", "embedding": "the field whose distances set the exchange",
+                   "forcing": "length of I(t), one per recorded volume", "substeps": "Euler steps per tick",
+                   "spacing": "voxel size per axis, um", "barrier": "the field of per-voxel barriers b >= 0 to exchange",
+                   "drive_offset": "the drive is (1 + beta) I(t), so I(t) learns from rest"}
+    REFERENCE = ("Skala, M. C. et al. (2007). PNAS 104:19494-19499; Walsh, A. J. et al. (2014). Cancer Res "
+                 "74:5184-5194.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")
+        self.spacing = [float(v) for v in (params.get("spacing") or [])]
+        if not self.spacing:
+            raise ValueError("diffuse[known_ode] needs `spacing:`, the voxel size per grid axis in um")
+        self.rest, self.rate, self.beta = params.get("rest"), params.get("rate"), params.get("beta")
+        self.embedding = params.get("embedding")
+        # A PER-VOXEL BARRIER b_i >= 0 (`barrier: <field>`): kappa_ij = kappa_axis exp(-(b_i + b_j)). Membranes are where
+        # b is high. It replaces the embedding gate for learning from rest: exp(-|a_i - a_j|^2) has ZERO gradient when the
+        # embeddings agree, as they do at the start (v34: the factor stayed 0.999), while exp(-(b_i + b_j)) at b = 0 has
+        # gradient -1. The embedding gate is kept so v34-v37 reproduce.
+        self.barrier = params.get("barrier")
+        # THE DRIVE IS (1 + beta_i) I(t) with `drive_offset: true`: with beta_i I(t) and both starting at 0, each one's
+        # gradient is the other, 0, and neither ever moved (v34-v37: beta and I stayed exactly 0).
+        self.drive_offset = bool(params.get("drive_offset", False))
+        self.substeps = int(params.get("substeps", 4))
+        self.forcing = int(params.get("forcing", 0))
+        D = len(self.spacing)
+        self.kappa = torch.zeros(D, device=device)                 # per axis, learned; 0 = no exchange
+        self.I = torch.zeros(self.forcing, device=device) if self.forcing else None
+        self.t_origin, self._tick = 0, 0
+        self.norm = (0.0, 1.0, 1.0)                                 # the trainer's mean / SD / one-step SD; mean used
+
+    @staticmethod
+    def _shift(x, ax, sgn):
+        """x's neighbour one step along +-ax (x[i + sgn]), and whether it exists (no wrap)."""
+        n = x.shape[ax]
+        idx = torch.arange(n, device=x.device) + sgn
+        ok = (idx >= 0) & (idx < n)
+        y = torch.index_select(x, ax, idx.clamp(0, n - 1))
+        shp = [1] * x.dim()
+        shp[ax] = n
+        return y, ok.view(shp).to(x.dtype)
+
+    def rhs(self, r, rest, rate, beta, a, t, b=None):
+        """dr/dt per voxel; r [C, *shape], the per-voxel fields [1, *shape] or None, a [k, *shape] or None."""
+        out = torch.zeros_like(r)
+        if rate is not None and rest is not None:
+            # THE SET POINT IS AN OFFSET FROM THE TISSUE'S MEAN (`norm[0]`, set by the trainer under `normalise: true`):
+            # the field starts at 0, so every r* starts at the mean ratio rather than at 0 (0.58 below the tissue).
+            out = out + rate * (self.norm[0] + rest - r)
+        D = r.dim() - 1
+        for d in range(D):
+            ax = d + 1
+            for sgn in (1, -1):
+                rj, ok = self._shift(r, ax, sgn)
+                w = self.kappa[d] * ok
+                if a is not None:
+                    aj, _ = self._shift(a, ax, sgn)
+                    w = w * torch.exp(-((a - aj) ** 2).sum(0, keepdim=True))
+                if b is not None:
+                    bj, _ = self._shift(b, ax, sgn)
+                    w = w * torch.exp(-(b + bj))
+                out = out + w * (rj - r)
+        if self.forcing and (beta is not None or self.drive_offset):
+            g = (1.0 + (beta if beta is not None else 0.0)) if self.drive_offset else beta
+            out = out + g * self.I[min(max(int(t), 0), self.forcing - 1)]
+        return out
+
+    def step(self, r, rest=None, rate=None, beta=None, a=None, t=0, b=None):
+        h = 1.0 / self.substeps
+        for _ in range(self.substeps):
+            r = r + h * self.rhs(r, rest, rate, beta, a, t, b)
+        return r
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        get = lambda n: H.fields[n].grid if n else None              # noqa: E731
+        t = self.t_origin + int(getattr(H, "frame", self._tick))
+        fld.grid = self.step(fld.grid, get(self.rest), get(self.rate), get(self.beta), get(self.embedding), t,
+                             get(self.barrier))
+        self._tick += 1
+        return {}
+
+
 @register_operator("decay", family="fields", set="field", kind="field",
                    equation=r"""$$c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)$$""")
 class Decay(FieldUpdate):
@@ -317,6 +908,114 @@ class Decay(FieldUpdate):
         fld = H.fields[self.field_name]
         dt = float(getattr(H.config, "dt", 1.0))
         fld.grid = (fld.grid - self.rate * dt).clamp(min=0.0)
+        return {}
+
+
+
+@register_operator("decay", family="fields", set="field", kind="field", model="surface_death",
+                   title="Cell death at the tissue's surface: the alive fraction of exposed voxels decays",
+                   equation=r"""$$\frac{dA_i}{dt}=-k\,e^{\gamma (z_i/Z-1/2)}\,e_i\,g_i(t)\,A_i,\qquad
+e_i=1-\tfrac16\sum_{j\in N(i)}A_j,\qquad g_i=\sigma\!\Big(\frac{r_i-r_c}{w}\Big)$$""")
+class DecaySurfaceDeath(FieldUpdate):
+    """CELL DEATH OF A LIVE ORGANOID (exp16, Cedric 2026-10-01): the tissue mask shrinks from 100 % of frame 1 to 74 %
+    by frame 69, lost in frames 10-45 with the washout, one voxel deep at the rim (median depth 3.3 um, no core), and
+    lost voxels are more reduced than the rim kept (ratio 0.619 against 0.605). So a voxel dies only where it is
+    EXPOSED, at a rate a stress function sets:
+
+        dA_i/dt = -k  exp(gamma (z_i / Z - 1/2))  e_i  g_i(t)  A_i,      e_i = 1 - (1/6) sum_{j in N(i)} A_j
+
+    A_i in [0, 1] is voxel i's ALIVE FRACTION (the field at `at:`; the trainer seeds it with the recorded tissue mask
+    at the rollout's origin); e_i its EXPOSURE, the share of its 6 face neighbours that are not alive (outside the box
+    counts as not alive), 0 deep inside, ~1/2 on a flat surface; k the death rate per tick (`k`, per 10 min);
+    gamma a top-to-bottom gradient of it over the stack (`gamma`, 0 = none; z_i / Z from 0 at the first plane to 1 at
+    the last) -- the top planes lose 61 % of their tissue, the bottom one gains 11 %. The stress g_i(t), `hazard:`
+
+        ratio          sigma((r_i - r_c) / w)          the voxel's own redox ratio past a threshold r_c (width w)
+        washout        softplus(h(t))                  a learned global time course, one number per recorded volume
+        ratio_washout  sigma((r_i - r_c) / w + h(t))   both
+        constant       1                               steady erosion, the null
+
+    with r_i read from the field `ratio:`. Every learned number starts where its gradient is not 0: k > 0, r_c at the
+    tissue's mean ratio plus `rc` (0), w 0.03, gamma 0, h 0 (sigma(0) = 1/2, softplus(0) = log 2). Explicit Euler with
+    `substeps` per tick; A only falls (the tissue the recording GAINS, 11 % of the bottom plane, is not modelled).
+    The redox law is untouched: the trainer scores the ratio on the recorded tissue and A against the recorded mask
+    (`mask_iou` / `mask_bce`); the movie draws the model on its own tissue, A > 1/2.
+
+    Reference: none for this form -- a surface hazard is a modelling choice read off the recording (exp16, finding
+    on the shrinkage), not a published law. Plexus (this work).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["cell_death", "surface_erosion", "field_decay"]
+    PARAM_ROLES = {"k": "death rate at full exposure and full stress, per tick", "rc": "stress threshold on the ratio, "
+                   "offset from the tissue mean", "w": "width of the stress threshold, ratio units",
+                   "gamma": "top-to-bottom gradient of the death rate over the stack", "h": "h(t) the global stress time course",
+                   "hazard": "what stresses a voxel: ratio | washout | ratio_washout | constant",
+                   "ratio": "the field of the redox ratio the stress reads", "forcing": "length of h(t), one per recorded volume",
+                   "substeps": "Euler steps per tick",
+                   "rc0": "the threshold's origin in ratio units, when the trainer does not normalise (default its mean)",
+                   "k0": "the death rate's starting value"}
+    REFERENCE = "Plexus (this work); a surface hazard read off the exp16 recording, not a published law."
+    HAZARDS = ("ratio", "washout", "ratio_washout", "constant")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")
+        self.ratio = params.get("ratio", "ratio")
+        self.hazard = params.get("hazard", "ratio")
+        if self.hazard not in self.HAZARDS:
+            raise ValueError(f"decay[surface_death] hazard {self.hazard!r}; one of {self.HAZARDS}")
+        self.substeps = int(params.get("substeps", 4))
+        self.forcing = int(params.get("forcing", 0))
+        if "washout" in self.hazard and not self.forcing:
+            raise ValueError("decay[surface_death] hazard with `washout` needs `forcing:`, the length of h(t)")
+        self.k = torch.tensor([float(params.get("k0", 0.05))], device=device)
+        self.rc = torch.zeros(1, device=device)
+        self.w = torch.tensor([0.03], device=device)
+        self.gamma = torch.zeros(1, device=device)
+        self.h = torch.zeros(max(self.forcing, 1), device=device)
+        self.t_origin, self._tick = 0, 0
+        self.norm = (0.0, 1.0, 1.0)                                 # the trainer's mean ratio: r_c = mean + rc
+        # THE THRESHOLD'S ORIGIN: the trainer's tissue mean (`normalise: true`), or `rc0` given in ratio units for a law
+        # trained without normalising (GraphCast): with r_c at 0 the sigmoid sits at 1 and r_c, w get no gradient.
+        self.rc0 = params.get("rc0")
+
+    @staticmethod
+    def exposure(A):
+        """1 - the mean alive fraction of the 6 face neighbours (2 per axis), outside the box counting as 0."""
+        tot = torch.zeros_like(A)
+        for ax in range(1, A.dim()):
+            for sgn in (1, -1):
+                aj, ok = DiffuseKnownODE._shift(A, ax, sgn)
+                tot = tot + aj * ok
+        return 1.0 - tot / (2 * (A.dim() - 1))
+
+    def stress(self, r, t):
+        ht = self.h[min(max(int(t), 0), self.h.numel() - 1)]
+        if self.hazard == "constant":
+            return torch.ones_like(r)
+        if self.hazard == "washout":
+            return torch.nn.functional.softplus(ht).expand_as(r)
+        x = (r - ((self.norm[0] if self.rc0 is None else float(self.rc0)) + self.rc)) / self.w.clamp(min=1e-3)
+        return torch.sigmoid(x + ht if self.hazard == "ratio_washout" else x)
+
+    def step(self, A, r, t=0):
+        Z = A.shape[1]
+        zf = (torch.arange(Z, device=A.device, dtype=A.dtype) / max(Z - 1, 1) - 0.5).view(1, Z, *([1] * (A.dim() - 2)))
+        rate = self.k * torch.exp(self.gamma * zf) * self.stress(r, t)
+        h = 1.0 / self.substeps
+        for _ in range(self.substeps):
+            A = A - h * rate * self.exposure(A) * A
+        return A.clamp(0.0, 1.0)
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        t = self.t_origin + int(getattr(H, "frame", self._tick))
+        fld.grid = self.step(fld.grid, H.fields[self.ratio].grid[:1], t)
+        self._tick += 1
         return {}
 
 

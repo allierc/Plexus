@@ -1,0 +1,13 @@
+name: hlo_f1_hash_die
+model: config/redox/hlo_f1_emb6_die.yaml
+learnable:
+- {param: theta, op: diffuse, title: GraphCast model to learn redox dynamics}
+- {field: embedding, with: hash, levels: 3, features: 2, base: [2, 4, 4], scale: 2.0, log2_table: 16, title: embedding to learn heterogeneity per voxel}
+- {param: k, op: decay, bounds: [0.0, 1.0], title: "death rate k of an exposed voxel, per 10 min"}
+- {param: rc, op: decay, bounds: [-0.3, 0.3], title: "stress threshold r_c on the ratio, offset from its start"}
+- {param: w, op: decay, bounds: [0.005, 0.5], title: "width w of the stress threshold"}
+task:
+  reference: {field_recording: hlo_washout, coarsen: 4, split: all, n_val: 6}
+  observe: {field: ratio, alive: alive}
+  loss: [{term: masked_mse}, {term: mask_iou, weight: 0.01}]
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 2000, horizon: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], batch: 4, seed: 0, save_every: 200}

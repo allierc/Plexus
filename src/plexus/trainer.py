@@ -80,27 +80,31 @@ from plexus.tasks.trainer import load_split, n_condition_cells, with_context
 _KEYS = {
     "top": {"name", "model", "learnable", "task", "training"},
     "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
-                  "prior", "title"},
+                  "prior", "field", "levels", "features", "log2_table", "base", "scale", "title"},
     "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask"},
     "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
-                  "recording", "beats", "points", "split", "trace_recording", "test_stride"},
+                  "recording", "beats", "field_recording", "coarsen", "points", "split", "normalise",
+                  "trace_recording", "test_stride"},
     "drive": {"set", "block", "prescribe", "width", "window"},
-    "observe": {"set", "block", "channel", "unit", "measure", "grid", "of"},
+    "observe": {"set", "block", "channel", "unit", "measure", "grid", "of", "field", "alive"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
                  "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
                  "iters", "save_every", "anneal", "select"},
     "term": {"term", "weight", "reduction"},
     "stage": {"resolution", "iters", "horizon"},
 }
-REPRESENTATIONS = ("tensor", "lattice")
-REFERENCES = ("corpus", "shape", "recording", "trace_recording")
-_LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_mse",), "trace_recording": ("trace_mse",)}
+REPRESENTATIONS = ("tensor", "lattice", "hash")
+_HASH_KEYS = ("levels", "features", "log2_table", "base", "scale")
+REFERENCES = ("corpus", "shape", "recording", "field_recording", "trace_recording")
+_LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_mse",),
+             "field_recording": ("masked_mse",), "trace_recording": ("trace_mse",)}
 PRIORS = ("shrink", "shrink_to_mean", "smooth", "l1", "l2", "group_l1", "row_l1", "sign",
           "monotone", "pin", "input_group_l1")      # the last three: computed by the operator (`prior_term`)
 # THE EVIDENCE TERMS each reference kind can score, by name. `task.loss` is one name or a list of
 # {term, weight, reduction}; the loop computes the quantities, `_objective` weighs and records them.
 TERMS = {"corpus": ("mse",), "shape": ("log_mse", "volume", "point_mse"),
-         "recording": ("affine_mse", "affine_A", "affine_u"), "trace_recording": ("trace_mse", "trace_increment")}
+         "recording": ("affine_mse", "affine_A", "affine_u"), "field_recording": ("masked_mse", "global_mse", "mask_iou", "mask_bce"),
+         "trace_recording": ("trace_mse", "trace_increment")}
 REDUCTIONS = ("mean", "norm2", "huber", "relative_l2")
 OPTIMIZERS = ("adam",)
 SCHEDULES = ("cosine", "none")
@@ -191,6 +195,24 @@ def load(path_or_name) -> dict:
                 raise ValueError(f"{path}: learnable[{i}] frees `{e['op']}.{e['param']}`, but no "
                                  f"operator line of the model is `{e['op']}` ({sorted(ops)})")
             continue
+        if "field" in e:
+            # A FIELD OF THE MODEL, learned whole: a per-voxel EMBEDDING the law reads (exp16), in the
+            # `tensor` representation (one free vector per voxel) or `hash` (Instant-NGP over the
+            # voxels' coordinates, `plexus.models.hashgrid`: levels x features numbers per voxel).
+            if any(k in e for k in ("block", "of")):
+                raise ValueError(f"{path}: learnable[{i}] is a `field:`; it has no block or set")
+            if e["field"] not in (raw.get("fields") or {}):
+                raise ValueError(f"{path}: learnable[{i}] frees field {e['field']!r}, not a field of "
+                                 f"{s['model']} ({sorted(raw.get('fields') or {})})")
+            rep = e.get("with", "tensor")
+            if rep not in ("tensor", "hash"):
+                raise ValueError(f"{path}: learnable[{i}] a field is learned as `tensor` or `hash`, not {rep!r}")
+            if rep == "hash" and any(k not in e for k in ("levels", "features")):
+                raise ValueError(f"{path}: learnable[{i}] a hash needs `levels:` and `features:` -- "
+                                 f"their product is the field's component count")
+            if rep != "hash" and any(k in e for k in _HASH_KEYS):
+                raise ValueError(f"{path}: learnable[{i}] sets hash keys on a {rep!r} representation")
+            continue
         for k in ("block", "of"):
             if k not in e:
                 raise ValueError(f"{path}: learnable[{i}] needs `{k}:`")
@@ -210,6 +232,8 @@ def load(path_or_name) -> dict:
                                  f"`extent: [cx, cy, cz, half_width]` in world units")
         elif any(k in e for k in ("over", "K", "extent")):
             raise ValueError(f"{path}: learnable[{i}] sets lattice keys on a {rep!r} representation")
+        if rep == "hash" or any(k in e for k in _HASH_KEYS):
+            raise ValueError(f"{path}: learnable[{i}] `hash` is implemented for a `field:` learnable only")
     t = s["task"]
     _refuse_unread(f"{path}: task", t, _KEYS["task"])
     ref = t.get("reference") or {}
@@ -225,7 +249,7 @@ def load(path_or_name) -> dict:
         if k not in t:
             raise ValueError(f"{path}: task needs `{k}:`")
         _refuse_unread(f"{path}: task.{k}", t[k], _KEYS[k])
-    for part in parts:
+    for part in (parts if kind != "field_recording" else ()):
         # THE EDGE BAND PRESCRIBES A SET'S POSITIONS AND VELOCITIES, so it names the set only.
         for k in (("set",) if (kind == "recording" and part == "drive") else ("set", "block")):
             if k not in t[part]:
@@ -277,6 +301,24 @@ def load(path_or_name) -> dict:
                              f"points' parent set `of:`")
         if "iters" not in tr:
             raise ValueError(f"{path}: a recording task trains for `iters:` steps")
+    elif kind == "field_recording":
+        # A RECORDED FIELD HAS NO DRIVE: the observed volume at the forecast's origin IS the
+        # starting state, written into the field before the first tick, and nothing enters after.
+        if "drive" in t:
+            raise ValueError(f"{path}: a field_recording task has no drive -- the recorded volume at "
+                             f"each origin is the starting state")
+        if t["observe"].get("field") not in (raw.get("fields") or {}):
+            raise ValueError(f"{path}: a field_recording task observes `field:`, a field of the model "
+                             f"({sorted(raw.get('fields') or {})})")
+        if set(t["observe"]) - {"field", "alive"}:
+            raise ValueError(f"{path}: a field_recording task observes a whole field (`field:`) and, with a death "
+                             f"operator, the field of its alive fraction (`alive:`); nothing else is read")
+        if "alive" in t["observe"] and t["observe"]["alive"] not in (raw.get("fields") or {}):
+            raise ValueError(f"{path}: observe.alive `{t['observe']['alive']}` is not a field of the model")
+        hz = tr.get("horizon")
+        if "iters" not in tr or not hz or not all(isinstance(h, int) and h >= 1 for h in hz):
+            raise ValueError(f"{path}: a field_recording task trains for `iters:` steps over a "
+                             f"`horizon:` curriculum of whole recorded intervals, e.g. [1, 3, 6]")
     elif kind == "trace_recording":
         # A RECORDING OF TRACES ON A SET (exp17): the observed block holds each element's value and its history,
         # seeded from the recording at each origin; the known stimulus, if any, is the drive -- a window of
@@ -337,10 +379,47 @@ class Learnables:
         self._pre: dict[str, torch.Tensor] = {}   # sender index of an edge-set block, for `sign`
         self._ops: dict = {}                       # the operator holding each {param, op} learnable
         self.scale = 1.0               # a DISPLAY rollout may spread one deformation over more frames
+        self.mods: dict[str, nn.Module] = {}      # a `hash` field learnable's encoder, its table in `p`
+        self._coords: dict[str, torch.Tensor] = {}
 
     @staticmethod
     def key(e) -> str:
+        if "field" in e:
+            return f"field.{e['field']}"
         return f"{e['op']}.{e['param']}" if "param" in e else f"{e['of']}.{e['block']}"
+
+    def _inject_field(self, H, e):
+        """A learned FIELD, written whole into the model's field before the first tick. `tensor`:
+        the field's own values, starting at the model's (zeros for a declared grid field). `hash`:
+        an Instant-NGP multiresolution grid read at every voxel's centre, coordinates in [0, 1] per
+        axis, its finest level capped at the voxel -- `levels` x `features` numbers per voxel, a
+        spatial prior for free (nearby voxels share table rows at the coarse levels)."""
+        fld = H.fields[e["field"]]
+        shape = tuple(fld.grid.shape)                                  # [k, *grid]
+        k = self.key(e)
+        if e.get("with", "tensor") == "tensor":
+            if k not in self.p:
+                self.p[k] = nn.Parameter(fld.grid.detach().clone())
+            fld.grid = self.p[k].clone()
+            return
+        if k not in self.mods:
+            from plexus.models.hashgrid import MultiResHashGrid
+            D, L, F = len(shape) - 1, int(e["levels"]), int(e["features"])
+            if L * F != shape[0]:
+                raise ValueError(f"learnable `{k}`: a hash of {L} levels x {F} features gives {L * F} "
+                                 f"numbers per voxel; the field has {shape[0]} components")
+            mod = MultiResHashGrid(n_input_dims=D, n_levels=L, n_features_per_level=F,
+                                   log2_hashmap_size=int(e.get("log2_table", 16)),
+                                   base_resolution=e.get("base", 4), per_level_scale=e.get("scale", 2.0),
+                                   max_resolution=list(shape[1:])).to(fld.grid.device)
+            if k not in self.p:                                        # else restored: keep its table
+                self.p[k] = mod.table
+            axes = [(torch.arange(n, device=fld.grid.device, dtype=torch.float32) + 0.5) / n for n in shape[1:]]
+            self._coords[k] = torch.stack(torch.meshgrid(*axes, indexing="ij"), -1).reshape(-1, D)
+            self.mods[k] = mod
+        mod = self.mods[k]
+        mod.table = self.p[k]                                          # always the held leaf
+        fld.grid = mod(self._coords[k]).T.reshape(shape)
 
     def ready(self, H):
         """Parameters of ACTIVITIES, set on the operator instances once they exist (`on_ready`).
@@ -431,6 +510,9 @@ class Learnables:
     def inject(self, H):
         for e in self.entries:
             if "param" in e:
+                continue
+            if "field" in e:
+                self._inject_field(H, e)
                 continue
             lvl = H.level(e["of"])
             if e["block"] not in lvl.state_schema:
@@ -645,6 +727,8 @@ def train(spec, device="cpu", root=None):
         return _train_shape(spec, device, root)
     if spec.get("_kind") == "recording":
         return _train_recording(spec, device, root)
+    if spec.get("_kind") == "field_recording":
+        return _train_field(spec, device, root)
     if spec.get("_kind") == "trace_recording":
         return _train_trace(spec, device, root)
     tr, task = spec["training"], spec["task"]
@@ -786,6 +870,10 @@ def test(spec, device="cpu", root=None):
         return _test_recording(spec, device, root)
     if spec.get("_kind") == "trace_recording":
         return _test_trace(spec, device, root)
+    if spec.get("_kind") == "field_recording":
+        if spec["task"]["reference"].get("split", "holdout") == "all":
+            return _test_field_full(spec, device, root)
+        return _test_field(spec, device, root)
     engine.quiet(True)
     sim, learn, ck, out = _restore(spec, device, root)
     task, corpus = spec["task"], _corpus(spec)
@@ -892,6 +980,8 @@ def analyse(spec, device="cpu", root=None):
     if spec.get("_kind") == "recording":
         print("[analyse] recording tasks: the per-beat scores are the analysis (see test)")
         return None
+    if spec.get("_kind") == "field_recording":
+        return _analyse_field(spec, device, root)
     if spec.get("_kind") == "trace_recording":
         return _analyse_trace(spec, device, root)
     import matplotlib
@@ -1431,6 +1521,720 @@ def _test_recording(spec, device="cpu", root=None):
         print(f"[test] beat {w['k']} window {tuple(w['span'])}: R2(A) {r['r2_A']:.4f}  R2(u) {r['r2_u']:.4f}")
     json.dump(res, open(os.path.join(out, "results", f"{spec['name']}_test.json"), "w"), indent=2)
     return res
+
+# ============================================================================== field recordings
+# A RECORDED FIELD (`task.reference.field_recording`): a sequence of volumes with a tissue mask and
+# no cells or tracks, as `plexus.tasks.field_recording` freezes it. The model is a field whose own
+# law is learned; a rollout starts from the recorded volume at an origin (`on_seeded`) and is
+# compared with the recorded volumes after it, on the voxels that are tissue at both ends. The
+# scorer is `field_recording.score`, the same arithmetic the baselines were measured with, so a
+# model's RMSE and persistence's are one number apart and nothing else.
+def _field_setup(spec, device):
+    """The recording at the model's grid, its train / val / test targets, and the check that the
+    model's field is that grid. The last `n_test` volumes are test targets, the `n_val` before them
+    validation targets (they pick the checkpoint), and the rest train targets."""
+    from plexus.tasks import field_recording as FR
+    ref, fname = spec["task"]["reference"], spec["task"]["observe"]["field"]
+    rec = FR.coarsen(FR.load(ref["field_recording"]), int(ref.get("coarsen", 1)))
+    if ref.get("split", "holdout") == "all":
+        # EVERY VOLUME IS TRAINED ON (Cedric, 2026-09-29): the question is what the law needs to REPRODUCE
+        # the recording, scored by a full rollout from t0 (`_test_field_full`). The last `n_val` volumes
+        # are still rolled out to watch the fit, in sample; nothing is held out.
+        tr, te = np.arange(rec["ratio"].shape[0]), np.arange(0)
+        va = tr[-int(ref.get("n_val", 6)):]
+    else:
+        tr, te = FR.split(rec, int(ref.get("n_test", 15)))
+        n_val = int(ref.get("n_val", 6))
+        va, tr = tr[-n_val:], tr[:-n_val]
+    sim = _model(spec, train=False, n_frames=0)
+    with torch.no_grad():
+        H, _ = engine.run(sim, device=device, progress=False)
+    shape = tuple(H.fields[fname].grid.shape[1:])
+    if shape != tuple(rec["ratio"].shape[1:]):
+        raise ValueError(f"the model's field `{fname}` is {shape}, the recording at coarsen "
+                         f"{ref.get('coarsen', 1)} is {tuple(rec['ratio'].shape[1:])}")
+    X = torch.as_tensor(rec["ratio"], device=device)[:, None]          # [T, 1, Z, Y, X]
+    M = torch.as_tensor(rec["mask"], device=device)                     # [T, Z, Y, X]
+    # A FIELD OF k CHANNELS HOLDS THE k LAST VOLUMES, newest first (`diffuse[graphcast] inputs: k`), so a
+    # rollout from origin o is seeded with x(o), x(o - 1), ...; an origin needs k - 1 volumes behind it.
+    n_in = int(H.fields[fname].grid.shape[0])
+    U = M.any(0)                                  # every voxel that is tissue in ANY frame: the global mask
+    # GRAPHCAST'S NORMALISATION, when asked (`reference.normalise: true`): the tissue's mean and SD over the training
+    # frames, and the SD of the one-step difference on voxels that are tissue at both ends -- handed to the law at
+    # `on_ready` (`_field_rollout`), as exp17's trace trainer hands `state_diffuse[graphcast]` its own.
+    norm = (0.0, 1.0, 1.0)
+    if ref.get("normalise"):
+        xt, mt = rec["ratio"][tr], rec["mask"][tr]
+        d = [(rec["ratio"][t + 1] - rec["ratio"][t])[rec["mask"][t] & rec["mask"][t + 1]]
+             for t in tr if t + 1 < rec["ratio"].shape[0]]
+        norm = (float(xt[mt].mean()), float(xt[mt].std()), float(np.sqrt(np.mean(np.concatenate(d) ** 2))))
+    # THE ALIVE FRACTION (`observe.alive`, exp16 2026-10-01): a death operator's field, seeded with the recorded tissue
+    # mask at each rollout's origin and scored against the mask of every target frame (`mask_iou`, `mask_bce`).
+    alive = spec["task"]["observe"].get("alive")
+    return dict(rec=rec, X=X, M=M, U=U, train=tr, val=va, test=te, field=fname, n_in=n_in, norm=norm, alive=alive)
+
+
+def _field_rollout(sims, learn, box, origin, h, device, grad):
+    """h recorded intervals from volume `origin`: [h, C, *grid], frame k the forecast of origin+k+1.
+    `sims[h]` is the model built for that horizon (n_frames = h - 1: one step per tick, and
+    `on_frame` fires after each)."""
+    fname, frames = box["field"], []
+    if origin - box["n_in"] + 1 < 0:
+        raise ValueError(f"origin {origin} has fewer than {box['n_in'] - 1} volumes behind it")
+    x0 = torch.cat([box["X"][origin - k] for k in range(box["n_in"])], 0)
+
+    alive = box.get("alive")
+
+    def seeded(H):
+        H.fields[fname].grid = x0.clone()
+        if alive:                                 # the tissue at the origin is alive, the rest is not
+            H.fields[alive].grid = box["M"][origin].to(x0.dtype)[None].clone()
+        learn.inject(H)                           # the trainer's field learnables (an embedding)
+
+    def hook(H, tick):
+        # WITH A DEATH OPERATOR THE ALIVE FRACTION RIDES AS THE LAST CHANNEL: pred[:, 0] stays the ratio everywhere
+        # it is read, pred[:, -1] is A (`_mask_iou`, `_mask_bce`, `_test_field_full`).
+        g = H.fields[fname].grid
+        frames.append(torch.cat([g, H.fields[alive].grid], 0) if alive else g)
+
+    def ready(H):
+        learn.ready(H)
+        for o in H.operators:                     # a law that reads the global forcing I(t) needs t
+            if hasattr(o, "t_origin"):
+                o.t_origin = origin
+                o.norm = box.get("norm", (0.0, 1.0, 1.0))
+
+    engine.run(sims[h], device=device, progress=False, grad=grad, on_frame=hook,
+               on_seeded=seeded, on_ready=ready)
+    return torch.stack(frames[:h])
+
+
+def _field_sims(spec, hs, train):
+    return {h: _model(spec, train=train, n_frames=h - 1) for h in sorted(set(hs))}
+
+
+def _field_forecaster(sims, learn, box, device):
+    """`forecast(origin, h) -> [Z, Y, X]` numpy, for `field_recording.score`; one rollout each."""
+    def f(o, h):
+        with torch.no_grad():
+            return _field_rollout(sims, learn, box, o, h, device, False)[h - 1, 0].cpu().numpy()
+    return f
+
+
+def _masked_mse(pred, box, origin, h, reduction="mean"):
+    """Mean over the h forecast steps of the reduced residual on voxels that are tissue at the origin
+    and at that step's target -- the scorer's voxel set, so with `mean` the loss is the scorer's MSE."""
+    tot = 0.0
+    for k in range(h):
+        v = box["M"][origin] & box["M"][origin + k + 1]
+        tgt = box["X"][origin + k + 1, 0][v]
+        tot = tot + _reduce(pred[k, 0][v] - tgt, reduction, tgt)
+    return tot / h
+
+
+LOSSES["masked_mse"] = _masked_mse
+
+
+def _global_mse(pred, box, origin, h, reduction="mean"):
+    """The rollout against the recording on the GLOBAL mask -- every voxel that is tissue in any frame --
+    with the recording's own 0 where there is no tissue at that frame (Cedric, 2026-09-29). With it the law
+    must drive a voxel to 0 where the organoid retreats and fill it where it grows; `masked_mse` alone scores
+    only voxels that are tissue at both ends, so the law never learned a boundary (finding 16)."""
+    U = box["U"]
+    tot = 0.0
+    for k in range(h):
+        tgt = box["X"][origin + k + 1, 0][U]
+        tot = tot + _reduce(pred[k, 0][U] - tgt, reduction, tgt)
+    return tot / h
+
+
+LOSSES["global_mse"] = _global_mse
+
+
+def _mask_iou(pred, box, origin, h, reduction="mean"):
+    """1 - the SOFT IoU of the alive fraction A (pred[:, -1]) with the recorded tissue mask M of each target frame,
+    sum A M / sum (A + M - A M), averaged over the h steps (exp16, Cedric 2026-10-01: "train with the IoU mask"). Too
+    much tissue and too little cost alike, and its gradient does not vanish where A is 0 or 1. `reduction` is unused."""
+    tot = 0.0
+    for k in range(h):
+        A, M = pred[k, -1], box["M"][origin + k + 1].to(pred.dtype)
+        inter = (A * M).sum()
+        tot = tot + 1.0 - inter / (A.sum() + M.sum() - inter).clamp(min=1.0)
+    return tot / h
+
+
+def _mask_bce(pred, box, origin, h, reduction="mean"):
+    """The binary cross-entropy of A against the recorded mask, on the GLOBAL mask's voxels (tissue in any frame):
+    the per-voxel rival of `mask_iou` (exp16 arm 6). `reduction` is unused."""
+    U = box["U"]
+    tot = 0.0
+    for k in range(h):
+        A, M = pred[k, -1][U].clamp(1e-6, 1 - 1e-6), box["M"][origin + k + 1][U].to(pred.dtype)
+        tot = tot + torch.nn.functional.binary_cross_entropy(A, M)
+    return tot / h
+
+
+LOSSES["mask_iou"] = _mask_iou
+LOSSES["mask_bce"] = _mask_bce
+
+
+def _train_field(spec, device="cpu", root=None):
+    from plexus.tasks import field_recording as FR
+    tr = spec["training"]
+    torch.manual_seed(int(tr.get("seed", 0)))
+    rng = np.random.default_rng(int(tr.get("seed", 0)))
+    out = out_dir(spec, root)
+    os.makedirs(os.path.join(out, "models"), exist_ok=True)
+    os.makedirs(os.path.join(out, "results"), exist_ok=True)
+    shutil.copyfile(spec["_path"], os.path.join(out, "config.yaml"))
+    shutil.copyfile(spec["model"], os.path.join(out, "model.yaml"))
+    print(f"[run] {spec['name']} -> {out}")
+    engine.quiet(True)
+    box = _field_setup(spec, device)
+    hs = [int(h) for h in tr["horizon"]]
+    sims = _field_sims(spec, hs, train=True)
+    evals = _field_sims(spec, hs, train=False)
+    tr_t, va_t = box["train"], box["val"]
+    print(f"[data] {spec['task']['reference']['field_recording']}: grid {tuple(box['X'].shape[2:])}, "
+          f"{len(tr_t)} train / {len(va_t)} val / {len(box['test'])} test target volumes "
+          f"(val {va_t[0] + 1}-{va_t[-1] + 1}, "
+          + (f"test {box['test'][0] + 1}-{box['test'][-1] + 1}" if len(box["test"]) else "none held out: val is in sample")
+          + ", 1-based)")
+    learn = Learnables(spec["learnable"], device)
+    with torch.no_grad():                                     # the first rollout makes the parameters
+        _field_rollout(sims, learn, box, int(tr_t[box["n_in"] - 1]), hs[0], device, False)
+    params = learn.parameters()
+    n_par = sum(p.numel() for p in params)
+    print(f"[fit] {len(params)} tensor(s), {n_par} values: " + ", ".join(learn.p))
+    base = {h: FR.score(FR.persistence(box["rec"]), box["rec"], va_t, h)["rmse"] for h in sorted(set(hs))}
+    print("[val] persistence RMSE " + "  ".join(f"h={h}: {v:.5f}" for h, v in base.items()))
+    # THE BAR IS THE BEST NON-LEARNED BASELINE, not persistence: at this grid the voxel jitter is most
+    # of persistence's error, so a law that only blurs beats it (exp16, finding 3). The blur's width
+    # is chosen on the TRAIN targets, as `tools/redox_baselines.py` chooses it.
+    blur = {}
+    for h in sorted(set(hs)):
+        sig = min((0.5, 1.0, 2.0, 4.0), key=lambda g: FR.score(FR.smoothed(box["rec"], g), box["rec"], tr_t[12:], h)["rmse"])
+        blur[h] = FR.score(FR.smoothed(box["rec"], sig), box["rec"], va_t, h)["rmse"]
+    print("[val] best blur RMSE   " + "  ".join(f"h={h}: {v:.5f}" for h, v in blur.items()))
+    iters = int(tr["iters"])
+    batch = max(1, int(tr.get("batch", 4)))
+    lr = float(tr.get("lr", 1e-3))
+    frac = float(tr.get("lr_min_frac", 0.05))
+    clip = float(tr.get("clip", 1.0))
+    opt = torch.optim.Adam(learn.groups(lr), lr=lr)
+    sch = torch.optim.lr_scheduler.LambdaLR(
+        opt, lambda i: frac + (1 - frac) * 0.5 * (1 + math.cos(math.pi * min(i, iters) / max(iters, 1))))
+    guard = tr.get("guard", "restore_and_halve")
+    save_every = int(tr.get("save_every", 50))
+    hist_p = os.path.join(out, "results", "history.jsonl")
+    open(hist_p, "w").close()
+
+    def val_row(it):
+        f = _field_forecaster(evals, learn, box, device)
+        r = {"it": it}
+        for h in sorted(set(hs)):
+            r[f"val_rmse_h{h}"] = FR.score(f, box["rec"], va_t, h)["rmse"]
+            r[f"val_persistence_h{h}"] = base[h]
+            r[f"val_blur_h{h}"] = blur[h]
+        return r
+
+    best, best_state, last_ok, log, t_all = np.inf, learn.snapshot(), learn.snapshot(), [], time.time()
+    v0 = val_row(0)
+    best = sum(v0[f"val_rmse_h{h}"] ** 2 for h in set(hs))
+    _field_snapshot(out, spec["name"], learn, evals, box, device, 0, [v0], base, hs, blur)
+    with open(hist_p, "a") as fh:
+        fh.write(json.dumps(v0) + "\n")
+    for it in range(iters):
+        # THE CURRICULUM: the horizons in the order given, an equal share of the iterations each.
+        h = hs[min(len(hs) - 1, it * len(hs) // max(iters, 1))]
+        ok_origins = [int(o) for o in tr_t if int(o) + h <= int(tr_t[-1]) and int(o) >= box["n_in"] - 1]
+        t0 = time.time()
+        opt.zero_grad()
+        loss_v, finite, parts = 0.0, True, {}
+        for o in rng.choice(ok_origins, size=min(batch, len(ok_origins)), replace=False):
+            pred = _field_rollout(sims, learn, box, int(o), h, device, True)
+            # THE ONE OBJECTIVE (`_objective`): the task's weighted terms and the learnables' priors,
+            # annealed by the iteration. Per origin, divided by the batch, so the priors enter once.
+            p_o = {}
+            loss_b = _objective(spec, learn, {
+                "masked_mse": lambda red, pred=pred, o=int(o): _masked_mse(pred, box, o, h, red),
+                "global_mse": lambda red, pred=pred, o=int(o): _global_mse(pred, box, o, h, red),
+                "mask_iou": lambda red, pred=pred, o=int(o): _mask_iou(pred, box, o, h, red),
+                "mask_bce": lambda red, pred=pred, o=int(o): _mask_bce(pred, box, o, h, red)}, it, p_o) / batch
+            for k, v in p_o.items():
+                parts[k] = parts.get(k, 0.0) + v / batch
+            if torch.isfinite(loss_b):
+                loss_b.backward()
+            else:
+                finite = False
+            loss_v += float(loss_b.detach())
+        if not finite and guard == "restore_and_halve":
+            learn.restore(last_ok)
+            for g in opt.param_groups:
+                g["lr"] *= 0.5
+            sch.step()
+            print(f"  it {it:5d} loss not finite -- restored the last finite values, step sizes halved", flush=True)
+            continue
+        torch.nn.utils.clip_grad_norm_(params, clip)
+        opt.step()
+        sch.step()
+        learn.clamp_()
+        last_ok = learn.snapshot()
+        ev = parts.get("loss.masked_mse", loss_v)
+        row = {"it": it + 1, "horizon": h, "loss": loss_v, "rmse": math.sqrt(max(ev, 0.0)),
+               "seconds": time.time() - t0, **parts}
+        log.append(row)
+        if (it + 1) % save_every == 0 or it == iters - 1:
+            row.update(val_row(it + 1))
+            score = sum(row[f"val_rmse_h{k}"] ** 2 for k in set(hs))
+            if score < best:
+                best, best_state = score, learn.snapshot()
+            _field_snapshot(out, spec["name"], learn, evals, box, device, it + 1, log, base, hs, blur)
+            print(f"  it {it + 1:5d} h {h}  loss {loss_v:.6f} (rmse {row['rmse']:.5f})  val (model/persistence/blur) "
+                  + "  ".join(f"h{k} {row[f'val_rmse_h{k}']:.5f}/{base[k]:.5f}/{blur[k]:.5f}" for k in sorted(set(hs)))
+                  + f"  {row['seconds']:.2f} s/it", flush=True)
+        with open(hist_p, "a") as fh:
+            fh.write(json.dumps(row) + "\n")
+    torch.save({"fitted": best_state, "model": spec["model"], "task": spec["task"],
+                "learnable": spec["learnable"]}, os.path.join(out, "models", "best.pt"))
+    rep = {"name": spec["name"], "model": spec["model"],
+           "field_recording": spec["task"]["reference"]["field_recording"], "horizons": hs,
+           "n_params": n_par, "iters": iters, "batch": batch, "val_persistence_rmse": base,
+           "best_val_sum_mse": best, "history": log, "seconds": round(time.time() - t_all, 1),
+           "peak_mem_gb": (torch.cuda.max_memory_allocated(device) / 2 ** 30
+                           if str(device).startswith("cuda") else None)}
+    json.dump(rep, open(os.path.join(out, "results", "report.json"), "w"), indent=2)
+    print(f"[done] {iters} iterations in {rep['seconds'] / 60:.1f} min, best val sum of MSE {best:.6f}")
+    return out
+
+
+def _field_snapshot(out, name, learn, evals, box, device, it, log, base, hs, blur=None):
+    """`results/live.png`, rewritten at every validation, so a watcher sees the run while it trains:
+    the loss and validation curves so far, and the mid plane of the last validation volume --
+    recorded, forecast from the volume `max(hs)` intervals before it, and their difference."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    va, h = box["val"], max(hs)
+    o, t = int(va[-1]) - h, int(va[-1])
+    with torch.no_grad():
+        pred = _field_rollout(evals, learn, box, o, h, device, False)[h - 1, 0].cpu().numpy()
+    obs, msk = box["rec"]["ratio"][t], box["rec"]["mask"][t]
+    zm = obs.shape[0] // 2
+    lo, hi = np.percentile(obs[msk], [2, 98])
+    fig, ax = plt.subplots(1, 4, figsize=(18, 4))
+    ax[0].spines[["top", "right"]].set_visible(False)
+    tr_rows = [r for r in log if "loss" in r]
+    if tr_rows:
+        ax[0].semilogy([r["it"] for r in tr_rows], [r["rmse"] for r in tr_rows], color="0.6", lw=0.8,
+                       label="train RMSE (batch)")
+    for k, c in zip(sorted(set(hs)), ("tab:red", "tab:blue", "tab:orange", "tab:purple")):
+        vr = [r for r in log if f"val_rmse_h{k}" in r]
+        ax[0].semilogy([r["it"] for r in vr], [r[f"val_rmse_h{k}"] for r in vr], "o-", ms=3, color=c,
+                       label=f"val RMSE, {k} step(s)")
+        ax[0].axhline(base[k], color=c, ls="--", lw=0.8)
+        if blur:
+            ax[0].axhline(blur[k], color=c, ls=":", lw=1.2)
+    ax[0].set_xlabel("iteration")
+    ax[0].set_ylabel("RMSE of the ratio (dashed: persistence, dotted: best blur)")
+    ax[0].legend(frameon=False, fontsize=8)
+    for a, img, lab, cm, v in ((ax[1], obs[zm], f"recorded, volume {t + 1}", "viridis", (lo, hi)),
+                               (ax[2], pred[zm], f"forecast, {h} steps from {o + 1}", "viridis", (lo, hi)),
+                               (ax[3], pred[zm] - obs[zm], "forecast - recorded", "RdBu_r",
+                                (-(hi - lo) / 2, (hi - lo) / 2))):
+        a.imshow(np.where(msk[zm], img, np.nan), cmap=cm, vmin=v[0], vmax=v[1])
+        a.set_axis_off()
+        a.set_title(f"{lab}, plane {zm}", fontsize=10, loc="left")
+    fig.suptitle(f"{name}  iteration {it}", x=0.01, ha="left", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(os.path.join(out, "results", "live.png"), dpi=90, facecolor="white")
+    plt.close(fig)
+
+
+def _r2_parts(pred, obs, m):
+    """Variance explained on the voxels m, over (t, v): TOTAL, and SPATIAL -- each frame's tissue mean
+    removed from both first, so a law that only follows the organoid-wide level scores 0 there."""
+    x, p = obs[m], pred[m]
+    r2 = 1.0 - float(((p - x) ** 2).sum()) / float(((x - x.mean()) ** 2).sum())
+    num = den = 0.0
+    for t in range(obs.shape[0]):
+        mt = m[t]
+        if mt.sum() < 2:
+            continue
+        xt, pt = obs[t][mt], pred[t][mt]
+        xt, pt = xt - xt.mean(), pt - pt.mean()
+        num += float(((pt - xt) ** 2).sum())
+        den += float((xt ** 2).sum())
+    return r2, 1.0 - num / max(den, 1e-12)
+
+
+def _test_field_full(spec, device="cpu", root=None):
+    """ONE FREE ROLLOUT FROM t0 through the whole recording, compared with it volume by volume
+    (Cedric, 2026-09-29): variance explained, total and spatial (`_r2_parts`), on the voxels that are
+    tissue at the origin and at the target -- beside the same numbers for persistence (x(t0) held) and
+    for the ceiling the voxel noise leaves, 1 - sigma^2 / variance, sigma the train volumes' noise floor."""
+    from plexus.tasks import field_recording as FR
+    engine.quiet(True)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    box = _field_setup(spec, device)
+    rec = box["rec"]
+    o = box["n_in"] - 1
+    T = rec["ratio"].shape[0]
+    n = T - 1 - o
+    sims = _field_sims(spec, [n], train=False)
+    with torch.no_grad():
+        roll = _field_rollout(sims, learn, box, o, n, device, False)
+    free = roll[:, 0].cpu().numpy()
+    alive = roll[:, -1].cpu().numpy() if box.get("alive") else None
+    obs = rec["ratio"][o + 1:]
+    m = rec["mask"][o + 1:] & rec["mask"][o]
+    hold = np.broadcast_to(rec["ratio"][o], obs.shape)
+    r2, r2s = _r2_parts(free, obs, m)
+    p2, p2s = _r2_parts(hold, obs, m)
+    D = FR.structure_function(rec, np.arange(T), hs=(1, 2, 3))
+    sig = FR.noise_floor(D)["sigma"]
+    var = float(obs[m].var())
+    var_s = float(np.mean([obs[t][m[t]].var() for t in range(n) if m[t].sum() > 1]))
+    # THE DENOISED TARGET (Cedric, 2026-09-29): the same rollout scored against the recording averaged over
+    # 3 voxels in z, y, x and 3 frames (`field_recording.denoise`), with its own noise ceiling from its own
+    # structure function. Beside the raw score, never instead of it: the box is fixed in advance.
+    recd = FR.denoise(rec)
+    obs_d = recd["ratio"][o + 1:]
+    r2d, r2ds = _r2_parts(free, obs_d, m)
+    p2d, p2ds = _r2_parts(hold, obs_d, m)
+    # ITS NOISE FROM LAGS 3-6 ONLY: the 3-frame average makes frames 1 and 2 apart share data, which
+    # shrinks D(1), D(2) and drove the nugget to 0 (a ceiling of exactly 1). Agrees with the raw noise
+    # floor over the box's 81 samples (0.979 against 0.981, measured 2026-09-29).
+    sig_d = FR.noise_floor(FR.structure_function(recd, np.arange(T), hs=(3, 4, 5, 6)), fit_hs=(3, 4, 5, 6))["sigma"]
+    res = {"name": spec["name"], "mode": "full", "origin_volume": o + 1, "steps": n,
+           "r2": r2, "r2_spatial": r2s, "persistence_r2": p2, "persistence_r2_spatial": p2s,
+           "ceiling_r2": 1 - sig ** 2 / var, "ceiling_r2_spatial": 1 - sig ** 2 / var_s, "noise_sigma": sig,
+           "r2_denoised": r2d, "r2_spatial_denoised": r2ds, "persistence_r2_denoised": p2d,
+           "persistence_r2_spatial_denoised": p2ds, "noise_sigma_denoised": sig_d,
+           "ceiling_r2_denoised": 1 - sig_d ** 2 / float(obs_d[m].var()),
+           # IS WHAT IS LEFT GAUSSIAN WHITE NOISE? The model's residual against the denoised recording, and
+           # -- the check on the target itself -- the recording's own residual against it.
+           "residual_model": {**FR.residual_stats(free - obs_d, m),
+                              "level_corr": float(np.corrcoef(np.abs(free - obs_d)[m], obs_d[m])[0, 1])},
+           "residual_data": {**FR.residual_stats(obs - obs_d, m),
+                             "level_corr": float(np.corrcoef(np.abs(obs - obs_d)[m], obs_d[m])[0, 1])},
+           "rmse": [float(np.sqrt(np.mean((free[k][m[k]] - obs[k][m[k]]) ** 2))) for k in range(n)],
+           "persistence_rmse": [float(np.sqrt(np.mean((hold[k][m[k]] - obs[k][m[k]]) ** 2))) for k in range(n)],
+           "organoid_mean_model": [float(free[k][m[k]].mean()) for k in range(n)],
+           "organoid_mean_recorded": [float(obs[k][m[k]].mean()) for k in range(n)],
+           "t_min": ((rec["t_s"][o + 1:] - rec["t_s"][o]) / 60).tolist()}
+    # THE SHAPE (2026-09-29): the model's tissue -- its ratio above 0.15, half the recording's p5 on the
+    # tissue (0.33), model choice -- against the recorded tissue at each frame, as IoU on the global mask;
+    # beside it, frame o's own tissue held (the shape of persistence).
+    U = rec["mask"].any(0)
+    Mt = rec["mask"][o + 1:]
+    # WITH A DEATH OPERATOR THE MODEL'S TISSUE IS ITS OWN ALIVE FIELD, A > 1/2 (exp16, 2026-10-01)
+    pt = (alive > 0.5) if alive is not None else (free > 0.15) & U
+    iou = [float((pt[k] & Mt[k]).sum() / max((pt[k] | Mt[k]).sum(), 1)) for k in range(n)]
+    iou0 = [float((rec["mask"][o] & Mt[k]).sum() / max((rec["mask"][o] | Mt[k]).sum(), 1)) for k in range(n)]
+    res.update(shape_iou=iou, shape_iou_hold=iou0, shape_iou_mean=float(np.mean(iou)),
+               shape_iou_hold_mean=float(np.mean(iou0)),
+               tissue_voxels_model=[int(pt[k].sum()) for k in range(n)], tissue_voxels_recorded=[int(Mt[k].sum()) for k in range(n)])
+    np.savez_compressed(os.path.join(out, "results", f"{spec['name']}_free.npz"), pred=free.astype(np.float16), origin=o,
+                        **({"alive": alive.astype(np.float16)} if alive is not None else {}))
+    json.dump(res, open(os.path.join(out, "results", f"{spec['name']}_test.json"), "w"), indent=2)
+    print(f"[test] full rollout from volume {o + 1}, {n} steps: R2 {r2:+.4f} (spatial {r2s:+.4f}); persistence "
+          f"{p2:+.4f} ({p2s:+.4f}); noise ceiling {res['ceiling_r2']:.4f} ({res['ceiling_r2_spatial']:.4f})")
+    print(f"[test] shape: IoU of the model's tissue with the recorded, mean {res['shape_iou_mean']:.3f} "
+          f"(frame {o + 1}'s shape held: {res['shape_iou_hold_mean']:.3f}); tissue voxels last frame model "
+          f"{res['tissue_voxels_model'][-1]} recorded {res['tissue_voxels_recorded'][-1]}")
+    print(f"[test] against the recording denoised (3 voxels x 3 frames): R2 {r2d:+.4f} (spatial {r2ds:+.4f}); "
+          f"persistence {p2d:+.4f}; ceiling {res['ceiling_r2_denoised']:.4f}")
+    for k in ("residual_model", "residual_data"):
+        q = res[k]
+        print(f"[test] {k}: sd {q['sd']:.4f} skew {q['skew']:+.2f} kurt {q['excess_kurtosis']:+.2f}  autocorr t {q['autocorr_t']:+.2f} "
+              f"z {q['autocorr_z']:+.2f} y {q['autocorr_y']:+.2f} x {q['autocorr_x']:+.2f}  |r| vs level {q['level_corr']:+.2f}")
+    return res
+
+
+def _test_field(spec, device="cpu", root=None):
+    """The kept checkpoint on the TEST volumes, per horizon, against persistence scored by the same
+    call; and one FREE rollout from the last volume before the test window through all of it, whose
+    organoid-mean ratio is the washout response the model must follow (exp16's G20)."""
+    from plexus.tasks import field_recording as FR
+    engine.quiet(True)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    box = _field_setup(spec, device)
+    rec, te = box["rec"], box["test"]
+    H_TEST = (1, 3, 6)
+    n_free = len(te)
+    sims = _field_sims(spec, list(H_TEST) + [n_free], train=False)
+    f = _field_forecaster(sims, learn, box, device)
+    res = {"name": spec["name"], "test_volumes": [int(te[0]) + 1, int(te[-1]) + 1], "horizons": {}}
+    for h in H_TEST:
+        m, p = FR.score(f, rec, te, h), FR.score(FR.persistence(rec), rec, te, h)
+        m.update(persistence_rmse=p["rmse"], skill=1 - m["mse"] / p["mse"])
+        res["horizons"][str(h)] = m
+        print(f"[test] h={h} ({h * 10} min): RMSE {m['rmse']:.5f}  persistence {p['rmse']:.5f}  "
+              f"skill {m['skill']:+.4f}  ({m['n_vox']:,} voxels over {m['n_pairs']} volumes)")
+    o = int(te[0]) - 1
+    with torch.no_grad():
+        free = _field_rollout(sims, learn, box, o, n_free, device, False)[:, 0].cpu().numpy()
+    obs = rec["ratio"][o + 1:o + 1 + n_free]
+    msk = rec["mask"][o + 1:o + 1 + n_free]
+    m0 = rec["mask"][o]
+    res["free"] = {
+        "origin_volume": o + 1,
+        "rmse": [float(np.sqrt(np.mean((free[k][m0 & msk[k]] - obs[k][m0 & msk[k]]) ** 2))) for k in range(n_free)],
+        "persistence_rmse": [float(np.sqrt(np.mean((rec["ratio"][o][m0 & msk[k]] - obs[k][m0 & msk[k]]) ** 2)))
+                             for k in range(n_free)],
+        # BOTH ORGANOID MEANS ARE READ ON THE SCORER'S VOXELS, tissue at the origin AND at the target.
+        # Read on the target's mask alone, the model's mean took in the voxels the tissue moved INTO,
+        # where the field started at 0 -- persistence then read 0.04 below the recording (v0).
+        "organoid_mean_model": [float(free[k][m0 & msk[k]].mean()) for k in range(n_free)],
+        "organoid_mean_recorded": [float(obs[k][m0 & msk[k]].mean()) for k in range(n_free)],
+    }
+    np.savez_compressed(os.path.join(out, "results", f"{spec['name']}_free.npz"),
+                        pred=free.astype(np.float16), origin=o)
+    json.dump(res, open(os.path.join(out, "results", f"{spec['name']}_test.json"), "w"), indent=2)
+    return res
+
+
+def _analyse_field(spec, device="cpu", root=None):
+    """One figure: RMSE per horizon against persistence, the free rollout's organoid mean against
+    the recording's, and the mid plane of the last test volume -- recorded, forecast, difference --
+    plus a movie of the free rollout beside the recording."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    out = out_dir(spec, root)
+    res = json.load(open(os.path.join(out, "results", f"{spec['name']}_test.json")))
+    if res.get("mode") == "full":
+        return _analyse_field_full(spec, res, out)
+    box = _field_setup(spec, "cpu")
+    rec = box["rec"]
+    z = np.load(os.path.join(out, "results", f"{spec['name']}_free.npz"))
+    free, o = z["pred"].astype(np.float32), int(z["origin"])
+    n = free.shape[0]
+    obs, msk = rec["ratio"][o + 1:o + 1 + n], rec["mask"][o + 1:o + 1 + n] & rec["mask"][o]
+    zm = free.shape[1] // 2
+    fig, ax = plt.subplots(1, 5, figsize=(22, 4.2))
+    for a in ax[:2]:
+        a.spines[["top", "right"]].set_visible(False)
+    hs = sorted(int(h) for h in res["horizons"])
+    ax[0].plot([h * 10 for h in hs], [res["horizons"][str(h)]["persistence_rmse"] for h in hs], "o-",
+               color="0.4", label="persistence")
+    ax[0].plot([h * 10 for h in hs], [res["horizons"][str(h)]["rmse"] for h in hs], "o-", color="tab:red",
+               label="model")
+    ax[0].set_xlabel("forecast horizon (min)")
+    ax[0].set_ylabel("RMSE of the ratio on the organoid")
+    ax[0].legend(frameon=False)
+    ax[0].set_title("test volumes, one forecast per origin", fontsize=10, loc="left")
+    tt = (rec["t_s"][o + 1:o + 1 + n] - rec["t_s"][o]) / 60
+    ax[1].plot(tt, res["free"]["organoid_mean_recorded"], "o-", color="black", ms=3, label="recorded")
+    ax[1].plot(tt, res["free"]["organoid_mean_model"], "o-", color="green", ms=3, label="model, free rollout")
+    ax[1].set_xlabel(f"minutes after volume {o + 1}")
+    ax[1].set_ylabel("organoid-mean ratio")
+    ax[1].legend(frameon=False)
+    ax[1].set_title("the washout response over the test window", fontsize=10, loc="left")
+    k = n - 1
+    lo, hi = np.percentile(obs[k][msk[k]], [2, 98])
+    for a, img, lab in ((ax[2], np.where(msk[k, zm], obs[k, zm], np.nan), f"recorded, volume {o + 1 + n}"),
+                        (ax[3], np.where(msk[k, zm], free[k, zm], np.nan), f"model, {n} steps from {o + 1}"),
+                        (ax[4], np.where(msk[k, zm], free[k, zm] - obs[k, zm], np.nan), "model - recorded")):
+        a.imshow(img, cmap="viridis" if a is not ax[4] else "RdBu_r",
+                 vmin=lo if a is not ax[4] else -(hi - lo) / 2, vmax=hi if a is not ax[4] else (hi - lo) / 2)
+        a.set_axis_off()
+        a.set_title(f"{lab}, plane {zm}", fontsize=10, loc="left")
+    fig.tight_layout()
+    p = os.path.join(out, "results", f"{spec['name']}_test.png")
+    fig.savefig(p, dpi=110, facecolor="white")
+    plt.close(fig)
+    insets = []
+    names = _identity_fields(spec)
+    if names:
+        # A failure here must not cost the run its movie (exp16 v34-v37 lost theirs).
+        try:
+            insets = _field_embedding_figure(spec, names, box, out)
+        except Exception as ex:                                                 # noqa: BLE001
+            print(f"[analyse] no per-voxel identity analysis: {type(ex).__name__}: {ex}")
+    _field_movie(out, obs, free, msk, rec, (rec["t_s"][o + 1:o + 1 + n] - rec["t_s"][o]) / 60, insets)
+    print(f"[analyse] -> {p}")
+    return p
+
+
+def _field_movie(out, obs, pred, msk, rec, t_min, insets=(), own=None):
+    """`results/movie.mp4`: the recording LEFT and the model RIGHT as 3-D oblique volumes
+    (`field_recording.render_pair_3d`) -- the watcher's movie of the run."""
+    from plexus.tasks import field_recording as FR
+    try:
+        # BOTH PANELS ON THE SCORED VOXELS, the per-frame mask (Cedric, 2026-09-29, from v30 on): tissue at t0
+        # AND at frame t, so the outline in both panels is the recording's -- the law draws no boundary of its
+        # own (findings 16, 18). The movies of v18-v29 were rendered once on the global mask instead, which
+        # shows the model's own volume. R2 raw and against the denoised recording.
+        o = rec["ratio"].shape[0] - 1 - obs.shape[0]
+        obs_d = FR.denoise(rec)["ratio"][o + 1:o + 1 + obs.shape[0]]
+        # `own` = (the model's tissue A > 1/2, the recorded tissue, IoU per frame) for a run with a death operator:
+        # each panel on its own tissue, the shape IoU printed under the R2 (Cedric, 2026-10-01).
+        kw = {} if own is None else dict(mask_pred=own[0], mask_obs=own[1], iou=own[2])
+        FR.render_pair_3d(obs, pred, msk, rec["dx_um"], rec["dz_um"], os.path.join(out, "results", "movie.mp4"),
+                          times_min=t_min, insets=insets, obs_denoised=obs_d, **kw)
+        print(f"[analyse] movie -> {os.path.join(out, 'results', 'movie.mp4')}")
+    except Exception as e:                        # a movie is a convenience; the figure is the result
+        print(f"[analyse] no movie: {type(e).__name__}: {e}")
+
+
+def _analyse_field_full(spec, res, out):
+    """The full rollout from t0 against the recording: RMSE per volume (model, persistence), the
+    organoid-mean ratio (recorded, model), the variance explained, and the mid plane at three times;
+    then the 3-D movie of the whole rollout, and the embedding's analysis when there is one."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    box = _field_setup(spec, "cpu")
+    rec = box["rec"]
+    z = np.load(os.path.join(out, "results", f"{spec['name']}_free.npz"))
+    free, o = z["pred"].astype(np.float32), int(z["origin"])
+    n = free.shape[0]
+    obs, msk = rec["ratio"][o + 1:o + 1 + n], rec["mask"][o + 1:o + 1 + n] & rec["mask"][o]
+    t = np.array(res["t_min"]) / 60
+    fig, ax = plt.subplots(1, 5, figsize=(24, 4.3))
+    for a in ax[:2]:
+        a.spines[["top", "right"]].set_visible(False)
+    ax[0].plot(t, res["persistence_rmse"], color="0.4", label="persistence (volume held)")
+    ax[0].plot(t, res["rmse"], color="tab:red", label="model, free rollout")
+    ax[0].axhline(res["noise_sigma"], color="0.6", ls="--", label="noise floor")
+    ax[0].set_xlabel(f"hours after volume {o + 1}")
+    ax[0].set_ylabel("RMSE of the ratio on the tissue")
+    ax[0].legend(frameon=False, fontsize=8)
+    ax[0].set_title(f"R2 {res['r2']:+.3f} (spatial {res['r2_spatial']:+.3f}); persistence {res['persistence_r2']:+.3f} "
+                    f"({res['persistence_r2_spatial']:+.3f}); ceiling {res['ceiling_r2']:.3f}", fontsize=9, loc="left")
+    ax[1].plot(t, res["organoid_mean_recorded"], color="black", label="recorded")
+    ax[1].plot(t, res["organoid_mean_model"], color="green", label="model")
+    ax[1].set_xlabel(f"hours after volume {o + 1}")
+    ax[1].set_ylabel("organoid-mean ratio")
+    ax[1].legend(frameon=False, fontsize=8)
+    ax[1].set_title("the washout response, the whole recording", fontsize=10, loc="left")
+    zm = free.shape[1] // 2
+    lo, hi = np.percentile(obs[msk], [2, 98])
+    for a, k in zip(ax[2:], (n // 3, 2 * n // 3, n - 1)):
+        both = np.concatenate([np.where(msk[k, zm], obs[k, zm], np.nan), np.full((obs.shape[2], 4), np.nan),
+                               np.where(msk[k, zm], free[k, zm], np.nan)], 1)
+        a.imshow(both, vmin=lo, vmax=hi)
+        a.set_axis_off()
+        a.set_title(f"plane {zm}, {t[k]:.1f} h: recorded | model", fontsize=10, loc="left")
+    fig.tight_layout()
+    p = os.path.join(out, "results", f"{spec['name']}_test.png")
+    fig.savefig(p, dpi=100, facecolor="white")
+    plt.close(fig)
+    print(f"[analyse] -> {p}")
+    insets = []
+    names = _identity_fields(spec)
+    if names:
+        # A failure here must not cost the run its movie (exp16 v34-v37 lost theirs).
+        try:
+            insets = _field_embedding_figure(spec, names, box, out)
+        except Exception as ex:                                                 # noqa: BLE001
+            print(f"[analyse] no per-voxel identity analysis: {type(ex).__name__}: {ex}")
+    own = None
+    if "alive" in z.files:                        # a death operator: the model drawn on ITS OWN tissue, A > 1/2
+        own = (z["alive"].astype(np.float32) > 0.5, rec["mask"][o + 1:o + 1 + n], res.get("shape_iou"))
+    _field_movie(out, obs, free, msk, rec, np.array(res["t_min"]), insets, own)
+    return p
+
+
+KNOWN_ODE_FIELDS = ("rest", "rate", "beta", "barrier")
+
+
+def _identity_fields(spec):
+    """The learned fields that say what each voxel IS: the embedding when the law has one; for the known ODE, its
+    per-voxel constants (set point r*, rate 1/tau, sensitivity beta, barrier b) -- the interpretable law's own
+    identity, clustered the same way so both laws answer "do voxels group into cells?" (Cedric, 2026-10-01)."""
+    learned = [e["field"] for e in spec["learnable"] if "field" in e]
+    ko = [n for n in KNOWN_ODE_FIELDS if n in learned]
+    if ko:
+        # A KNOWN ODE IS READ BY ITS CONSTANTS, even when it also carries an embedding: v34's never learned (its gate
+        # had no gradient), and clustering it grouped the hash grid's smooth starting noise into false domains.
+        return ko
+    return ["embedding"] if "embedding" in learned else []
+
+
+def _field_embedding_figure(spec, names, box, out, device="cpu"):
+    """The learned per-voxel EMBEDDING, where cells might emerge (exp16): its first three principal
+    components over the tissue voxels drawn as RGB on three planes, and the tissue voxels scattered
+    in the first two. The tissue is the mask of the last training volume. Writes
+    `results/<name>_embedding.png` and `.npz` (the embedding itself, for the rulers)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    sim = _model(spec, train=False, n_frames=0)
+    with torch.no_grad():
+        H, _ = engine.run(sim, device=device, progress=False, on_seeded=learn.inject)
+    a = np.concatenate([H.fields[n].grid.detach().cpu().numpy() for n in names], 0)   # [k, Z, Y, X]
+    if len(names) > 1:
+        # SEVERAL CONSTANTS OF DIFFERENT SCALES (a rate ~0.2 per tick, a barrier ~0.01): each standardised over the
+        # tissue first, so the principal components and the clusters weigh them alike.
+        mm = box["rec"]["mask"][int(box["train"][-1])]
+        a = (a - a[:, mm].mean(1)[:, None, None, None]) / np.maximum(a[:, mm].std(1), 1e-12)[:, None, None, None]
+    np.savez_compressed(os.path.join(out, "results", f"{spec['name']}_embedding.npz"), a=a.astype(np.float32))
+    m = box["rec"]["mask"][int(box["train"][-1])]
+    v = a[:, m].T                                                           # [n tissue voxels, k]
+    v = v - v.mean(0)
+    U, S, Vt = np.linalg.svd(v[:: max(1, len(v) // 50000)], full_matrices=False)
+    pc = (a.reshape(a.shape[0], -1).T - a[:, m].T.mean(0)) @ Vt[:3].T      # [N, <=3]
+    pc = pc.reshape(a.shape[1:] + (pc.shape[1],))
+    lo, hi = np.percentile(pc[m], 2, axis=0), np.percentile(pc[m], 98, axis=0)
+    rgb = np.clip((pc - lo) / np.maximum(hi - lo, 1e-9), 0, 1)
+    if rgb.shape[-1] < 3:
+        rgb = np.concatenate([rgb, np.zeros(rgb.shape[:-1] + (3 - rgb.shape[-1],))], -1)
+    Z = a.shape[1]
+    fig, ax = plt.subplots(1, 4, figsize=(20, 4.6))
+    for j, z in enumerate((Z // 4, Z // 2, 3 * Z // 4)):
+        img = np.where(m[z][..., None], rgb[z], 1.0)
+        ax[j].imshow(img)
+        ax[j].set_axis_off()
+        ax[j].set_title(f"embedding PC1-3 as RGB, plane {z}", fontsize=10, loc="left")
+    pm = pc[m]
+    sub = pm[:: max(1, len(pm) // 20000)]
+    ax[3].scatter(sub[:, 0], sub[:, 1] if sub.shape[1] > 1 else np.zeros(len(sub)), s=1, c="0.3", alpha=0.3)
+    ax[3].spines[["top", "right"]].set_visible(False)
+    ax[3].set_xlabel("PC1")
+    ax[3].set_ylabel("PC2")
+    ev = S ** 2 / max((S ** 2).sum(), 1e-12)
+    ax[3].set_title(f"tissue voxels; variance explained {', '.join(f'{x:.2f}' for x in ev[:3])}", fontsize=10, loc="left")
+    fig.tight_layout()
+    q = os.path.join(out, "results", f"{spec['name']}_embedding.png")
+    fig.savefig(q, dpi=100, facecolor="white")
+    plt.close(fig)
+    print(f"[analyse] embedding ({a.shape[0]} per voxel) -> {q}")
+    # DO CELLS EMERGE? The embedding clustered, the clusters mapped back into the volume
+    # (`field_recording.cluster_embedding`): separation in embedding space, contiguity in 3-D.
+    from plexus.tasks import field_recording as FR
+    lab, st, lab8 = FR.cluster_embedding(a, m, box["rec"]["dx_um"], box["rec"]["dz_um"])
+    json.dump(st, open(os.path.join(out, "results", f"{spec['name']}_clusters.json"), "w"), indent=1)
+    insets = []
+    try:
+        pe = os.path.join(out, "results", f"{spec['name']}_embedding3d.png")
+        what = "embedding" if names == ["embedding"] else "learned constants " + ", ".join(names)
+        FR.render_embedding_3d(a, m, box["rec"]["dx_um"], box["rec"]["dz_um"], pe, title=f"{what}, PC1-3 as RGB")
+        dom = FR.domains(lab8)
+        pd = os.path.join(out, "results", f"{spec['name']}_domains3d.png")
+        FR.render_domains_3d(dom, box["rec"]["dx_um"], box["rec"]["dz_um"], pd,
+                             title=f"{int(dom.max()) + 1} domains, median {st['domain_um3_median_k8']:.0f} um3")
+        ps = os.path.join(out, "results", f"{spec['name']}_embedding_scatter.png")
+        FR.render_embedding_scatter(a, m, lab8, ps, title=f"{what}, tissue voxels, 8 clusters")
+        insets = [ps, pe, pd]
+    except Exception as ex:
+        print(f"[analyse] no 3-D embedding render: {type(ex).__name__}: {ex}")
+    print(f"[analyse] clusters: k {st['k']} silhouette {st['silhouette']:.2f}, coherence {st['coherence']:.2f} "
+          f"(shuffled {st['coherence_null']:+.2f}); at 8 clusters {st['coherence_k8']:.2f}, median domain "
+          f"{st['domain_um3_median_k8']:.0f} um3")
+    return insets
+
 
 # ============================================================================== entry points
 # ============================================================================== trace recordings

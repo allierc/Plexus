@@ -1,0 +1,24 @@
+general:
+  name: hlo_ko2_die_ratio
+  seed: 0
+  n_frames: 6
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [0.109375, 1.0, 1.0]
+  save_data: false
+sets: {}
+fields:
+  ratio: {frame: grid, res: 128, components: 1, title: the redox ratio NADH/FAD of each voxel}
+  rest: {frame: grid, res: 128, components: 1, title: "each voxel's metabolic set point, offset from the tissue mean"}
+  rate: {frame: grid, res: 128, components: 1, title: "each voxel's relaxation rate 1/tau, per 10 min"}
+  beta: {frame: grid, res: 128, components: 1, title: "each voxel's sensitivity to the washout, offset from 1"}
+  barrier: {frame: grid, res: 128, components: 1, title: "each voxel's barrier to exchange (membranes)"}
+  alive: {frame: grid, res: 128, components: 1, title: "each voxel's alive fraction A, the recorded tissue at the start"}
+operators:
+- {op: diffuse, model: known_ode, at: ratio, rest: rest, rate: rate, beta: beta, barrier: barrier, drive_offset: true,
+   forcing: 69, substeps: 4, spacing: [5.0, 3.3146, 3.3146],
+   title: "each voxel relaxes to its set point, exchanges with its neighbours across barriers and follows the washout"}
+- {op: decay, model: surface_death, at: alive, ratio: ratio, hazard: ratio, substeps: 4,
+   title: "a voxel at the surface dies at a rate its stress sets"}
+schedule: [diffuse, decay]

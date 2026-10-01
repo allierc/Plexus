@@ -140,8 +140,53 @@ def health(run: str, audit=True) -> dict:
                 continue
             a = z[k]
             if not np.issubdtype(a.dtype, np.floating):
+def training_health(run: str) -> dict:
+    """A TRAINER'S run (`training/<model>/<name>`, exp16) has no trajectory: its health is its training
+    history (`results/history.jsonl`: every loss finite, the last validation against persistence), its
+    held-out test (`results/<name>_test.json`, the free rollout finite) and its movie."""
+    import json
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from exp_measures.common import run_dir
+    d = run_dir(run)
+    name = os.path.basename(d.rstrip("/"))
+    hist = os.path.join(d, "results", "history.jsonl")
+    rows = [json.loads(l) for l in open(hist)] if os.path.exists(hist) else []
+    tj = os.path.join(d, "results", f"{name}_test.json")
+    h = {"run": run, "training": True, "trajectory": True, "movie": os.path.exists(os.path.join(d, "results", "movie.mp4")),
+         "iterations": max([r.get("it", 0) for r in rows] or [0]), "tested": os.path.exists(tj), "non_finite": []}
+    bad = [r["it"] for r in rows if "loss" in r and not np.isfinite(r["loss"])]
+    if bad:
+        h["non_finite"].append(f"loss not finite at iteration(s) {bad[:5]}")
+    val = [r for r in rows if any(k.startswith("val_rmse_h") for k in r)]
+    if val:
+        h["val_last"] = {k: round(v, 5) for k, v in val[-1].items() if k.startswith(("val_rmse", "val_persistence", "val_blur"))}
+    if h["tested"]:
+        t = json.load(open(tj))
+        # THREE TEST FORMATS: exp16's held-out forecast (`horizons`, `free.rmse`), its full rollout (mode "full":
+        # top-level `rmse`, `r2`) and exp17's trace test (mode "trace": skills over the mean baseline, `free`).
+        if t.get("mode") == "trace":
+            if not t["free"].get("finite", 1.0):
+                h["non_finite"].append("the free rollout left the finite numbers")
+            h["test"] = {"skill_short": round(t["skill_short"], 4), "skill_long": round(t["skill_long"], 4),
+                         "free_r2_denoised": round(t["free"]["r2_denoised"], 4)}
+        elif t.get("mode") == "full":
+            if not np.isfinite(np.asarray(t.get("rmse", np.nan), float)).all():
+                h["non_finite"].append("the full rollout's RMSE is not finite")
+            h["test"] = {k: t[k] for k in ("r2", "r2_spatial") if k in t}
+        else:
+            if not np.isfinite(t["free"]["rmse"]).all():
+                h["non_finite"].append("the free rollout's RMSE is not finite")
+            h["test"] = {k: (round(v["rmse"], 5), round(v["persistence_rmse"], 5)) for k, v in t["horizons"].items()}
+    ev = [r for r in rows if "eval_skill_short" in r]
+    if ev:
+        h["eval_last"] = {k: round(ev[-1][k], 4) for k in ("eval_skill_short", "eval_skill_long")}
+    return h
+
+
                 continue
             nf = ~np.isfinite(a)
+    if run.startswith("training/"):
+        return training_health(run)
             if nf.any():
                 fr = int(np.argmax(nf.reshape(nf.shape[0], -1).any(1))) if a.ndim >= 2 and a.shape[0] == T else None
                 bad.append(f"{k}: {int(nf.sum())} non-finite" + (f" from frame {fr}" if fr is not None else ""))
@@ -209,6 +254,11 @@ def _since_last(n) -> list[str]:
     out = []
     for tj in glob.glob(os.path.join(_gd(), "*", f"exp{int(n):02d}*", "trajectory.npz")):
         if os.path.getmtime(tj) > t_last:
+    if h.get("training"):
+        f = h["non_finite"] + ([] if h["tested"] else ["NOT TESTED"]) + ([] if h["movie"] else ["no movie"])
+        head = f"- **`{h['run']}`**: " + "; ".join(f) if f else f"- `{h['run']}`: healthy"
+        return [head, f"  - {h['iterations']} iterations; last validation {h.get('val_last', {})}",
+                f"  - test (model, persistence) per horizon: {h.get('test', {})}"]
             out.append(os.path.relpath(os.path.dirname(tj), _gd()))
     return sorted(out)
 
