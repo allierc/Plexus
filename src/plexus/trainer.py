@@ -282,9 +282,10 @@ def load(path_or_name) -> dict:
         # seeded from the recording at each origin; the known stimulus, if any, is the drive -- a window of
         # frames written into a set's block before every step. The curriculum is a list of STAGES, one horizon
         # each (plexus2.tex: "a curriculum is a list of stages, each overriding the rollout's horizon").
-        if (ref.get("split") or "all") != "all":
-            raise ValueError(f"{path}: a trace_recording task trains on every frame (`split: all`, Cedric "
-                             f"2026-09-30: no time blocks)")
+        if (ref.get("split") or "all") not in ("all", "zapbench"):
+            raise ValueError(f"{path}: a trace_recording task's `split:` is `all` (train and score on every frame, "
+                             f"Cedric 2026-09-30) or `zapbench` (ZAPBench's own split: train on its training frames, "
+                             f"score its unseen test frames, Cedric 2026-10-01)")
         if set(t["observe"]) - {"set", "block"}:
             raise ValueError(f"{path}: a trace_recording task observes `set:` and `block:` only")
         if "drive" in t:
@@ -1466,8 +1467,17 @@ def _trace_setup(spec, device):
     # GRAPHCAST'S NORMALISATION (supplement 3.7), from the reference: inputs to zero mean and unit variance, the
     # output in units of the one-step difference's standard deviation. Handed to the law at `on_ready`.
     norm = (float(X.mean()), float(X.std()), float(d1.std()))
+    split, lab = t["reference"].get("split", "all"), None
+    if split == "zapbench":
+        # ZAPBENCH'S SPLIT: the labels per frame, and the normalisation from the TRAINING frames only (no statistic
+        # of a test frame reaches the law)
+        lab = TR.zapbench_split(rec["offsets"], int(X.shape[0]))
+        tr_ = torch.as_tensor(lab == 0, device=X.device)
+        Xt = X[tr_]
+        norm = (float(Xt.mean()), float(Xt.std()), float(d1[tr_[1:] & tr_[:-1]].std()))
+        del Xt
     del d1
-    return dict(rec=rec, X=X, S=S, n_in=b - a, norm=norm, T=int(X.shape[0]))
+    return dict(rec=rec, X=X, S=S, n_in=b - a, norm=norm, T=int(X.shape[0]), split=split, lab=lab)
 
 
 def _trace_rollout(sim, learn, spec, box, o, K, device, grad):
@@ -1578,6 +1588,8 @@ def _train_trace(spec, device="cpu", root=None):
     # THE ORIGINS ARE DRAWN FROM ONE RANGE IN EVERY STAGE, bounded by the LARGEST horizon (connectome-gnn's
     # get_training_frame_sampling): the curriculum is then the only thing that changes between stages.
     origins = np.arange(n_in - 1, T - 1 - kmax)
+    if box["split"] == "zapbench":            # every frame of every training window is a ZAPBench training frame
+        origins = TR.split_origins(box["lab"], box["rec"]["condition"], "train", n_in, kmax)
     sims = {k: _model(spec, train=True, n_frames=k - 1) for k in sorted({k for k, _ in stages})}
     learn = Learnables(spec["learnable"], device)
     _trace_rollout(sims[stages[0][0]], learn, spec, box, int(origins[0]), stages[0][0], device, False)  # creates the leaves
@@ -1597,9 +1609,14 @@ def _train_trace(spec, device="cpu", root=None):
     # 16 fixed origins, the live evaluation; from frame 5 at the earliest, or the mean baseline's W = 6 reads X[-1..]
     # (the recording's end) for a 1-frame law (review, 2026-09-30)
     ev_o = np.linspace(max(int(origins[0]), 5), T - 34, 16).astype(int)
-    # THE STIMULUS LOOKUP ON THOSE ORIGINS, once: the live figure draws its per-step skill beside the model's.
     rec_ = box["rec"]
-    look = TR.stimulus_lookup(box["X"], TR.stimulus_keys(rec_["stimulus"], rec_["condition"]))
+    kid_ = TR.stimulus_keys(rec_["stimulus"], rec_["condition"])
+    if box["split"] == "zapbench":            # the live evaluation on ZAPBench's VALIDATION windows, never its test
+        vo = TR.split_origins(box["lab"], rec_["condition"], "val", n_in, 32)
+        ev_o = vo[np.linspace(0, len(vo) - 1, 16).astype(int)]
+    # THE STIMULUS LOOKUP ON THOSE ORIGINS, once: the live figure draws its per-step skill beside the model's.
+    look = (TR.stimulus_lookup_fit(box["X"], kid_, box["lab"] == 0) if box["split"] == "zapbench"
+            else TR.stimulus_lookup(box["X"], kid_))
     lk_mse = TR.mse_per_origin(lambda oo, h: look[oo + h], box["X"], torch.as_tensor(ev_o, device=box["X"].device)).mean(1)
     del look
     save_every = int(tr.get("save_every", 500))
@@ -1752,27 +1769,56 @@ def _test_trace(spec, device="cpu", root=None):
     # origins without enough frames behind them, so arms of different history are scored on the same frames
     origins = np.arange(5, T - H_ - 1, stride)
     origins = origins[origins >= box["n_in"] - 1]
+    zb = box["split"] == "zapbench"
+    if zb:                                    # ZAPBench's test windows, all of them (stride 1), and the held-out TAXIS
+        o_test = TR.split_origins(box["lab"], rec["condition"], "test", box["n_in"], H_)
+        o_hold = TR.split_origins(box["lab"], rec["condition"], "holdout", box["n_in"], H_)
+        origins, stride = np.concatenate([o_test, o_hold]), 1
     t0 = time.time()
     m, base = _trace_eval(spec, learn, box, device, origins, H_)
     ot = torch.as_tensor(origins, device=X.device)
     kid = TR.stimulus_keys(rec["stimulus"], rec["condition"])
-    look = TR.stimulus_lookup(X, kid)
+    look = TR.stimulus_lookup_fit(X, kid, box["lab"] == 0) if zb else TR.stimulus_lookup(X, kid)
     lk = TR.mse_per_origin(lambda oo, h: look[oo + h], X, ot)
     oc, nc = rec["condition"][origins], len(rec["names"])
+    # THE GRAND AVERAGE: every condition, or with ZAPBench's split its 8 training conditions' test windows (TAXIS,
+    # held out, is reported on its own) -- ZAPBench's own average
+    gsel = [c for c in range(nc) if c != TR.ZB_HOLDOUT] if zb else list(range(nc))
     base_c = TR.by_condition(base, oc, nc)                                      # [C, W, h]
-    best_w = base_c.mean(0).argmin(0)                                           # per h, on the grand average
+    best_w = base_c[gsel].mean(0).argmin(0)                                     # per h, on the grand average
     mean_c = base_c[:, best_w, np.arange(H_)]                                   # [C, h]
     model_c, look_c = TR.by_condition(m, oc, nc), TR.by_condition(lk, oc, nc)
     pers_c = base_c[:, 0, :]
-    res = TR.skills(model_c, mean_c)
-    sk_look = TR.skills(look_c, mean_c)
+
+    def _sk(mc, bc):                          # per-condition fields over all conditions, the grand ones over gsel
+        r, g = TR.skills(mc, bc), TR.skills(mc[gsel], bc[gsel])
+        r.update({k: g[k] for k in ("skill", "skill_short", "skill_long", "n_conditions_long_positive")})
+        return r
+    res = _sk(model_c, mean_c)
+    sk_look = _sk(look_c, mean_c)
+    zbj = {}
+    if zb:
+        # ZAPBENCH'S OWN SKILL: against its mean baseline at context 4, the mean of the last W = 4 frames (our scorer
+        # reproduces its published mean-baseline MSE on these very windows, data/baselines.json scorer_check), so
+        # this number stands beside its published 0.206 / 0.438 like for like
+        w4 = base_c[:, 3, :]
+        z = TR.skills(model_c[gsel], w4[gsel])
+        zh = TR.skills(model_c[[TR.ZB_HOLDOUT]], w4[[TR.ZB_HOLDOUT]])
+        zbj = {"split": "zapbench", "n_test_windows": int(len(o_test)), "n_holdout_windows": int(len(o_hold)),
+               "skill_short_zapbench": z["skill_short"], "skill_long_zapbench": z["skill_long"],
+               "skill_zapbench": z["skill"], "taxis_skill_short_zapbench": zh["skill_short"],
+               "taxis_skill_long_zapbench": zh["skill_long"],
+               "lookup_skill_long_zapbench": TR.skills(look_c[gsel], w4[gsel])["skill_long"]}
+        print(f"[test] ZAPBench split: {len(o_test)} test + {len(o_hold)} TAXIS windows; skill vs its mean (W 4): "
+              f"short {z['skill_short']:+.4f} long {z['skill_long']:+.4f} (published best 0.206 / 0.438); "
+              f"TAXIS short {zh['skill_short']:+.4f} long {zh['skill_long']:+.4f}")
     ident = float(np.max(np.abs(model_c.mean(0) - pers_c.mean(0)) / pers_c.mean(0)))
     D1 = float(((X[1:] - X[:-1]) ** 2).mean())
     D = [float(((X[h:] - X[:-h]) ** 2).mean()) for h in (1, 2, 3)]
     sigma2 = max(float(np.polyfit([1, 2, 3], D, 1)[1]), 0.0) / 2
     print(f"[test] {len(origins)} origins (stride {stride}), {time.time() - t0:.0f} s: skill short "
           f"{res['skill_short']:+.4f} long {res['skill_long']:+.4f}; lookup long {sk_look['skill_long']:+.4f}; "
-          f"conditions long > 0: {res['n_conditions_long_positive']}/{nc}; identity gap {ident:.2e}")
+          f"conditions long > 0: {res['n_conditions_long_positive']}/{len(gsel)}; identity gap {ident:.2e}")
     # THE FREE ROLLOUT of the whole recording
     t1 = time.time()
     o0, n = box["n_in"] - 1, T - box["n_in"]
@@ -1814,14 +1860,14 @@ def _test_trace(spec, device="cpu", root=None):
     out_j = {"name": spec["name"], "mode": "trace", "origins": int(len(origins)), "stride": stride,
              "names": rec["names"], "offsets": rec["offsets"].tolist(), "frame_s": 0.914,
              **res, "identity_gap": ident, "best_W": (best_w + 1).tolist(),
-             "mse_model": model_c.mean(0).tolist(), "mse_mean": mean_c.mean(0).tolist(),
-             "mse_persistence": pers_c.mean(0).tolist(), "mse_lookup": look_c.mean(0).tolist(),
+             "mse_model": model_c[gsel].mean(0).tolist(), "mse_mean": mean_c[gsel].mean(0).tolist(),
+             "mse_persistence": pers_c[gsel].mean(0).tolist(), "mse_lookup": look_c[gsel].mean(0).tolist(),
              "mse_model_by_condition": model_c.tolist(), "mse_mean_by_condition": mean_c.tolist(),
              "lookup_skill_short": sk_look["skill_short"], "lookup_skill_long": sk_look["skill_long"],
              "skill_long_minus_lookup": res["skill_long"] - sk_look["skill_long"],
              "noise_sigma2": sigma2, "one_step_msd": D1, "free": free,
              "free_t_s": ((o0 + 1 + np.arange(n)) * 0.914).tolist(), "free_r2_raw": r2r.tolist(),
-             "free_r2_denoised": r2d.tolist(), "it": ck.get("it"), "select": ck.get("select", "last")}
+             "free_r2_denoised": r2d.tolist(), "it": ck.get("it"), "select": ck.get("select", "last"), **zbj}
     out_j["checkpoint"] = ckn or "best"
     json.dump(out_j, open(os.path.join(out, "results", f"{stem}_test.json"), "w"))
     return out_j

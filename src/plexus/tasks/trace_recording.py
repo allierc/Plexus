@@ -72,6 +72,69 @@ def stimulus_lookup(X: torch.Tensor, kid: np.ndarray) -> torch.Tensor:
     return pred
 
 
+# ============================================================================== ZAPBench's own split
+# zapbench/constants.py and its data sources: each condition is trimmed by PADDING_FRAMES = 1 at both ends; of the rest
+# the first frames train, then int(0.1 n) validate, then the last int(0.2 n) test; condition 3 (TAXIS) is held out
+# whole and scored from its MAX_CONTEXT_LENGTH = 256-th frame on. A test origin is the last context frame of a
+# window whose H forecast frames all lie in the test block (Cedric, 2026-10-01: compare on ZAPBench's unseen frames).
+ZB_PAD, ZB_VAL, ZB_TEST, ZB_HOLDOUT, ZB_MAXCTX = 1, 0.1, 0.2, 3, 256
+SPLIT_LABEL = {"train": 0, "val": 1, "test": 2, "holdout": 3}
+
+
+def zapbench_split(offsets: np.ndarray, T: int) -> np.ndarray:
+    """[T] per frame: 0 train, 1 val, 2 test, 3 the held-out condition, -1 a pad frame."""
+    lab = -np.ones(T, np.int64)
+    for c in range(len(offsets) - 1):
+        lo, hi = int(offsets[c]) + ZB_PAD, int(offsets[c + 1]) - ZB_PAD
+        if c == ZB_HOLDOUT:
+            lab[lo:hi] = 3
+            continue
+        n = hi - lo
+        n_test, n_val = int(n * ZB_TEST), int(n * ZB_VAL)
+        n_train = n - n_test - n_val
+        lab[lo:lo + n_train] = 0
+        lab[lo + n_train:lo + n_train + n_val] = 1
+        lab[lo + n_train + n_val:hi] = 2
+    return lab
+
+
+def split_origins(lab: np.ndarray, cond: np.ndarray, part: str, n_in: int, H: int) -> np.ndarray:
+    """Origins o (the last context frame) of the windows of one part. `train`: every frame o-n_in+1 .. o+H is a
+    training frame (nothing of the window is ever scored). `val` / `test` / `holdout`: the H forecast frames lie in
+    that part; the context frames are any non-pad frames of the same condition (ZAPBench: a test window's context
+    reaches back into validation). `holdout` starts at the condition's 256-th frame, as ZAPBench's."""
+    k = SPLIT_LABEL[part]
+    T = len(lab)
+    out = []
+    for o in range(n_in - 1, T - H):
+        if part == "train":
+            ok = bool((lab[o - n_in + 1:o + H + 1] == 0).all())
+        else:
+            ok = bool((lab[o + 1:o + H + 1] == k).all()) and bool((lab[o - n_in + 1:o + 1] >= 0).all()) \
+                and len(set(cond[o - n_in + 1:o + H + 1].tolist())) == 1
+            if ok and part == "holdout":
+                ok = o >= int(np.argmax(lab == 3)) - ZB_PAD + ZB_MAXCTX - 1 + ZB_PAD
+        if ok:
+            out.append(o)
+    return np.array(out, np.int64)
+
+
+def stimulus_lookup_fit(X: torch.Tensor, kid: np.ndarray, fit: np.ndarray) -> torch.Tensor:
+    """[T, N]: the stimulus-evoked lookup LEARNED ON THE `fit` FRAMES ONLY (ZAPBench's stimulus baseline is built on
+    its training split): each frame gets the mean over the fit frames with its key (leave-one-out where the frame is
+    itself a fit frame); a key no fit frame has gets each element's mean over the fit frames."""
+    k = torch.as_tensor(kid, device=X.device)
+    f = torch.as_tensor(fit, device=X.device, dtype=X.dtype)
+    nk = int(k.max()) + 1
+    sums = torch.zeros(nk, X.shape[1], device=X.device, dtype=X.dtype).index_add_(0, k, X * f[:, None])
+    cnt = torch.zeros(nk, device=X.device, dtype=X.dtype).index_add_(0, k, f)
+    s_k, c_k = sums[k] - X * f[:, None], cnt[k] - f
+    mu = (X * f[:, None]).sum(0) / f.sum().clamp(min=1)
+    pred = s_k / c_k.clamp(min=1)[:, None]
+    pred[c_k < 1] = mu
+    return pred
+
+
 def denoise(X: torch.Tensor) -> torch.Tensor:
     """THE DENOISED RECORDING, fixed before any model: each element's 3-frame mean (t-1, t, t+1)."""
     Xd = X.clone()
