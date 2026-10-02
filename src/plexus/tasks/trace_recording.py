@@ -44,8 +44,14 @@ def mse_per_origin(pred_fn, X: torch.Tensor, o: torch.Tensor, hs=range(1, H_MAX 
     return np.stack([((X[o + h] - pred_fn(o, h)) ** 2).double().mean(1).cpu().numpy() for h in hs], 0)
 
 
+N_VISUAL = 22             # the release's visual stimulus features: the first columns of every recording's `stimulus`
+
+
 def stimulus_keys(S: np.ndarray, cond: np.ndarray, cap: int = 64) -> np.ndarray:
-    """Per frame, the id of (condition, stimulus vector, frames since the stimulus last changed, capped)."""
+    """Per frame, the id of (condition, stimulus vector, frames since the stimulus last changed, capped). The VISUAL
+    columns only (the first N_VISUAL): a recording with ephys columns appended (zapbench_destripe_ephys: swim and
+    turn power, continuous) would otherwise give nearly every frame its own key and the lookup baseline no repeats."""
+    S = np.asarray(S)[:, :N_VISUAL]
     keys, since = [], 0
     for t in range(len(S)):
         if t > 0 and (cond[t] != cond[t - 1] or not np.array_equal(S[t], S[t - 1])):
@@ -167,12 +173,12 @@ def skills(model_c: np.ndarray, mean_c: np.ndarray) -> dict:
 
 
 # ============================================================================== figures
-def render_curves(res: dict, path: str, names, gates: dict | None = None):
-    """THE PREDICTION AGAINST THE BASELINES (white background, an analysis plot).
-    a  MSE per step ahead, grand average: the model, the best mean baseline, persistence, the stimulus lookup,
-       the noise floor sigma^2;
-    b  skill over the mean baseline per step ahead: grand average (thick) and each condition (thin), the short and
-       long windows shaded, the published best (the gates' full lines) dashed;
+def render_curves(res: dict, path: str, names, gates: dict | None = None, history: list | None = None):
+    """THE PREDICTION AGAINST THE BASELINES, black (the deck and the watcher).
+    a  MSE per step ahead: the grand average of the learned law (thick), of the best mean baseline, persistence, the
+       stimulus lookup and the noise floor sigma^2, and the learned law in each condition (thin, one colour each);
+    b  the training loss against the updates, one curriculum stage per horizon: a line where a stage begins and its
+       horizon above it (Cedric, 2026-10-01: the loss per horizon in place of the skill panel);
     c  the free rollout of the whole recording: R^2 per frame, raw and denoised, the conditions as bands."""
     import matplotlib
     matplotlib.use("Agg")
@@ -183,40 +189,49 @@ def render_curves(res: dict, path: str, names, gates: dict | None = None):
     a = fig.add_axes([0.06, 0.55, 0.40, 0.38])
     b = fig.add_axes([0.56, 0.55, 0.40, 0.38])
     c = fig.add_axes([0.06, 0.08, 0.90, 0.34])
-    a.plot(h, res["mse_model"], color="#4c72b0", lw=2.0, label="learned law")
-    a.plot(h, res["mse_mean"], color="0.85", lw=1.6, label="mean baseline (best W per step)")
-    a.plot(h, res["mse_persistence"], color="0.6", lw=1.0, ls="--", label="persistence")
-    a.plot(h, res["mse_lookup"], color="#c44e52", lw=1.4, label="stimulus-evoked lookup")
-    a.axhline(res["noise_sigma2"], color="0.5", ls=":", lw=1.0, label="noise floor $\\sigma^2$")
-    a.set_xlabel("steps ahead h (0.914 s each)")
-    a.set_ylabel("MSE, dF/F$^2$ (grand average)")
-    a.legend(frameon=False, fontsize=8)
-    a.text(0.0, 1.04, "a", transform=a.transAxes, fontsize=12)
-    for s0, s1, col in ((SHORT[0] - 0.5, SHORT[1] + 0.5, "0.22"), (LONG[0] - 0.5, LONG[1] + 0.5, "0.14")):
-        b.axvspan(s0, s1, color=col, lw=0)
-    sk_c = 1 - np.asarray(res["mse_model_by_condition"]) / np.asarray(res["mse_mean_by_condition"])
     cmap = plt.get_cmap("tab10")
+    mc = np.asarray(res["mse_model_by_condition"])
     for ci, name in enumerate(names):
-        b.plot(h, sk_c[ci], lw=0.8, color=cmap(ci), alpha=0.8, label=name)
-    b.plot(h, res["skill"], color="white", lw=2.2, label="grand average")
-    b.plot(h, 1 - np.asarray(res["mse_lookup"]) / np.asarray(res["mse_mean"]), color="#c44e52", lw=1.2, ls="--",
-           label="stimulus lookup")
+        a.plot(h, mc[ci], lw=0.8, color=cmap(ci), alpha=0.85, label=name)
+    a.plot(h, res["mse_model"], color="white", lw=2.4, label="learned law, grand average")
+    a.plot(h, res["mse_mean"], color="0.75", lw=1.6, ls="--", label="mean baseline (best W per step)")
+    a.plot(h, res["mse_persistence"], color="0.55", lw=1.0, ls=":", label="persistence")
+    a.plot(h, res["mse_lookup"], color="#c44e52", lw=1.4, label="stimulus-evoked lookup")
     pub = (gates or {}).get("published")
-    if pub:                                        # ZAPBench's best published model, on ZAPBench's own split
-        bc = pub["best_ctx4"]
-        b.plot(h, bc["skill"], color="#7aa6ff", lw=1.8, ls="-.",
-               label=f"ZAPBench best, {bc['method']} ctx 4 (published)")
-    for key, lab in (("short_full", "published best, short"), ("long_full", "published best, long")):
-        if gates and key in gates:
-            rng = SHORT if key.startswith("short") else LONG
-            b.plot(rng, [gates[key]] * 2, color="0.7", ls=":", lw=1.5)
-            b.text(rng[0], gates[key] + 0.015, lab, fontsize=7, va="bottom")
-    b.axhline(0, color="0.6", lw=0.7)
-    top = max(float(np.nanmax(sk_c)) + 0.1, (gates or {}).get("long_full", 0.0) + 0.1)
-    b.set_ylim(max(-1.0, float(np.nanmin(sk_c)) - 0.05), min(1.0, top))
-    b.set_xlabel("steps ahead h")
-    b.set_ylabel("MSE skill over the mean baseline")
-    b.legend(frameon=False, fontsize=6, ncol=2, loc="lower right")
+    if pub:                                        # ZAPBench's best model: its published skill over its own mean
+        bc = pub["best_ctx4"]                      # baseline, applied to THIS run's mean baseline (MSE on these frames)
+        zbc = (np.asarray(bc["mse_test"]) if res.get("split") == "zapbench" and "mse_test" in bc     # same windows:
+               else (1 - np.asarray(bc["skill"])) * np.asarray(res["mse_mean"]))                    # its own MSE
+        a.plot(h, zbc, color="#7aa6ff", lw=1.8, ls="-.",
+               label=f"ZAPBench best ({bc['method']}, ctx 4)")
+    a.axhline(res["noise_sigma2"], color="0.45", ls=":", lw=1.0, label="noise floor $\\sigma^2$")
+    a.set_xlabel("steps ahead h (0.914 s each)")
+    a.set_ylabel("MSE, dF/F$^2$")
+    a.legend(frameon=False, fontsize=6, ncol=2, loc="upper left")
+    a.text(0.0, 1.04, "a", transform=a.transAxes, fontsize=12)
+    if history:
+        it = np.array([r["it"] for r in history])
+        lo = np.array([r["loss"] for r in history], dtype=float)
+        hz = np.array([r.get("horizon", 0) for r in history])
+        b.plot(it, lo, color="0.75", lw=0.3)
+        k = max(1, len(lo) // 400)                 # a running median, so the trend reads through the batch noise
+        if len(lo) > 3 * k:
+            sm = np.array([np.median(lo[max(0, q - k):q + k + 1]) for q in range(len(lo))])
+            b.plot(it, sm, color="white", lw=1.4)
+        starts = np.where(np.diff(hz, prepend=hz[0] - 1) != 0)[0]
+        ymax = np.nanpercentile(lo, 99.5)
+        for q, st in enumerate(starts):
+            b.axvline(it[st], color="0.35", lw=0.6)
+            if hz[st] in (1, 2, 3, 5, 10, 15, 20, 25, 30, 40):   # a few horizons named, never crowded
+                b.text(it[st], 1.01, f"{hz[st]}", transform=b.get_xaxis_transform(), fontsize=6.5, color="0.8",
+                       ha="center")
+        b.set_yscale("log")
+        b.set_ylim(np.nanpercentile(lo, 0.5) * 0.9, ymax * 1.1)
+        b.set_xlabel("training updates (Adam steps; one curriculum stage per horizon)")
+        b.set_ylabel("training loss")
+        b.text(1.0, 1.08, "horizon of the stage", transform=b.transAxes, fontsize=7, color="0.8", ha="right")
+    else:
+        b.text(0.5, 0.5, "no training history", transform=b.transAxes, ha="center", color="0.6")
     b.text(0.0, 1.04, "b", transform=b.transAxes, fontsize=12)
     t = np.asarray(res["free_t_s"]) / 60
     off = res["offsets"]
@@ -229,12 +244,15 @@ def render_curves(res: dict, path: str, names, gates: dict | None = None):
     c.plot(t, res["free_r2_denoised"], color="#4c72b0", lw=0.8, label="R$^2$ denoised")
     c.axhline(0, color="0.6", lw=0.7)
     r2d = np.asarray(res["free_r2_denoised"], dtype=float)
-    fin = r2d[np.isfinite(r2d)]                    # a diverged rollout's -inf / nan frames must not set the axis
-    lo = np.percentile(fin, 2) if len(fin) else -3.0
-    c.set_ylim(max(lo - 0.1, -3), 1)
-    if len(fin) < len(r2d):
-        c.text(0.99, 0.04, f"not finite from frame {int(np.argmax(~np.isfinite(r2d)))}", color="#d62728", fontsize=8,
-               ha="right", transform=c.transAxes)
+    c.set_ylim(0, 1)                               # every R2 axis 0..1 (Cedric, 2026-10-02): runs compare at a glance
+    bad = ~np.isfinite(r2d) | (r2d < -1)
+    if bad.any():                                  # where the rollout leaves the axis for good, said in words
+        c.text(0.99, 0.04, f"diverges from t = {t[int(np.argmax(bad))]:.0f} min (R$^2$ < -1)", color="#d62728",
+               fontsize=8, ha="right", transform=c.transAxes)
+    sil = np.asarray(res.get("free_silenced") or [0])
+    if sil[-1]:                                    # top right, above the traces: runaway neurons frozen and left out of R^2 (finding 21)
+        c.text(0.99, 0.93, f"{int(sil[-1]):,} exploding neuron{'s' if sil[-1] != 1 else ''} silenced, the first at "
+               f"t = {t[int(np.argmax(sil > 0))]:.0f} min", color="#ff7f0e", fontsize=8, ha="right", transform=c.transAxes)
     c.set_xlabel("time, min (free rollout from the law's own context frames)")
     c.set_ylabel("R$^2$ per frame over neurons")
     c.legend(frameon=False, fontsize=8, loc="lower left")
@@ -275,30 +293,75 @@ def _ffmpeg() -> str:
 INPUT_ON = 0.01          # |B_i| above which a neuron counts as a stimulus input (normalised activity per unit feature)
 
 
+_MOVIE: dict = {}          # the movie's data, set before the frame workers fork (they read it, never copy it in)
+
+
 def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.ndarray, r2_raw: np.ndarray,
                  r2_den: np.ndarray, frame_s: float, cond_of: np.ndarray, names, path: str,
                  emb: np.ndarray | None = None, labels: np.ndarray | None = None, fps: int = 25,
-                 mean_obs: np.ndarray | None = None, mean_pred: np.ndarray | None = None,
                  ffmpeg: str | None = None, emb_name: str = "embedding", law: str = "GraphCast law",
-                 inputs: np.ndarray | None = None):
+                 inputs: np.ndarray | None = None, rec_name: str = "ZAPBench", r2_t: np.ndarray | None = None,
+                 r2_raw_all: np.ndarray | None = None, r2_den_all: np.ndarray | None = None, workers: int = 16,
+                 silenced_all: np.ndarray | None = None, mean_obs_all: np.ndarray | None = None,
+                 mean_pred_all: np.ndarray | None = None, cond_all: np.ndarray | None = None,
+                 split_all: np.ndarray | None = None, split_name: str = "all", mean_obs=None, mean_pred=None):
     """TWO PANELS, recorded LEFT and learned RIGHT: every neuron a point at its position (dorsal view, deeper
-    drawn first) coloured by dF/F on one scale; black background, labels inside; `R2 raw` and `R2 denoised`, mean
-    +- SD over the frames so far, top right; under the recorded panel the brain-mean dF/F, recorded and learned, with
-    a cursor; a strip of insets below, titled above -- the embedding's PC1-PC2 coloured by its clusters, the
-    embedding on the brain (PCA as RGB), its clusters on the brain -- when the law learns one. `frames` are
-    consecutive: one movie frame per recorded frame, at `fps` (the pace of the deck's data movie)."""
+    drawn first, the brain vertical and head up) coloured by dF/F on one scale; black background, labels above.
+    `frames` sample the FREE ROLLOUT of the whole recording (Cedric, 2026-10-02: the full 2 h, ~800 movie frames, not
+    a 200-frame restart). Under the learned panel the free rollout's R2 per frame over the whole recording (`r2_t` the
+    frames, `r2_*_all` the values; denoised white, raw grey, axis 0..1) with a cursor; top right its mean +- SD up to
+    the cursor, or the time it diverged. A strip of insets below when the law has neuron constants or an embedding:
+    PC1-PC2 by cluster, PCA as RGB on the brain, the clusters on the brain, the stimulus input map."""
     import os
     import shutil
     import subprocess
     import tempfile
+    import multiprocessing as mp
+    ffmpeg = ffmpeg or _ffmpeg()
+    if np.ptp(pos[:, 0]) > np.ptp(pos[:, 1]):
+        # head up first (zap-inr's anatomy frame has its long axis along x: drawn as (y, -x), the destriped slides'
+        # mapping; ZAPBench's long axis is already along y, head up) ...
+        pos = np.stack([pos[:, 1], -pos[:, 0], pos[:, 2]], 1)
+    # ... then THE BRAIN HORIZONTAL, HEAD LEFT (Cedric, 2026-10-02: a vertical brain left most of each panel blank)
+    pos = np.stack([-pos[:, 1], pos[:, 0], pos[:, 2]], 1)
+    order = np.argsort(pos[:, 2])
+    if r2_t is None:                                # no whole-rollout trace: the sampled frames' own R2
+        r2_t, r2_raw_all, r2_den_all = frames, r2_raw, r2_den
+    tmp = tempfile.mkdtemp(prefix="trace_movie_")
+    _MOVIE.clear()
+    _MOVIE.update(dict(obs=obs, pred=pred, frames=np.asarray(frames), P=pos[order], order=order,
+                       vmax=float(np.percentile(obs, 97)), frame_s=frame_s, cond_of=cond_of, names=list(names),
+                       emb=emb, labels=labels, emb_name=emb_name, law=law, inputs=inputs, rec_name=rec_name,
+                       r2_t=np.asarray(r2_t), r2r=np.asarray(r2_raw_all, float), r2d=np.asarray(r2_den_all, float),
+                       sil=None if silenced_all is None else np.asarray(silenced_all),
+                       mo=mean_obs_all, mp_=mean_pred_all, cond=cond_all, split=split_all, split_name=split_name,
+                       tmp=tmp))
+    ks = np.arange(len(frames))
+    workers = min(workers, len(os.sched_getaffinity(0)))          # a cluster job's slots, not the node's cores
+    chunks = [c for c in np.array_split(ks, max(1, min(workers, len(ks)))) if len(c)]
+    if len(chunks) > 1:
+        with mp.get_context("fork").Pool(len(chunks)) as pool:   # matplotlib only in the workers, no CUDA
+            pool.map(_movie_frames, chunks)
+    else:
+        _movie_frames(chunks[0])
+    subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
+                    "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", path],
+                   check=True)
+    shutil.copy(os.path.join(tmp, f"{len(frames) // 2:05d}.png"), path.replace(".mp4", ".png"))
+    shutil.rmtree(tmp)
+    _MOVIE.clear()
+
+
+def _movie_frames(ks):
+    """One worker: the figure built ONCE (the insets and the R2 traces are static), then per frame only the two
+    panels' colours, the cursor and the texts change before each save."""
+    import os
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    ffmpeg = ffmpeg or _ffmpeg()
-    order = np.argsort(pos[:, 2])
-    P = pos[order]
-    vmax = float(np.percentile(obs, 97))
-    tmp = tempfile.mkdtemp(prefix="trace_movie_")
+    d = _MOVIE
+    P, order, vmax, frames = d["P"], d["order"], d["vmax"], d["frames"]
+    emb, labels, inputs = d["emb"], d["labels"], d["inputs"]
     ins = emb is not None
     # THE INPUT MAP (Cedric, 2026-09-30): which neurons the stimulus enters -- |B_i|, the norm of each neuron's row of
     # stimulus weights, bright where it is large; a row the lasso zeroed is dark. A law with no per-neuron stimulus
@@ -311,67 +374,119 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
         inp_title = (f"stimulus input |B_i| per neuron (log)\n{on.sum():,} of {len(nrm):,} above {INPUT_ON:g} "
                      f"({100 * on.mean():.0f} %)")
     else:
-        inp_col = np.tile(np.array([[0.93, 0.55, 0.25]]), (len(pos), 1))
+        inp_col = np.tile(np.array([[0.93, 0.55, 0.25]]), (len(P), 1))
         inp_title = "stimulus input: every neuron\n(no per-neuron input weights)"
+    fig = plt.figure(figsize=(12, 8.6 if ins else 7.0), facecolor="black")
+    top = 0.40 if ins else 0.16
+    sc = []
+    for j, lab in enumerate((f"recorded ({d['rec_name']})", f"learned ({d['law']})")):
+        ax = fig.add_axes([0.5 * j, top, 0.5, 0.88 - top])           # the labels sit above, never on the brain
+        ax.set_facecolor("black")
+        ax.axis("off")
+        sc.append(ax.scatter(P[:, 0], P[:, 1], c=np.zeros(len(P)), s=0.5, cmap="inferno", vmin=0, vmax=vmax,
+                             linewidths=0))
+        ax.set_aspect("equal")
+        fig.text(0.5 * j + 0.03, 0.985, lab, color="white", fontsize=12, va="top")
+    t_txt = fig.text(0.03, 0.945, "", color="0.7", fontsize=9, va="top")
+    r_txt = fig.text(0.97, 0.955, "", color="white", fontsize=9, va="top", ha="right")
+    tm = d["r2_t"] * d["frame_s"] / 60
+
+    def strip(x0):
+        m_ = fig.add_axes([x0, top - 0.115, 0.42, 0.085])
+        m_.set_facecolor("black")
+        for k_, sp in m_.spines.items():
+            sp.set_visible(k_ in ("left", "bottom"))
+            sp.set_color("0.5")
+        m_.set_xlim(tm[0], tm[-1])
+        m_.tick_params(colors="0.6", labelsize=7, length=2)
+        return m_
+
+    def runs(lab):
+        """[(first, last, value)] the consecutive blocks of a per-frame label."""
+        lab = np.asarray(lab)
+        cut = np.flatnonzero(np.diff(lab)) + 1
+        st = np.r_[0, cut]
+        en = np.r_[cut, len(lab)] - 1
+        return [(int(a_), int(b_), lab[a_]) for a_, b_ in zip(st, en)]
+    # LEFT: THE BRAIN-MEAN dF/F over the whole free rollout, recorded (green) and learned (white), the stimulus
+    # CONDITIONS as alternating blocks with their names (Cedric, 2026-10-02: which blocks the law holds flat)
+    cur = []
+    if d["mo"] is not None:
+        m = strip(0.05)
+        for i_, (a_, b_, c_) in enumerate(runs(d["cond"])):
+            m.axvspan(tm[a_], tm[b_], color=("0.30" if i_ % 2 else "0.18"), alpha=0.6, lw=0, zorder=0)
+            m.text((tm[a_] + tm[b_]) / 2, 1.02, d["names"][int(c_)], color="0.75", fontsize=6, ha="center", va="bottom",
+                   transform=m.get_xaxis_transform())
+        m.plot(tm, d["mo"], color="#2ca02c", lw=0.6, zorder=2)
+        m.plot(tm, d["mp_"], color="white", lw=0.6, zorder=3)
+        lo_, hi_ = np.nanpercentile(np.r_[d["mo"], d["mp_"]], [0.5, 99.5])
+        m.set_ylim(lo_ - 0.1 * (hi_ - lo_), hi_ + 0.1 * (hi_ - lo_))
+        m.set_yticks([])
+        cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=4))
+        fig.text(0.05, top - 0.005, "brain-mean dF/F: recorded (green), learned (white); time, min", color="0.7",
+                 fontsize=8, va="bottom")
+    # RIGHT: THE FREE ROLLOUT'S R2 per frame, 0..1, the split's parts behind it in transparent colours
+    m = strip(0.55)
+    SPLIT = {0: ("train", "#1f77b4"), 1: ("val", "#ffbf00"), 2: ("test", "#d62728"), 3: ("held-out condition", "#9467bd")}
+    seen = []
+    if d["split"] is not None and d["split_name"] == "zapbench":
+        for a_, b_, v_ in runs(d["split"]):
+            if int(v_) in SPLIT:
+                m.axvspan(tm[a_], tm[b_], color=SPLIT[int(v_)][1], alpha=0.22, lw=0, zorder=0)
+                seen.append(int(v_))
+    m.plot(tm, d["r2r"], color="0.55", lw=0.6, zorder=2)
+    m.plot(tm, d["r2d"], color="white", lw=0.8, zorder=3)
+    m.set_ylim(0, 1)
+    m.set_yticks([0, 1])
+    cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=4))
+    split_txt = ("; behind: " + ", ".join(f"{SPLIT[v][0]}" for v in sorted(set(seen)))) if seen else \
+        ("; every frame trained (no split)" if d["split_name"] != "zapbench" else "")
+    fig.text(0.55, top - 0.005, "free rollout R$^2$: denoised (white), raw (grey)" + split_txt, color="0.7",
+             fontsize=8, va="bottom")
+    if seen:                                        # the split's colours, named in their own colour, left to right
+        for i_, v in enumerate(sorted(set(seen))):
+            fig.text(0.55 + 0.09 * i_, top - 0.14, SPLIT[v][0], color=SPLIT[v][1], fontsize=7, ha="left", va="top")
     if ins:
         pc, rgb = _pca_rgb(emb)
         cm = plt.get_cmap("tab10")
         lab_rgb = cm(labels % 10)[:, :3] if labels is not None else rgb
-    for k in range(len(frames)):
-        fig = plt.figure(figsize=(12, 8.6 if ins else 7.0), facecolor="black")
-        top = 0.40 if ins else 0.16
-        for j, (img, lab) in enumerate(((obs[k], "recorded (ZAPBench)"), (pred[k], f"learned ({law})"))):
-            ax = fig.add_axes([0.5 * j, top, 0.5, 0.88 - top])       # the labels sit above, never on the brain
+        for j, (title, kind) in enumerate(((f"{d['emb_name']} PC1-PC2, by cluster", "scatter"),
+                                           (f"{d['emb_name']} on the brain (PCA as RGB)", "rgb"),
+                                           ("its clusters on the brain", "labels"),
+                                           (inp_title, "inputs"))):
+            ax = fig.add_axes([0.01 + 0.25 * j, 0.01, 0.23, 0.19])       # below its title, never under it
             ax.set_facecolor("black")
             ax.axis("off")
-            ax.scatter(P[:, 0], P[:, 1], c=img[order], s=0.5, cmap="inferno", vmin=0, vmax=vmax, linewidths=0)
-            ax.set_aspect("equal")
-            fig.text(0.5 * j + 0.03, 0.985, lab, color="white", fontsize=12, va="top")
-            if j == 0:
-                t = frames[k] * frame_s
-                fig.text(0.03, 0.945, f"{names[cond_of[k]]}   t = {t / 60:5.1f} min", color="0.7", fontsize=9, va="top")
+            if kind == "scatter":
+                ax.scatter(pc[::7, 0], pc[::7, 1], s=0.4, c=lab_rgb[::7], linewidths=0)
+            elif kind == "inputs":
+                ax.scatter(P[:, 0], P[:, 1], s=0.2, c=inp_col[order], linewidths=0)
+                ax.set_aspect("equal")
             else:
-                fig.text(0.97, 0.955, f"R2 raw {np.mean(r2_raw[:k + 1]):+.3f} +- {np.std(r2_raw[:k + 1]):.3f}\n"
-                         f"R2 denoised {np.mean(r2_den[:k + 1]):+.3f} +- {np.std(r2_den[:k + 1]):.3f}",
-                         color="white", fontsize=9, va="top", ha="right")
-        if mean_obs is not None:
-            m = fig.add_axes([0.05, top - 0.10, 0.40, 0.07])
-            m.set_facecolor("black")
-            for sp in m.spines.values():
-                sp.set_visible(False)
-            m.set_xticks([])
-            m.set_yticks([])
-            tt = np.arange(len(frames))
-            m.plot(tt, mean_obs, color="#2ca02c", lw=1.0)
-            if mean_pred is not None:
-                m.plot(tt, mean_pred, color="white", lw=1.0)
-            m.axvline(k, color="0.7", lw=0.8)
-            m.set_xlim(0, len(frames) - 1)
-            fig.text(0.05, top - 0.02, "brain-mean dF/F: recorded (green), learned (white)", color="0.7", fontsize=8,
-                     va="bottom")
-        if ins:
-            for j, (title, kind) in enumerate(((f"{emb_name} PC1-PC2, by cluster", "scatter"),
-                                               (f"{emb_name} on the brain (PCA as RGB)", "rgb"),
-                                               ("its clusters on the brain", "labels"),
-                                               (inp_title, "inputs"))):
-                ax = fig.add_axes([0.01 + 0.25 * j, 0.01, 0.23, 0.19])   # below its title, never under it
-                ax.set_facecolor("black")
-                ax.axis("off")
-                if kind == "scatter":
-                    ax.scatter(pc[::7, 0], pc[::7, 1], s=0.4, c=lab_rgb[::7], linewidths=0)
-                elif kind == "inputs":
-                    ax.scatter(P[:, 0], P[:, 1], s=0.2, c=inp_col[order], linewidths=0)
-                    ax.set_aspect("equal")
-                else:
-                    col = (rgb if kind == "rgb" else lab_rgb)[order]
-                    ax.scatter(P[:, 0], P[:, 1], s=0.2, c=col, linewidths=0)
-                    ax.set_aspect("equal")
-                fig.text(0.01 + 0.25 * j + 0.115, 0.215, title, color="0.8", fontsize=7, ha="center", va="bottom",
-                         linespacing=1.1)
-        fig.savefig(os.path.join(tmp, f"{k:05d}.png"), dpi=90, facecolor="black")
-        plt.close(fig)
-    subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
-                    "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", path],
-                   check=True)
-    shutil.copy(os.path.join(tmp, f"{len(frames) // 2:05d}.png"), path.replace(".mp4", ".png"))
-    shutil.rmtree(tmp)
+                col = (rgb if kind == "rgb" else lab_rgb)[order]
+                ax.scatter(P[:, 0], P[:, 1], s=0.2, c=col, linewidths=0)
+                ax.set_aspect("equal")
+            fig.text(0.01 + 0.25 * j + 0.115, 0.215, title, color="0.8", fontsize=7, ha="center", va="bottom",
+                     linespacing=1.1)
+    r2t, r2r, r2d = d["r2_t"], d["r2r"], d["r2d"]
+    bad = ~np.isfinite(r2d) | (r2d < -1)
+    for k in ks:
+        f = frames[k]
+        sc[0].set_array(np.asarray(d["obs"][k], np.float32)[order])
+        sc[1].set_array(np.asarray(d["pred"][k], np.float32)[order])
+        t_txt.set_text(f"{d['names'][d['cond_of'][k]]}   t = {f * d['frame_s'] / 60:5.1f} min")
+        upto = r2t <= f
+        nsil = int(d["sil"][upto][-1]) if d["sil"] is not None and upto.any() else 0
+        sil_txt = f"\n{nsil:,} exploding neuron{'s' if nsil != 1 else ''} silenced" if nsil else ""
+        if (bad & upto).any():
+            r_txt.set_text(f"diverged at t = {tm[int(np.argmax(bad))]:.0f} min\n(R2 denoised < -1)" + sil_txt)
+            r_txt.set_color("#ff6b6b")
+        else:
+            rr, rd = r2r[upto], r2d[upto]
+            r_txt.set_text((f"R2 raw {np.mean(rr):+.3f} +- {np.std(rr):.3f}\n"
+                            f"R2 denoised {np.mean(rd):+.3f} +- {np.std(rd):.3f}" if len(rd) else "") + sil_txt)
+            r_txt.set_color("#ffb366" if nsil else "white")
+        for c_ in cur:
+            c_.set_xdata([f * d["frame_s"] / 60] * 2)
+        fig.savefig(os.path.join(d["tmp"], f"{k:05d}.png"), dpi=90, facecolor="black")
+    plt.close(fig)

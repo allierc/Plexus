@@ -439,6 +439,12 @@ def g_watch_open3d(h, q):
         # as None -- the 3D button answered "'NoneType' object has no attribute 'get'" on exp_02's graphs
         if not isinstance(spec, dict):
             return h._send_json({"error": "this step is a measurement (a graph): it has a picture and no scene to open"}, 400)
+        # A TRAINING STEP (exp17): its spec trains a law, it simulates nothing -- the 3-D view opens the run's LEARNED
+        # frames instead, as a replay-only spec built from it (gui/train_view.py; Cedric, 2026-10-01)
+        from plexus.gui import train_view
+        if train_view.is_training_spec(spec):
+            f = train_view.view_spec_for(os.path.realpath(f))
+            spec = yaml.safe_load(open(f))
         name = str(((spec.get("general") or {}).get("name")) or "opened").strip()
         dst = _spec_path(name)
         os.makedirs(studio.CONFIG_DIR, exist_ok=True)

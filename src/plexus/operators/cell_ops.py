@@ -1927,14 +1927,20 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
                    "mesh_rate": "raw 1/tau of each mesh node (softplus)", "mesh_rest": "each mesh node's rest value",
                    "mesh_reversal": "each mesh node's reversal value, as a sender (conductance)",
                    "tau": "the elements' raw 1/tau block", "rest": "the elements' rest block",
-                   "gain": "the elements' gain on the mesh block", "input": "the elements' forcing weights block"}
+                   "gain": "the elements' gain on the mesh block", "input": "the elements' forcing weights block",
+                   "adaptation": "the slow adaptation state block (width 1); absent = no adaptation",
+                   "adapt_gain": "the elements' raw adaptation strength block (softplus)",
+                   "adapt_rate": "the elements' raw adaptation rate block (softplus, per tick)",
+                   "input_mask": "an npz (graphs_data) whose array keeps the elements the forcing enters; absent = every element",
+                   "input_mask_array": "the array of it (default mask)",}
 
     def __init__(self, params, device="cpu"):
         self.synapse = str(params.get("synapse", "current"))
         self.activation = str(params.get("activation", "tanh" if self.synapse == "current" else "relu"))
-        if self.synapse not in ("current", "conductance") or self.activation not in ("tanh", "relu"):
-            raise ValueError("state_diffuse[known_ode]: `synapse:` current|conductance, `activation:` tanh|relu")
+        if self.synapse not in ("current", "conductance") or self.activation not in ("tanh", "relu", "linear"):
+            raise ValueError("state_diffuse[known_ode]: `synapse:` current|conductance, `activation:` tanh|relu|linear")
         self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "gain", "input")}
+        self._adapt_params(params)
         super().__init__(params, device)
         if self.inputs != 1:
             raise ValueError("state_diffuse[known_ode] is a first-order ODE of the state: `inputs: 1`")
@@ -1945,6 +1951,44 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
 
     def init_theta(self):
         return torch.zeros(0, device=self.device_)                         # no MLP
+
+    # ADAPTATION (exp17 batch 8, Cedric 2026-10-01): a second, SLOW state per element that follows the activity and is
+    # subtracted from its drive -- the overshoot-and-decay a single leaky variable cannot make (a big response to a
+    # stimulus step, then a decay while the stimulus stays). In the normalised units of z:
+    #     dz = softplus(tau_i) (-z + ... - softplus(g_i) a)              da = softplus(k_i) (z - a)
+    # `adaptation: <block>` names the state block (width 1); `adapt_gain` / `adapt_rate` the elements' raw g and k blocks
+    # (learned as `{block:, of:}`). At a rollout's start a = z (adapted to the present level: `init_latent`).
+    def _adapt_params(self, params):
+        # THE INPUT MASK (exp17 batch 10, Cedric 2026-10-01): the stimulus enters only the elements the mask keeps
+        # (`input_mask`: an npz under graphs_data, `input_mask_array` its array, one value per element); every other
+        # element gets it only through the coupling. Its B rows then receive no gradient and stay at their start.
+        self.input_mask = None
+        if params.get("input_mask"):
+            import numpy as np
+            from plexus.paths import graphs_data_path
+            f = str(params["input_mask"])
+            f = f if os.path.isabs(f) else graphs_data_path(f)
+            self.input_mask = torch.as_tensor(np.load(f)[str(params.get("input_mask_array", "mask"))],
+                                              dtype=torch.float32, device=self.device_ if hasattr(self, "device_") else "cpu")[:, None]
+        self.adapt = params.get("adaptation")
+        self.adapt_blocks = {"adapt_gain": str(params.get("adapt_gain", "adapt_gain")),
+                             "adapt_rate": str(params.get("adapt_rate", "adapt_rate"))} if self.adapt else {}
+
+    def _act(self, v):
+        return torch.tanh(v) if self.activation == "tanh" else (torch.relu(v) if self.activation == "relu" else v)
+
+    def init_latent(self, H):
+        """a = z at the rollout's start (the trainer calls this at `on_ready`, once `norm` is set)."""
+        if not self.adapt:
+            return
+        lvl = H.level(self.at)
+        b0, _ = lvl.state_schema[self.block]
+        a0, _ = lvl.state_schema[self.adapt]
+        mu, sd, _ = self.norm
+        z = (lvl.state[..., b0:b0 + 1] - mu) / sd
+        st = lvl.state.clone()
+        st[..., a0:a0 + 1] = z
+        lvl.state = st
 
     def step(self, x, xyz, a=None, u=None, nb=None):
         import torch.nn.functional as Fnn
@@ -1964,7 +2008,7 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
         rest = self.mesh_rest[:, None]
         for _ in range(self.substeps):
             if self.synapse == "current":
-                act = torch.tanh(v[ms]) if self.activation == "tanh" else torch.relu(v[ms])
+                act = self._act(v[ms])
                 msg = self.W[:, None] * act
             else:
                 msg = self.W[:, None] ** 2 * torch.relu(v[ms]) * (self.mesh_reversal[ms][:, None] - v[mr])
@@ -1973,8 +2017,14 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
         m_s, m_r, _ = G["m2g"]
         mi = torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype).index_add(0, m_r, v[m_s]) / 8.0
         drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
-        dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive)
-        return sd * dz
+        if self.input_mask is not None and self.forcing_dim:
+            drive = drive * self.input_mask.to(drive.device)
+        if not self.adapt:
+            dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive)
+            return sd * dz
+        ad = nb["adapt"]
+        dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive - Fnn.softplus(nb["adapt_gain"]) * ad)
+        return sd * dz, Fnn.softplus(nb["adapt_rate"]) * (z - ad)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -1986,19 +2036,32 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
                 continue
             c0, c1 = lvl.state_schema[name]
             nb[k] = lvl.state[:, c0:c1]
+        if getattr(self, "adapt", None):
+            for k, name in {"adapt": self.adapt, **self.adapt_blocks}.items():
+                c0, c1 = lvl.state_schema[name]
+                nb[k] = lvl.state[:, c0:c1]
         u = None
         if self.forcing:
             fl = H.level(self.forcing[0])
             f0, f1 = fl.state_schema[self.forcing[1]]
             u = fl.state[:, f0:f1]
+        if getattr(self, "modulation", "none") == "hash":
+            # the neuron graph's modulation: its spatial features once per rollout (one instance), handed to each tick
+            if getattr(self, "_fs_cache", None) is None or self._fs_cache[0] is not self.omega_table:
+                self._fs_cache = (self.omega_table, self._space_features())
+            nb["_omega_fs"] = self._fs_cache[1]
         run = self.step
         if self.checkpoint and torch.is_grad_enabled():
             from torch.utils.checkpoint import checkpoint
             run = lambda *q, **k: checkpoint(self.step, *q, use_reentrant=False, **k)   # noqa: E731
-        return {(lvl.name, self.block): run(lvl.state[:, b0:b1], lvl.state[:, p0:p1], None, u, nb=nb)}
+        d = run(lvl.state[:, b0:b1], lvl.state[:, p0:p1], None, u, nb=nb)
+        if getattr(self, "adapt", None):
+            return {(lvl.name, self.block): d[0], (lvl.name, self.adapt): d[1]}
+        return {(lvl.name, self.block): d}
 
 
 _NG_GRAPH_CACHE: dict = {}
+_NG_MOD_CACHE: dict = {}
 
 
 @register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph",
@@ -2038,13 +2101,36 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
                    "short_k": "nearest elements sending to each element (the short edges)",
                    "mid_um": "reach of the middle edges, um (0: none)", "long_um": "reach of the long edges, um (0: none)",
                    "W_short": "one weight per short edge", "W_mid": "one weight per middle edge",
+                   "omega_table": "the modulation's spatial hash table (modulation: hash)", "omega_ttable": "its time table",
+                   "omega_mlp": "its decoder or SIREN weights, flat",
                    "W_long": "one weight per long edge", "w_init": "the starting weights (default 0)",
                    "substeps": "Euler substeps per tick", "inputs": "values read per element: 1 (now)",
                    "forcing": "<set>.<block> of the known forcing (the task's drive)", "forcing_dim": "its size",
                    "seed": "unused (no random start); kept for the spec's uniformity",
                    "checkpoint": "recompute each tick during backward instead of storing it",
                    "tau": "the elements' raw 1/tau block", "rest": "the elements' rest block",
-                   "input": "the elements' forcing weights block"}
+                   "input": "the elements' forcing weights block",
+                   "activation": "phi of the messages: tanh (default), relu or linear (no cap)",
+                   "adaptation": "the slow adaptation state block (width 1); absent = no adaptation",
+                   "adapt_gain": "the elements' raw adaptation strength block (softplus)",
+                   "adapt_rate": "the elements' raw adaptation rate block (softplus, per tick)",
+                   "input_mask": "an npz (graphs_data) whose array keeps the elements the forcing enters; absent = every element",
+                   "input_mask_array": "the array of it (default mask)",
+                   "integrator": "euler (default: z += rate (target - z) / M, stable for rate < 2M) or exponential "
+                                 "(z += (1 - exp(-rate / M)) (target - z), stable at any rate)",
+                   "rate_max": "a smooth cap on every learned rate, rate_max tanh(rate / rate_max); absent = none",
+                   "synapse": "current (W phi(z_j), default) or conductance (W^2 relu(z_j) (E_j - z_i), E per sender)",
+                   "reversal": "the elements' reversal block E_j (conductance), in the normalised units of z",
+                   "w_init": "every edge weight's start (0; a conductance needs > 0: W^2 has no gradient at 0)",
+                   "modulation": "none (default), hash or siren: Omega_i(t) = 1 + f(x_i, y_i, z_i, t) scales each "
+                                 "element's message sum (Allier et al. 2026, arXiv 2602.13325, eq. 3)",
+                   "mod_levels": "hash: levels (12)", "mod_features": "hash: features per level (2)",
+                   "mod_log2_table": "hash: log2 table rows per level (19)",
+                   "mod_res_space": "hash: [coarsest, finest] cells across the brain ([4, 128])",
+                   "mod_res_time": "hash: [coarsest, finest] cells across the recording ([8, 2048]); space and time are two tables",
+                   "mod_hidden": "the decoder's (hash) or the SIREN's width (32 / 128)",
+                   "mod_layers": "siren: layers, input to output (5, the paper's)",
+                   "siren_omega": "siren: omega_0 of its sines (30, Sitzmann et al.; coordinates in [-1, 1])",}
     EDGE_SETS = ("short", "mid", "long")
 
     def __init__(self, params, device="cpu"):
@@ -2069,6 +2155,41 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         self.device_ = device
         self.theta = torch.zeros(0, device=device)
         self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "input")}
+        self.activation = str(params.get("activation", "tanh"))
+        if self.activation not in ("tanh", "relu", "linear"):
+            raise ValueError("state_diffuse[neuron_graph] `activation:` tanh (default), relu or linear")
+        self._adapt_params(params)
+        # THE INTEGRATOR (exp17 batch 12, Cedric 2026-10-02; finding 21): explicit Euler substeps are stable only for a
+        # learned rate below 2M per frame, and flat neurons drift past it and run away. `exponential` takes the exact
+        # relaxation of the leak over a substep, stable at any rate (equal to Euler for slow neurons); `rate_max`
+        # bounds the rates smoothly. Defaults keep every earlier run's law bit-for-bit.
+        self.integrator = str(params.get("integrator", "euler"))
+        if self.integrator not in ("euler", "exponential"):
+            raise ValueError("state_diffuse[neuron_graph] `integrator:` euler (default) or exponential")
+        self.rate_max = float(params["rate_max"]) if params.get("rate_max") is not None else None
+        if self.rate_max is not None and self.rate_max <= 0:
+            raise ValueError("state_diffuse[neuron_graph] `rate_max:` must be positive")
+        # THE CONDUCTANCE SYNAPSE (exp17 batch 14, Cedric 2026-10-02; connectome-gnn's flyvis_ode): the message from j to
+        # i is W^2 relu(z_j) (E_j - z_i) -- a non-negative conductance times a driving force toward the SENDER's reversal
+        # E_j (zebrafish has no cell types to give the sign: E_j is learned per neuron, its sign the synapse's)
+        self.synapse = str(params.get("synapse", "current"))
+        if self.synapse not in ("current", "conductance"):
+            raise ValueError("state_diffuse[neuron_graph] `synapse:` current (default) or conductance")
+        if self.synapse == "conductance":
+            self.blocks["reversal"] = str(params.get("reversal", "reversal"))
+            if float(params.get("w_init", 0.0)) == 0.0:
+                raise ValueError("state_diffuse[neuron_graph] conductance: `w_init:` > 0 (W^2 has no gradient at W = 0)")
+        # THE MODULATION (exp17 batch 14; Allier et al. 2026, eq. 3): Omega_i(t) = 1 + f(x_i, y_i, z_i, t) multiplies the
+        # element's message sum, f a hash grid + decoder or a SIREN of the position and the ABSOLUTE frame time (the
+        # trainer sets `frame` each tick and `n_frames_ref` once: FRAME_CLOCK). f's last layer starts at 0: Omega = 1.
+        self.modulation = str(params.get("modulation", "none"))
+        if self.modulation not in ("none", "hash", "siren"):
+            raise ValueError("state_diffuse[neuron_graph] `modulation:` none (default), hash or siren")
+        self.FRAME_CLOCK = self.modulation != "none"
+        self.frame, self.n_frames_ref = 0, 1
+        self._mod_params = {k: params[k] for k in ("mod_levels", "mod_features", "mod_log2_table", "mod_res_space",
+                                                   "mod_res_time", "mod_hidden", "mod_layers", "siren_omega")
+                            if k in params}
         import numpy as np
         from plexus.paths import graphs_data_path
         pf = str(params["positions_file"])
@@ -2082,6 +2203,151 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         w0 = float(params.get("w_init", 0.0))
         for s in self.EDGE_SETS:
             setattr(self, f"W_{s}", torch.full((E[s][0].numel(),), w0, device=device))
+        if self.modulation != "none":
+            P = torch.as_tensor(np.asarray(pos, np.float32), device=device)
+            lo, hi = P.min(0).values, P.max(0).values
+            self._xyz01 = (P - lo) / (hi - lo).clamp(min=1e-6)                   # [N, 3] in [0, 1]
+            self._build_modulation(self._mod_params, device)
+
+    def _rate(self, raw):
+        """A learned rate per frame: softplus of its raw value, smoothly capped at `rate_max` when one is set."""
+        import torch.nn.functional as Fnn
+        r = Fnn.softplus(raw)
+        return r if self.rate_max is None else self.rate_max * torch.tanh(r / self.rate_max)
+
+    def _frac(self, rate):
+        """The fraction of the way to the target in one substep: rate / M (Euler, as before) or 1 - exp(-rate / M)."""
+        if self.integrator == "exponential":
+            return -torch.expm1(-rate / self.substeps)
+        return rate / self.substeps
+
+    def _build_modulation(self, mp, device):
+        """Built once per (positions, parameters, device) and shared by every later instance (_NG_MOD_CACHE): a
+        rollout makes a new operator, and recomputing the spatial corners and drawing a 6.3 M-row table each time
+        cost ~0.6 s per rollout (exp17, profiled 2026-10-02). The learnables replace the tables after the first."""
+        key = (self._pos_file, self.modulation, tuple(sorted((k, str(v)) for k, v in mp.items())), self.seed,
+               str(device), self._xyz01.shape[0])
+        if key not in _NG_MOD_CACHE:
+            self._build_modulation_once(mp, device)
+            _NG_MOD_CACHE[key] = {k: getattr(self, k) for k in ("_mlp_shapes", "omega_mlp", "_omega0", "_s_idx", "_s_w",
+                                                               "_t_res", "_t_off", "_L", "_F", "_rows", "omega_table",
+                                                               "omega_ttable", "_t_lv") if hasattr(self, k)}
+        for k, v in _NG_MOD_CACHE[key].items():
+            setattr(self, k, v)
+
+    def _build_modulation_once(self, mp, device):
+        """The learnable tensors of f: `omega_table` (hash: the space and time tables, flat) and `omega_mlp` (the
+        decoder or SIREN weights, flat), declared as `{param: omega_table / omega_mlp, op: state_diffuse}`.
+
+        THE HASH ENCODING IS SPACE x TIME (Instant NGP's multiresolution tables, one 3-D for x, y, z and one 1-D for
+        t, their features concatenated into the decoder): a joint 4-D grid re-hashes every neuron's 16 corners at
+        every level on every tick, ~6.5x the whole law's time on 100,759 neurons (exp17, measured 2026-10-02). The
+        neurons do not move, so their spatial corners and weights are computed ONCE here; a tick reads table rows."""
+        import math
+        import numpy as np
+        g = torch.Generator().manual_seed(self.seed)
+        H = int(mp.get("mod_hidden", 32 if self.modulation == "hash" else 128))
+        if self.modulation == "hash":
+            L, F = int(mp.get("mod_levels", 12)), int(mp.get("mod_features", 2))
+            rows = 2 ** int(mp.get("mod_log2_table", 19))
+            rs, rt = list(mp.get("mod_res_space", [4, 128])), list(mp.get("mod_res_time", [8, 2048]))
+            X = self._xyz01.detach().cpu().numpy().astype(np.float64)
+            idx, wts = [], []
+            for l in range(L):
+                res = rs[0] * (rs[1] / rs[0]) ** (l / max(L - 1, 1))
+                q = X * res
+                c0 = np.floor(q).astype(np.int64)
+                fr = q - c0
+                dense = (int(math.ceil(res)) + 2) ** 3 <= rows
+                il, wl = [], []
+                for corner in range(8):
+                    off = np.array([(corner >> d) & 1 for d in range(3)])
+                    c = c0 + off
+                    if dense:
+                        n_ = int(math.ceil(res)) + 2
+                        h = (c[:, 0] * n_ + c[:, 1]) * n_ + c[:, 2]
+                    else:
+                        h = (c[:, 0] * 1) ^ (c[:, 1] * 2654435761) ^ (c[:, 2] * 805459861)
+                    il.append(h % rows)
+                    wl.append(np.prod(np.where(off == 1, fr, 1 - fr), axis=1))
+                idx.append(np.stack(il, 1) + l * rows)                       # one flat table, a slice per level
+                wts.append(np.stack(wl, 1))
+            self._s_idx = torch.as_tensor(np.stack(idx, 1), device=device)    # [N, L, 8]
+            self._s_w = torch.as_tensor(np.stack(wts, 1), dtype=torch.float32, device=device)
+            self._t_res = [int(round(rt[0] * (rt[1] / rt[0]) ** (l / max(L - 1, 1)))) for l in range(L)]
+            self._t_off = np.cumsum([0] + [r + 1 for r in self._t_res]).tolist()
+            self._L, self._F, self._rows = L, F, rows
+            n_t = self._t_off[-1]
+            # TWO TABLES, two learnables: a small time table read every tick (`omega_ttable`), the large space table
+            # read once per rollout (`omega_table`) -- one table for both made every tick's few time rows backward
+            # into a dense gradient of all 6.3 M rows (exp17, profiled 2026-10-02: ~5x the law's time)
+            self.omega_table = ((torch.rand(L * rows, F, generator=g) * 2 - 1) * 1e-4).to(device)
+            self.omega_ttable = ((torch.rand(n_t, F, generator=g) * 2 - 1) * 1e-4).to(device)
+            t_lv = []
+            for l, r in enumerate(self._t_res):
+                t_lv.append((self._t_off[l], r))
+            self._t_lv = t_lv
+            shapes = [(2 * L * F, H), (H,), (H, 1), (1,)]
+        else:
+            n = int(mp.get("mod_layers", 5))
+            self._omega0 = float(mp.get("siren_omega", 30.0))
+            dims = [4] + [H] * (n - 1) + [1]
+            shapes = [s_ for i in range(n) for s_ in ((dims[i], dims[i + 1]), (dims[i + 1],))]
+        self._mlp_shapes = shapes
+        parts = []
+        for i, sh in enumerate(shapes):
+            if i >= len(shapes) - 2:
+                parts.append(torch.zeros(sh))                                   # f = 0 at the start: Omega = 1
+            elif len(sh) == 2:
+                fan = sh[0]
+                if self.modulation == "siren":                                  # Sitzmann et al.'s init
+                    bnd = 1.0 / fan if i == 0 else math.sqrt(6.0 / fan) / self._omega0
+                else:
+                    bnd = math.sqrt(6.0 / fan)
+                parts.append((torch.rand(sh, generator=g) * 2 - 1) * bnd)
+            else:
+                parts.append(torch.zeros(sh))
+        self.omega_mlp = torch.cat([q.reshape(-1) for q in parts]).to(device)
+
+    def _space_features(self):
+        """[N, L F] the hash's spatial features: the same on every tick of a rollout (the neurons do not move), so
+        the law computes them once per rollout (an operator instance is one rollout) and hands them to each tick."""
+        tab = self.omega_table
+        return (tab[self._s_idx] * self._s_w[..., None]).sum(2).reshape(self._xyz01.shape[0], -1)
+
+    def _omega(self, fs=None):
+        """[N, 1] Omega_i at the current frame: 1 + f(x_i, y_i, z_i, t)."""
+        N = self._xyz01.shape[0]
+        t = float(self.frame) / max(self.n_frames_ref - 1, 1)
+        ws, o = [], 0
+        for sh in self._mlp_shapes:
+            n = 1
+            for d in sh:
+                n *= d
+            ws.append(self.omega_mlp[o:o + n].reshape(sh))
+            o += n
+        if self.modulation == "hash":
+            tab = self.omega_table
+            fs = self._space_features() if fs is None else fs                        # [N, L F], space
+            i0, wt = [], []                                                         # [L F], time, the same for all
+            for base, r in self._t_lv:
+                q = t * r
+                c0 = min(int(q), r - 1)
+                i0.append(base + c0)
+                wt.append(q - c0)
+            dev = self.omega_ttable.device
+            i0 = torch.tensor(i0, device=dev)
+            wt = torch.tensor(wt, device=dev, dtype=self.omega_ttable.dtype)[:, None]
+            tt = self.omega_ttable
+            ft = (1 - wt) * tt[i0] + wt * tt[i0 + 1]                              # ONE gather of the small table
+            h = torch.cat([fs, ft.reshape(1, -1).expand(N, -1)], 1)
+            h = torch.relu(h @ ws[0] + ws[1])
+            return 1.0 + h @ ws[2] + ws[3]
+        c = torch.cat([self._xyz01, torch.full((N, 1), t, device=self._xyz01.device)], 1)
+        h = c * 2 - 1
+        for i in range(0, len(ws) - 2, 2):
+            h = torch.sin(self._omega0 * (h @ ws[i] + ws[i + 1]))
+        return 1.0 + h @ ws[-2] + ws[-1]
 
     def graph(self, pos) -> dict:
         """{set: (senders, receivers)} as long tensors on this device, and `stats` (edges and mean length, um)."""
@@ -2131,16 +2397,171 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         mu, sd, _ = self.norm
         z0 = (x[:, :1] - mu) / sd
         z = z0
-        rate = Fnn.softplus(nb["tau"])
+        rate = self._rate(nb["tau"])
         drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
+        if self.input_mask is not None and self.forcing_dim:
+            drive = drive * self.input_mask.to(drive.device)
+        ad0 = nb["adapt"] if self.adapt else None
+        ad = ad0
+        if self.adapt:
+            ga, ka = Fnn.softplus(nb["adapt_gain"]), self._rate(nb["adapt_rate"])
+        fz = self._frac(rate)                  # the fraction of the way to the target per substep
+        fa = self._frac(ka) if self.adapt else None
+        om = self._omega(nb.get("_omega_fs")) if self.modulation != "none" else None   # once per tick: f is of the frame
+        cond = self.synapse == "conductance"
         for _ in range(self.substeps):
-            act = torch.tanh(z)
+            if cond:
+                # sum_j W^2 relu(z_j) (E_j - z_i) = sum_j W^2 relu(z_j) E_j - z_i sum_j W^2 relu(z_j): ONE gather and
+                # ONE sum of a 2-wide sender quantity, not three gathers per edge
+                r = torch.relu(z)
+                q = torch.cat([r * nb["reversal"], r], 1)
+                acc = torch.zeros_like(q)
+                for s in self.EDGE_SETS:
+                    snd, rcv = E[s]
+                    if snd.numel():
+                        w = getattr(self, f"W_{s}")[:, None]
+                        acc = acc.index_add(0, rcv, (w * w) * q[snd])
+                agg = acc[:, :1] - z * acc[:, 1:]
+            else:
+                act = self._act(z)
+                agg = torch.zeros_like(z)
+                for s in self.EDGE_SETS:
+                    snd, rcv = E[s]
+                    if snd.numel():
+                        agg = agg.index_add(0, rcv, getattr(self, f"W_{s}")[:, None] * act[snd])
+            if om is not None:
+                agg = om * agg
+            if self.adapt:
+                z, ad = (z + fz * (-z + nb["rest"] + agg + drive - ga * ad),
+                         ad + fa * (z - ad))
+            else:
+                z = z + fz * (-z + nb["rest"] + agg + drive)
+        if self.adapt:
+            return sd * (z - z0), ad - ad0
+        return sd * (z - z0)
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_mlp",
+                   title="A set's scalar through a learned GNN (MLP message and update, per-element embedding) on the "
+                         "multi-scale graph between the elements",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}f_\theta\big(z_i,a_i,\textstyle\sum_{s}\sum_{j\in\mathcal N_s(i)}
+W^{s}_{ji}\,g_\phi(\cdot)^2,B_i\cdot u\big)$$""")
+class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
+    """THE GNN-MLP ON THE NEURON GRAPH (exp17 batch 12, Cedric 2026-10-02: "twin of 13 but with GNN-MLP + 2D embedding
+    instead of known-ode, sweep over g_phi MLP(a_j, v_j) and MLP(a_i, a_j, v_i, v_j)"): connectome-gnn's signal model
+    on the neuron graph's three typed edge sets. One tick, M substeps, in the normalised units z = (x - mu)/sd:
+
+        m_i = sum_s sum_{j->i} W^s_e g_phi(.)^2          `message: sender`  g_phi(z_j, a_j)        (per sender: N MLPs)
+                                                         `message: pair`    g_phi(z_i, z_j, a_i, a_j) (per edge)
+        z_i <- z_i + (1/M) f_theta(z_i, a_i, m_i, B_i . u)
+
+    a_i the element's learned embedding (the `embedding` block, `{block: embedding, of: <set>}`, width E), W^s one
+    weight per edge (`W_short` / `W_mid` / `W_long`), g_phi squared (connectome-gnn's g_phi_positive: the message's
+    sign is W's), f_theta's last layer at zero (the untrained law is persistence). B_i . u the known stimulus as in the
+    known ODE, `input_mask` applying. Both MLPs: 2 hidden layers of `hidden`, SiLU (the connectome law's `_mlp3`).
+    Priors on theta_g as the connectome law: `monotone` (g does not fall as the sender's value rises), `pin`
+    (g(z = 2) = 1, the scale W and g share), `input_group_l1`. No leak, rest or rate: f_theta is the whole update.
+    """
+    REQUIRES_PARAMS = ["block", "positions", "positions_file"]
+    MECHANISM_TAGS = ["learned_update", "proxy_connectome", "gnn"]
+    NORM_FROM_REFERENCE = True
+    PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraph.PARAM_ROLES.items()
+                      if k not in ("tau", "rest", "integrator", "rate_max", "synapse", "reversal", "activation",
+                                   "adaptation", "adapt_gain", "adapt_rate", "modulation", "mod_levels",
+                                   "mod_features", "mod_log2_table", "mod_res_space", "mod_res_time", "mod_hidden",
+                                   "mod_layers", "siren_omega", "omega_table", "omega_mlp")},
+                   "message": "sender (g_phi(z_j, a_j), default) or pair (g_phi(z_i, z_j, a_i, a_j))",
+                   "embedding": "the elements' learned embedding block a_i (its width is E)",
+                   "embedding_dim": "E, the embedding block's width (2)",
+                   "hidden": "both MLPs' width (64)",
+                   "theta_g": "the message MLP g_phi, flat", "theta_f": "the update MLP f_theta, flat"}
+
+    def __init__(self, params, device="cpu"):
+        bad = [k for k in ("integrator", "rate_max", "synapse", "adaptation", "modulation", "activation") if k in params]
+        if bad:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: {bad} belong to the known ODE (neuron_graph)")
+        super().__init__(params, device)
+        self.message = str(params.get("message", "sender"))
+        if self.message not in ("sender", "pair"):
+            raise ValueError("state_diffuse[neuron_graph_mlp] `message:` sender (default) or pair")
+        self.hidden = int(params.get("hidden", 64))
+        self.embedding_dim = int(params.get("embedding_dim", 2))
+        self.blocks = {"input": str(params.get("input", "input")), "embedding": str(params.get("embedding", "embedding"))}
+        self._a_last = None
+        self.init_theta()
+
+    def _shapes(self):
+        E = self.embedding_dim
+        n_g = (2 + 2 * E) if self.message == "pair" else (1 + E)
+        return {"theta_g": n_g, "theta_f": 2 + E + (1 if self.forcing_dim else 0)}
+
+    def init_theta(self):
+        g = torch.Generator().manual_seed(self.seed)
+        for name, n_in in self._shapes().items():
+            parts = []
+            for k, shape in self._layout3(n_in):
+                if name == "theta_f" and k in ("w3", "b3"):
+                    t = torch.zeros(shape)                                 # persistence at the start
+                else:
+                    fan = n_in if k in ("w1", "b1") else self.hidden
+                    t = (torch.rand(shape, generator=g) * 2 - 1) / math.sqrt(fan)
+                parts.append(t.reshape(-1))
+            setattr(self, name, torch.cat(parts).to(self.device_))
+        return torch.zeros(0, device=self.device_)
+
+    def _g(self, zi, zj, ai, aj):
+        x = torch.cat([zj, aj], 1) if self.message == "sender" else torch.cat([zi, zj, ai, aj], 1)
+        return self._mlp3("theta_g", x) ** 2
+
+    def prior_term(self, param, kind):
+        """The connectome law's priors on theta_g, the embeddings sampled from the last rollout's (ones before any)."""
+        if param != "theta_g":
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: `{kind}` is a prior of `theta_g`, not of `{param}`")
+        dev = self.theta_g.device
+        A = self._a_last if self._a_last is not None else torch.ones(1, self.embedding_dim, device=dev)
+        a = A[torch.randint(0, A.shape[0], (512,), device=dev)]
+        if kind == "monotone":
+            v = torch.rand(512, 1, device=dev) * 6 - 3
+            return torch.relu(self._g(v, v, a, a) - self._g(v, v + 0.1, a, a)).norm(2)
+        if kind == "pin":
+            v = torch.full((512, 1), 2.0, device=dev)
+            return (self._g(v, v, a, a) - 1.0).norm(2)
+        if kind == "input_group_l1":
+            w1 = self.theta_g[: self.hidden * self._shapes()["theta_g"]].view(self.hidden, -1)
+            return w1.norm(dim=0).sum()
+        raise ValueError(f"state_diffuse[neuron_graph_mlp]: no prior `{kind}`")
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        E = self._E
+        if x.shape[0] != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: {x.shape[0]} elements, the graph was built on "
+                             f"{self.n_elements} (`positions_file`)")
+        if x.shape[1] != 1:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
+        ae = nb["embedding"]
+        if ae.shape[1] != self.embedding_dim:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: the embedding block is {ae.shape[1]} wide, "
+                             f"`embedding_dim` {self.embedding_dim}")
+        self._a_last = ae.detach()
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        feats_d = []
+        if self.forcing_dim:
+            drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True)
+            if self.input_mask is not None:
+                drive = drive * self.input_mask.to(drive.device)
+            feats_d = [drive]
+        for _ in range(self.substeps):
             agg = torch.zeros_like(z)
+            gn = self._g(z, z, ae, ae) if self.message == "sender" else None     # per sender: one MLP per element
             for s in self.EDGE_SETS:
                 snd, rcv = E[s]
                 if snd.numel():
-                    agg = agg.index_add(0, rcv, getattr(self, f"W_{s}")[:, None] * act[snd])
-            z = z + rate * (-z + nb["rest"] + agg + drive) / self.substeps
+                    w = getattr(self, f"W_{s}")[:, None]
+                    ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
+                    agg = agg.index_add(0, rcv, w * ge)
+            z = z + self._mlp3("theta_f", torch.cat([z, ae, agg] + feats_d, 1)) / self.substeps
         return sd * (z - z0)
 
 
