@@ -1065,7 +1065,9 @@ def slides_ablation(r, tag):
                             (kl, "no stimulus into the left half (its stimulus weights B = 0), every W kept: "
                                  "stimulus-locked activity left there came through the network from the right"
                                  if kl == "Sleft0" else "W = 0 on every edge INTO the left half", kl)):
-        mv = os.path.join(r["dir"], "results", f"movie_{kind}.mp4")
+        mv = os.path.join(r["dir"], "results", f"movie_{kind}_cmp.mp4")    # the full model beside the ablation
+        if not os.path.exists(mv):
+            mv = os.path.join(r["dir"], "results", f"movie_{kind}.mp4")
         if not os.path.exists(mv):
             continue
         shutil.copy(mv, os.path.join(PRES, "Movies", f"{n}_{kind}.mp4"))
@@ -1218,6 +1220,7 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
 
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
 HIDE_BATCHES_UPTO = 7     # batches whose own slides are commented out of all.tex (Cedric, 2026-10-02)
+HIDE_BATCHES = {"10"}     # and these single batches too (Cedric, 2026-10-02: batch 10, the |B_i| mask)
 HIDDEN_BATCHES: set = set()   # Cedric hid batch 4 while one arm had landed (2026-09-30); back with all 8 (2026-10-01)
 
 
@@ -1848,7 +1851,7 @@ def main():
           " here every message runs between two real neurons, and a row lasso on $B_i$ can make the stimulus"
           " travel along the edges\\par}\n")
     s_ng = frame("The neuron graph: one weight per edge between two neurons", "\\panel{figs/07_neuron_graph.png}",
-                 right_ng, "state_diffuse[model: neuron_graph]", left_gap=True, deck_title="Known\\_ODE-neuron\\_graph")
+                 right_ng, "state_diffuse[model: neuron_graph]", left_gap=True, deck_title=f"{DECK_TITLE} - distance graph")
     # ---- the twin of the neuron-graph slide on the DESTRIPED traces (Cedric, 2026-10-01): the graph the batch-9 law
     # builds from the destriped positions, drawn head-up as the destriped movie (x_plot = y, y_plot = -x)
     s_ng_ds = ""
@@ -1932,6 +1935,7 @@ def main():
     # Cedric, 2026-10-02: batches 1-7's own slides (levers, movie, curves) commented out, kept in the deck file; the
     # method slides (data, mesh, one-step, neuron graph, calcium) and the pooled slides stay shown
     HIDDEN_SLIDES |= {name for name, _ in deck if (batch_of(name) or "99").isdigit() and int(batch_of(name) or 99) <= HIDE_BATCHES_UPTO}
+    HIDDEN_SLIDES |= {name for name, _ in deck if batch_of(name) in HIDE_BATCHES}   # single batches hidden (Cedric)
     pages, shown = {}, 0
     for name, _ in deck:
         if name in HIDDEN_SLIDES:

@@ -402,5 +402,157 @@ def main(argv=None):
             run_one(r, a.device, movie=not a.no_movie)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and "--compare" not in sys.argv:
     sys.exit(main())
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# THE COMPARISON MOVIES (Cedric, 2026-10-02): the full learned model LEFT and the ablated one RIGHT, not the recording
+# against the ablation. W0: under each brain its brain-mean dF/F (recorded green, the model white) and its free-rollout
+# R2 (0..1) -- a 2 x 2 of curves. Sleft0: the brain-mean dF/F of the LEFT half and of the RIGHT half, each recorded
+# (green), full model (white) and ablated (orange); no R2.
+_CMP: dict = {}
+
+
+def _brain_view(pos):
+    """Horizontal, head left: the run movies' mapping (trace_recording.render_movie)."""
+    if np.ptp(pos[:, 0]) > np.ptp(pos[:, 1]):
+        pos = np.stack([pos[:, 1], -pos[:, 0], pos[:, 2]], 1)
+    return np.stack([-pos[:, 1], pos[:, 0], pos[:, 2]], 1)
+
+
+def _cmp_frames(ks):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    d = _CMP
+    P, order, vmax, tm, fr = d["P"], d["order"], d["vmax"], d["tm"], d["frames"]
+    fig = plt.figure(figsize=(12, 7.6), facecolor="black")
+    sc, txt = [], []
+    for j, lab in enumerate(("learned: the full model", f"learned: {d['label']}")):
+        ax = fig.add_axes([0.5 * j, 0.40, 0.5, 0.50])
+        ax.set_facecolor("black")
+        ax.axis("off")
+        sc.append(ax.scatter(P[:, 0], P[:, 1], c=np.zeros(len(P)), s=0.5, cmap="inferno", vmin=0, vmax=vmax,
+                             linewidths=0))
+        ax.set_aspect("equal")
+        fig.text(0.5 * j + 0.03, 0.985, lab, color="white", fontsize=12, va="top")
+        txt.append(fig.text(0.5 * j + 0.47, 0.955, "", color="white", fontsize=9, va="top", ha="right"))
+    t_txt = fig.text(0.03, 0.945, "", color="0.7", fontsize=9, va="top")
+    cur = []
+
+    def strip(x0, y0, h=0.085):
+        m = fig.add_axes([x0, y0, 0.42, h])
+        m.set_facecolor("black")
+        for k_, sp in m.spines.items():
+            sp.set_visible(k_ in ("left", "bottom"))
+            sp.set_color("0.5")
+        m.set_xlim(tm[0], tm[-1])
+        m.tick_params(colors="0.6", labelsize=7, length=2)
+        for i_, (a_, b_, c_) in enumerate(d["blocks"]):
+            m.axvspan(a_, b_, color=("0.30" if i_ % 2 else "0.18"), alpha=0.6, lw=0, zorder=0)
+        cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=5))
+        return m
+
+    def dff(m, curves):
+        for y, col in curves:
+            m.plot(tm, y, color=col, lw=0.7, zorder=2)
+        lo_, hi_ = np.nanpercentile(np.concatenate([c for c, _ in curves]), [0.5, 99.5])
+        m.set_ylim(lo_ - 0.1 * (hi_ - lo_), hi_ + 0.1 * (hi_ - lo_))
+        m.set_yticks([])
+    if d["mode"] == "W0":
+        for j, key in enumerate(("full", "abl")):
+            x0 = 0.05 + 0.5 * j
+            m = strip(x0, 0.235)
+            dff(m, [(d["mean_rec"], "#2ca02c"), (d[f"mean_{key}"], "white")])
+            for a_, b_, c_ in d["blocks"]:
+                m.text((a_ + b_) / 2, 1.02, d["names"][int(c_)], color="0.75", fontsize=6, ha="center", va="bottom",
+                       transform=m.get_xaxis_transform())
+            fig.text(x0, 0.345, "brain-mean dF/F: recorded (green), this model (white)", color="0.7", fontsize=8)
+            r = strip(x0, 0.06)
+            r.plot(d["t_all"], d[f"r2_{key}"], color="white", lw=0.6, zorder=2)
+            r.set_ylim(0, 1)
+            r.set_yticks([0, 1])
+            fig.text(x0, 0.155, "free rollout R$^2$ (denoised) per frame; time, min", color="0.7", fontsize=8)
+    else:
+        for j, side in enumerate(("left", "right")):
+            x0 = 0.05 + 0.5 * j
+            m = strip(x0, 0.10, h=0.20)
+            dff(m, [(d[f"{side}_rec"], "#2ca02c"), (d[f"{side}_full"], "white"), (d[f"{side}_abl"], "#ff9f1c")])
+            for a_, b_, c_ in d["blocks"]:
+                m.text((a_ + b_) / 2, 1.02, d["names"][int(c_)], color="0.75", fontsize=6, ha="center", va="bottom",
+                       transform=m.get_xaxis_transform())
+            fig.text(x0, 0.335, f"the {side.upper()} half's mean dF/F: recorded (green), full model (white), "
+                     "ablated (orange)", color="0.75", fontsize=8)
+            fig.text(x0, 0.03, "time, min", color="0.6", fontsize=8)
+    for k in ks:
+        f = fr[k]
+        sc[0].set_array(np.asarray(d["full"][k], np.float32)[order])
+        sc[1].set_array(np.asarray(d["abl"][k], np.float32)[order])
+        t_txt.set_text(f"{d['names'][d['cond'][k]]}   t = {f * FRAME_S / 60:5.1f} min")
+        upto = d["t_all"] <= f * FRAME_S / 60
+        for j, key in enumerate(("full", "abl")):
+            rr = d[f"r2_{key}"][upto]
+            txt[j].set_text(f"R2 denoised {np.mean(rr):+.3f} so far" if len(rr) else "")
+        for c_ in cur:
+            c_.set_xdata([f * FRAME_S / 60] * 2)
+        fig.savefig(os.path.join(d["tmp"], f"{k:05d}.png"), dpi=90, facecolor="black")
+    plt.close(fig)
+
+
+def render_compare(name, arm, workers=16):
+    """results/movie_<arm>_cmp.mp4 (+ .png): the full model and the `arm` ablation side by side (see above)."""
+    import multiprocessing as mp
+    import shutil as sh
+    import subprocess
+    import tempfile
+    from plexus import trainer as T
+    from plexus.tasks import trace_recording as TR
+    spec = T.load(name)
+    out = T.out_dir(spec, None)
+    rec = TR.load(spec["task"]["reference"]["trace_recording"])
+    full = np.load(os.path.join(out, "results", f"{name}_movie.npz"))
+    abl = np.load(os.path.join(out, "results", f"{name}_{arm}_movie.npz"))
+    fr = full["frames"]
+    if not np.array_equal(fr, abl["frames"]):
+        raise SystemExit(f"{name}: the full and the {arm} movies sample different frames")
+    left = np.load(os.path.join(out, "results", f"{name}_ablation_sides.npz"))["left"].astype(bool)
+    pos = _brain_view(np.asarray(rec["pos_um"], np.float64))
+    order = np.argsort(pos[:, 2])
+    X = rec["dff"][fr].astype(np.float32)
+    pf, pa = full["pred"].astype(np.float32), abl["pred"].astype(np.float32)
+    tm = fr * FRAME_S / 60
+    cond = rec["condition"][fr]
+    cut = np.flatnonzero(np.diff(cond)) + 1
+    st, en = np.r_[0, cut], np.r_[cut, len(cond)] - 1
+    blocks = [(tm[a], tm[b], cond[a]) for a, b in zip(st, en)]
+    _CMP.clear()
+    _CMP.update(P=pos[order], order=order, vmax=float(np.percentile(X, 97)), tm=tm, frames=fr, full=pf, abl=pa,
+                cond=cond, names=[str(s) for s in rec["names"]], blocks=blocks, mode=arm,
+                label=MOVIE_LABEL.get(arm, arm), t_all=full["r2_t"] * FRAME_S / 60,
+                r2_full=np.asarray(full["r2_denoised_all"], float), r2_abl=np.asarray(abl["r2_denoised_all"], float),
+                mean_rec=np.nanmean(X, 1), mean_full=np.nanmean(pf, 1), mean_abl=np.nanmean(pa, 1),
+                left_rec=np.nanmean(X[:, left], 1), left_full=np.nanmean(pf[:, left], 1),
+                left_abl=np.nanmean(pa[:, left], 1), right_rec=np.nanmean(X[:, ~left], 1),
+                right_full=np.nanmean(pf[:, ~left], 1), right_abl=np.nanmean(pa[:, ~left], 1),
+                tmp=tempfile.mkdtemp(prefix="abl_cmp_"))
+    ks = np.arange(len(fr))
+    workers = min(workers, len(os.sched_getaffinity(0)))
+    chunks = [c for c in np.array_split(ks, workers) if len(c)]
+    with mp.get_context("fork").Pool(len(chunks)) as pool:
+        pool.map(_cmp_frames, chunks)
+    path = os.path.join(out, "results", f"movie_{arm}_cmp.mp4")
+    subprocess.run([TR._ffmpeg(), "-y", "-loglevel", "error", "-framerate", "25", "-i",
+                    os.path.join(_CMP["tmp"], "%05d.png"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt",
+                    "yuv420p", "-c:v", "libx264", path], check=True)
+    sh.copy(os.path.join(_CMP["tmp"], f"{len(fr) // 2:05d}.png"), path.replace(".mp4", ".png"))
+    sh.rmtree(_CMP["tmp"])
+    _CMP.clear()
+    print(f"[ablation] {path}", flush=True)
+    return path
+
+
+if __name__ == "__main__" and len(sys.argv) > 2 and sys.argv[1] == "--compare":
+    for n_ in sys.argv[2:]:
+        for a_ in ("W0", "Sleft0"):
+            render_compare(n_, a_)
