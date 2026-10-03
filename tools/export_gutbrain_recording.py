@@ -141,6 +141,15 @@ def swim_power(sig):
 def forcings_and_trials(E, st):
     T = len(st)
     uv_on = (np.asarray(E[:, CH["ch_UV"]]) > TRIG_V).astype(np.float64)
+    if not uv_on.any():
+        # THE BLOOD-GLUCOSE SESSIONS carry no trigger on ch_UV (an analog, galvo-like signal there); their pulses are the
+        # 8-ms onset markers of ch_uvtrial, which count exactly as ch_UV's pulses wherever both exist (glucose fish 1:
+        # 18 / 18; fish water 1: 20 / 20), each lasting ch_stimDuration ms from its marker
+        a_, _ = runs_above(E[:, CH["ch_uvtrial"]], 0.5, gap=UV_GAP)
+        uv_on = np.zeros(len(E))
+        for t0 in a_:
+            n_ = int(round(float(E[t0, CH["ch_stimDuration"]]) * FS / 1e3)) or int(0.2 * FS)
+            uv_on[t0:t0 + n_] = 1.0
     uv = per_volume_mean(uv_on, st)
     gx = per_volume_mean(np.asarray(E[:, CH["ch_galvoX"]]) * uv_on, st)
     gy = per_volume_mean(np.asarray(E[:, CH["ch_galvoY"]]) * uv_on, st)
@@ -152,7 +161,7 @@ def forcings_and_trials(E, st):
         live.append(bool(top > SWIM_LIVE * floor))
         sw.append(np.clip((p - floor) / max(top - floor, 1e-12), 0, SWIM_CLIP) if live[-1] else np.zeros_like(p))
     S = np.stack([uv, gx, gy, vis, sw[0], sw[1]], 1).astype(np.float32)
-    on, off = runs_above(E[:, CH["ch_UV"]], TRIG_V, gap=UV_GAP)
+    on, off = runs_above(uv_on, 0.5, gap=UV_GAP)
     period = float(np.median(np.diff(st))) / FS
     pre, post = int(round(PRE_S / period)), int(np.ceil(POST_S / period))
     trials = []
