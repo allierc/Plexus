@@ -380,6 +380,11 @@ REC1 = "gutbrain_glucose_f1"
 
 def _tex(t):
     t = str(t).replace("_now", "_no_W")                 # Cedric, 2026-10-03: the no-network runs read "no_W"
+    # BATCH 3's DEFAULT IS NO W PRIOR (Cedric, 2026-10-03: "no l1 is the nominal default now, do not specify"): its run
+    # names drop "_nol1", and the one arm that keeps the prior (gb_sx_base, gb_sx_f4_base) reads "Wprior"
+    t = re.sub(r"\bgb_sx_nol1\b", "gb_sx_f1", t)          # fish 1's nominal, named as the other fish's
+    t = re.sub(r"(gb_sx_\w*?)_nol1", r"\1", t)
+    t = re.sub(r"gb_sx_(f4_)?base", r"gb_sx_\1Wprior", t)
     return t.replace("_", "\\_").replace("%", "\\%").replace("&", "\\&").replace("#", "\\#")
 
 
