@@ -392,6 +392,30 @@ def brain_r2(d, stem):
     return T._brain_mean_metrics(z["mean_obs_all"], z["mean_pred_all"])["brain_mean_r2"]
 
 
+def cell_r2(d, stem):
+    """The per-cell R2: R2 per frame over the alive cells against the denoised recording, the mean over the free
+    rollout's frames (results/<stem>_free.npz, the trainer's `_trace_free` or a rollout variant)."""
+    p = os.path.join(d, "results", f"{stem}_free.npz")
+    return float(np.nanmean(np.load(p)["r2_denoised"])) if os.path.exists(p) else None
+
+
+def control_table(name, now):
+    """THE CONTROLS TABLE on every results slide (Cedric, 2026-10-03): the full model, the same model with W = 0 at
+    inference, and the batch's model trained with no network -- brain-mean R2 and per-cell R2 of each free rollout.
+    A row is left out when its rollout does not exist yet."""
+    r, rn = landed(name), landed(now) if now else None
+    f = lambda v: f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
+    rws = [(f"full model ({_tex(name)})", brain_r2(r["dir"], name), cell_r2(r["dir"], name))]
+    if os.path.exists(os.path.join(r["dir"], "results", f"{name}_W0_movie.npz")):
+        rws.append(("W = 0 at inference", brain_r2(r["dir"], f"{name}_W0"), cell_r2(r["dir"], f"{name}_W0")))
+    if rn and now != name:
+        rws.append((f"trained with no network ({_tex(now)})", brain_r2(rn["dir"], now), cell_r2(rn["dir"], now)))
+    body = "".join(f"{a} & {f(b_)} & {f(c)} \\\\\n" for a, b_, c in rws)
+    return ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{}}\n"
+            "free rollout, whole session & brain-mean R$^2$ & per-cell R$^2$ \\\\\n\\hline\n" + body
+            + "\\end{tabular}\\par}\\vspace{6pt}\n")
+
+
 def numbers(r):
     """The four numbers a batch slide shows for a run, from its own result files (None where not measured)."""
     from exp_measures import exp20 as M
@@ -455,7 +479,7 @@ def slide_batch(b):
                                        "the runs' _test, _trials, _freetrial json", deck_title=f"batch {b} ({_tex(title)}) $\\cdot$ every arm"))
 
 
-def slides_run(name, b):
+def slides_run(name, b, now=None):
     import shutil
     r = landed(name)
     if not r:
@@ -476,7 +500,7 @@ def slides_run(name, b):
             + ([("free gut", f"{ft['evoked_gut_free_over_rec']:.2f} of the recorded response, pattern r {ft['pattern_r_gut']:+.2f}"),
                 ("free ctrl", f"{ft['evoked_ctrl_free_over_rec_gut']:+.2f} of the recorded gut response"),
                 ("", ", ".join(f"{t['kind'][0]}{t['onset']}: {t['evoked_free']:+.3f} / {t['evoked_rec']:+.3f}" for t in ft["trials"]))]
-               if ft else [])))
+               if ft else [])) + control_table(name, now))
         out.append((f"{name}_movie", frame("the free rollout of the whole session, recorded left, learned right",
                                            f"\\playmovie{{Movies/{name}}}", right, f"{name}/results/movie.mp4", deck_title=dt)))
     cp = os.path.join(r["dir"], "results", f"{name}_test.png")
@@ -526,7 +550,7 @@ def slides_controls(name, now, b):
         out.append((f"{name}_controls", frame(f"{_tex(name)} with W = 0, and a law with no network: the gut response is the network's",
                                               left, right, f"{name}_freetrial.json, ablation_{name}.json", deck_title=dt)))
     if rn:
-        out += [(k.replace("_movie", "_nonet_movie"), v) for k, v in slides_run(now, b) if k.endswith("_movie")]
+        out += [(k.replace("_movie", "_nonet_movie"), v) for k, v in slides_run(now, b, now) if k.endswith("_movie")]
     return out
 
 
@@ -651,7 +675,7 @@ def main():
         if not any(landed(n) for n in names):
             continue
         deck.append(slide_batch(b))
-        deck += slides_run(shown, b)
+        deck += slides_run(shown, b, now)
         deck.append(slide_network(shown, now, b))
         deck += slides_controls(shown, now, b)
     deck.append(slide_overview())
