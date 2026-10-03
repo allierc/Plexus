@@ -110,13 +110,15 @@ def main():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(1, 3, figsize=(15, 4), facecolor="black")
+    fig, ax = plt.subplots(3, 1, figsize=(7, 9.5), facecolor="black")        # stacked: one brain per input, large
     for a_, (k, col) in zip(ax, (("uv", "#ff4040"), ("visual", "#4fc3f7"), ("swim", "#81c784"))):
         a_.set_facecolor("black")
-        a_.scatter(P[::20, 0], P[::20, 1], s=0.05, c="0.3", lw=0)
-        a_.scatter(P[m[k], 0], P[m[k], 1], s=0.15, c=col, lw=0)
+        a_.scatter(P[::10, 0], P[::10, 1], s=0.3, c="0.3", lw=0)
+        a_.scatter(P[m[k], 0], P[m[k], 1], s=0.6, c=col, lw=0)
         a_.set_aspect("equal"); a_.axis("off")
-        a_.set_title(f"{k}: top {a.top:.0%} ({int(m[k].sum()):,} cells)", color="white", fontsize=10)
+        what = {"uv": "UV pulse: trial-locked |t| over the training pulses", "visual": "grating: coherence",
+                "swim": "swim power: coherence"}[k]
+        a_.set_title(f"{what} -- top {a.top:.0%} ({int(m[k].sum()):,} cells), head left", color="white", fontsize=11)
     os.makedirs(os.path.join(EXP, "png"), exist_ok=True)
     png = os.path.join(EXP, "png", f"input_mask_{a.recording}.png")
     fig.savefig(png, dpi=130, facecolor="black", bbox_inches="tight")

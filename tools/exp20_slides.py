@@ -36,7 +36,8 @@ DATA = os.path.join(EXP, "data")
 PAPERS = os.path.join(EXP, "papers")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-DECK_TITLE = "gut-brain GNN"
+DECK_TITLE = "multi-level GNN on brain-gut fish"
+HIDDEN = {"04_fig3d"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
 
 # THE PAPER'S NUMBERS, each with its figure and panel (read off papers/figs/*_crop.png, +-1 on the bars)
 PAPER = {
@@ -204,6 +205,13 @@ def slide_anatomy():
         im = plt.imread(os.path.join(A, f"body_{v}.png"))
         r0, r1 = (0.12, 0.78) if v == "lateral" else (0.28, 0.72)      # full width in both: head and tail align
         a_.imshow(im[int(r0 * im.shape[0]):int(r1 * im.shape[0])])
+        # SCALE BAR (Cedric, 2026-10-03): the model has no units; its skin is 19.7 units long, taken as a 3.8-mm 7-dpf
+        # larva (1 unit ~ 0.19 mm; the retina then ~300 um across). The render's parallel scale (tools/exp20_body_render.py)
+        # gives 23 units across the 2400-px width, so 500 um = (0.5 / 0.193) units = that many px
+        px = 0.5 / (3.8 / 19.7) * 2400 / 23.0
+        h_ = (r1 - r0) * im.shape[0]
+        a_.plot([60, 60 + px], [h_ - 40, h_ - 40], color="white", lw=2.5)
+        a_.text(60 + px / 2, h_ - 55, "\u2248 500 \u00b5m", color="white", fontsize=8, ha="center", va="bottom")
         a_.axis("off")
         a_.set_title(f"{v} view, head left", color="0.8", fontsize=9)
     marks = [("off the fish (control)", "#bdbdbd"), ("foregut", "#ff4040"), ("midgut", "#ffd54f"),
@@ -361,28 +369,86 @@ def _tex(t):
     return str(t).replace("_", "\\_").replace("%", "\\%").replace("&", "\\&").replace("#", "\\#")
 
 
+def figure_graph(op, P, path, n_show=80, seed=0, box_um=140.0):
+    """The cell graph the law trains on (the operator's own edges), TOP VIEW, HEAD LEFT (pos_view): a, the whole brain,
+    every cell a faint dot and the middle and long edges INTO `n_show` random cells; b, a box around one cell, the
+    short edges between the cells inside it and that cell's own 18 edges drawn thick."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    C = {"short": "#9ecae1", "mid": "#fd8d3c", "long": "#ff4040"}
+    E = {k: (op._E[k][0].cpu().numpy(), op._E[k][1].cpu().numpy()) for k in ("short", "mid", "long") if k in op._E}
+    rng = np.random.default_rng(seed)
+    fig, ax = plt.subplots(1, 2, figsize=(10, 4.2), facecolor="black", gridspec_kw={"width_ratios": [2.1, 1]})
+    a, b = ax
+    for x_ in ax:
+        x_.set_facecolor("black"); x_.set_aspect("equal"); x_.axis("off")
+    sub = rng.choice(len(P), min(50000, len(P)), replace=False)
+    a.scatter(P[sub, 0], P[sub, 1], s=0.2, c="0.35", lw=0)
+    tgt = rng.choice(len(P), n_show, replace=False)
+    for k in ("mid", "long"):
+        s_, r_ = E[k]
+        m = np.isin(r_, tgt)
+        a.add_collection(LineCollection(np.stack([P[s_[m], :2], P[r_[m], :2]], 1), colors=C[k], lw=0.5, alpha=0.8))
+    a.scatter(P[tgt, 0], P[tgt, 1], s=6, c="white", lw=0, zorder=3)
+    x0, y0 = P[:, 0].min(), P[:, 1].min() - 25
+    a.plot([x0, x0 + 100], [y0, y0], color="white", lw=2.5)
+    a.text(x0 + 50, y0 - 8, "100 \u00b5m", color="white", fontsize=8, ha="center", va="top")
+    fig.text(0.02, 0.95, f"a  the whole brain, head left: middle and long edges into {n_show} cells", color="0.9",
+             fontsize=12, va="top")
+    c0 = int(np.argmin(np.linalg.norm(P - np.median(P, 0), axis=1)))     # a cell at the brain's centre: a full box
+    inb = np.where(np.all(np.abs(P[:, :2] - P[c0, :2]) < box_um / 2, 1) & (np.abs(P[:, 2] - P[c0, 2]) < 8.0))[0]
+    sset = set(inb.tolist())
+    s_, r_ = E["short"]
+    m = np.isin(r_, inb) & np.isin(s_, inb)
+    b.scatter(P[inb, 0], P[inb, 1], s=8, c="0.6", lw=0)
+    b.add_collection(LineCollection(np.stack([P[s_[m], :2], P[r_[m], :2]], 1), colors=C["short"], lw=0.4, alpha=0.5))
+    for k in ("short", "mid", "long"):
+        s_, r_ = E[k]
+        m = r_ == c0
+        b.add_collection(LineCollection(np.stack([P[s_[m], :2], P[r_[m], :2]], 1), colors=C[k], lw=1.8))
+    b.scatter([P[c0, 0]], [P[c0, 1]], s=40, c="white", zorder=4)
+    b.set_xlim(P[c0, 0] - box_um / 2, P[c0, 0] + box_um / 2)
+    b.set_ylim(P[c0, 1] - box_um / 2, P[c0, 1] + box_um / 2)
+    xb, yb = P[c0, 0] - box_um / 2 + 8, P[c0, 1] - box_um / 2 + 8
+    b.plot([xb, xb + 20], [yb, yb], color="white", lw=2.5, zorder=5)
+    b.text(xb + 10, yb + 3, "20 \u00b5m", color="white", fontsize=10, ha="center", va="bottom", zorder=5)
+    fig.text(0.685, 0.95, "b  one cell (white) and its 18 senders,\n    in a 16-\u00b5m-deep slab around it", color="0.9",
+             fontsize=12, va="top")
+    for i_, (k, c) in enumerate(C.items()):
+        fig.text(0.70 + 0.09 * i_, 0.06, k, color=c, fontsize=10, ha="center", weight="bold")
+    fig.tight_layout(rect=(0, 0.08, 1, 0.84))               # both panels under one title line, tops aligned
+    pa, pb = a.get_position(), b.get_position()
+    b.set_position([pb.x0, pa.y0, pb.width, pa.height])
+    fig.savefig(path, dpi=200, facecolor="black")
+    plt.close(fig)
+
+
 def slide_law():
-    """The neuron graph on this fish, drawn by exp17's figure from the operator itself (the picture IS the graph)."""
+    """The neuron graph on this fish, from the operator itself (the picture IS the graph trained), head left."""
     import exp17_slides as X17
-    from plexus.paths import graphs_data_path
+    from plexus.tasks import trace_recording as TR
     png = os.path.join(PRES, "figs", "05_neuron_graph.png")
     pf = f"zebrafish/{REC1}_recording.npz"
     op = X17.neuron_graph_op(positions_file=pf)
-    if not os.path.exists(png) or "--figs" in sys.argv:
-        X17.figure_neuron_graph(np.load(graphs_data_path(pf))["pos_um"], png, op=op)
+    rec = TR.load(REC1)
+    figure_graph(op, rec["pos_view"], png)
     E = {s: int(op._E[s][0].numel()) for s in ("short", "mid", "long") if s in op._E}
-    right = (head("the law: a known ODE on a graph between the cells") + rows([
-        ("cells", "one state each, dF/F; its own rate, rest and 6 input weights"),
-        ("edges", ", ".join(f"{k} {v:,}" for k, v in E.items()) + ": one learned W each"),
-        ("", "6 nearest, 6 at 32 \\textmu m, 6 at 128 \\textmu m (exp17 7.2's law)"),
-        ("step", "$dz_i = r_i(-z_i + c_i + \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u)$"),
-        ("", "$r_i$ rate, $c_i$ rest, $W_{ij}$ edge weight, $B_i$ input weights"),
-        ("inputs", "$u$: UV pulse, beam x, y, grating speed, swim L, R"),
-        ("", "read at the step's frame only; nothing recorded after the start")])
-        + head("training") + rows([("", "exp17's curriculum: horizons 1..30, every step scored"),
-                                    ("", "split: the held-out trial windows never trained on")]))
+    right = (head("the law: a known ODE on a cell graph") + rows([
+        ("state", "one per cell: dF/F"),
+        ("cell", "its own time constant $\\tau_i$, rest $c_i$, 6 input weights $B_i$"),
+        ("edges", ", ".join(f"{k} {v / 1e6:.2f}M" for k, v in E.items()) + ", one $W$ each"),
+        ("", "6 nearest, 6 at 32 \\textmu m, 6 at 128 \\textmu m"),
+        ("step", "$\\tau_i\\, dz_i/dt = -z_i + c_i + \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u$"),
+        ("inputs", "$u$: UV pulse, beam x, y, grating, swim L, R"),
+        ("", "nothing recorded is read after the start")])
+        + head("training") + rows([("", "horizons 1..30, every step scored (exp17)"),
+                                    ("", "held-out trial windows never trained on")]))
     return ("05_law", frame("The law: a leaky ODE per cell, coupled by a learned graph, driven by the known inputs",
-                            "\\panel{figs/05_neuron_graph.png}", right, "state_diffuse[neuron_graph] on glucose fish 1"))
+                            "\\panel{figs/05_neuron_graph.png}", right, "state_diffuse[neuron_graph] on glucose fish 1",
+                            left_gap=3, deck_title="The law: a known ODE per cell, coupled by a learned graph, driven "
+                                                   "by the known inputs"))
 
 
 def slide_baselines():
@@ -404,7 +470,9 @@ def slide_baselines():
             ("uv", "site-blind trial-locked $|t|$: holds 71 \\% of the gut-responsive cells"),
             ("visual, swim", "exp17's coherence with the input")]))
     return ("06_baselines", frame("Before training: the gut-responsive cells, the references, the input mask",
-                                  "\\panel{figs/06_input_mask.png}", right, f"data/baselines_{REC1}.json"))
+                                  "\\panel{figs/06_input_mask.png}", right, f"data/baselines_{REC1}.json",
+                                  deck_title="Before training: the references, and the input mask (the cells each "
+                                             "input enters)"))
 
 
 # ============================================================================== batches, runs, controls
@@ -750,7 +818,8 @@ def main():
         out.append(stem)
         print(f"[slides] {stem}")
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(
-        "% generated by tools/exp20_slides.py\n" + "".join(f"\\input{{slides/{s}.tex}}\n" for s in out))
+        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN else ''}\\input{{slides/{s}.tex}}\n"
+                                                           for s in out))
 
 
 if __name__ == "__main__":
