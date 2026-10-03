@@ -479,6 +479,96 @@ def slides_controls(name, now, b):
     return out
 
 
+def figure_network(name, now, path):
+    """CEDRIC'S CLAIM IN ONE FIGURE: top, the gut-responsive cells' mean dF/F around each held-out pulse inside the free
+    rollout of the whole session (recorded, the full law, the same law with W = 0, the law trained with no network);
+    bottom, the whole brain's mean dF/F over the session (exp17's white trace), the same four."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    r, rn = landed(name), landed(now)
+    ft = r["freetrial"]
+    nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
+    pre, post = ft["window"]
+    dt = float(np.median(np.diff(np.load(os.path.join(GD, "graphs_data", "zebrafish",
+                                                      f"{ft['recording']}_recording.npz"))["t_s"])))
+    COL = {"rec": "#4caf50", "full": "white", "W0": "#ff5252", "now": "#42a5f5"}
+    LAB = {"rec": "recorded", "full": "network law", "W0": "same law, W = 0", "now": "trained with no network"}
+    trials = ft["arms"]["full"]["trials"]
+    fig = plt.figure(figsize=(8.6, 6.4), facecolor="black")
+    gs = fig.add_gridspec(2, len(trials), height_ratios=[1.25, 1], hspace=0.45, wspace=0.28)
+    tt = (np.arange(-pre, post + 1)) * dt
+    for j, t0 in enumerate(trials):
+        a = fig.add_subplot(gs[0, j])
+        _black(a)
+        cur = {"rec": t0["trace_rec"], "full": t0["trace_free"],
+               "W0": ft["arms"]["W0"]["trials"][j]["trace_free"]}
+        if nw:
+            cur["now"] = nw["trials"][j]["trace_free"]
+        for k, y in cur.items():
+            a.plot(tt, y, color=COL[k], lw=2.0 if k in ("rec", "full") else 1.4, label=LAB[k])
+        a.axvline(0, color="#ffd54f", lw=0.8, ls=":")
+        a.set_title(f"{'control (off the fish)' if t0['kind'] == 'control' else 'gut'} pulse, held out\n"
+                    f"volume {t0['onset']}", fontsize=8)
+        a.set_xlabel("s from the UV pulse", fontsize=7)
+        if j == 0:
+            a.set_ylabel(f"mean dF/F, {ft['responsive_cells']:,}\ngut-responsive cells", fontsize=7)
+    h, l = a.get_legend_handles_labels()
+    fig.legend(h, l, loc="upper center", ncol=4, frameon=False, fontsize=8, labelcolor="white")
+    b = fig.add_subplot(gs[1, :])
+    _black(b)
+    mf = np.load(os.path.join(r["dir"], "results", f"{name}_movie.npz"))
+    m0 = np.load(os.path.join(r["dir"], "results", f"{name}_W0_movie.npz"))
+    T = mf["r2_t"] * dt / 60
+    b.plot(T, mf["mean_obs_all"], color=COL["rec"], lw=1.0, label=LAB["rec"])
+    b.plot(T, mf["mean_pred_all"], color=COL["full"], lw=1.0)
+    b.plot(T, m0["mean_pred_all"], color=COL["W0"], lw=1.0)
+    if rn:
+        mn = np.load(os.path.join(rn["dir"], "results", f"{now}_movie.npz"))
+        b.plot(T, mn["mean_pred_all"], color=COL["now"], lw=1.0)
+    tr = np.load(os.path.join(GD, "graphs_data", "zebrafish", f"{ft['recording']}_recording.npz"))["trials"]
+    for f, site, held in zip(tr[:, 0], tr[:, 2], tr[:, 6]):
+        b.axvline(f * dt / 60, color="#9e9e9e" if site == 1 else "#ffd54f", lw=1.2 if held else 0.5,
+                  ls="--" if held else "-", alpha=0.8)
+    b.set_xlabel("min (free rollout from the first volume; UV pulses: grey off the fish, yellow gut; dashed held out)", fontsize=7)
+    b.set_ylabel("whole-brain\nmean dF/F", fontsize=7)
+    fig.savefig(path, dpi=200, facecolor="black", bbox_inches="tight")
+    plt.close(fig)
+
+
+def slide_network(name, now, b):
+    r, rn = landed(name), landed(now)
+    if not (r and r["freetrial"] and "W0" in r["freetrial"]["arms"]):
+        return ("", "")
+    png = f"batch_{b}_network.png"
+    figure_network(name, now, os.path.join(PRES, "figs", png))
+    full, w0 = r["freetrial"]["arms"]["full"], r["freetrial"]["arms"]["W0"]
+    nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
+    ab = os.path.join(EXP, "data", f"ablation_{name}.json")
+    A = json.load(open(ab)) if os.path.exists(ab) else None
+    lk = os.path.join(EXP, "data", f"leak_{name}.json")
+    LK = json.load(open(lk)) if os.path.exists(lk) else None
+    fr = lambda a: f"{a['evoked_gut_free_over_rec']:.2f}"
+    right = (head("the claim") + "{\\scriptsize the response to a held-out gut pulse is made by the network: "
+             "remove it, after training or from the start, and the response is gone\\par}\\vspace{6pt}\n"
+             + head("gut response / recorded (free rollout)") + rows(
+                 [("network law", f"{fr(full)}, pattern r {full['pattern_r_gut']:+.2f} over the cells"),
+                  ("W = 0", f"{fr(w0)}, pattern r {w0['pattern_r_gut']:+.2f}")]
+                 + ([("no network", f"{fr(nw)}, pattern r {nw['pattern_r_gut']:+.2f}")] if nw else []))
+             + head("whole-session R$^2$ (denoised)") + rows(
+                 [("network law", f"{A['full']['r2_denoised']:+.3f}" if A else "--"),
+                  ("W = 0", f"{A['W0']['r2_denoised']:+.3f}" if A else "--")]
+                 + ([("no network", f"{rn['test']['free']['r2_denoised']:+.3f}: the slow drift, no response")] if rn else []))
+             + head("driven by the stimuli only") + rows(
+                 [("start", "one recorded volume, then the inputs only"),
+                  ("leak check", (f"recording after the start zeroed or noise: max {max(x['max_abs_zeroed'] for x in LK['rows']):.1e} dF/F, "
+                                  f"= run-to-run {max(x['max_abs_self'] for x in LK['rows']):.1e}") if LK else "--"),
+                  ("caveat", "swim power is still an input here (batch 3: none)")]))
+    return (f"batch_{b}_network", frame("Network dynamics, not a function of the stimulus",
+                                        f"\\panel{{figs/{png}}}", right, f"{name}_freetrial.json, {now}_freetrial.json, ablation_{name}.json",
+                                        deck_title=f"batch {b} $\\cdot$ network dynamics, not a function of the stimulus"))
+
+
 def slide_overview():
     rw = md_rows()
     lines = []
@@ -510,6 +600,7 @@ def main():
             continue
         deck.append(slide_batch(b))
         deck += slides_run(shown, b)
+        deck.append(slide_network(shown, now, b))
         deck += slides_controls(shown, now, b)
     deck.append(slide_overview())
     out = []

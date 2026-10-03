@@ -112,7 +112,10 @@ def run_one(name, device, w0=True):
             c = float(torch.corrcoef(torch.stack([e_p, e_r]))[0, 1])
             rows.append({"onset": f, "site": site, "kind": "control" if site == CTRL_SITE else "gut",
                          "evoked_free": float(e_p.mean()), "evoked_rec": float(e_r.mean()), "pattern_r": c,
-                         "mse_window": float(((P - R) ** 2).double().mean())})
+                         "mse_window": float(((P - R) ** 2).double().mean()),
+                         # the responsive cells' mean dF/F over the window (frames onset - pre .. onset + post), for the
+                         # slide's traces
+                         "trace_free": P.mean(1).cpu().tolist(), "trace_rec": R.mean(1).cpu().tolist()})
         g = [r for r in rows if r["kind"] == "gut"]
         c_ = [r for r in rows if r["kind"] == "control"]
         res["arms"][arm] = {"silenced": n_dead, "trials": rows,
