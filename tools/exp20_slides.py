@@ -553,9 +553,9 @@ def slides_kymo(rec_name=REC1, n_rows=100):
 
 # ============================================================================== batches, runs, controls
 BATCHES = {
-    "1": ("Euler integrator, glucose fish 1", ["gb_ng_base", "gb_ng_s1", "gb_ng_mask", "gb_ng_now", "gb_ng_nol1",
+    "1": ("which levers carry the gut response", ["gb_ng_base", "gb_ng_s1", "gb_ng_mask", "gb_ng_now", "gb_ng_nol1",
                                                 "gb_ng_wide", "gb_ng_h50", "gb_gc_base", "gb_ng_base_lglu"], "gb_ng_nol1", "gb_ng_now"),
-    "2": ("exponential integrator", ["gb_ex_base", "gb_ex_s1", "gb_ex_nol1", "gb_ex_now", "gb_ex_mask", "gb_ex_h50",
+    "2": ("the same levers, without runaway cells", ["gb_ex_base", "gb_ex_s1", "gb_ex_nol1", "gb_ex_now", "gb_ex_mask", "gb_ex_h50",
                                      "gb_ex_base_lglu", "gb_ex_f4"], "gb_ex_nol1", "gb_ex_now"),
 }
 
