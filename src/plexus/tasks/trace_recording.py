@@ -435,8 +435,10 @@ def _movie_frames(ks):
     # RIGHT: THE FREE ROLLOUT'S R2 per frame, 0..1, the split's parts behind it in transparent colours
     m = strip(0.55)
     SPLIT = {0: ("train", "#1f77b4"), 1: ("val", "#ffbf00"), 2: ("test", "#d62728"), 3: ("held-out condition", "#9467bd")}
+    if d["split_name"] == "recording":              # exp20: the recording's own split, its test part = held-out trials
+        SPLIT[2] = ("held-out trials", SPLIT[2][1])
     seen = []
-    if d["split"] is not None and d["split_name"] == "zapbench":
+    if d["split"] is not None and d["split_name"] in ("zapbench", "recording"):
         for a_, b_, v_ in runs(d["split"]):
             if int(v_) in SPLIT:
                 m.axvspan(tm[a_], tm[b_], color=SPLIT[int(v_)][1], alpha=0.22, lw=0, zorder=0)
@@ -447,12 +449,12 @@ def _movie_frames(ks):
     m.set_yticks([0, 1])
     cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=4))
     split_txt = ("; behind: " + ", ".join(f"{SPLIT[v][0]}" for v in sorted(set(seen)))) if seen else \
-        ("; every frame trained (no split)" if d["split_name"] != "zapbench" else "")
+        ("; every frame trained (no split)" if d["split_name"] not in ("zapbench", "recording") else "")
     fig.text(0.55, top - 0.005, "free rollout R$^2$: denoised (white), raw (grey)" + split_txt, color="0.7",
              fontsize=8, va="bottom")
     if seen:                                        # the split's colours, named in their own colour, left to right
         for i_, v in enumerate(sorted(set(seen))):
-            fig.text(0.55 + 0.09 * i_, top - 0.14, SPLIT[v][0], color=SPLIT[v][1], fontsize=7, ha="left", va="top")
+            fig.text(0.55 + 0.11 * i_, top - 0.14, SPLIT[v][0], color=SPLIT[v][1], fontsize=7, ha="left", va="top")
     if ins:
         pc, rgb = _pca_rgb(emb)
         cm = plt.get_cmap("tab10")
