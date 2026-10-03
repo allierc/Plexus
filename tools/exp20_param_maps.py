@@ -1,6 +1,6 @@
 """exp20: THE LEARNED CONSTANTS ON THE BRAIN, exp17's figure (tools/exp17_param_maps.py, its `constants` reused
 unchanged) on a gut-brain run (Cedric, 2026-10-03: "I like exp17's slide 35"): every cell a dot, head LEFT (pos_view),
-coloured by tau (the leak's time constant, s, log), the rest V (dF/F), the summed signed W into the cell, and |B|, the
+coloured by tau (the leak's time constant, in s, linear scale), the rest V (dF/F), the summed signed W into the cell, and |B|, the
 norm of its stimulus weights (grey: outside the input mask).
 
     PYTHONPATH=src:tools python tools/exp20_param_maps.py <run> [<run> ...]
@@ -17,6 +17,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 os.environ.setdefault("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
 EXP = os.path.join(ROOT, "experiments", "exp20_gutbrain_graphcast")
+REF17 = "zap_e15_cur_siren"          # exp17's slide-35 run, whose tau colour limits exp20's maps share
 
 
 def render(name):
@@ -36,13 +37,20 @@ def render(name):
     P = P[order]
     m = c["mask"][order]
     fig = plt.figure(figsize=(16, 9.2), facecolor="black")
-    lo_t, hi_t = np.percentile(c["tau_s"], [2, 98])
-    wl = np.percentile(np.abs(c["W_in"]), 98) or 1e-6
-    panels = [("a   leak time constant $\\tau$, s (log)", c["tau_s"], "viridis", LogNorm(lo_t, hi_t)),
-              ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
-              ("c   summed W into the cell (blue < 0 < red)", c["W_in"], "RdBu_r", TwoSlopeNorm(0, -wl, wl)),
-              ("d   input weight $|B|$ (input cells; grey: outside the mask)", c["B_norm"], "inferno",
-               Normalize(*np.percentile(c["B_norm"][c["mask"]], [2, 98])))]
+    # EVERY PANEL ON exp17's COLOUR LIMITS (Cedric, 2026-10-03: "same log scale as exp17 for comparison"; "same for the
+    # other heatmaps"): the 2nd-98th percentiles of exp17's slide-35 run (data/param_maps_zap_e15_cur_siren.json); tau on a
+    # LOG scale (0.275-779 s there); this run's own percentiles if that file is absent
+    ref = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast", "data", f"param_maps_{REF17}.json")
+    R = json.load(open(ref)) if os.path.exists(ref) else None
+    lim = lambda k, v: (R[k]["p2"], R[k]["p98"]) if R else tuple(np.percentile(v, [2, 98]))
+    lo_t, hi_t = lim("tau_s", c["tau_s"])
+    wl = max(abs(R["W_in"]["p2"]), abs(R["W_in"]["p98"])) if R else (np.percentile(np.abs(c["W_in"]), 98) or 1e-6)
+    tag = " (exp17's colour limits)" if R else ""
+    panels = [("a   leak time constant $\\tau$, s (log)" + tag, c["tau_s"], "viridis", LogNorm(lo_t, hi_t)),
+              ("b   rest $V$, dF/F" + tag, c["V"], "magma", Normalize(*lim("V", c["V"]))),
+              ("c   summed W into the cell (blue < 0 < red)" + tag, c["W_in"], "RdBu_r", TwoSlopeNorm(0, -wl, wl)),
+              ("d   input weight $|B|$ (input cells; grey: outside the mask)" + tag, c["B_norm"], "inferno",
+               Normalize(*lim("B_norm", c["B_norm"][c["mask"]])))]
     stats = {}
     for i, (lab, v, cm, nrm) in enumerate(panels):
         ax = fig.add_axes([0.02 + (i % 2) * 0.49, 0.52 - (i // 2) * 0.48, 0.44, 0.40])
