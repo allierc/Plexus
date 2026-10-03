@@ -1333,7 +1333,9 @@ BATCHES = (
     ("batch 14: modulation and conductance on the destriped traces, coherence mask", None,
      (("current", "zap_v14_cur"), ("conductance", "zap_v14_cond"), ("current + hash Omega", "zap_v14_cur_hash"), ("current + SIREN Omega", "zap_v14_cur_siren"), ("conductance + hash", "zap_v14_cond_hash"), ("conductance + SIREN", "zap_v14_cond_siren"), ("current + coarse hash", "zap_v14_cur_hashlo"), ("current + hash, seed 1", "zap_v14_cur_hash_s1"), ("trained with no network", "zap_v14_now")), ("zap_v14_cur_hash", "zap_v14_cur_hash_s1")),
     ("batch 15: batch 14 on the ephys stimulus (22 visual + 5 swim / turn), ephys-aware mask", "12_input_kymo_ephys",
-     (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
+     (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now"), ("leak + MLP message, per sender", "zap_e15_lk_snd"), ("leak + MLP message, per edge", "zap_e15_lk_pair")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
+    ("batch 16: batch 15 with the calcium indicator, tau_ca fixed, latent substeps", None,
+     (("tau_ca learned", "zap_c16_learn"), ("tau_ca 1 s", "zap_c16_t1"), ("tau_ca 2 s", "zap_c16_t2"), ("tau_ca 3 s", "zap_c16_t3"), ("2 s, 5 substeps", "zap_c16_t2_s5"), ("2 s, 10 substeps", "zap_c16_t2_s10"), ("2 s + SIREN Omega", "zap_c16_t2_siren"), ("trained with no network", "zap_c16_t2_now")), ()),
 )
 # the law of each batch, in the title of every one of its slides (Cedric: which slide belongs to which batch)
 BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4": "GraphCast law",
@@ -1343,7 +1345,8 @@ BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4"
              "11": "known ODE, neuron graph, destriped, coherence mask 10 %",
              "12": "GNN-MLP, neuron graph, destriped", "13": "neuron graph, new rig, destriped",
              "14": "neuron graph, modulation / conductance, destriped",
-             "15": "neuron graph, modulation / conductance, destriped + ephys"}            # Cedric's names, 2026-10-01
+             "15": "neuron graph, modulation / conductance, destriped + ephys",
+             "16": "neuron graph + calcium indicator, destriped + ephys"}            # Cedric's names, 2026-10-01
 BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh levels", "2": "regularisers, synapse, substeps, levels",
                 "3": "activation, substeps, levels, synapse", "4": "seed, history 12/24, embedding 2/16, stimulus window, curriculum 5/40",
                 "5": "W prior, row lasso, edge reach, no graph", "6": "batch 5 + indicator; indicator start, k fixed",
@@ -1353,7 +1356,8 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
                 "12": "message per sender or per edge, W prior, MLP priors, width, reach",
                 "13": "integrator (Euler, exponential, rate cap), seed, W prior, linear, adaptation, reach",
                 "14": "conductance, Omega by hash grid or SIREN, in sample",
-                "15": "batch 14 with 5 ephys features in the stimulus and the mask"}
+                "15": "batch 14 with 5 ephys features in the stimulus and the mask",
+                "16": "calcium indicator: tau_ca learned or fixed 1 / 2 / 3 s, latent substeps, SIREN, no network"}
 
 
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
@@ -2160,7 +2164,51 @@ def main():
                                                   "log/training/zapbench/zap_dm_ng_now", left_gap=True,
                                                   deck_title="batch 11 $\\cdot$ zap\\_dm\\_ng\\_now $\\cdot$ no network: "
                                                              "network dynamics, not the stimulus only")))
-    MOVE_TO_END = ("08_latent_calcium",)          # Cedric, 2026-10-02: the latent-calcium slide closes the deck
+    # Cedric, 2026-10-03: does the calcium batch (6) work? Its shown run beside its twin with no indicator (batch 5),
+    # the learned indicator from the checkpoint: k = sigmoid(rate), tau_ca = -dt / ln(1 - k) (neuron_ops.CalciumIndicator)
+    if "zap_ca_ng_nol1" in landed and "zap_ng_nol1" in landed:
+        import torch
+        rc_ = landed["zap_ca_ng_nol1"]
+        fit_ = torch.load(os.path.join(rc_["dir"], "models", "best.pt"), weights_only=False, map_location="cpu")["fitted"]
+        raw_ = float(fit_["calcium_indicator.rate"].reshape(-1)[0])
+        taps_ = fit_["calcium_indicator.taps"].float().numpy()
+        tau_ = 0.914 / -np.log(float(torch.sigmoid(torch.tensor(-raw_)))) if raw_ < 30 else 0.0   # -ln(1 - k)
+        k_ = float(torch.sigmoid(torch.tensor(raw_)))
+        ca0_ = next(o for o in yaml.safe_load(open(os.path.join(rc_["dir"], "model.yaml")))["operators"]
+                    if o.get("op") == "calcium_indicator")
+        t0_ = float(ca0_["tau_s"])
+        k0_ = 1 - math.exp(-float(ca0_.get("frame_s", 0.914)) / t0_)
+
+        def row_(n):
+            t_ = landed[n]["test"]
+            m_ = bm_metrics(os.path.join(landed[n]["dir"], "results", f"{n}_movie.npz"))
+            return (f"{t_['skill_short']:+.3f} & {t_['skill_long']:+.3f} & {t_['free']['r2_denoised']:+.3f} & "
+                    f"{m_['r2']:+.3f}")
+        src_ = os.path.join(rc_["dir"], "results", "movie.mp4")
+        shutil.copy(src_, os.path.join(PRES, "Movies", "zap_ca_ng_nol1.mp4"))
+        shutil.copy(src_.replace(".mp4", ".png"), os.path.join(PRES, "Movies", "zap_ca_ng_nol1.png"))
+        right_ca = (head("batch 6, arm 3: zap\\_ca\\_ng\\_nol1")
+                    + "{\\scriptsize the neuron-graph known ODE on a LATENT activity $v$, read through a learned indicator: "
+                      "$c \\mathrel{+}= k\\,(v - c)$; ZAPBench traces, all frames (in sample)\\par}\\vspace{6pt}\n"
+                    + head("against its twin with no indicator (batch 5)") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                    "& \\multicolumn{2}{c}{skill vs mean} & \\multicolumn{2}{c}{free R$^2$} \\\\\n"
+                    "& short & long & neuron & brain \\\\\n\\hline\n"
+                    f"calcium (6.3) & {row_('zap_ca_ng_nol1')} \\\\\nno indicator (5.3) & {row_('zap_ng_nol1')} \\\\\n"
+                    + ("calcium, no network (6.8) & " + row_("zap_ca_ng_now") + " \\\\\n" if "zap_ca_ng_now" in landed else "")
+                    + ("no indicator, no network (5.8) & " + row_("zap_ng_now") + " \\\\\n" if "zap_ng_now" in landed else "")
+                    + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                    + head("the learned indicator") + rows([
+                        ("$k$", f"{k_:.7f} (start {k0_:.2f})"),
+                        ("$\\tau_{ca}$", f"{tau_:.3f} s (start {t0_:g} s; one frame 0.914 s)"),
+                        ("start taps $a_j$", ", ".join(f"{v:.2f}" for v in taps_) + f" (sum {taps_.sum():.2f})")])
+                    + "{\\scriptsize It runs: finite, every condition above the mean far ahead. But the indicator "
+                      "learns itself away: $\\tau_{ca}$ falls from its start to well under one frame, so $c$ follows $v$ and "
+                      "the latent IS the recording; the start taps are a smoothing over the last frames, not an "
+                      "inverse. The calcium arm scores slightly below its twin with no indicator.\\par}\n")
+        deck.append(("08b_calcium_result", frame("the calcium batch: does it work?", "\\playmovie{Movies/zap_ca_ng_nol1}",
+                                                right_ca, "log/training/zapbench/zap_ca_ng_nol1", left_gap=True,
+                                                deck_title="Known\\_ODE-latent\\_calcium $\\cdot$ batch 6 result")))
+    MOVE_TO_END = ("08_latent_calcium", "08b_calcium_result")   # Cedric, 2026-10-02 / 10-03: calcium closes the deck
     deck = [x for x in deck if x[0] not in MOVE_TO_END] + [x for x in deck if x[0] in MOVE_TO_END]
     # Cedric, 2026-10-02: one slide of GraphCast results right after the GraphCast slides -- the best GraphCast run's
     # movie (batch 4's curriculum to 40), shown although batch 4's own slides are hidden
