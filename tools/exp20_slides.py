@@ -199,17 +199,29 @@ def slide_fish(cond="glucose", k=1):
         return (f"03_{name}", "")
     z = np.load(f)
     prov = json.load(open(f.replace(".npz", ".json")))
-    X, P, S, tr, t = z["dff"], z["pos_um"], z["stimulus"], z["trials"], z["t_s"] / 60
+    from plexus.tasks import trace_recording as TR
+    X, P, S, tr, t = z["dff"], TR.load(name)["pos_view"], z["stimulus"], z["trials"], z["t_s"] / 60   # head left (exp17)
     fig = plt.figure(figsize=(7.2, 6.6), facecolor="black")
-    gs = fig.add_gridspec(5, 1, height_ratios=[3.2, 0.5, 0.5, 0.5, 1.4], hspace=0.35)
+    gs = fig.add_gridspec(5, 1, height_ratios=[4.6, 0.5, 0.5, 0.5, 1.4], hspace=0.35)
     ax = fig.add_subplot(gs[0])
     _black(ax)
-    sub = np.random.default_rng(0).choice(len(P), min(40000, len(P)), replace=False)
-    act = X[:, sub].std(0)
-    ax.scatter(P[sub, 0], P[sub, 1], s=0.15, c=act, cmap="inferno", vmin=0, vmax=np.percentile(act, 99), lw=0)
+    # WHERE THE GUT SIGNAL REACHES (Cedric, 2026-10-03): the gut-responsive cells (tools/gutbrain_baselines.py, the
+    # paper's selection on the training frames) coloured by their mean evoked change after the training gut pulses,
+    # over every cell in grey; top view of the brain, no frame, a 100-um scale bar
+    cz = np.load(os.path.join(DATA, f"baselines_{name}_cells.npz"))
+    resp, evg = cz["responsive"], cz["evoked_gut"]
+    sub = np.random.default_rng(0).choice(len(P), min(60000, len(P)), replace=False)
+    ax.scatter(P[sub, 0], P[sub, 1], s=0.6, c="0.35", lw=0)
+    o = np.argsort(evg[resp])
+    ax.scatter(P[resp, 0][o], P[resp, 1][o], s=3.0, c=evg[resp][o], cmap="autumn", vmin=0,
+               vmax=np.percentile(evg[resp], 98), lw=0)
     ax.set_aspect("equal")
-    ax.set_xticks([]); ax.set_yticks([])
-    ax.set_title(f"{len(P):,} cells, coloured by their dF/F's standard deviation (40,000 drawn)", fontsize=8)
+    ax.axis("off")
+    x0, y0 = P[:, 0].min(), P[:, 1].min() - 0.06 * np.ptp(P[:, 1])
+    ax.plot([x0, x0 + 100], [y0, y0], color="white", lw=2.5)
+    ax.text(x0 + 50, y0 - 0.02 * np.ptp(P[:, 1]), "100 \u00b5m", color="white", fontsize=8, ha="center", va="top")
+    ax.set_title(f"the {int(resp.sum()):,} gut-responsive cells, coloured by their evoked dF/F after a gut pulse\n"
+                 f"(yellow = strongest), on all {len(P):,} cells (grey); brain, top view, head left", fontsize=8)
     names = ["UV pulses", "grating speed", "swim power (L)"]
     for i, (nm, col) in enumerate(zip(names, (None, 3, 4))):
         a = fig.add_subplot(gs[1 + i])

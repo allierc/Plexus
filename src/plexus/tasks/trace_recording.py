@@ -26,6 +26,13 @@ def load(name: str = "zapbench") -> dict:
     z = np.load(graphs_data_path("zebrafish", f"{name}_recording.npz"))
     rec = {k: z[k] for k in z.files}
     rec["names"] = [str(n) for n in rec["names"]]
+    # THE DRAWING ORIENTATION (exp20, Cedric 2026-10-03: "consistent with exp17's views", head LEFT): render_movie lays a
+    # long-x brain with its low-x end on the left; a recording whose provenance says its head is at +x (`"head": "+x"`,
+    # the gut-brain fish) is drawn mirrored in x. Drawing only: the positions the law reads (pos_um) never change.
+    rec["pos_view"] = rec["pos_um"]
+    prov = graphs_data_path("zebrafish", f"{name}_recording.json")
+    if os.path.exists(prov) and json.load(open(prov)).get("head") == "+x":
+        rec["pos_view"] = rec["pos_um"] * np.array([-1.0, 1.0, 1.0])
     pub = graphs_data_path("zebrafish", f"{name}_published.json")
     if os.path.exists(pub):                        # the reference's published results, drawn beside every run
         rec["published"] = json.load(open(pub))

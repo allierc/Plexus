@@ -69,7 +69,8 @@ def main():
     z = np.load(graphs_data_path("zebrafish", f"{a.recording}_recording.npz"))
     prov = json.load(open(graphs_data_path("zebrafish", f"{a.recording}_recording.json")))
     X = torch.as_tensor(z["dff"], device=a.device)
-    S, tr, split, P = z["stimulus"], z["trials"], z["split"], z["pos_um"]
+    from plexus.tasks import trace_recording as TR
+    S, tr, split, P = z["stimulus"], z["trials"], z["split"], TR.load(a.recording)["pos_view"]   # drawing only: head left
     T, N = X.shape
     dt = float(np.median(np.diff(z["t_s"])))
     pre, ev = int(round(PRE_S / dt)), int(round(EVOKED_S / dt))

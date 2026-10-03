@@ -219,6 +219,14 @@ def dff_kept(h5, uv_frames, chunk=20000):
     return np.concatenate(cols, 0).T.copy(), np.concatenate(keep), bg, n_clip / max(n_tot, 1), N, T
 
 
+def head_end(P):
+    """'+x' when the brain's wide (rostral) end is at high x: the drawing flag trace_recording.load reads (pos_view)."""
+    x = P[:, 0]
+    q = (x - x.min()) / np.ptp(x)
+    w = lambda f: np.ptp(P[np.abs(q - f) < 0.02, 1])
+    return "+x" if w(0.98) > w(0.02) else "-x"
+
+
 def sha256_head(p, n=64 << 20):
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -275,7 +283,8 @@ def main():
             "uv_frames_replaced": uv_frames, "voxel_um": VOXEL_UM, "window_volumes": [pre, post],
             "trial_columns": ["onset_frame", "duration_ms", "site", "galvo_x", "galvo_y", "full_window", "held_out"],
             "trials": trials.tolist(), "stim_names": STIM_NAMES, "swim_live": live,
-            "dff_mean_sd": [float(X.mean()), float(X.std())], "extent_um": np.ptp(P, 0).tolist()}
+            "dff_mean_sd": [float(X.mean()), float(X.std())], "extent_um": np.ptp(P, 0).tolist(),
+            "head": head_end(P), "head_rule": "the narrow end (spinal cord) is caudal: width along y at 2 % and 98 % of x"}
     json.dump(prov, open(out.replace(".npz", ".json"), "w"), indent=1)
     print(f"-> {out}: {X.shape[1]:,} of {N0:,} cells, clipped {frac_clip * 100:.3f} %, {time.time() - t0:.0f} s")
 

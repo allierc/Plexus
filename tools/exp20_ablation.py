@@ -30,7 +30,7 @@ def _render(spec, out, stem, path, law, rec):
     t1 = time.time()
     mv = np.load(os.path.join(out, "results", f"{stem}_movie.npz"))
     frames = mv["frames"]
-    TR.render_movie(rec["dff"][frames], mv["pred"].astype(np.float32), frames, rec["pos_um"],
+    TR.render_movie(rec["dff"][frames], mv["pred"].astype(np.float32), frames, rec.get("pos_view", rec["pos_um"]),
                     mv["r2_raw"], mv["r2_denoised"], A.FRAME_S, rec["condition"][frames], rec["names"], path,
                     emb=None, labels=None, r2_t=mv["r2_t"], r2_raw_all=mv["r2_raw_all"],
                     r2_den_all=mv["r2_denoised_all"], silenced_all=mv["silenced_all"],
