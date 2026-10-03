@@ -84,7 +84,7 @@ _KEYS = {
     "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
                   "prior", "field", "levels", "features", "log2_table", "base", "scale", "title"},
     "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup", "rollouts"},
-    "rollout": {"name", "zero", "drive", "clamp"},
+    "rollout": {"name", "zero", "drive", "clamp", "messages"},
     "clamp": {"rois"},
     "roi": {"box", "sphere", "units"},
     "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
@@ -128,12 +128,15 @@ def _check_rollouts(path, s, kind):
     """`task.rollouts` (Cedric, 2026-10-03): the free rollouts the test phase makes besides the nominal one, each a
     named VARIANT of the same learned model -- `zero:` learnables set to 0 (the network's W: "W = 0"), `drive: off`
     (no known stimulus), `clamp: {rois: [...]}` (the elements inside the ROIs given their RECORDED value every frame:
-    measured leaders or hypothesised input neurons; they are left out of every score). Trace references only."""
+    measured leaders or hypothesised input neurons; they are left out of every score). Trace references, and field
+    references (exp19, 2026-10-03): there `messages: off` is the W = 0 of a message-passing law (`diffuse[graphcast]`'s
+    `messages`), `zero: [I]` / `[I_mlp]` removes its learned forcing (the field's stand-in for a stimulus, it has no
+    drive), and `clamp:` gives the voxels inside the ROIs their recorded values (x, y, z in um from the voxel size)."""
     ros = s["task"].get("rollouts")
     if ros is None:
         return
-    if kind != "trace_recording":
-        raise ValueError(f"{path}: task.rollouts is implemented for a trace_recording reference only")
+    if kind not in ("trace_recording", "field_recording"):
+        raise ValueError(f"{path}: task.rollouts is implemented for trace_recording and field_recording references")
     names = {e.get("param") or e.get("block") for e in s["learnable"]}
     seen = set()
     for j, ro in enumerate(ros):
@@ -148,6 +151,12 @@ def _check_rollouts(path, s, kind):
             raise ValueError(f"{w}: zero {bad} are not learnables of this run (its learnables: {sorted(names)})")
         if ro.get("drive", "on") not in ("on", "off"):
             raise ValueError(f"{w}: `drive:` on (default) or off")
+        if "drive" in ro and kind == "field_recording":
+            raise ValueError(f"{w}: a field recording has no drive; its stand-in stimulus is a learnable -- `zero: [I]`")
+        if ro.get("messages", "on") not in ("on", "off"):
+            raise ValueError(f"{w}: `messages:` on (default) or off")
+        if "messages" in ro and kind != "field_recording":
+            raise ValueError(f"{w}: `messages:` is a field law's switch (diffuse[graphcast]); a trace law zeroes its W")
         if ro.get("drive") == "off" and "drive" not in s["task"]:
             raise ValueError(f"{w}: `drive: off` but the task has no drive")
         if "clamp" in ro:
@@ -1692,10 +1701,13 @@ def _field_setup(spec, device):
     return dict(rec=rec, X=X, M=M, U=U, train=tr, val=va, test=te, field=fname, n_in=n_in, norm=norm, alive=alive)
 
 
-def _field_rollout(sims, learn, box, origin, h, device, grad):
+def _field_rollout(sims, learn, box, origin, h, device, grad, messages=None, clamp=None):
     """h recorded intervals from volume `origin`: [h, C, *grid], frame k the forecast of origin+k+1.
     `sims[h]` is the model built for that horizon (n_frames = h - 1: one step per tick, and
-    `on_frame` fires after each)."""
+    `on_frame` fires after each). The `task.rollouts` hooks (exp19, 2026-10-03), both off by default:
+    `messages` True / False set on every operator that has the switch (`diffuse[graphcast]`); `clamp`, a bool
+    tensor over the grid, writes the RECORDED volume origin+k+1 into those voxels' newest channel after tick k,
+    before the law reads the next step -- the only way anything recorded enters after the origin, by request."""
     fname, frames = box["field"], []
     if origin - box["n_in"] + 1 < 0:
         raise ValueError(f"origin {origin} has fewer than {box['n_in'] - 1} volumes behind it")
@@ -1713,6 +1725,10 @@ def _field_rollout(sims, learn, box, origin, h, device, grad):
         # WITH A DEATH OPERATOR THE ALIVE FRACTION RIDES AS THE LAST CHANNEL: pred[:, 0] stays the ratio everywhere
         # it is read, pred[:, -1] is A (`_mask_iou`, `_mask_bce`, `_test_field_full`).
         g = H.fields[fname].grid
+        if clamp is not None and origin + len(frames) + 1 < len(box["X"]):
+            g = g.clone()
+            g[0][clamp] = box["X"][origin + len(frames) + 1][0][clamp]
+            H.fields[fname].grid = g
         frames.append(torch.cat([g, H.fields[alive].grid], 0) if alive else g)
 
     def ready(H):
@@ -1721,10 +1737,116 @@ def _field_rollout(sims, learn, box, origin, h, device, grad):
             if hasattr(o, "t_origin"):
                 o.t_origin = origin
                 o.norm = box.get("norm", (0.0, 1.0, 1.0))
+            if messages is not None and hasattr(o, "messages"):
+                o.messages = bool(messages)
 
     engine.run(sims[h], device=device, progress=False, grad=grad, on_frame=hook,
                on_seeded=seeded, on_ready=ready)
     return torch.stack(frames[:h])
+
+
+class _OwnState:
+    """Stands in for the recording at the seed of a later segment of a free rollout: index origin - k returns the
+    MODEL's own state k volumes back (channel k of its last field) -- `_field_rollout` reads only X[origin - k]."""
+
+    def __init__(self, origin, grid, X):
+        self.origin, self.grid, self.X = origin, grid, X
+
+    def __getitem__(self, i):
+        k = self.origin - i
+        return self.grid[k:k + 1] if 0 <= k < self.grid.shape[0] else self.X[i]
+
+    def __len__(self):
+        return len(self.X)
+
+
+def _field_free(spec, learn, box, device, variant=None, seg=200):
+    """The free rollout from volume `inputs - 1` to the last, in segments of `seg` volumes moved to the CPU as they
+    are made (the [n, C, *grid] stack of a 1,594-volume whole-body rollout is 19 GB), each later segment seeded from
+    the model's OWN last field; equal to one `_field_rollout` (tests/test_exp19_no_leak.py). `variant`, one entry of
+    `task.rollouts`: its `zero:` learnables at 0, its `messages:`, its `clamp:` voxels given their recorded values.
+    Returns (pred [n, *grid] numpy, origin, n, clamped [*grid] bool numpy)."""
+    v = variant or {}
+    o = box["n_in"] - 1
+    n = box["rec"]["ratio"].shape[0] - 1 - o
+    msg = None if "messages" not in v else v["messages"] == "on"
+    cl = None
+    if "clamp" in v:
+        rec = box["rec"]
+        Z, Y, X = rec["ratio"].shape[1:]
+        zz, yy, xx = np.meshgrid((np.arange(Z) + 0.5) * rec["dz_um"], (np.arange(Y) + 0.5) * rec["dx_um"],
+                                 (np.arange(X) + 0.5) * rec["dx_um"], indexing="ij")
+        pos = np.stack([xx.ravel(), yy.ravel(), zz.ravel()], 1)          # x, y, z: a 2-axis box spans every z
+        cl = torch.as_tensor(_roi_mask(v["clamp"]["rois"], pos).reshape(Z, Y, X), device=device)
+    out, cur, done, b = [], o, 0, dict(box)
+    with _zeroed(learn, spec, v.get("zero", [])), torch.no_grad():
+        while done < n:
+            h = min(seg, n - done)
+            roll = _field_rollout(_field_sims(spec, [h], train=False), learn, b, cur, h, device, False,
+                                  messages=msg, clamp=cl)
+            out.append(roll[:, 0].cpu().numpy())
+            b = dict(box, X=_OwnState(cur + h, roll[-1], box["X"]))
+            cur, done = cur + h, done + h
+            del roll
+    clm = cl.cpu().numpy() if cl is not None else np.zeros(box["rec"]["ratio"].shape[1:], bool)
+    return np.concatenate(out, 0), o, n, clm
+
+
+def _field_scores(free, rec, recd, o, n, clamped):
+    """A field free rollout read as `_test_field_full` reads it, on the voxels on the mask at the origin and the frame
+    and NOT clamped, plus exp17's brain-mean metrics on the field's mean trace (raw recording, unweighted voxel mean,
+    every free frame: `_brain_mean_metrics`, its SDs (ddof 0) and correlation)."""
+    obs, obs_d = rec["ratio"][o + 1:o + 1 + n], recd["ratio"][o + 1:o + 1 + n]
+    m = rec["mask"][o + 1:o + 1 + n] & rec["mask"][o] & ~clamped
+    r2, r2s = _r2_parts(free, obs, m)
+    r2d, r2ds = _r2_parts(free, obs_d, m)
+    fm = np.array([free[k][m[k]].mean() for k in range(n)])
+    om = np.array([obs[k][m[k]].mean() for k in range(n)])
+    return {"r2": r2, "r2_spatial": r2s, "r2_denoised": r2d, "r2_spatial_denoised": r2ds,
+            **_brain_mean_metrics(om, fm), "brain_mean_sd_obs": float(om.std()), "brain_mean_sd_pred": float(fm.std()),
+            "brain_mean_r": float(np.corrcoef(fm, om)[0, 1]) if fm.std() > 0 and om.std() > 0 else float("nan"),
+            "n_clamped": int(clamped.sum()), "finite": bool(np.isfinite(free).all())}, fm, om
+
+
+def _field_variants(spec, learn, box, device, out, stem, names=None):
+    """Every `task.rollouts` variant but the nominal one, for a field recording: {name: its scores}; each writes
+    results/<stem>_<name>_brain_mean.npz (the learned and recorded mean traces, the per-voxel rollout is not kept:
+    2.5 GB a variant at exp19's grid)."""
+    from plexus.tasks import field_recording as FR
+    res, recd = {}, None
+    for v in spec["task"].get("rollouts") or []:
+        if v["name"] == "nominal" or (names and v["name"] not in names):
+            continue
+        t1 = time.time()
+        recd = recd if recd is not None else FR.denoise(box["rec"])
+        free, o, n, clm = _field_free(spec, learn, box, device, variant=v)
+        sc, fm, om = _field_scores(free, box["rec"], recd, o, n, clm)
+        np.savez_compressed(os.path.join(out, "results", f"{stem}_{v['name']}_brain_mean.npz"), pred=fm, obs=om)
+        res[v["name"]] = {**sc, "spec": v}
+        print(f"[test] rollout `{v['name']}` ({time.time() - t1:.0f} s): brain-mean R2 {sc['brain_mean_r2']:+.3f} "
+              f"(RMSE {sc['brain_mean_rmse']:.4f}, SD {sc['brain_mean_sd_pred']:.4f} against {sc['brain_mean_sd_obs']:.4f} "
+              f"recorded, r {sc['brain_mean_r']:+.2f}); R2 denoised {sc['r2_denoised']:+.3f} ({sc['n_clamped']:,} voxels given)")
+        del free
+    return res
+
+
+def field_rollouts(name, device="cuda:0", root=None, names=None):
+    """A landed field run's `task.rollouts` variants made from its best model (as `trace_rollouts`), the test json's
+    `rollouts` updated."""
+    engine.quiet(True)
+    spec = load(name)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    box = _field_setup(spec, device)
+    res = _field_variants(spec, learn, box, device, out, spec["name"], names)
+    tj = os.path.join(out, "results", f"{spec['name']}_test.json")
+    if os.path.exists(tj):
+        j = json.load(open(tj))
+        j["rollouts"] = {**j.get("rollouts", {}), **res}
+        json.dump(j, open(tj, "w"), indent=2)
+    return res
 
 
 def _field_sims(spec, hs, train):
@@ -2007,6 +2129,7 @@ def _test_field_full(spec, device="cpu", root=None):
         roll = _field_rollout(sims, learn, box, o, n, device, False)
     free = roll[:, 0].cpu().numpy()
     alive = roll[:, -1].cpu().numpy() if box.get("alive") else None
+    del roll                                       # the GPU stack, before the `task.rollouts` variants need the room
     obs = rec["ratio"][o + 1:]
     m = rec["mask"][o + 1:] & rec["mask"][o]
     hold = np.broadcast_to(rec["ratio"][o], obs.shape)
@@ -2058,6 +2181,13 @@ def _test_field_full(spec, device="cpu", root=None):
                tissue_voxels_model=[int(pt[k].sum()) for k in range(n)], tissue_voxels_recorded=[int(Mt[k].sum()) for k in range(n)])
     np.savez_compressed(os.path.join(out, "results", f"{spec['name']}_free.npz"), pred=free.astype(np.float16), origin=o,
                         **({"alive": alive.astype(np.float16)} if alive is not None else {}))
+    # EXP17'S BRAIN-MEAN METRICS (Cedric's headline, 2026-10-03) on the field's mean trace, and the `task.rollouts` variants
+    om_, fm_ = np.array(res["organoid_mean_recorded"]), np.array(res["organoid_mean_model"])
+    res.update(_brain_mean_metrics(om_, fm_), brain_mean_sd_obs=float(om_.std()), brain_mean_sd_pred=float(fm_.std()),
+               brain_mean_r=float(np.corrcoef(fm_, om_)[0, 1]) if fm_.std() > 0 and om_.std() > 0 else float("nan"))
+    print(f"[test] brain-mean R2 {res['brain_mean_r2']:+.3f} (RMSE {res['brain_mean_rmse']:.4f}, SD "
+          f"{res['brain_mean_sd_pred']:.4f} against {res['brain_mean_sd_obs']:.4f} recorded, r {res['brain_mean_r']:+.2f})")
+    res["rollouts"] = _field_variants(spec, learn, box, device, out, spec["name"])
     json.dump(res, open(os.path.join(out, "results", f"{spec['name']}_test.json"), "w"), indent=2)
     print(f"[test] full rollout from volume {o + 1}, {n} steps: R2 {r2:+.4f} (spatial {r2s:+.4f}); persistence "
           f"{p2:+.4f} ({p2s:+.4f}); noise ceiling {res['ceiling_r2']:.4f} ({res['ceiling_r2_spatial']:.4f})")

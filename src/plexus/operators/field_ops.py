@@ -52,10 +52,17 @@ class ScalarField(Field):
     species is the usual reading, and `deposit` writes each element into the channel of its own
     type.
 
+    `per_axis: true` (exp19, 2026-10-02) makes EVERY axis follow the world box: axis k spans
+    [0, world_size[k]] and holds round(world_size[k] R) pixels, still dx = 1/R on every axis. A
+    recorded volume that is not square in its last two axes (a larval zebrafish imaged laterally,
+    13 x 107 x 144 voxels) is then held as it is, not padded. Off by default: every existing spec,
+    whatever its `world:`, keeps the nx = round(W R) by R (by R) grid above.
+
     Reference: none -- a regular scalar grid is a representation, not a result.
     """
 
-    def __init__(self, name, couples_to=None, components=1, res=200, width=1.0, dim=2, device="cpu"):
+    def __init__(self, name, couples_to=None, components=1, res=200, width=1.0, dim=2, device="cpu",
+                 per_axis=False, world_size=None):
         super().__init__(name, couples_to)
         self.C = int(components)
         self.R = int(res)
@@ -63,11 +70,21 @@ class ScalarField(Field):
         self.dim = int(dim)
         self.nx = int(round(self.width * self.R))      # square pixels, dx = 1/R
         self.ny = self.R
-        if self.dim == 2:
+        if per_axis:
+            if world_size is None or len(world_size) < self.dim:
+                raise ValueError(f"field {name}: `per_axis: true` needs the world box on all {self.dim} axes")
+            self.box = tuple(float(w) for w in world_size[:self.dim])
+            self.shape = tuple(int(round(w * self.R)) for w in self.box)
+            self.nx, self.ny = self.shape[0], self.shape[1]
+            if self.dim == 3:
+                self.nz = self.shape[2]
+        elif self.dim == 2:
             self.shape = (self.nx, self.ny)
         else:                                          # 3D: axes 1,2 span [0,1]
             self.nz = self.R
             self.shape = (self.nx, self.ny, self.nz)
+        if not per_axis:
+            self.box = (self.width,) + (1.0,) * (self.dim - 1)
         self.periodic = False                          # set by the engine from the spec boundary
         self.register_buffer("grid", torch.zeros((self.C,) + self.shape, device=device))
 
@@ -81,7 +98,7 @@ class ScalarField(Field):
         same torus the periodic particle wrap uses."""
         out = []
         for k, c in enumerate(coords):
-            box = self.width if k == 0 else 1.0
+            box = self.box[k]
             if getattr(self, "periodic", False):
                 # floor (not trunc-toward-0) so a coord just below 0 wraps to the far edge
                 out.append(torch.remainder(torch.floor(c * self.R).long(), self.shape[k]))   # torus wrap
@@ -382,6 +399,21 @@ class DiffuseGraphCast(FieldUpdate):
     explains the recording by storing it. The rollout's absolute volume index is `t_origin + tick`,
     `t_origin` set by the caller at `on_ready` (the trainer). `forcing: 0` (default) is no forcing.
 
+    A LEARNED STIMULUS, `forcing_model: siren` (exp19, Cedric 2026-10-03). Without a recorded stimulus the forcing
+    is learned; a free number per volume (`forcing_model: free`, the default above) can follow ANY global time course,
+    the recording's own included. The SIREN (Sitzmann et al. 2020: sine activations, their init) makes it a smooth
+    function of time instead, s(t) = SIREN(2 t / (T - 1) - 1), `forcing_channels` K global channels, every voxel
+    reading all K through its encoder as exp17's neurons read their stimulus features. Its capacity is limited on
+    purpose -- `siren_hidden` units, `siren_layers` layers, `siren_omega` the first layer's frequency scale -- so that
+    it cannot explain the data alone: the no-network control (`messages: false`) is its test. The last layer starts
+    at 0, so s(t) = 0 and the untrained law is the forcing-free one. Learnable as `{param: I_mlp, op: diffuse}`.
+
+    THE NETWORK CONTROLS, `messages: false` (exp19, Cedric 2026-10-03, exp17's slides 26-27). Every voxel's node
+    update then receives NOTHING from its neighbours (the lattice's `agg` is 0; on the multi-mesh the grid skips
+    the mesh entirely): each voxel evolves from its own inputs and the forcing alone. Set in a spec, it is the
+    law trained with NO NETWORK from the start; set on a trained law's instance (`op.messages = False`) before
+    a rollout, it is the trained law with its network weights ZEROED and the forcing kept. Default true.
+
     Reference: Battaglia, P. W. et al. (2018). Relational inductive biases, deep learning, and
     graph networks. arXiv:1806.01261; Lam, R. et al. (2023). Learning skillful medium-range global
     weather forecasting. Science 382:1416-1421.
@@ -404,7 +436,13 @@ class DiffuseGraphCast(FieldUpdate):
                    "checkpoint": "recompute each tick during backward instead of storing it",
                    "transport": "move the field by a learned velocity each tick",
                    "transport_embedding": "move the embedding with the same velocity",
-                   "max_speed": "largest velocity, voxels per tick"}
+                   "max_speed": "largest velocity, voxels per tick",
+                   "messages": "false: no message from any neighbour (the network controls)",
+                   "forcing_model": "free (one number per volume, default) or siren (a smooth function of time)",
+                   "forcing_channels": "siren: K global channels of the learned stimulus",
+                   "siren_hidden": "siren: units per hidden layer", "siren_layers": "siren: layers, the last linear",
+                   "siren_omega": "siren: omega_0, the first layer's frequency scale (t in [-1, 1])",
+                   "I_mlp": "the SIREN's weights, flat"}
     REFERENCE = ("Lam, R. et al. (2023). Learning skillful medium-range global weather forecasting. "
                  "Science 382:1416-1421; Battaglia, P. W. et al. (2018). arXiv:1806.01261.")
 
@@ -421,6 +459,7 @@ class DiffuseGraphCast(FieldUpdate):
         # updates the newest and shifts it down. `inputs: 1` is the one-state law.
         self.inputs = int(params.get("inputs", 1))
         self.mesh_levels = int(params.get("mesh_levels", 0))
+        self.messages = bool(params.get("messages", True))
         self.mesh_stride = [int(v) for v in (params.get("mesh_stride") or [])]
         self.embedding = params.get("embedding")
         self.embedding_dim = int(params.get("embedding_dim", 0)) if self.embedding else 0
@@ -436,6 +475,17 @@ class DiffuseGraphCast(FieldUpdate):
             raise ValueError("diffuse[graphcast]: `transport_embedding:` needs `transport: true` and `embedding:`")
         self.forcing = int(params.get("forcing", 0))
         self.I = torch.zeros(self.forcing, device=device) if self.forcing else None
+        self.forcing_model = str(params.get("forcing_model", "free"))
+        if self.forcing_model not in ("free", "siren"):
+            raise ValueError("diffuse[graphcast] `forcing_model:` free (default) or siren")
+        self.fK = int(params.get("forcing_channels", 1)) if self.forcing else 0
+        if self.forcing_model == "free" and self.fK > 1:
+            raise ValueError("diffuse[graphcast]: `forcing_channels:` > 1 needs `forcing_model: siren`")
+        if self.forcing_model == "siren":
+            if not self.forcing:
+                raise ValueError("diffuse[graphcast] `forcing_model: siren` needs `forcing:`, the number of volumes")
+            self._siren_init(int(params.get("siren_hidden", 16)), int(params.get("siren_layers", 3)),
+                             float(params.get("siren_omega", 30.0)), device)
         self.t_origin = 0                          # the rollout's first volume, set by the caller
         # GRAPHCAST'S INPUT AND OUTPUT NORMALISATION (supplement 3.7; exp17's `state_diffuse[graphcast]`):
         # mu, sd, dsd = the recording's mean, standard deviation and SD of the ONE-STEP difference, set by the
@@ -454,6 +504,43 @@ class DiffuseGraphCast(FieldUpdate):
         self.theta = self.init_theta(self.channels, len(self.spacing))
         self._graph = None
 
+    # ------------------------------------------------------------------ the forcing
+    def _siren_init(self, hidden, layers, omega, device):
+        """The SIREN's weights, flat in `I_mlp`: Sitzmann et al.'s init (first layer U(-1/fan, 1/fan), the others
+        U(-sqrt(6/fan)/omega, +)), the last layer 0 so s(t) = 0 at the start (exp17's `modulation: siren` init)."""
+        import math
+        dims = [1] + [hidden] * (layers - 1) + [self.fK]
+        self._siren_shapes = [s_ for i in range(layers) for s_ in ((dims[i + 1], dims[i]), (dims[i + 1],))]
+        self._siren_omega = omega
+        g = torch.Generator().manual_seed(self.seed + 7)
+        parts = []
+        for i, sh in enumerate(self._siren_shapes):
+            if i >= len(self._siren_shapes) - 2 or len(sh) == 1:
+                parts.append(torch.zeros(sh))
+            else:
+                fan = sh[1]
+                bnd = 1.0 / fan if i == 0 else math.sqrt(6.0 / fan) / omega
+                parts.append((torch.rand(sh, generator=g) * 2 - 1) * bnd)
+        self.I_mlp = torch.cat([q.reshape(-1) for q in parts]).to(device)
+
+    def forcing_at(self, t):
+        """[fK] the global forcing at volume index t: I[t] (free) or the SIREN at t (siren)."""
+        ti = min(max(int(t), 0), self.forcing - 1)
+        if self.forcing_model == "free":
+            return self.I[ti].reshape(1)
+        x = torch.tensor([[2.0 * ti / max(self.forcing - 1, 1) - 1.0]], device=self.I_mlp.device, dtype=self.I_mlp.dtype)
+        o, n_lin = 0, len(self._siren_shapes) // 2
+        for i in range(n_lin):
+            (wo, wi), (bo,) = self._siren_shapes[2 * i], self._siren_shapes[2 * i + 1]
+            w = self.I_mlp[o:o + wo * wi].reshape(wo, wi)
+            o += wo * wi
+            b = self.I_mlp[o:o + bo]
+            o += bo
+            x = x @ w.T + b
+            if i < n_lin - 1:
+                x = torch.sin(self._siren_omega * x)
+        return x.reshape(self.fK)
+
     # ------------------------------------------------------------------ the weights, flat
     def layout(self, C, D):
         """[(name, shape)] of every tensor inside `theta`, in order. Linear weights are [out, in].
@@ -468,7 +555,7 @@ class DiffuseGraphCast(FieldUpdate):
                 out.extend([(f"{name}.g", (n_out,)), (f"{name}.beta", (n_out,))])
         if self.mesh_levels:
             F = D + 1                                               # the step d, and its length
-            nin = C * self.inputs + self.embedding_dim + (self.forcing > 0)
+            nin = C * self.inputs + self.embedding_dim + self.fK
             for name, n_in, n_out in (("enc_g", nin, H), ("enc_m", nin, H),
                                       ("enc_e_g2m", F, H), ("g2m_edge", 3 * H, H), ("g2m_node", 2 * H, H),
                                       ("g2m_grid", H, H), ("enc_e_mm", F, H)):
@@ -483,7 +570,7 @@ class DiffuseGraphCast(FieldUpdate):
             if self.transport:
                 mlp("dec_v", H, D, norm=False)
             return out
-        mlp("enc_v", C * self.inputs + self.embedding_dim + (self.forcing > 0), H)
+        mlp("enc_v", C * self.inputs + self.embedding_dim + self.fK, H)
         mlp("enc_e", D, H)
         for layer in range(self.layers):
             mlp(f"edge{layer}", 3 * H, H)
@@ -640,6 +727,9 @@ class DiffuseGraphCast(FieldUpdate):
             return torch.zeros(n, H, device=e.device, dtype=e.dtype).index_add(0, rc, e)
 
         g = self._mlp(W, "enc_g", x)
+        if not self.messages:                                       # no network: the grid never meets the mesh
+            g = g + self._mlp(W, "g2m_grid", g)
+            return self._mlp(W, "dec", g, norm=False), g
         m = self._mlp(W, "enc_m", torch.zeros(1, x.shape[1], device=x.device, dtype=x.dtype)).expand(Nm, H)
         sn, rc, f = G["g2m"]
         e = self._mlp(W, "enc_e_g2m", f)
@@ -701,7 +791,7 @@ class DiffuseGraphCast(FieldUpdate):
         if self.forcing:
             if t is None:
                 raise ValueError("diffuse[graphcast] with `forcing:` needs the volume index t of each tick")
-            f = self.I[min(max(int(t), 0), self.forcing - 1)].reshape(1, *([1] * D)).expand(1, *shape)
+            f = self.forcing_at(t).reshape(self.fK, *([1] * D)).expand(self.fK, *shape)
             a = f if a is None else torch.cat([a, f], 0)   # a global input, beside the embedding
         if self.mesh_levels:
             ds, h = self._step_mesh(s, W, C, shape, a)
@@ -718,6 +808,8 @@ class DiffuseGraphCast(FieldUpdate):
                 for k, (nb, ok, _) in enumerate(dirs):
                     e[k] = e[k] + self._mlp(W, f"edge{layer}", torch.cat([e[k], h, h[nb]], -1))
                     agg = agg + e[k] * ok                           # a missing neighbour sends nothing
+                if not self.messages:                               # the network controls: nothing arrives
+                    agg = torch.zeros_like(h)
                 h = h + self._mlp(W, f"node{layer}", torch.cat([h, agg], -1))
             ds = self._mlp(W, "dec", h, norm=False)                 # [N, C]
         ds = self.norm[2] * ds                                      # the increment in the field's units

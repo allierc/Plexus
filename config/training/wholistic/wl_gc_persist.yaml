@@ -1,0 +1,9 @@
+name: wl_gc_persist
+model: config/redox/wl_f338_in4.yaml
+learnable:
+- {param: theta, op: diffuse, title: GraphCast model of whole-body calcium (exp19)}
+task:
+  reference: {field_recording: wholistic_f338_gcamp, coarsen: 1, n_test: 320, n_val: 160}
+  observe: {field: ratio}
+  loss: masked_mse
+training: {optimizer: adam, lr: 0.001, iters: 0, horizon: [1], batch: 1, seed: 0}
