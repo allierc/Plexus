@@ -1336,6 +1336,8 @@ BATCHES = (
      (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now"), ("leak + MLP message, per sender", "zap_e15_lk_snd"), ("leak + MLP message, per edge", "zap_e15_lk_pair")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
     ("batch 16: batch 15 with the calcium indicator, tau_ca fixed, latent substeps", None,
      (("tau_ca learned", "zap_c16_learn"), ("tau_ca 1 s", "zap_c16_t1"), ("tau_ca 2 s", "zap_c16_t2"), ("tau_ca 3 s", "zap_c16_t3"), ("2 s, 5 substeps", "zap_c16_t2_s5"), ("2 s, 10 substeps", "zap_c16_t2_s10"), ("2 s + SIREN Omega", "zap_c16_t2_siren"), ("trained with no network", "zap_c16_t2_now")), ()),
+    ("batch 17: batch 15.1 over different graphs", None,
+     (("axes turned 45 deg", "zap_g17_rot45"), ("random directions", "zap_g17_randdir"), ("18 nearest only", "zap_g17_knn18"), ("no highways", "zap_g17_nolong"), ("reaches 16 / 64 um", "zap_g17_r16_64"), ("reaches 64 / 256 um", "zap_g17_r64_256"), ("random graph (null)", "zap_g17_random"), ("base, seed 1", "zap_g17_s1")), ()),
 )
 # the law of each batch, in the title of every one of its slides (Cedric: which slide belongs to which batch)
 BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4": "GraphCast law",
@@ -1346,7 +1348,8 @@ BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4"
              "12": "GNN-MLP, neuron graph, destriped", "13": "neuron graph, new rig, destriped",
              "14": "neuron graph, modulation / conductance, destriped",
              "15": "neuron graph, modulation / conductance, destriped + ephys",
-             "16": "neuron graph + calcium indicator, destriped + ephys"}            # Cedric's names, 2026-10-01
+             "16": "neuron graph + calcium indicator, destriped + ephys",
+             "17": "neuron graph topologies, destriped + ephys"}            # Cedric's names, 2026-10-01
 BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh levels", "2": "regularisers, synapse, substeps, levels",
                 "3": "activation, substeps, levels, synapse", "4": "seed, history 12/24, embedding 2/16, stimulus window, curriculum 5/40",
                 "5": "W prior, row lasso, edge reach, no graph", "6": "batch 5 + indicator; indicator start, k fixed",
@@ -1357,7 +1360,8 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
                 "13": "integrator (Euler, exponential, rate cap), seed, W prior, linear, adaptation, reach",
                 "14": "conductance, Omega by hash grid or SIREN, in sample",
                 "15": "batch 14 with 5 ephys features in the stimulus and the mask",
-                "16": "calcium indicator: tau_ca learned or fixed 1 / 2 / 3 s, latent substeps, SIREN, no network"}
+                "16": "calcium indicator: tau_ca learned or fixed 1 / 2 / 3 s, latent substeps, SIREN, no network",
+                "17": "the graph: rotated or random directions, kNN only, no highways, reaches, random graph, seed"}
 
 
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
@@ -2106,6 +2110,69 @@ def main():
             deck.append((f"13_edges_amp_{suf_}", frame("edge weights on one scale", f"\\panel{{figs/edges_amp_{run_}.png}}",
                                                       right_amp, "tools/exp17_edges.py --amplitude",
                                                       deck_title=f"batch {b_} $\\cdot$ {rt_} $\\cdot$ edge weights")))
+    # Cedric, 2026-10-03: the learned constants on the brain, batch 15's best run (tools/exp17_param_maps.py)
+    jm_ = os.path.join(EXP, "data", "param_maps_zap_e15_cur_siren.json")
+    if os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "param_maps_zap_e15_cur_siren.png")):
+        S_ = json.load(open(jm_))
+
+        def r3(k_, f_="{:.3g}"):
+            return f"{f_.format(S_[k_]['median'])} ({f_.format(S_[k_]['p2'])} .. {f_.format(S_[k_]['p98'])})"
+        right_pm = (head("the learned constants on the brain")
+                    + "{\\scriptsize every neuron coloured by its own learned value; median (2nd .. 98th percentile)\\par}\\vspace{4pt}\n"
+                    + rows([("$\\tau$, s", r3("tau_s")), ("rest $V$, dF/F", r3("V")), ("W in, summed", r3("W_in")),
+                            ("$|B|$, input neurons", r3("B_norm"))])
+                    + rows([("$\\tau$ under one frame", f"{100 * S_['frac_tau_below_frame']:.1f} \\% of neurons"),
+                            ("W in $<$ 0", f"{100 * S_['frac_W_in_negative']:.1f} \\% of neurons"),
+                            ("input neurons", f"{S_['n_masked']:,} of {S_['n']:,}")])
+                    + "{\\tiny\\color{gray} $\\tau$ = 0.914 s / softplus($\\tau_{raw}$); $V$ in dF/F; W the signed sum over "
+                      "the three edge sets into the neuron (the messages are then scaled by $\\Omega$, mean 3.2); $B$ is "
+                      "used only inside the input mask\\par}\n")
+        deck.append(("13_param_maps_e15", frame("the learned constants on the brain",
+                                               "\\vspace*{0.11\\textheight}\\panel{figs/param_maps_zap_e15_cur_siren.png}", right_pm,
+                                               "tools/exp17_param_maps.py",
+                                               deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ tau, V, W, B")))
+    # Cedric, 2026-10-03: what batch 15's 8 clusters are, and how far to trust them (tools/exp17_cluster_profile.py)
+    jp_ = os.path.join(EXP, "data", "cluster_profile_zap_e15_cur_siren_k8.json")
+    if os.path.exists(jp_):
+        D_ = json.load(open(jp_))
+        tr_, e_, C_ = D_["trust"], D_["eta2"], D_["clusters"]
+        oth_ = [(k_[len("ari_vs_"):], v_) for k_, v_ in tr_.items() if k_.startswith("ari_vs_zap")]
+        lab_e = {"V rest": "rest $V$", "dF/F mean": "mean dF/F", "log10 tau": "$\\tau$", "|B| (masked)": "$|B|$",
+                 "dF/F SD": "dF/F SD", "|W| in": "$|W|$ in", "masked": "in the mask", "W in": "W in", "W out": "W out",
+                 "body axis": "head-tail position"}
+        fast_ = [c["cluster"] for c in C_ if c["tau_s_median"] < D_["frame_s"]]
+        R_ = json.load(open(os.path.join(EXP, "data", "cluster_reality_zap_e15_cur_siren_k8.json")))
+        sil_ = R_["silhouette"]
+        c5_ = [c["cluster"] for c in C_ if c["masked_frac"] > 0.99]
+        right_cp = (head("are they real clusters? mostly not")
+                    + "{\\scriptsize $\\tau$ and $V$ each form ONE continuous hump (a, b): KMeans cuts them into slices "
+                      f"-- clusters {', '.join(map(str, fast_))} tile the fast tail of $\\tau$, the others are steps along "
+                      f"$V$. The silhouette, {sil_['data']:.2f}, beats data with no clusters ({sil_['gaussian_null']:.2f} "
+                      f"one Gaussian, {sil_['permuted_null']:.2f} permuted, c), but {100 * R_['frac_B_zero']:.0f} \\% of "
+                      "the neurons have $B = 0$ (outside the input mask), a point mass that alone separates. "
+                    + (f"Cluster {c5_[0]}, input neurons only with strong turning and turn-ephys weights, is the one "
+                       "group of its own." if c5_ else "")
+                    + "\\par}\\vspace{4pt}\n"
+                    + rows([("same run (ARI)", f"restarts {np.median(tr_['restarts_ari']):.2f}, subsamples "
+                                               f"{np.median(tr_['subsample_ari']):.2f}"),
+                            ("other trainings (ARI)", " / ".join(f"{v_:.2f}" for _, v_ in oth_))])
+                    + head("the input neurons (mask) in each cluster")
+                    + "{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
+                      "cl. & neurons & inputs & \\% of cl. & \\% of inputs & $\\tau$, s & $V$ \\\\\n\\hline\n"
+                    + "".join(f"{c['cluster']} & {c['n']:,} & {c['masked_n']:,} & {100 * c['masked_frac']:.1f} & "
+                              f"{100 * c['share_of_all_masked']:.1f} & {c['tau_s_median']:.2g} & {c['V_median']:.3f} \\\\\n" for c in C_)
+                    + f"all & {D_['n']:,} & {D_['n_masked']:,} & {100 * D_['n_masked'] / D_['n']:.1f} & 100 & & \\\\\n"
+                    + "\\end{tabular}\\par}\\vspace{4pt}\n"
+                    + "{\\scriptsize $\\eta^2$ (variance between clusters): " + ", ".join(
+                        f"{lab_e.get(k_, k_)} {v_:.2f}" for k_, v_ in sorted(e_.items(), key=lambda kv: -kv[1])[:5])
+                    + f"; W out {e_['W out']:.2f}, head-tail position {e_['body axis']:.2f}\\par}}\n")
+        deck.append(("13_cluster_profile_e15", frame("what the 8 clusters are",
+                                                    "\\centering\\includegraphics[width=\\linewidth,height=0.26\\textheight,keepaspectratio]"
+                                                    "{figs/cluster_reality_zap_e15_cur_siren_k8.png}\\par\\vspace{6pt}"
+                                                    "\\includegraphics[width=\\linewidth,height=0.50\\textheight,keepaspectratio]"
+                                                    "{figs/cluster_profile_zap_e15_cur_siren_k8.png}",
+                                                    right_cp, "tools/exp17_cluster_profile.py",
+                                                    deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ the 8 clusters")))
     # Cedric, 2026-10-03: the learned modulation Omega_i(t) of batch 15's best run beside the recorded activity
     # (tools/exp17_modulation.py), right after its movie
     om_ = os.path.join(GD, "log", "training", "zapbench", "zap_e15_cur_siren", "results")
@@ -2216,9 +2283,9 @@ def main():
                   "13_clusters_k4_montage_dm": "13_clusters_3d_dm", "13_clusters_k8_montage_dm": "13_clusters_k4_montage_dm",
                   "13_clusters_k16_montage_dm": "13_clusters_k8_montage_dm", "13_clusters_k32_montage_dm": "13_clusters_k16_montage_dm",
                   "13_edges_amp_dm": "13_clusters_k32_montage_dm",
-                  "zap_e15_cur_siren_omega": "zap_e15_cur_siren_movie", "13_clusters_3d_e15": "zap_e15_cur_siren_omega",
+                  "zap_e15_cur_siren_omega": "zap_e15_cur_siren_movie", "13_param_maps_e15": "zap_e15_cur_siren_omega", "13_clusters_3d_e15": "13_param_maps_e15",
                   "13_clusters_k4_montage_e15": "13_clusters_3d_e15", "13_clusters_k8_montage_e15": "13_clusters_k4_montage_e15",
-                  "13_clusters_k16_montage_e15": "13_clusters_k8_montage_e15",
+                  "13_cluster_profile_e15": "13_clusters_k8_montage_e15", "13_clusters_k16_montage_e15": "13_cluster_profile_e15",
                   "13_clusters_k32_montage_e15": "13_clusters_k16_montage_e15", "13_edges_amp_e15": "13_clusters_k32_montage_e15", "zap_dm_ng_now_movie": "zap_dm_ng_rl1lo_W0"}   # beside the W = 0 slide: the same argument
     for nm, after in MOVE_AFTER.items():
         item = next((x for x in deck if x[0] == nm), None)

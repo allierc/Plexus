@@ -210,3 +210,37 @@ def test_conductance_drives_toward_the_senders_reversal(tmp_path):
         out.append(float(o.step(x, P, None, torch.zeros(22, 1), nb=nb)[r[0]] - o.step(
             torch.where(torch.arange(len(P))[:, None] == s[0], 0.0, x), P, None, torch.zeros(22, 1), nb=nb)[r[0]]))
     assert out[0] > 0 > out[1]
+
+
+def _edges(o):
+    return {k: (o._E[k][0].numpy(), o._E[k][1].numpy()) for k in ("short", "mid", "long")}
+
+
+def test_graph_topologies(tmp_path):
+    """exp17 batch 17: the default graph is unchanged by the new options; rotated / random directions change the mid
+    and long partners and not the short ones; the random graph keeps every element's degree, has no self edge and no
+    spatial structure (its edges are far longer than the spatial graph's)."""
+    import pytest
+    base = _edges(setup(str(tmp_path))[0])
+    same = _edges(setup(str(tmp_path), reach_dirs="axes")[0])
+    for k in base:
+        assert np.array_equal(base[k][0], same[k][0]) and np.array_equal(base[k][1], same[k][1])
+    for kw in ({"reach_dirs": "rotated", "reach_rotation_deg": 45.0}, {"reach_dirs": "random", "graph_seed": 1}):
+        e = _edges(setup(str(tmp_path), **kw)[0])
+        assert np.array_equal(e["short"][0], base["short"][0])                       # the streets are untouched
+        for k in ("mid", "long"):
+            assert len(e[k][0]) > 0.5 * len(base[k][0])
+            assert not np.array_equal(np.sort(e[k][0] * 10 ** 6 + e[k][1]), np.sort(base[k][0] * 10 ** 6 + base[k][1]))
+    o, P, _ = setup(str(tmp_path), graph="random", graph_seed=3)
+    e = _edges(o)
+    for k, deg in (("short", 6), ("mid", 6), ("long", 6)):
+        s, r = e[k]
+        assert np.all(np.bincount(r, minlength=len(P)) == deg) and not np.any(s == r)
+    ln = lambda s, r: np.linalg.norm(P.numpy()[s] - P.numpy()[r], axis=1).mean()
+    assert ln(*e["short"]) > 5 * ln(*base["short"])
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), reach_dirs="rotated")                                    # a rotation needs its angle
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), reach_rotation_deg=30.0)                                 # an angle needs `rotated`
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), graph="smallworld")

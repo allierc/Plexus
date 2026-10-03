@@ -2130,7 +2130,11 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
                    "mod_res_time": "hash: [coarsest, finest] cells across the recording ([8, 2048]); space and time are two tables",
                    "mod_hidden": "the decoder's (hash) or the SIREN's width (32 / 128)",
                    "mod_layers": "siren: layers, input to output (5, the paper's)",
-                   "siren_omega": "siren: omega_0 of its sines (30, Sitzmann et al.; coordinates in [-1, 1])",}
+                   "siren_omega": "siren: omega_0 of its sines (30, Sitzmann et al.; coordinates in [-1, 1])",
+                   "reach_dirs": "mid / long partners along the axes (default), the axes rotated, or 6 random directions per element",
+                   "reach_rotation_deg": "with reach_dirs: rotated, the turn of the axes about z, degrees",
+                   "graph": "spatial (default) or random: the same degrees, senders drawn uniformly (the null)",
+                   "graph_seed": "the seed of the random directions or the random graph"}
     EDGE_SETS = ("short", "mid", "long")
 
     def __init__(self, params, device="cpu"):
@@ -2151,6 +2155,22 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         self.substeps = int(params.get("substeps", 4))
         self.short_k = int(params.get("short_k", 6))
         self.reach = {"mid": float(params.get("mid_um", 32.0)), "long": float(params.get("long_um", 128.0))}
+        # THE GRAPH'S TOPOLOGY (exp17 batch 17, Cedric 2026-10-03: "the visualisation shows the graph that supports
+        # the dynamics; train over different graphs"). `reach_dirs`: the mid / long partners are the elements nearest
+        # p_i +- L along the frame's axes (`axes`, every earlier run), along those axes turned `reach_rotation_deg`
+        # about z (`rotated`), or along 6 random unit directions drawn per element (`random`, seed `graph_seed`).
+        # `graph: random` is the null: every set keeps its degree (short_k, 6, 6 senders per element) but the
+        # senders are drawn uniformly over all the elements -- no space in it.
+        self.reach_dirs = str(params.get("reach_dirs", "axes"))
+        if self.reach_dirs not in ("axes", "rotated", "random"):
+            raise ValueError("state_diffuse[neuron_graph] `reach_dirs:` axes (default), rotated or random")
+        self.reach_rot = float(params.get("reach_rotation_deg", 0.0))
+        if (self.reach_rot != 0.0) != (self.reach_dirs == "rotated"):
+            raise ValueError("state_diffuse[neuron_graph] `reach_rotation_deg:` goes with `reach_dirs: rotated` only")
+        self.graph_kind = str(params.get("graph", "spatial"))
+        if self.graph_kind not in ("spatial", "random"):
+            raise ValueError("state_diffuse[neuron_graph] `graph:` spatial (default) or random")
+        self.graph_seed = int(params.get("graph_seed", 0))
         self.norm = (0.0, 1.0, 1.0)
         self.device_ = device
         self.theta = torch.zeros(0, device=device)
@@ -2352,25 +2372,43 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
     def graph(self, pos) -> dict:
         """{set: (senders, receivers)} as long tensors on this device, and `stats` (edges and mean length, um)."""
         import numpy as np
-        key = (self._pos_file, self.short_k, self.reach["mid"], self.reach["long"], len(pos))
+        key = (self._pos_file, self.short_k, self.reach["mid"], self.reach["long"], len(pos), self.reach_dirs,
+               self.reach_rot, self.graph_kind, self.graph_seed)
         if key not in _NG_GRAPH_CACHE:
             from scipy.spatial import cKDTree
             P = np.asarray(pos, dtype=np.float64)
             tree = cKDTree(P)
             N = len(P)
             out, stats = {}, {}
-            if self.short_k > 0:
+            rng = np.random.default_rng(self.graph_seed)
+            if self.graph_kind == "random":                              # the null: the degrees, no space
+                for name, k in (("short", self.short_k), ("mid", 6 if self.reach["mid"] > 0 else 0),
+                                ("long", 6 if self.reach["long"] > 0 else 0)):
+                    s = rng.integers(0, N - 1, N * k)
+                    r = np.repeat(np.arange(N), k)
+                    s = s + (s >= r)                                       # never the element itself
+                    out[name] = (s, r)
+            elif self.short_k > 0:
                 _, j = tree.query(P, k=self.short_k + 1)                  # the first is the element itself
                 s, r = j[:, 1:].reshape(-1), np.repeat(np.arange(N), self.short_k)
             else:
                 s = r = np.zeros(0, dtype=np.int64)
-            out["short"] = (s, r)
+            if self.graph_kind == "spatial":
+                out["short"] = (s, r)
             dirs = np.concatenate([np.eye(3), -np.eye(3)])
-            for name in ("mid", "long"):
+            if self.reach_dirs == "rotated":
+                c_, s_ = np.cos(np.radians(self.reach_rot)), np.sin(np.radians(self.reach_rot))
+                dirs = dirs @ np.array([[c_, -s_, 0.0], [s_, c_, 0.0], [0.0, 0.0, 1.0]]).T
+            for name in (("mid", "long") if self.graph_kind == "spatial" else ()):
                 L = self.reach[name]
                 ss, rr = [], []
                 if L > 0:
-                    for d in dirs:
+                    for i_ in range(6):
+                        if self.reach_dirs == "random":                    # 6 random unit directions per element
+                            d = rng.normal(size=(N, 3))
+                            d /= np.linalg.norm(d, axis=1, keepdims=True)
+                        else:
+                            d = dirs[i_]
                         dist, j = tree.query(P + L * d)
                         ok = (dist < 0.5 * L) & (j != np.arange(N))
                         ss.append(j[ok])
