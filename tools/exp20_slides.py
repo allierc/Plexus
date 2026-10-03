@@ -380,10 +380,23 @@ def landed(name):
     return r
 
 
+def brain_r2(d, stem):
+    """THE BRAIN-MEAN R2 (exp17's headline, Cedric 2026-10-03): 1 - sum_t (pbar_t - obar_t)^2 / sum_t (obar_t - mean)^2
+    over the free rollout's frames, obar / pbar the recorded / learned mean over the alive cells (trainer
+    `_brain_mean_metrics`, read from the rollout's own movie npz)."""
+    from plexus import trainer as T
+    p = os.path.join(d, "results", f"{stem}_movie.npz")
+    if not os.path.exists(p):
+        return None
+    z = np.load(p)
+    return T._brain_mean_metrics(z["mean_obs_all"], z["mean_pred_all"])["brain_mean_r2"]
+
+
 def numbers(r):
     """The four numbers a batch slide shows for a run, from its own result files (None where not measured)."""
     from exp_measures import exp20 as M
-    out = {"short": r["test"]["skill_short"], "free_r2": r["test"]["free"]["r2_denoised"], "trial": None, "free_gut": None}
+    out = {"short": r["test"]["skill_short"], "free_r2": r["test"]["free"]["r2_denoised"], "trial": None, "free_gut": None,
+           "brain_r2": brain_r2(r["dir"], r["name"])}
     if r["trials"]:
         g = [t for t in r["trials"]["trials"] if t["kind"] == "gut"]
         out["trial"] = M.window_skill([t["mse_resp"] for t in g], [t["mse_sta_resp"] for t in g])
@@ -400,7 +413,7 @@ def figure_batch(b, names, path):
     L = {n: landed(n) for n in names}
     N = {n: numbers(r) for n, r in L.items() if r}
     keys = [("short", "skill over the mean, h 1-3"), ("trial", "held-out trial skill over the STA"),
-            ("free_gut", "free rollout: gut response / recorded"), ("free_r2", "free rollout R$^2$ (denoised)")]
+            ("free_gut", "free rollout: gut response / recorded"), ("brain_r2", "free rollout: brain-mean R$^2$")]
     fig, ax = plt.subplots(len(keys), 1, figsize=(7, 7.5), facecolor="black", sharex=True)
     x = np.arange(len(names))
     for a, (k, lab) in zip(ax, keys):
@@ -429,15 +442,15 @@ def slide_batch(b):
     def f(n, k):
         v = N.get(n, {}).get(k)
         return f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
-    tab = "".join(f"{i + 1} & {_tex(n)} & {f(n, 'short')} & {f(n, 'trial')} & {f(n, 'free_gut')} & {f(n, 'free_r2')} \\\\\n"
+    tab = "".join(f"{i + 1} & {_tex(n)} & {f(n, 'short')} & {f(n, 'trial')} & {f(n, 'free_gut')} & {f(n, 'brain_r2')} \\\\\n"
                   if n in N else f"{i + 1} & {_tex(n)} & \\multicolumn{{4}}{{l}}{{running}} \\\\\n" for i, n in enumerate(names))
     right = (head(f"batch {b}: {title}") + "{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{4pt}}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
-             "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n & arm & short & trial & free gut & free R$^2$ \\\\\n\\hline\n" + tab
+             "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n & arm & short & trial & free gut & brain R$^2$ \\\\\n\\hline\n" + tab
              + "\\end{tabular}\\par}\\vspace{6pt}\n"
              + "{\\scriptsize short: skill over the best recent mean, h 1-3, held-out windows. trial: skill over the "
                "stimulus-triggered mean, held-out gut trials, gut-responsive cells, from the pulse. free gut: the evoked response "
                "to the held-out gut pulses INSIDE the free rollout of the whole session (stimuli and the first frame only), over "
-               "the recorded one. free R$^2$: the whole session.\\par}\n")
+               "the recorded one. brain R$^2$: the whole session's brain-mean dF/F, learned against recorded (exp17's headline).\\par}\n")
     return (f"batch_{b}_levers", frame(f"batch {b}: every arm", f"\\panel{{figs/batch_{b}_levers.png}}", right,
                                        "the runs' _test, _trials, _freetrial json", deck_title=f"batch {b} ({_tex(title)}) $\\cdot$ every arm"))
 
@@ -593,10 +606,11 @@ def slide_network(name, now, b):
                  [("network law", f"{fr(full)}, pattern r {full['pattern_r_gut']:+.2f} over the cells"),
                   ("W = 0", f"{fr(w0)}, pattern r {w0['pattern_r_gut']:+.2f}")]
                  + ([("no network", f"{fr(nw)}, pattern r {nw['pattern_r_gut']:+.2f}")] if nw else []))
-             + head("whole-session R$^2$ (denoised)") + rows(
-                 [("network law", f"{A['full']['r2_denoised']:+.3f}" if A else "--"),
-                  ("W = 0", f"{A['W0']['r2_denoised']:+.3f}" if A else "--")]
-                 + ([("no network", f"{rn['test']['free']['r2_denoised']:+.3f}: the slow drift, no response")] if rn else []))
+             + head("whole session: brain-mean R$^2$ (per-cell R$^2$)") + rows(
+                 [("network law", f"{brain_r2(r['dir'], name):+.2f} ({A['full']['r2_denoised']:+.2f})" if A else "--"),
+                  ("W = 0", f"{brain_r2(r['dir'], name + '_W0'):+.2f} ({A['W0']['r2_denoised']:+.2f})" if A else "--")]
+                 + ([("no network", f"{brain_r2(rn['dir'], now):+.2f} ({rn['test']['free']['r2_denoised']:+.2f}): the drift, "
+                                    "no response")] if rn else []))
              + head("driven by the stimuli only") + rows(
                  [("start", "one recorded volume, then the inputs only"),
                   ("leak check", (f"recording after the start zeroed or noise: max {max(x['max_abs_zeroed'] for x in LK['rows']):.1e} dF/F, "
@@ -617,9 +631,9 @@ def slide_overview():
                 continue
             N = numbers(r)
             fmt = lambda v: f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
-            lines.append(f"{b}.{names.index(n) + 1} & {_tex(n)} & {fmt(N['short'])} & {fmt(N['trial'])} & {fmt(N.get('free_gut'))} & {fmt(N['free_r2'])} \\\\")
+            lines.append(f"{b}.{names.index(n) + 1} & {_tex(n)} & {fmt(N['short'])} & {fmt(N['trial'])} & {fmt(N.get('free_gut'))} & {fmt(N['brain_r2'])} \\\\")
     body = ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}l@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{}}\n"
-            "arm & run & short & trial & free gut & free R$^2$ \\\\\n\\hline\n" + "\n".join(lines) + "\n\\end{tabular}\\par}")
+            "arm & run & short & trial & free gut & brain R$^2$ \\\\\n\\hline\n" + "\n".join(lines) + "\n\\end{tabular}\\par}")
     return ("90_overview", (f"% generated by tools/exp20_slides.py (overview)\n\\begin{{frame}}[t]{{{DECK_TITLE} $\\cdot$ every landed run}}\n"
                             f"\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n"))
 

@@ -43,6 +43,15 @@ task:
   - term: trace_mse
     reduction: norm2
   warmup: 10
+  rollouts:
+  - name: nominal
+  - name: W0
+    zero:
+    - W_short
+    - W_mid
+    - W_long
+  - name: no_stimulus
+    drive: 'off'
 training:
   optimizer: adam
   lr: 0.0018

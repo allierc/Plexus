@@ -30,6 +30,10 @@ task:
   loss:
   - term: trace_mse
     reduction: norm2
+  rollouts:
+  - name: nominal
+  - name: no_stimulus
+    drive: 'off'
 training:
   optimizer: adam
   lr: 0.0018
