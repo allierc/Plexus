@@ -13,6 +13,11 @@ figure and panel). Runs in the devcontainer only (INSTRUCTION.md, the cluster ru
     02  the deposit: conditions, fish, what each file holds              (figure)
     03  one fish: anatomy, cells, the known inputs over the session      (figure, from the exported recording)
     04  the target of the integration gate: Fig. 3d                       (figure crop + GV/GM)
+    05  the law: the neuron graph on this fish (exp17's figure, drawn from the operator)
+    06  the references before training: baselines, input mask
+    then per batch (exp17's structure, Cedric 2026-10-03): its levers slide, the shown run's movie and curves, Cedric's
+    two controls (W = 0 on the trained law; a law trained with no network) on the gut response in the free rollout;
+    90  overview of every landed run
 """
 from __future__ import annotations
 
@@ -246,12 +251,269 @@ def slide_fig3d():
                               "\\panel{figs/04_fig3d.png}", right, "papers/figs/Chen2026_fig3d_crop.png"))
 
 
+# ============================================================================== 05 the law, 06 the baselines
+GD = os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
+RUNS = os.path.join(GD, "log", "training", "gutbrain")
+REC1 = "gutbrain_glucose_f1"
+
+
+def _tex(t):
+    return str(t).replace("_", "\\_").replace("%", "\\%").replace("&", "\\&").replace("#", "\\#")
+
+
+def slide_law():
+    """The neuron graph on this fish, drawn by exp17's figure from the operator itself (the picture IS the graph)."""
+    import exp17_slides as X17
+    from plexus.paths import graphs_data_path
+    png = os.path.join(PRES, "figs", "05_neuron_graph.png")
+    pf = f"zebrafish/{REC1}_recording.npz"
+    op = X17.neuron_graph_op(positions_file=pf)
+    if not os.path.exists(png) or "--figs" in sys.argv:
+        X17.figure_neuron_graph(np.load(graphs_data_path(pf))["pos_um"], png, op=op)
+    E = {s: int(op._E[s][0].numel()) for s in ("short", "mid", "long") if s in op._E}
+    right = (head("the law: a known ODE on a graph between the cells") + rows([
+        ("cells", "one state each, dF/F; its own rate, rest and 6 input weights"),
+        ("edges", ", ".join(f"{k} {v:,}" for k, v in E.items()) + ": one learned W each"),
+        ("", "6 nearest, 6 at 32 \\textmu m, 6 at 128 \\textmu m (exp17 7.2's law)"),
+        ("step", "$dz_i = r_i(-z_i + c_i + \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u)$"),
+        ("", "$r_i$ rate, $c_i$ rest, $W_{ij}$ edge weight, $B_i$ input weights"),
+        ("inputs", "$u$: UV pulse, beam x, y, grating speed, swim L, R"),
+        ("", "read at the step's frame only; nothing recorded after the start")])
+        + head("training") + rows([("", "exp17's curriculum: horizons 1..30, every step scored"),
+                                    ("", "split: the held-out trial windows never trained on")]))
+    return ("05_law", frame("The law: a leaky ODE per cell, coupled by a learned graph, driven by the known inputs",
+                            "\\panel{figs/05_neuron_graph.png}", right, "state_diffuse[neuron_graph] on glucose fish 1"))
+
+
+def slide_baselines():
+    b = json.load(open(os.path.join(DATA, f"baselines_{REC1}.json")))
+    m = np.load(os.path.join(GD, "graphs_data", "zebrafish", f"input_mask_{REC1}.npz"))
+    png = os.path.join(EXP, "png", f"input_mask_{REC1}.png")
+    import shutil
+    shutil.copyfile(png, os.path.join(PRES, "figs", "06_input_mask.png"))
+    g = b["gut_window_mse_resp"]
+    right = (head("the references, before any training") + rows([
+        ("gut-responsive", f"{b['gut_responsive']:,} cells (the paper's selection, training frames)"),
+        ("noise", f"$\\sigma^2$ {b['noise_sigma2']:.3f} dF/F$^2$ over all cells (ZAPBench 0.0005)"),
+        ("held-out gut", f"window MSE ($10^{{-3}}$): STA {g['sta'] * 1e3:.0f}, regression {g['reg'] * 1e3:.0f},"),
+        ("", f"best recent mean {g['mean'] * 1e3:.0f}, persistence {g['pers'] * 1e3:.0f}"),
+        ("control / gut", f"{b['evoked_ratio_ctrl_over_gut']:.2f}: the brain barely answers the off-fish UV"),
+        ("replicable", f"{b['top1_cells']:,} cells, held-out gut evoked {b['evoked_top1_heldout_gut']:+.3f}")])
+        + head("the input mask (exp17's, per input)") + rows([
+            ("", f"top 10 \\% per input, training frames: union {int(m['mask'].sum()):,} cells"),
+            ("uv", "site-blind trial-locked $|t|$: holds 71 \\% of the gut-responsive cells"),
+            ("visual, swim", "exp17's coherence with the input")]))
+    return ("06_baselines", frame("Before training: the gut-responsive cells, the references, the input mask",
+                                  "\\panel{figs/06_input_mask.png}", right, f"data/baselines_{REC1}.json"))
+
+
+# ============================================================================== batches, runs, controls
+BATCHES = {
+    "1": ("Euler integrator, glucose fish 1", ["gb_ng_base", "gb_ng_s1", "gb_ng_mask", "gb_ng_now", "gb_ng_nol1",
+                                                "gb_ng_wide", "gb_ng_h50", "gb_gc_base", "gb_ng_base_lglu"], "gb_ng_nol1", "gb_ng_now"),
+    "2": ("exponential integrator", ["gb_ex_base", "gb_ex_s1", "gb_ex_nol1", "gb_ex_now", "gb_ex_mask", "gb_ex_h50",
+                                     "gb_ex_base_lglu", "gb_ex_f4"], "gb_ex_nol1", "gb_ex_now"),
+}
+
+
+def md_rows():
+    """{run: (v, what changed)} from the md's results table (the one place a run's change is written)."""
+    md = open(os.path.join(ROOT, "experiments", "exp20_gutbrain_graphcast.md")).read()
+    out = {}
+    for line in md.splitlines():
+        m = re.match(r"\\| (\\S+) \\| `training/gutbrain/(\\w+)` \\|(.*)\\|\\s*$", line)
+        if m:
+            cells = [c.strip() for c in m.group(3).split("|")]
+            out[m.group(2)] = (m.group(1), cells[-2] if len(cells) >= 2 else "")
+    return out
+
+
+def landed(name):
+    d = os.path.join(RUNS, name, "results")
+    t = os.path.join(d, f"{name}_test.json")
+    if not os.path.exists(t):
+        return None
+    r = {"name": name, "dir": os.path.join(RUNS, name), "test": json.load(open(t))}
+    for k in ("trials", "freetrial"):
+        p = os.path.join(d, f"{name}_{k}.json")
+        r[k] = json.load(open(p)) if os.path.exists(p) else None
+    rep = os.path.join(d, "report.json")
+    r["report"] = json.load(open(rep)) if os.path.exists(rep) else {}
+    return r
+
+
+def numbers(r):
+    """The four numbers a batch slide shows for a run, from its own result files (None where not measured)."""
+    from exp_measures import exp20 as M
+    out = {"short": r["test"]["skill_short"], "free_r2": r["test"]["free"]["r2_denoised"], "trial": None, "free_gut": None}
+    if r["trials"]:
+        g = [t for t in r["trials"]["trials"] if t["kind"] == "gut"]
+        out["trial"] = M.window_skill([t["mse_resp"] for t in g], [t["mse_sta_resp"] for t in g])
+    if r["freetrial"]:
+        out["free_gut"] = r["freetrial"]["arms"]["full"]["evoked_gut_free_over_rec"]
+        out["pattern"] = r["freetrial"]["arms"]["full"]["pattern_r_gut"]
+    return out
+
+
+def figure_batch(b, names, path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    L = {n: landed(n) for n in names}
+    N = {n: numbers(r) for n, r in L.items() if r}
+    keys = [("short", "skill over the mean, h 1-3"), ("trial", "held-out trial skill over the STA"),
+            ("free_gut", "free rollout: gut response / recorded"), ("free_r2", "free rollout R$^2$ (denoised)")]
+    fig, ax = plt.subplots(len(keys), 1, figsize=(7, 7.5), facecolor="black", sharex=True)
+    x = np.arange(len(names))
+    for a, (k, lab) in zip(ax, keys):
+        _black(a)
+        v = [N[n][k] if n in N and N[n].get(k) is not None else np.nan for n in names]
+        a.bar(x, np.clip(v, -1.0, 1.5), 0.6, color=["#4fc3f7" if np.isfinite(t) and t >= 0 else "#ff7043" for t in v])
+        for i, t in enumerate(v):
+            if np.isfinite(t):
+                a.text(i, (min(max(t, -1.0), 1.5)) + (0.04 if t >= 0 else -0.12), f"{t:+.2f}", ha="center",
+                       color="white", fontsize=7)
+        a.axhline(0, color="0.6", lw=0.6)
+        a.set_ylabel(lab, fontsize=7, rotation=0, ha="right", va="center")
+    ax[-1].set_xticks(x, [f"{i + 1}" for i in range(len(names))], fontsize=8)
+    ax[-1].set_xlabel("arm (table, right)")
+    fig.tight_layout()
+    fig.savefig(path, dpi=180, facecolor="black")
+    plt.close(fig)
+    return N
+
+
+def slide_batch(b):
+    title, names, shown, now = BATCHES[b]
+    N = figure_batch(b, names, os.path.join(PRES, "figs", f"batch_{b}_levers.png"))
+    rw = md_rows()
+
+    def f(n, k):
+        v = N.get(n, {}).get(k)
+        return f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
+    tab = "".join(f"{i + 1} & {_tex(n)} & {f(n, 'short')} & {f(n, 'trial')} & {f(n, 'free_gut')} & {f(n, 'free_r2')} \\\\\n"
+                  if n in N else f"{i + 1} & {_tex(n)} & \\multicolumn{{4}}{{l}}{{running}} \\\\\n" for i, n in enumerate(names))
+    right = (head(f"batch {b}: {title}") + "{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{4pt}}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
+             "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n & arm & short & trial & free gut & free R$^2$ \\\\\n\\hline\n" + tab
+             + "\\end{tabular}\\par}\\vspace{6pt}\n"
+             + "{\\scriptsize short: skill over the best recent mean, h 1-3, held-out windows. trial: skill over the "
+               "stimulus-triggered mean, held-out gut trials, gut-responsive cells, from the pulse. free gut: the evoked response "
+               "to the held-out gut pulses INSIDE the free rollout of the whole session (stimuli and the first frame only), over "
+               "the recorded one. free R$^2$: the whole session.\\par}\n")
+    return (f"batch_{b}_levers", frame(f"batch {b}: every arm", f"\\panel{{figs/batch_{b}_levers.png}}", right,
+                                       "the runs' _test, _trials, _freetrial json", deck_title=f"batch {b} ({_tex(title)}) $\\cdot$ every arm"))
+
+
+def slides_run(name, b):
+    import shutil
+    r = landed(name)
+    if not r:
+        return []
+    out, rw = [], md_rows()
+    v, what = rw.get(name, ("", ""))
+    dt = f"batch {b} $\\cdot$ {_tex(name)}"
+    N = numbers(r)
+    mv = os.path.join(r["dir"], "results", "movie.mp4")
+    if os.path.exists(mv):
+        shutil.copyfile(mv, os.path.join(PRES, "Movies", f"{name}.mp4"))
+        shutil.copyfile(mv.replace(".mp4", ".png"), os.path.join(PRES, "Movies", f"{name}.png"))
+        ft = r["freetrial"]["arms"]["full"] if r["freetrial"] else None
+        right = (head(_tex(name)) + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n" + rows(
+            [("short", f"{N['short']:+.3f} over the best recent mean, h 1-3"),
+             ("trial", f"{N['trial']:+.3f} over the STA (held-out gut trials)" if N["trial"] is not None else "--"),
+             ("free R$^2$", f"{N['free_r2']:+.3f} (whole session, denoised)")]
+            + ([("free gut", f"{ft['evoked_gut_free_over_rec']:.2f} of the recorded response, pattern r {ft['pattern_r_gut']:+.2f}"),
+                ("free ctrl", f"{ft['evoked_ctrl_free_over_rec_gut']:+.2f} of the recorded gut response"),
+                ("", ", ".join(f"{t['kind'][0]}{t['onset']}: {t['evoked_free']:+.3f} / {t['evoked_rec']:+.3f}" for t in ft["trials"]))]
+               if ft else [])))
+        out.append((f"{name}_movie", frame("the free rollout of the whole session, recorded left, learned right",
+                                           f"\\playmovie{{Movies/{name}}}", right, f"{name}/results/movie.mp4", deck_title=dt)))
+    cp = os.path.join(r["dir"], "results", f"{name}_test.png")
+    if os.path.exists(cp):
+        shutil.copyfile(cp, os.path.join(PRES, "figs", f"{name}_test.png"))
+        out.append((f"{name}_curves", frame("its forecasts against the baselines, step by step",
+                                            f"\\panel{{figs/{name}_test.png}}", head(_tex(name)) + "{\\scriptsize the trainer's "
+                                            "test figure: MSE per step ahead on the held-out windows, the law against the best "
+                                            "recent mean, persistence and the stimulus lookup; the free rollout's R$^2$ per frame.\\par}\n",
+                                            f"{name}_test.png", deck_title=dt)))
+    return out
+
+
+def slides_controls(name, now, b):
+    """CEDRIC'S TWO CONTROLS (exp17 slides 26-27): the trained law with W = 0, and a law trained with no network."""
+    import shutil
+    r, rn = landed(name), landed(now)
+    out = []
+    dt = f"batch {b} $\\cdot$ network dynamics, not a function of the stimulus"
+    if r and r["freetrial"] and "W0" in r["freetrial"]["arms"]:
+        full, w0 = r["freetrial"]["arms"]["full"], r["freetrial"]["arms"]["W0"]
+        nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
+        ab = os.path.join(EXP, "data", f"ablation_{name}.json")
+        A = json.load(open(ab)) if os.path.exists(ab) else None
+        t = lambda a: ", ".join(f"{x['kind'][0]}{x['onset']} {x['evoked_free']:+.3f}" for x in a["trials"])
+        rows_ = [("recorded", ", ".join(f"{x['kind'][0]}{x['onset']} {x['evoked_rec']:+.3f}" for x in full["trials"])),
+                 ("full law", t(full)), ("W = 0", t(w0))] + ([("no network", t(nw))] if nw else [])
+        right = (head("1. the trained law with W = 0") + "{\\scriptsize every edge weight set to 0 after training; the "
+                 "inputs kept\\par}\\vspace{4pt}\n" + head("2. trained with no network from the start")
+                 + "{\\scriptsize " + _tex(now) + ": the fair control (B and the cells' constants fitted without W)\\par}\\vspace{6pt}\n"
+                 + head("evoked change at the held-out pulses, free rollout") + rows(rows_)
+                 + rows([("gut / recorded", f"full {full['evoked_gut_free_over_rec']:.2f}, W = 0 {w0['evoked_gut_free_over_rec']:.2f}"
+                          + (f", no network {nw['evoked_gut_free_over_rec']:.2f}" if nw else "")),
+                         ("pattern r", f"full {full['pattern_r_gut']:+.2f}, W = 0 {w0['pattern_r_gut']:+.2f}"
+                          + (f", no network {nw['pattern_r_gut']:+.2f}" if nw else ""))]
+                        + ([("free R$^2$", f"full {A['full']['r2_denoised']:+.3f}, W = 0 {A['W0']['r2_denoised']:+.3f}")] if A else [])))
+        mv = os.path.join(r["dir"], "results", "movie_W0.mp4")
+        left = "\\panel{figs/ablation_" + name + ".png}"
+        if os.path.exists(mv):
+            shutil.copyfile(mv, os.path.join(PRES, "Movies", f"{name}_W0.mp4"))
+            shutil.copyfile(mv.replace(".mp4", ".png"), os.path.join(PRES, "Movies", f"{name}_W0.png"))
+            left = f"\\playmovie{{Movies/{name}_W0}}"
+        elif A:
+            shutil.copyfile(os.path.join(EXP, "data", "figs", f"ablation_{name}.png"), os.path.join(PRES, "figs", f"ablation_{name}.png"))
+        else:
+            left = ""
+        out.append((f"{name}_controls", frame(f"{_tex(name)} with W = 0, and a law with no network: the gut response is the network's",
+                                              left, right, f"{name}_freetrial.json, ablation_{name}.json", deck_title=dt)))
+    if rn:
+        out += [(k.replace("_movie", "_nonet_movie"), v) for k, v in slides_run(now, b) if k.endswith("_movie")]
+    return out
+
+
+def slide_overview():
+    rw = md_rows()
+    lines = []
+    for b, (title, names, _, _) in BATCHES.items():
+        for n in names:
+            r = landed(n)
+            if not r:
+                continue
+            N = numbers(r)
+            fmt = lambda v: f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
+            lines.append(f"{b}.{names.index(n) + 1} & {_tex(n)} & {fmt(N['short'])} & {fmt(N['trial'])} & {fmt(N.get('free_gut'))} & {fmt(N['free_r2'])} \\\\")
+    body = ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}l@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{}}\n"
+            "arm & run & short & trial & free gut & free R$^2$ \\\\\n\\hline\n" + "\n".join(lines) + "\n\\end{tabular}\\par}")
+    return ("90_overview", (f"% generated by tools/exp20_slides.py (overview)\n\\begin{{frame}}[t]{{{DECK_TITLE} $\\cdot$ every landed run}}\n"
+                            f"\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n"))
+
+
 def main():
     for d in ("slides", "Movies", "figs"):
         os.makedirs(os.path.join(PRES, d), exist_ok=True)
+    deck = []
+    for fn in (slide_paper, slide_deposit, slide_fish, slide_fig3d, slide_law, slide_baselines):
+        try:
+            deck.append(fn())
+        except Exception as e:                      # one slide's failure must not lose the deck
+            print(f"[slides] {fn.__name__} FAILED: {e}")
+    for b, (_, names, shown, now) in BATCHES.items():
+        if not any(landed(n) for n in names):
+            continue
+        deck.append(slide_batch(b))
+        deck += slides_run(shown, b)
+        deck += slides_controls(shown, now, b)
+    deck.append(slide_overview())
     out = []
-    for fn in (slide_paper, slide_deposit, slide_fish, slide_fig3d):
-        stem, body = fn()
+    for stem, body in deck:
         if not body:
             print(f"[slides] {stem}: no data yet, skipped")
             continue
