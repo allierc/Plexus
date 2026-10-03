@@ -35,7 +35,7 @@ def main():
             st = st[:T]
             S, tr, period, pre, post, live = X.forcings_and_trials(E, st)
             out.append({"condition": c, "fish": k, "volumes": T, "volume_s": period, "minutes": T * period / 60,
-                        "cells": N, "pulses": [{"volume": int(r[0]), "site": int(r[2]), "ms": float(r[1])} for r in tr],
+                        "cells": N, "pulses": [{"volume": int(r[0]), "site": int(r[2]), "ms": float(r[1]), "galvo_x": float(r[3]), "galvo_y": float(r[4])} for r in tr],
                         "grating_on": float(np.mean(S[:, 3] > 0)), "swim_live": live})
             print(f"{c:14s} fish {k}: {T:5d} vol x {period:.3f} s = {T * period / 60:5.1f} min, {N:,} cells, "
                   f"{len(tr)} pulses, sites {''.join(str(int(r[2])) for r in tr)}", flush=True)

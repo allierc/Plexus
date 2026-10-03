@@ -187,6 +187,62 @@ def slide_deposit():
                                 deck_title=f"The experimental design: {n_f} fish, five conditions, UV pulses on and off the gut"))
 
 
+def slide_anatomy():
+    """WHERE THE UV WAS AIMED (Cedric, 2026-10-03: "pinpoint the sites on a fish anatomy"): the WHOLISTIC whole-body
+    model (tools/exp20_body_export.py, tools/exp20_body_render.py) with the paper's target regions; the deposit's site
+    labels per condition with their galvo x range, from data/design.json. The label -> region mapping is NOT recorded:
+    the slide says so."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    A = os.path.join(DATA, "anatomy")
+    if not os.path.exists(os.path.join(A, "body_lateral.png")):
+        return ("02b_anatomy", "")
+    fig, ax = plt.subplots(2, 1, figsize=(8, 5.2), facecolor="black")
+    for a_, v in zip(ax, ("lateral", "dorsal")):
+        im = plt.imread(os.path.join(A, f"body_{v}.png"))
+        r0, r1 = (0.12, 0.78) if v == "lateral" else (0.28, 0.72)      # full width in both: head and tail align
+        a_.imshow(im[int(r0 * im.shape[0]):int(r1 * im.shape[0])])
+        a_.axis("off")
+        a_.set_title(f"{v} view, head left", color="0.8", fontsize=9)
+    marks = [("off the fish (control)", "#bdbdbd"), ("foregut", "#ff4040"), ("midgut", "#ffd54f"),
+             ("hepatic portal system", "#66bb6a")]
+    org = [("brain + spinal cord", "#4fc3f7"), ("gut", "#ff8a65"), ("liver", "#8d4a3a"), ("heart", "#e53935"),
+           ("kidney", "#7e57c2"), ("swim bladder", "#e0e0e0")]
+    h = [Line2D([], [], marker="o", ls="", color=c, markersize=9, label=l) for l, c in marks] + \
+        [Line2D([], [], marker="s", ls="", color=c, markersize=7, label=l) for l, c in org]
+    fig.legend(handles=h, loc="lower center", ncol=5, frameon=False, fontsize=8, labelcolor="white")
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    fig.savefig(os.path.join(PRES, "figs", "02b_anatomy.png"), dpi=200, facecolor="black")
+    plt.close(fig)
+    D = json.load(open(os.path.join(DATA, "design.json")))
+    from collections import defaultdict
+    gx = defaultdict(list)
+    for d in D:
+        for p_ in d["pulses"]:
+            if "galvo_x" in p_:
+                gx[(d["condition"], p_["site"])].append(p_["galvo_x"])
+    rw = []
+    for c in COND_ORDER:
+        ss = sorted({k[1] for k in gx if k[0] == c and k[1] > 0})
+        rw.append((COND_LABEL[c], "sites " + ", ".join(str(k) for k in ss)))
+    right = (head("the paper's targets (markers)") + rows([
+        ("control", "UV outside the fish, on the tail or the swim bladder"),
+        ("gut", "foregut, midgut (Fig. 1b, 2e): foregut ~4x more cells"),
+        ("blood", "hepatic portal system near the liver (Fig. 5a)")])
+        + head("the deposit's site labels") + rows(rw)
+        + head("what we can and cannot say") + rows([
+            ("", "site 1 = off the fish in every session (control block)"),
+            ("", "the other labels are not calibrated to the body: one"),
+            ("", "site moves 0.6 V fish to fish; blood sites 2, 4, 5, 6 share"),
+            ("", "one voltage. Marker positions are the paper's regions"),
+            ("", "on the WHOLISTIC body model, not measured beam spots")]))
+    return ("02b_anatomy", frame("Where the UV was aimed: the paper's target regions on the larval body",
+                                 "\\panel{figs/02b_anatomy.png}", right, "data/anatomy, data/design.json", left_gap=1,
+                                 deck_title="Where the UV was aimed: the paper's target regions on a larval zebrafish"))
+
+
 # ============================================================================== 03 one fish
 def slide_fish(cond="glucose", k=1):
     import matplotlib
@@ -271,8 +327,12 @@ def slide_fish(cond="glucose", k=1):
 # ============================================================================== 04 Fig. 3d
 def slide_fig3d():
     import shutil
-    src = os.path.join(PAPERS, "figs", "Chen2026_fig3d_crop.png")
-    shutil.copyfile(src, os.path.join(PRES, "figs", "04_fig3d.png"))
+    import fitz                                            # Fig. 3d whole: its bars AND the region names under them
+    d = fitz.open(os.path.join(PAPERS, "Chen_2026_NatCommun_s41467-026-76242-8_gut_vascular_interoception.pdf"))
+    pg = d[5]
+    W, H = pg.rect.width, pg.rect.height
+    pg.get_pixmap(dpi=450, clip=fitz.Rect(W * 0.665, H * 0.262, W * 0.955, H * 0.418)).save(
+        os.path.join(PRES, "figs", "04_fig3d.png"))
     F = PAPER["fig3d"]
     gvgm = {r: gv / gm for r, gv, gm in zip(F["regions"], F["GV"], F["GM"])}
     mid = np.mean([gvgm[r] for r in F["midbrain"]])
@@ -286,7 +346,9 @@ def slide_fig3d():
                  ("ratio", f"{mid / hind:.1f}: the law's input ablations, read the same way,"),
                  ("", "against the same ruler on the recording")]))
     return ("04_fig3d", frame("The integration map the law should learn: Fig. 3d",
-                              "\\panel{figs/04_fig3d.png}", right, "papers/figs/Chen2026_fig3d_crop.png"))
+                              "\\panel{figs/04_fig3d.png}", right, "the paper's Fig. 3d", left_gap=1,
+                              deck_title="The target of G-region (Fig. 3d): gut + visual in the midbrain, gut + motor "
+                                         "in the hindbrain"))
 
 
 # ============================================================================== 05 the law, 06 the baselines
@@ -666,7 +728,7 @@ def main():
     for d in ("slides", "Movies", "figs"):
         os.makedirs(os.path.join(PRES, d), exist_ok=True)
     deck = []
-    for fn in (slide_paper, slide_deposit, slide_fish, slide_fig3d, slide_law, slide_baselines):
+    for fn in (slide_paper, slide_deposit, slide_anatomy, slide_fish, slide_fig3d, slide_law, slide_baselines):
         try:
             deck.append(fn())
         except Exception as e:                      # one slide's failure must not lose the deck
