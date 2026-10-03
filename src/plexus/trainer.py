@@ -2124,12 +2124,18 @@ def _test_field_full(spec, device="cpu", root=None):
     o = box["n_in"] - 1
     T = rec["ratio"].shape[0]
     n = T - 1 - o
-    sims = _field_sims(spec, [n], train=False)
-    with torch.no_grad():
-        roll = _field_rollout(sims, learn, box, o, n, device, False)
-    free = roll[:, 0].cpu().numpy()
-    alive = roll[:, -1].cpu().numpy() if box.get("alive") else None
-    del roll                                       # the GPU stack, before the `task.rollouts` variants need the room
+    if box.get("alive"):                           # a death operator's law needs its alive channel: one stacked rollout
+        sims = _field_sims(spec, [n], train=False)
+        with torch.no_grad():
+            roll = _field_rollout(sims, learn, box, o, n, device, False)
+        free = roll[:, 0].cpu().numpy()
+        alive = roll[:, -1].cpu().numpy()
+        del roll                                   # the GPU stack, before the `task.rollouts` variants need the room
+    else:
+        # IN SEGMENTS (exp19, 2026-10-03): the [n, C, *grid] stack of a whole-body rollout with 12 input volumes was
+        # 56 GB and ran a 96 GB card out of memory; `_field_free` is the same rollout (tests/test_exp19_no_leak.py)
+        free, _, _, _ = _field_free(spec, learn, box, device)
+        alive = None
     obs = rec["ratio"][o + 1:]
     m = rec["mask"][o + 1:] & rec["mask"][o]
     hold = np.broadcast_to(rec["ratio"][o], obs.shape)

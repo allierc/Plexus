@@ -61,10 +61,10 @@ def rollout(spec, learn, box, device, messages, seg=200):
     n = box["rec"]["ratio"].shape[0] - 1 - o
     ready = learn.ready
 
-    def ready_off(H):                                # the trained instance, its messages switched as asked
+    def ready_off(H):                                # the trained instance; its messages switched only when asked
         ready(H)
         for op in H.operators:
-            if hasattr(op, "messages"):
+            if messages is not None and hasattr(op, "messages"):
                 op.messages = messages
     learn.ready = ready_off
     out, cur, done, b = [], o, 0, dict(box)
@@ -114,7 +114,9 @@ def run(name, device):
     trained_with_messages = all(o.get("messages", True) for o in yaml_ops(spec))
     res, traces = {"run": name, "trained_with_messages": trained_with_messages}, {}
     forcing = [k for k in learn.p if k in ("diffuse.I", "diffuse.I_mlp")]
-    for tag, msg in (("full", True), ("W0", False), ("no_stimulus", True)):
+    # "full" and "no_stimulus" run the law AS TRAINED (messages untouched: a law trained without them must not get
+    # them back -- the 2026-10-03 bug that gave wl_gc_I_now R2 -15,271); only W0 switches them off.
+    for tag, msg in (("full", None), ("W0", False), ("no_stimulus", None)):
         if tag == "W0" and not trained_with_messages or tag == "no_stimulus" and not forcing:
             continue
         saved = {k: learn.p[k].detach().clone() for k in forcing} if tag == "no_stimulus" else {}
