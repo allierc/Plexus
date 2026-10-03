@@ -154,10 +154,58 @@ def main():
     jp = os.path.join(EXP, "data", f"cluster_profile_{a.run}_k{k}.json")
     json.dump(doc, open(jp, "w"), indent=1)
     figure(doc, q, lab, mask, raw["input"], names, a.run, k)
+    reality(a.run, k, X, raw, lab, rec)
     print(json.dumps({"trust": {kk: (np.round(v, 3).tolist() if isinstance(v, list) else round(v, 3)) for kk, v in trust.items()},
                       "eta2": {kk: round(v, 3) for kk, v in e2.items()}}, indent=1))
     for p in prof:
         print(p)
+
+
+def reality(run, k, X, raw, lab, rec):
+    """ARE THEY REAL CLUSTERS (Cedric, 2026-10-03): the silhouette of the run's clustering against two clusterings of
+    data with NO clusters (one Gaussian with the data's covariance; every column permuted on its own), and tau and V as
+    histograms stacked by cluster -- a continuum cut into slices shows as contiguous, non-overlapping bands."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import silhouette_score
+    from exp17_clusters import plt_cols
+    rng = np.random.default_rng(0)
+    si = rng.choice(len(X), 20000, replace=False)
+    s_real = silhouette_score(X[si], lab[si])
+    G = rng.multivariate_normal(X.mean(0), np.cov(X.T), size=len(X))
+    s_g = silhouette_score(G[si], kmeans(G, k, 0).labels_[si])
+    Pm = np.column_stack([rng.permutation(X[:, j]) for j in range(X.shape[1])])
+    s_p = silhouette_score(Pm[si], kmeans(Pm, k, 0).labels_[si])
+    tau = FRAME_S / raw["tau"].reshape(-1)
+    mu, sd = float(rec["dff"].mean()), float(rec["dff"].std())
+    V = raw["rest"].reshape(-1) * sd + mu
+    cols = plt_cols(k)
+    fig, axs = plt.subplots(1, 3, figsize=(16, 4.6), gridspec_kw={"width_ratios": [1.3, 1.3, 0.8]})
+    for ax, (x, lab_, bins) in zip(axs[:2], ((np.log10(tau), "leak time constant $\\tau$, log10 s", np.linspace(-1.3, 4.2, 90)),
+                                              (V, "rest $V$, dF/F", np.linspace(np.percentile(V, 0.2), np.percentile(V, 99.8), 90)))):
+        ax.hist([x[lab == c] for c in range(k)], bins=bins, stacked=True, color=cols, label=[str(c + 1) for c in range(k)])
+        ax.set_xlabel(lab_)
+        ax.set_ylabel("neurons")
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+    axs[0].legend(title="cluster", fontsize=8, ncol=2, frameon=False)
+    axs[2].bar([0, 1, 2], [s_real, s_g, s_p], color=["0.2", "0.6", "0.6"])
+    axs[2].set_xticks([0, 1, 2])
+    axs[2].set_xticklabels(["the run's\nconstants", "one Gaussian,\nsame covariance", "columns\npermuted"], fontsize=8)
+    axs[2].set_ylabel(f"silhouette (k = {k})")
+    for sp in ("top", "right"):
+        axs[2].spines[sp].set_visible(False)
+    for ax, t in zip(axs, ("a   tau, stacked by cluster", "b   V, stacked by cluster", "c   against data with no clusters")):
+        ax.set_title(t, fontsize=10, loc="left")
+    fig.tight_layout()
+    fig.savefig(os.path.join(EXP, "presentation", "figs", f"cluster_reality_{run}_k{k}.png"), dpi=110)
+    plt.close(fig)
+    json.dump({"silhouette": {"data": float(s_real), "gaussian_null": float(s_g), "permuted_null": float(s_p)},
+               "frac_B_zero": float((np.abs(raw["input"]).sum(1) == 0).mean()),
+               "tau_ranges_s": {str(c + 1): [float(np.percentile(tau[lab == c], 1)), float(np.percentile(tau[lab == c], 99))]
+                                for c in range(k)}},
+              open(os.path.join(EXP, "data", f"cluster_reality_{run}_k{k}.json"), "w"), indent=1)
 
 
 def figure(doc, q, lab, mask, B, names, run, k):

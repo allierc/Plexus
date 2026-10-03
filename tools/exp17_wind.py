@@ -67,7 +67,9 @@ def fields(name, cells=220, device="cuda:0"):
           else torch.ones_like(z))
     E = []
     for s in ("short", "mid", "long"):
-        e = next(l for l in spec["learnable"] if l.get("param") == f"W_{s}")
+        e = next((l for l in spec["learnable"] if l.get("param") == f"W_{s}"), None)
+        if e is None:                                       # an edge set this graph does not have (batch 17)
+            continue
         w = fit[T.Learnables.key(e)].float().to(device).reshape(-1)
         snd, rcv = (t.to(device) for t in op._E[s])
         d = Pt[rcv] - Pt[snd]
@@ -105,6 +107,9 @@ def fields(name, cells=220, device="cuda:0"):
     sp = {k: np.linalg.norm(v, axis=1) for k, v in wind.items()}
     print(f"[wind] {name}: {len(fr)} frames, grid {nx} x {ny} ({h:.1f} um cells); 99th percentile of the wind "
           f"speed: excitatory {np.percentile(sp['ex'][:, ins], 99):.3g}, inhibitory {np.percentile(sp['in'][:, ins], 99):.3g}")
+    # the time-averaged fields, kept for comparing runs (exp17 batch 17: same graph or not, same flows?)
+    np.savez_compressed(os.path.join(out, "results", f"{name}_wind_fields.npz"), ex=wind["ex"].mean(0),
+                        inh=wind["in"].mean(0), inside=ins, grid=np.array([x0, y0, h]))
     return dict(wind=wind, speed=sp, act=act, inside=ins, grid=(x0, y0, h), fr=fr, rec=rec, out=out, pred=pred, P=P)
 
 
@@ -230,5 +235,6 @@ if __name__ == "__main__":
     ap.add_argument("run")
     ap.add_argument("--cells", type=int, default=160)
     ap.add_argument("--particles", type=int, default=6000, help="per map")
+    ap.add_argument("--device", default="cuda:0")
     a = ap.parse_args()
-    render(a.run, fields(a.run, a.cells), a.particles)
+    render(a.run, fields(a.run, a.cells, a.device), a.particles)

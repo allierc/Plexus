@@ -64,7 +64,9 @@ def aggregate(name, n_nodes=400, device="cuda:0"):
     res = {"frames": frames, "centres": km.cluster_centers_, "node_of": km.labels_, "n_nodes": n_nodes}
     local = torch.zeros(len(frames), n_nodes, device=device)
     for s in SETS:
-        e = next(l for l in spec["learnable"] if l.get("param") == f"W_{s}")
+        e = next((l for l in spec["learnable"] if l.get("param") == f"W_{s}"), None)
+        if e is None:                                       # an edge set this graph does not have (batch 17)
+            continue
         w = fit[T.Learnables.key(e)].float().to(device).reshape(-1)
         snd, rcv = (t.to(device) for t in op._E[s])
         a, b = node[snd], node[rcv]
