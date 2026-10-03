@@ -1,0 +1,96 @@
+name: gb_b4_blood_glucose_f3
+model: config/gutbrain/gb_b4_blood_glucose_f3_siren.yaml
+learnable:
+- param: W_short
+  op: state_diffuse
+  lr: 0.0009
+  title: one weight per short edge (6 nearest cells)
+- param: W_mid
+  op: state_diffuse
+  lr: 0.0009
+  title: one weight per middle edge
+- param: W_long
+  op: state_diffuse
+  lr: 0.0009
+  title: one weight per long edge
+- block: tau
+  of: neuron
+  lr: 0.0018
+  title: each cell's rate 1/tau
+- block: rest
+  of: neuron
+  lr: 0.0018
+  title: each cell's rest value
+- block: input
+  of: neuron
+  lr: 0.0018
+  title: each cell's weights on the 6 forcings
+- param: omega_mlp
+  op: state_diffuse
+  lr: 1.0e-06
+  title: the modulation's SIREN weights
+task:
+  reference:
+    trace_recording: gutbrain_blood_glucose_f3_nosw
+    split: recording
+    test_stride: 8
+  drive:
+    set: stimulus
+    block: u
+    window:
+    - 0
+    - 0
+  observe:
+    set: neuron
+    block: dff
+  loss:
+  - term: trace_mse
+    reduction: norm2
+  rollouts:
+  - name: nominal
+  - name: W0
+    zero:
+    - W_short
+    - W_mid
+    - W_long
+  - name: no_stimulus
+    drive: 'off'
+  warmup: 10
+training:
+  optimizer: adam
+  lr: 0.0018
+  schedule: none
+  clip: 1.0
+  batch: 4
+  seed: 0
+  save_every: 500
+  select: last
+  stages:
+  - horizon: 1
+    iters: 12000
+  - horizon: 2
+    iters: 6000
+  - horizon: 3
+    iters: 4000
+  - horizon: 4
+    iters: 3000
+  - horizon: 5
+    iters: 2400
+  - horizon: 10
+    iters: 2400
+  - horizon: 15
+    iters: 2400
+  - horizon: 20
+    iters: 2400
+  - horizon: 25
+    iters: 2400
+  - horizon: 30
+    iters: 2400
+  - horizon: 35
+    iters: 2400
+  - horizon: 40
+    iters: 2400
+  - horizon: 45
+    iters: 2400
+  - horizon: 50
+    iters: 2400
