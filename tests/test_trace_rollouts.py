@@ -56,15 +56,17 @@ def test_accepts_the_four_kinds_and_drive_off_needs_a_drive():
         T._check_rollouts("spec", _spec(ok), "field_recording")
 
 
-def test_zeroed_restores():
+def test_zeroed_restores(monkeypatch):
     class L:
         p = {"op.W_short": torch.ones(4), "n.input": torch.full((3, 2), 2.0)}
     spec = {"learnable": [{"param": "W_short", "op": "state_diffuse"}, {"block": "input", "of": "n"}]}
-    orig = T.Learnables.key
-    T.Learnables.key = staticmethod(lambda e: "op.W_short" if e.get("param") else "n.input")
-    try:
-        with T._zeroed(L, spec, ["W_short"]):
-            assert float(L.p["op.W_short"].abs().sum()) == 0 and float(L.p["n.input"].sum()) == 12
-        assert float(L.p["op.W_short"].sum()) == 4
-    finally:
-        T.Learnables.key = orig
+    # monkeypatch restores the class's own staticmethod object (a bare `T.Learnables.key` read through the class is
+    # the plain function, and writing it back made it an instance method for every later test -- exp19, 2026-10-03)
+    monkeypatch.setattr(T.Learnables, "key", staticmethod(lambda e: "op.W_short" if e.get("param") else "n.input"))
+    with T._zeroed(L, spec, ["W_short"]):
+        assert float(L.p["op.W_short"].abs().sum()) == 0 and float(L.p["n.input"].sum()) == 12
+    assert float(L.p["op.W_short"].sum()) == 4
+
+
+def test_learnables_key_is_still_static_after_the_test_above():
+    assert isinstance(T.Learnables.__dict__["key"], staticmethod)
