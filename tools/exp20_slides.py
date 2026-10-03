@@ -37,7 +37,8 @@ PAPERS = os.path.join(EXP, "papers")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
-HIDDEN = {"04_fig3d"}
+HIDDEN = {"04_fig3d", "90_overview"}
+HIDDEN_PAT = ("gb_ex_f4",)       # batch 2's fish 4 slides: another law than fish 1's shown one (W prior), not comparable (Cedric)
 NET_DECK = "batch {b} $\\cdot$ network dynamics"   # the control slides' title
 # PER BATCH, ONE GROUP PER FISH (Cedric, 2026-10-03: "batch 2 on the template of batch 1, results for the two fish"):
 # (fish, the run whose movie and curves are shown, the run the network test is read on, its no-network twin or None)
@@ -375,7 +376,8 @@ REC1 = "gutbrain_glucose_f1"
 
 
 def _tex(t):
-    return str(t).replace("_", "\\_").replace("%", "\\%").replace("&", "\\&").replace("#", "\\#")
+    t = str(t).replace("_now", "_no_W")                 # Cedric, 2026-10-03: the no-network runs read "no_W"
+    return t.replace("_", "\\_").replace("%", "\\%").replace("&", "\\&").replace("#", "\\#")
 
 
 def figure_graph(op, P, path, n_show=80, seed=0, box_um=300.0):
@@ -705,7 +707,12 @@ def slide_batch(b):
                                        "the runs' _test, _trials, _freetrial json", deck_title=BATCH_DECK[b]))
 
 
-def slides_run(name, b, now=None):
+def run_deck(b, fish=""):
+    """A batch's title, naming the fish when the batch runs more than one (Cedric, 2026-10-03)."""
+    return BATCH_DECK[b] if not fish else BATCH_DECK[b].replace("glucose fish 1 and 4", fish)
+
+
+def slides_run(name, b, now=None, fish=""):
     """Two slides per shown run, exp17's (tools/exp17_slides.py slides_run): the movie with the network test, the MSE
     table, exp20's gut trials, the free rollout and the training; the curves with the per-trial MSE and the scale."""
     import shutil
@@ -717,7 +724,7 @@ def slides_run(name, b, now=None):
     names = BATCHES[b][1]
     arm = names.index(name) + 1 if name in names else ""
     tag = f"batch {b}, arm {arm}" if arm else f"batch {b}"
-    dt = BATCH_DECK[b]
+    dt = run_deck(b, fish)
     t, rep = r["test"], r["report"]
     N = numbers(r)
     S_, L_ = slice(0, 3), slice(15, 32)
@@ -811,8 +818,8 @@ def slides_controls(name, now, b, fish=""):
         out.append((f"{name}_controls", frame(f"{_tex(name)} with W = 0, and a law with no network: the gut response is the network's",
                                               left, right, f"{name}_freetrial.json, ablation_{name}.json", deck_title=dt)))
     if rn:
-        out += [(k.replace("_movie", "_nonet_movie"), v.replace(BATCH_DECK[b], net_deck(b, fish)))
-                for k, v in slides_run(now, b, now) if k.endswith("_movie")]
+        out += [(k.replace("_movie", "_nonet_movie"), v.replace(run_deck(b, fish), net_deck(b, fish)))
+                for k, v in slides_run(now, b, now, fish) if k.endswith("_movie")]
     return out
 
 
@@ -914,6 +921,109 @@ def slide_network(name, now, b, fish=""):
                                         deck_title=net_deck(b, fish)))
 
 
+# WHICH GUT SPOT A SITE LABEL IS (inferred: the labels are not calibrated to the body; tools/exp20_body_render.py)
+SITE_REGION = {("gutbrain_glucose_f1", 1): "off", ("gutbrain_glucose_f1", 2): "gutA", ("gutbrain_glucose_f1", 3): "gutA",
+               ("gutbrain_glucose_f4", 1): "off", ("gutbrain_glucose_f4", 2): "gutA", ("gutbrain_glucose_f4", 5): "gutB"}
+REGION_TXT = {"off": "UV off the fish (control)",
+              "gutA": "UV on the gut: foregut? (the galvo spot of fish 1's sites 2 and 3; fish 4's site 2 has its voltage)",
+              "gutB": "UV on the gut, another spot: midgut? (galvo x -1.2 V against -2.4 V; over all pulses it evokes +0.078 "
+                      "dF/F against +0.184 at site 2, less than half, as the paper's midgut against foregut, Fig. 2g)"}
+
+
+def figure_site(name, now, site, path):
+    """One pulse site in the free rollout: top, the gut-responsive cells' mean dF/F around EVERY pulse of the site,
+    mean +- SD over its pulses (recorded, the network law, the same law W = 0, the no-network law); bottom left, the body
+    diagram with the site; bottom right, the whole session's brain mean with this site's pulses marked."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    r, rn = landed(name), (landed(now) if now else None)
+    ft = r["freetrial"]
+    pre, post = ft["window"]
+    z = np.load(os.path.join(GD, "graphs_data", "zebrafish", f"{ft['recording'].replace('_nosw', '')}_recording.npz"))
+    dt = float(np.median(np.diff(z["t_s"])))
+    tt = np.arange(-pre, post + 1) * dt
+    COL = {"rec": "#4caf50", "full": "white", "W0": "#ff5252", "now": "#42a5f5"}
+    LAB = {"rec": "recorded", "full": "network law", "W0": "same law, W = 0", "now": "trained with no network (no_W)"}
+    sel = lambda arm_pulses, key: np.array([p_[key] for p_ in arm_pulses if p_["site"] == site])
+    series = {"rec": sel(ft["arms"]["full"]["pulses"], "trace_rec"), "full": sel(ft["arms"]["full"]["pulses"], "trace_free"),
+              "W0": sel(ft["arms"]["W0"]["pulses"], "trace_free")}
+    if rn and rn["freetrial"] and "pulses" in rn["freetrial"]["arms"]["full"]:
+        series["now"] = sel(rn["freetrial"]["arms"]["full"]["pulses"], "trace_free")
+    n = len(series["rec"])
+    fig = plt.figure(figsize=(9, 6.6), facecolor="black")
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.5, 1], width_ratios=[1.5, 2], hspace=0.30, wspace=0.10)
+    a = fig.add_subplot(gs[0, :])
+    _black(a)
+    for k, Y in series.items():
+        if len(Y) == 0:
+            continue
+        m_, s_ = Y.mean(0), Y.std(0)
+        a.fill_between(tt, m_ - s_, m_ + s_, color=COL[k], alpha=0.18, lw=0)
+        a.plot(tt, m_, color=COL[k], lw=2.0 if k in ("rec", "full") else 1.4, label=LAB[k])
+    a.axvline(0, color="#ffd54f", lw=0.8, ls=":")
+    a.set_ylim(0, 0.7)
+    a.set_xlabel("s from the UV pulse", fontsize=8)
+    a.set_ylabel(f"mean dF/F, {ft['responsive_cells']:,}\ngut-responsive cells", fontsize=8)
+    a.set_title(f"site {site}: mean $\\pm$ SD over its {n} pulses, inside the free rollout", fontsize=10)
+    a.legend(frameon=False, fontsize=8, labelcolor="white", loc="upper right")
+    d = fig.add_subplot(gs[1, 0])
+    d.axis("off")
+    reg = SITE_REGION.get((ft["recording"].replace("_nosw", ""), site), "gutA")
+    im = plt.imread(os.path.join(DATA, "anatomy", f"site_{reg}.png"))
+    d.imshow(im[int(0.22 * im.shape[0]):int(0.82 * im.shape[0]), :int(0.92 * im.shape[1])])
+    d.set_title({"off": "site: off the fish", "gutA": "site: gut (foregut?)", "gutB": "site: gut (midgut?)"}[reg],
+                color="#ffeb3b", fontsize=9)
+    b = fig.add_subplot(gs[1, 1])
+    _black(b)
+    mf = np.load(os.path.join(r["dir"], "results", f"{name}_movie.npz"))
+    T = mf["r2_t"] * dt / 60
+    b.plot(T, mf["mean_obs_all"], color=COL["rec"], lw=0.8)
+    b.plot(T, mf["mean_pred_all"], color=COL["full"], lw=0.8)
+    w0p = os.path.join(r["dir"], "results", f"{name}_W0_movie.npz")
+    if os.path.exists(w0p):
+        b.plot(T, np.load(w0p)["mean_pred_all"], color=COL["W0"], lw=0.8)
+    if rn:
+        b.plot(T, np.load(os.path.join(rn["dir"], "results", f"{now}_movie.npz"))["mean_pred_all"], color=COL["now"], lw=0.8)
+    for f, st_ in zip(z["trials"][:, 0], z["trials"][:, 2]):
+        if int(st_) == site:
+            b.axvline(f * dt / 60, color="#ffd54f", lw=1.0, alpha=0.8)
+    b.set_xlabel("min (the whole session; this site's pulses in yellow)", fontsize=7)
+    b.set_ylabel("whole-brain\nmean dF/F", fontsize=7)
+    fig.savefig(path, dpi=200, facecolor="black", bbox_inches="tight")
+    plt.close(fig)
+    ev = {k: float(np.mean(Y[:, pre:pre + int(round(20 / dt))].mean(1) - Y[:, :pre].mean(1))) for k, Y in series.items() if len(Y)}
+    return n, ev
+
+
+def slides_sites(name, now, b, fish=""):
+    """Cedric, 2026-10-03: the network slide split by pulse site (fish 1: sites 1, 2, 3; fish 4: 1, 5, 2)."""
+    r = landed(name)
+    if not (r and r["freetrial"] and "pulses" in r["freetrial"]["arms"]["full"]):
+        return []
+    ft = r["freetrial"]
+    sites = list(dict.fromkeys(p_["site"] for p_ in ft["arms"]["full"]["pulses"]))
+    out = []
+    for site in sites:
+        png = f"batch_{b}_site{site}_{name}.png"
+        n, ev = figure_site(name, now, site, os.path.join(PRES, "figs", png))
+        reg = SITE_REGION.get((ft["recording"].replace("_nosw", ""), site), "gutA")
+        rec = ev.get("rec", 0.0)
+        frac = lambda k: f"{ev[k]:+.3f} ({ev[k] / rec:.2f} of recorded)" if k in ev and abs(rec) > 1e-3 else (f"{ev[k]:+.3f}" if k in ev else "--")
+        right = (head(f"site {site}: {REGION_TXT[reg].split(':')[0]}") + "{\\scriptsize " + REGION_TXT[reg] + "\\par}\\vspace{6pt}\n"
+                 + head(f"evoked change, 0-20 s, mean of {n} pulses") + rows(
+                     [("recorded", f"{rec:+.3f} dF/F"), ("network law", frac("full")), ("W = 0", frac("W0"))]
+                     + ([("no\\_W", frac("now"))] if "now" in ev else []))
+                 + head("read") + rows([
+                     ("", "free rollout from one recorded volume, inputs only;"),
+                     ("", "every pulse of the site, held-out ones included;"),
+                     ("", "the law never sees the site label, only the beam"),
+                     ("", "position: off-fish pulses must stay flat")]))
+        out.append((f"batch_{b}_site{site}_{name}", frame(f"site {site}", f"\\panel{{figs/{png}}}", right,
+                                                          f"{name}_freetrial.json", deck_title=net_deck(b, fish) + f" $\\cdot$ site {site}")))
+    return out
+
+
 def slide_overview():
     rw = md_rows()
     lines = []
@@ -951,8 +1061,8 @@ def main():
         groups = SHOWN.get(b, [("", shown, shown, now)])
         for fish, run, ctrl, nw in groups:
             fish_tag = fish if len(groups) > 1 else ""
-            deck += slides_run(run, b, nw)
-            deck.append(slide_network(ctrl, nw, b, fish_tag))
+            deck += slides_run(run, b, nw, fish_tag)
+            deck += slides_sites(ctrl, nw, b, fish_tag)            # replaces the one network slide (Cedric, 2026-10-03)
             deck += slides_controls(ctrl, nw, b, fish_tag)
     deck.append(slide_overview())
     out = []
@@ -964,7 +1074,7 @@ def main():
         out.append(stem)
         print(f"[slides] {stem}")
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(
-        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN else ''}\\input{{slides/{s}.tex}}\n"
+        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN or any(h in s for h in HIDDEN_PAT) else ''}\\input{{slides/{s}.tex}}\n"
                                                            for s in out))
 
 

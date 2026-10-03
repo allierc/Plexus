@@ -79,5 +79,36 @@ def main():
     np.save(os.path.join(EXP, "data", "anatomy", "markers.npy"), {k: v.tolist() for k, v in M.items()}, allow_pickle=True)
 
 
+SITE_KINDS = {"off": "off the fish (control)", "gutA": "foregut", "gutB": "midgut"}
+
+
+def render_sites():
+    """One SMALL lateral diagram per kind of site, only its marker drawn (the deck's per-site slides): off the fish,
+    the gut spot of site 2 (and 3), the other gut spot of fish 4's site 5. Region names are the paper's; which label
+    went where is inferred (tools/exp20_slides.py SITE_REGION)."""
+    import pyvista as pv
+    pv.OFF_SCREEN = True
+    z = np.load(NPZ)
+    M = markers(z)
+    for kind, mk in SITE_KINDS.items():
+        p = pv.Plotter(off_screen=True, window_size=(1200, 420))
+        p.set_background("black")
+        for k in ("skin", "gut", "liver", "swim_bladder", "brain", "eye", "heart"):
+            if f"{k}__v" in z:
+                f = z[f"{k}__f"]
+                c, a = COL[k]
+                p.add_mesh(pv.PolyData(z[f"{k}__v"], np.c_[np.full(len(f), 3), f].ravel()), color=c, opacity=a,
+                           smooth_shading=True)
+        p.add_mesh(pv.Sphere(radius=0.45, center=np.asarray(M[mk]) + np.array([0, -1.6, 0])), color="#ffeb3b")
+        cx = np.array([10.4, 0.0, 0.0])
+        p.camera_position = [(cx[0], -45.0, 0.0), cx, (0, 0, 1)]
+        p.camera.parallel_projection = True
+        p.camera.parallel_scale = 23.0 / 2 / (1200 / 420)
+        p.screenshot(os.path.join(EXP, "data", "anatomy", f"site_{kind}.png"))
+        p.close()
+        print("-> site", kind)
+
+
 if __name__ == "__main__":
     main()
+    render_sites()

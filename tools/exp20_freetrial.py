@@ -91,7 +91,10 @@ def run_one(name, device, w0=True):
     pre, post, ev = int(round(PRE_S / dt)), int(np.ceil(POST_S / dt)), int(round(EVOKED_S / dt))
     tr = rec["trials"]
     held = [(int(f), int(s)) for f, s, full, h in zip(tr[:, 0], tr[:, 2], tr[:, 5], tr[:, 6]) if h and full]
-    windows = {f: (f - pre, f + post) for f, _ in held}
+    # EVERY full-window pulse too (Cedric, 2026-10-03: one slide per site, mean +- SD over its pulses); the trial
+    # scores below stay on the held-out ones
+    allp = [(int(f), int(s), bool(h)) for f, s, full, h in zip(tr[:, 0], tr[:, 2], tr[:, 5], tr[:, 6]) if full]
+    windows = {f: (f - pre, f + post) for f, _, _ in allp}
     keys = {e["param"][2:]: T.Learnables.key(e) for e in spec["learnable"]
             if e.get("op") == "state_diffuse" and str(e.get("param", "")).startswith("W_")}
     arms = {"full": contextlib.nullcontext()}
@@ -116,9 +119,12 @@ def run_one(name, device, w0=True):
                          # the responsive cells' mean dF/F over the window (frames onset - pre .. onset + post), for the
                          # slide's traces
                          "trace_free": P.mean(1).cpu().tolist(), "trace_rec": R.mean(1).cpu().tolist()})
+        pulses = [{"onset": f, "site": site, "held_out": h,
+                   "trace_free": preds[f][:, ri].mean(1).cpu().tolist(),
+                   "trace_rec": X[f - pre:f + post + 1][:, ri].mean(1).cpu().tolist()} for f, site, h in allp]
         g = [r for r in rows if r["kind"] == "gut"]
         c_ = [r for r in rows if r["kind"] == "control"]
-        res["arms"][arm] = {"silenced": n_dead, "trials": rows,
+        res["arms"][arm] = {"silenced": n_dead, "trials": rows, "pulses": pulses,
                             "evoked_gut_free_over_rec": float(np.mean([r["evoked_free"] for r in g]) /
                                                               np.mean([r["evoked_rec"] for r in g])) if g else None,
                             "pattern_r_gut": float(np.mean([r["pattern_r"] for r in g])) if g else None,

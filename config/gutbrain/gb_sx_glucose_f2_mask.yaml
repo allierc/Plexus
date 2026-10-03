@@ -1,5 +1,5 @@
 general:
-  name: gb_sx_glucose_f1_mask
+  name: gb_sx_glucose_f2_mask
   seed: 0
   n_frames: 1
   dt: 1.0
@@ -11,9 +11,9 @@ sets:
   brain: {n: 1}
   neuron:
     parent: brain
-    per_parent: 190346
+    per_parent: 149426
     grow_reserve: 0
-    title: "the 190,346 segmented cells of glucose fish 1 (Chen 2026 deposit), at their footprint centroids"
+    title: "the 149,426 segmented cells of glucose fish 2 (Chen 2026 deposit), at their footprint centroids"
     state:
       dff: {width: 1, role: coordinate, integration: first_order, boundary: free, title: "dF/F now"}
       xyz: {width: 3, integration: none, boundary: free, record: false, title: "footprint centroid, um"}
@@ -29,12 +29,12 @@ sets:
       u: {width: 1, integration: none, boundary: free, record: false, title: "each forcing at frame t"}
 fields: {}
 seed:
-- {op: seed_state_from_file, at: neuron, file: zebrafish/gutbrain_glucose_f1_nosw_recording.npz, blocks: {xyz: pos_um}}
+- {op: seed_state_from_file, at: neuron, file: zebrafish/gutbrain_glucose_f2_nosw_recording.npz, blocks: {xyz: pos_um}}
 - {op: seed_state_random, at: neuron, block: tau, lo: -2.97, hi: -2.97}
 - {op: seed_state_random, at: neuron, block: rest, lo: 0.0, hi: 0.0}
 - {op: seed_state_random, at: neuron, block: input, lo: 0.0, hi: 0.0}
 - {op: seed_state_random, at: stimulus, block: u, lo: 0.0, hi: 0.0}
 operators:
-- {op: state_diffuse, model: neuron_graph, integrator: exponential, input_mask: zebrafish/input_mask_gutbrain_glucose_f1.npz, at: neuron, block: dff, positions: xyz, positions_file: zebrafish/gutbrain_glucose_f1_nosw_recording.npz, short_k: 6, mid_um: 32.0, long_um: 128.0, substeps: 4, inputs: 1, forcing: stimulus.u, forcing_dim: 6, seed: 0, checkpoint: true, title: "each cell's dF/F through a known ODE on a graph between the cells: 6 nearest, 6 at 32 um, 6 at 128 um, one weight per edge"}
+- {op: state_diffuse, model: neuron_graph, integrator: exponential, input_mask: zebrafish/input_mask_gutbrain_glucose_f2.npz, at: neuron, block: dff, positions: xyz, positions_file: zebrafish/gutbrain_glucose_f2_nosw_recording.npz, short_k: 6, mid_um: 32.0, long_um: 128.0, substeps: 4, inputs: 1, forcing: stimulus.u, forcing_dim: 6, seed: 0, checkpoint: true, title: "each cell's dF/F through a known ODE on a graph between the cells: 6 nearest, 6 at 32 um, 6 at 128 um, one weight per edge"}
 schedule: [state_diffuse]
 plotting: {renderer: none, max_frames: 0}
