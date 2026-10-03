@@ -1171,7 +1171,15 @@ def _bm_table(r, n, kind):
 
 
 VARIANT_SLIDES = {"lead_left_quarter": ("the left quarter of the brain GIVEN (its recorded activity every frame), the "
-                                       "rest run free: do measured leaders carry the rest of the brain?")}
+                                       "rest run free: do measured leaders carry the rest of the brain?"),
+                  # Cedric, 2026-10-03: the edge sets one at a time, at inference (the trained model, its W of the
+                  # named sets set to 0)
+                  "no_short": "without the streets: every short edge's W = 0 (the 6 nearest neurons), mid and long kept",
+                  "no_mid": "without the roads: every middle edge's W = 0 (partners at 32 um), short and long kept",
+                  "no_long": "without the highways: every long edge's W = 0 (partners at 128 um), short and mid kept",
+                  "short_only": "the streets alone: the middle and long edges' W = 0, only the 6 nearest neurons kept"}
+VARIANT_TITLE = {"lead_left_quarter": "leaders given", "no_short": "no streets", "no_mid": "no roads",
+                 "no_long": "no highways", "short_only": "streets only"}
 
 
 def slides_variant(r, tag):
@@ -1189,6 +1197,28 @@ def slides_variant(r, tag):
         shutil.copy(mv, os.path.join(PRES, "Movies", f"{n}_{v}.mp4"))
         shutil.copy(mv.replace(".mp4", ".png"), os.path.join(PRES, "Movies", f"{n}_{v}.png"))
         za, zf = np.load(zp), np.load(os.path.join(r["dir"], "results", f"{n}_movie.npz"))
+        t = r["test"].get("rollouts", {}).get(v, {})
+        if "clamp" not in t.get("spec", {"clamp": 1}):              # an ablation: the network test's columns
+            res_ = os.path.join(r["dir"], "results")
+            lines_ = [("full model", f"{n}_movie.npz"), (VARIANT_TITLE[v], f"{n}_{v}_movie.npz"),
+                      ("W = 0 (all three)", f"{n}_W0_movie.npz")]
+            body_ = ""
+            for lab_, f_ in lines_:
+                m_ = bm_metrics(os.path.join(res_, f_))
+                if m_ is not None:
+                    body_ += f"{lab_} & {m_['r2']:+.3f} & {m_['rmse']:.4f} & {_per_neuron_r2(os.path.join(res_, f_)):+.3f} \\\\\n"
+            ne_ = {s_: int(r["test"].get("edges", {}).get(s_, 0)) for s_ in ("short", "mid", "long")}
+            right = (head(f"{tag}: {_tex(n)}") + "{\\scriptsize " + what + "\\par}\\vspace{6pt}\n"
+                     + rows([("zeroed", ", ".join(_tex(z_) for z_ in t["spec"]["zero"])), ("stimulus", "on, as in the full model")])
+                     + head("the network test, free rollout 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                       "& \\multicolumn{2}{c}{brain mean} & per-neuron \\\\\n& R$^2$ & RMSE & R$^2$ \\\\\n\\hline\n" + body_
+                     + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                     + "{\\tiny\\color{gray} the trained model, its named edge weights set to 0 at inference only (not "
+                       "retrained); brain mean over every neuron and every free frame\\par}\n")
+            out.append((f"{n}_{v}", frame(f"{tag}: {VARIANT_TITLE[v]}", f"\\playmovie{{Movies/{n}_{v}}}", right,
+                                          "trainer task.rollouts, tools/exp17_ablation.py", left_gap=True,
+                                          deck_title=f"batch {b0} $\\cdot$ {_tex(n)} $\\cdot$ {VARIANT_TITLE[v]}")))
+            continue
         free_ = ~za["clamped"].astype(bool)
         rec = REC_CACHE(r)
         X = rec["dff"][za["frames"]][:, free_].astype(np.float64)
@@ -1198,7 +1228,6 @@ def slides_variant(r, tag):
             p_ = pred[:, free_].astype(np.float64).mean(1)
             return 1 - ((p_ - o) ** 2).sum() / ((o - o.mean()) ** 2).sum(), float(np.sqrt(((p_ - o) ** 2).mean()))
         rf, ra = bm_(zf["pred"]), bm_(za["pred"])
-        t = r["test"].get("rollouts", {}).get(v, {})
         right = (head(f"{tag}: {_tex(n)}") + "{\\scriptsize " + what + "\\par}\\vspace{6pt}\n"
                  + rows([("given", f"{int((~free_).sum()):,}: first 25 \\% of the length (head)"),
                          ("free", f"{int(free_.sum()):,} neurons, scored"),
@@ -2246,20 +2275,27 @@ def main():
         t0_ = float(ca0_["tau_s"])
         k0_ = 1 - math.exp(-float(ca0_.get("frame_s", 0.914)) / t0_)
 
-        def row_(n):
-            t_ = landed[n]["test"]
-            m_ = bm_metrics(os.path.join(landed[n]["dir"], "results", f"{n}_movie.npz"))
-            return (f"{t_['skill_short']:+.3f} & {t_['skill_long']:+.3f} & {t_['free']['r2_denoised']:+.3f} & "
-                    f"{m_['r2']:+.3f}")
+        def row_(n):                       # the standard numbers: MSE (1e-3 dF/F^2), brain-mean and per-neuron R2
+            ms_ = mse_summary(landed[n]["test"])
+            f_ = os.path.join(landed[n]["dir"], "results", f"{n}_movie.npz")
+            m_ = bm_metrics(f_)
+            return f"{_f3(ms_['model_s'])} & {_f3(ms_['model_l'])} & {m_['r2']:+.3f} & {_per_neuron_r2(f_):+.3f}"
         src_ = os.path.join(rc_["dir"], "results", "movie.mp4")
         shutil.copy(src_, os.path.join(PRES, "Movies", "zap_ca_ng_nol1.mp4"))
         shutil.copy(src_.replace(".mp4", ".png"), os.path.join(PRES, "Movies", "zap_ca_ng_nol1.png"))
+        t6_ = rc_["test"]
+        ms6_ = mse_summary(t6_)
         right_ca = (head("batch 6, arm 3: zap\\_ca\\_ng\\_nol1")
                     + "{\\scriptsize the neuron-graph known ODE on a LATENT activity $v$, read through a learned indicator: "
                       "$c \\mathrel{+}= k\\,(v - c)$; ZAPBench traces, all frames (in sample)\\par}\\vspace{6pt}\n"
-                    + head("against its twin with no indicator (batch 5)") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
-                    "& \\multicolumn{2}{c}{skill vs mean} & \\multicolumn{2}{c}{free R$^2$} \\\\\n"
-                    "& short & long & neuron & brain \\\\\n\\hline\n"
+                    + network_table(rc_, landed)
+                    + head("MSE, $10^{-3}$ dF/F$^2$ (lower is better)") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}r@{\\hspace{7pt}}r@{}}\n"
+                    + "& h 1-3 & h 16-32 \\\\\n" + "".join(f"{lab} & {_f3(ms6_[k + '_s'])} & {_f3(ms6_[k + '_l'])} \\\\\n" for lab, k in (
+                        ("learned law", "model"), ("mean baseline", "mean"), ("stimulus lookup", "look"), ("ZAPBench best", "zb")))
+                    + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                    + head("against the twins with no indicator (batch 5)") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                    "& \\multicolumn{2}{c}{MSE, $10^{-3}$} & \\multicolumn{2}{c}{free R$^2$} \\\\\n"
+                    "& h 1-3 & h 16-32 & brain & neuron \\\\\n\\hline\n"
                     f"calcium (6.3) & {row_('zap_ca_ng_nol1')} \\\\\nno indicator (5.3) & {row_('zap_ng_nol1')} \\\\\n"
                     + ("calcium, no network (6.8) & " + row_("zap_ca_ng_now") + " \\\\\n" if "zap_ca_ng_now" in landed else "")
                     + ("no indicator, no network (5.8) & " + row_("zap_ng_now") + " \\\\\n" if "zap_ng_now" in landed else "")
@@ -2268,10 +2304,9 @@ def main():
                         ("$k$", f"{k_:.7f} (start {k0_:.2f})"),
                         ("$\\tau_{ca}$", f"{tau_:.3f} s (start {t0_:g} s; one frame 0.914 s)"),
                         ("start taps $a_j$", ", ".join(f"{v:.2f}" for v in taps_) + f" (sum {taps_.sum():.2f})")])
-                    + "{\\scriptsize It runs: finite, every condition above the mean far ahead. But the indicator "
-                      "learns itself away: $\\tau_{ca}$ falls from its start to well under one frame, so $c$ follows $v$ and "
-                      "the latent IS the recording; the start taps are a smoothing over the last frames, not an "
-                      "inverse. The calcium arm scores slightly below its twin with no indicator.\\par}\n")
+                    + "{\\scriptsize It runs, but the indicator learns itself away: $\\tau_{ca}$ falls from its start to "
+                      "well under one frame, so $c$ follows $v$ and the latent IS the recording; the start taps are a "
+                      "smoothing over the last frames, not an inverse.\\par}\n")
         deck.append(("08b_calcium_result", frame("the calcium batch: does it work?", "\\playmovie{Movies/zap_ca_ng_nol1}",
                                                 right_ca, "log/training/zapbench/zap_ca_ng_nol1", left_gap=True,
                                                 deck_title="Known\\_ODE-latent\\_calcium $\\cdot$ batch 6 result")))

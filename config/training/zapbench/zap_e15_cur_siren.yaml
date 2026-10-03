@@ -74,6 +74,19 @@ task:
         - - 0.0
           - 1.0
         units: fraction
+  - name: no_short
+    zero:
+    - W_short
+  - name: no_mid
+    zero:
+    - W_mid
+  - name: no_long
+    zero:
+    - W_long
+  - name: short_only
+    zero:
+    - W_mid
+    - W_long
 training:
   optimizer: adam
   lr: 0.0018

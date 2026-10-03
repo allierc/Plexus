@@ -289,7 +289,9 @@ def run_one(name, device="cuda:0", movie=True):
 
 # the learned panel's label, "learned (<this>)": short enough to fit above the panel
 MOVIE_LABEL = {"W0": "neuron graph, W = 0: no network", "Sleft0": "no stimulus into the left half",
-               "no_stimulus": "no stimulus (u = 0)", "lead_left_quarter": "left quarter given (recorded), rest free"}
+               "no_stimulus": "no stimulus (u = 0)", "lead_left_quarter": "left quarter given (recorded), rest free",
+               "no_short": "no streets (W_short = 0)", "no_mid": "no roads (W_mid = 0)", "no_long": "no highways (W_long = 0)",
+               "short_only": "streets only (W_mid = W_long = 0)"}
 
 
 def render_arms(spec, out, rec=None):
