@@ -42,12 +42,15 @@ HIDDEN_PAT = ("gb_ex_f4",)       # batch 2's fish 4 slides: another law than fis
 NET_DECK = "batch {b} $\\cdot$ network dynamics"   # the control slides' title
 # PER BATCH, ONE GROUP PER FISH (Cedric, 2026-10-03: "batch 2 on the template of batch 1, results for the two fish"):
 # (fish, the run whose movie and curves are shown, the run the network test is read on, its no-network twin or None)
-SHOWN = {"1": [("glucose fish 1", "gb_ng_mask", "gb_ng_nol1", "gb_ng_now")],
+SHOWN = {"3": [(f"glucose fish {k}", f"gb_sx_f{k}_mask_nol1", f"gb_sx_f{k}_mask_nol1",
+                {1: "gb_sx_now", 4: "gb_sx_f4_now"}.get(k)) for k in range(1, 7)],
+         "1": [("glucose fish 1", "gb_ng_mask", "gb_ng_nol1", "gb_ng_now")],
          "2": [("glucose fish 1", "gb_ex_mask", "gb_ex_nol1", "gb_ex_now"),
                ("glucose fish 4", "gb_ex_f4", "gb_ex_f4", None)]}
 # ONE TITLE PER BATCH, on every slide of it (Cedric, 2026-10-03)
 BATCH_DECK = {"1": "batch 1 $\\cdot$ gut-brain glucose fish 1 $\\cdot$ sweep of multi-level GNN models",
-              "2": "batch 2 $\\cdot$ gut-brain glucose fish 1 and 4 $\\cdot$ sweep of multi-level GNN models, stable integrator"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
+              "2": "batch 2 $\\cdot$ gut-brain glucose fish 1 and 4 $\\cdot$ sweep of multi-level GNN models, stable integrator",
+              "3": "batch 3 $\\cdot$ gut-brain glucose fish 1-6 $\\cdot$ stimuli only, the nominal law with its input mask"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
 
 # THE PAPER'S NUMBERS, each with its figure and panel (read off papers/figs/*_crop.png, +-1 on the bars)
 PAPER = {
@@ -568,6 +571,11 @@ BATCHES = {
                                                 "gb_ng_wide", "gb_ng_h50", "gb_gc_base", "gb_ng_base_lglu"], "gb_ng_nol1", "gb_ng_now"),
     "2": ("the same levers, without runaway cells", ["gb_ex_base", "gb_ex_s1", "gb_ex_nol1", "gb_ex_now", "gb_ex_mask", "gb_ex_h50",
                                      "gb_ex_base_lglu", "gb_ex_f4"], "gb_ex_nol1", "gb_ex_now"),
+    "3": ("stimuli only, six fish", ["gb_sx_base", "gb_sx_lin", "gb_sx_nol1", "gb_sx_now", "gb_sx_lk_snd", "gb_sx_siren",
+                                     "gb_sx_base_lglu"] + [f"gb_sx_f{k}_nol1" for k in (2, 3, 4, 5, 6)]
+                                    + [f"gb_sx_f{k}_mask_nol1" for k in range(1, 7)]
+                                    + ["gb_sx_f4_base", "gb_sx_f4_lin", "gb_sx_f4_now", "gb_sx_f4_lk_snd", "gb_sx_f4_siren"],
+          "gb_sx_f1_mask_nol1", "gb_sx_now"),
 }
 
 
@@ -709,7 +717,7 @@ def slide_batch(b):
 
 def run_deck(b, fish=""):
     """A batch's title, naming the fish when the batch runs more than one (Cedric, 2026-10-03)."""
-    return BATCH_DECK[b] if not fish else BATCH_DECK[b].replace("glucose fish 1 and 4", fish)
+    return BATCH_DECK[b] if not fish else BATCH_DECK[b].replace("glucose fish 1 and 4", fish).replace("glucose fish 1-6", fish)
 
 
 def slides_run(name, b, now=None, fish=""):
@@ -922,8 +930,9 @@ def slide_network(name, now, b, fish=""):
 
 
 # WHICH GUT SPOT A SITE LABEL IS (inferred: the labels are not calibrated to the body; tools/exp20_body_render.py)
-SITE_REGION = {("gutbrain_glucose_f1", 1): "off", ("gutbrain_glucose_f1", 2): "gutA", ("gutbrain_glucose_f1", 3): "gutA",
-               ("gutbrain_glucose_f4", 1): "off", ("gutbrain_glucose_f4", 2): "gutA", ("gutbrain_glucose_f4", 5): "gutB"}
+# (galvo positions per site, design.json, every glucose fish: site 1 off the fish; sites 2 and 3 one spot; site 5 another)
+SITE_REGION = {(f"gutbrain_glucose_f{k}", st): {1: "off", 2: "gutA", 3: "gutA", 5: "gutB"}[st]
+               for k in range(1, 7) for st in (1, 2, 3, 5)}
 REGION_TXT = {"off": "UV off the fish (control)",
               "gutA": "UV on the gut: foregut? (the galvo spot of fish 1's sites 2 and 3; fish 4's site 2 has its voltage)",
               "gutB": "UV on the gut, another spot: midgut? (galvo x -1.2 V against -2.4 V; over all pulses it evokes +0.078 "
@@ -1039,6 +1048,72 @@ def slide_params(name, b, fish=""):
             f"keepaspectratio]{{figs/param_maps_{name}.png}}\\end{{center}}\n\\vfill\n\\end{{frame}}\n")
 
 
+def slides_fish_compare(b="3"):
+    """FISH TO FISH (Cedric, 2026-10-03): the same law on the six glucose fish. Slide 1, a table: session, cells,
+    gut-responsive cells, per-site recorded evoked change and the law's share, W = 0's share, brain-mean R2 (masked law,
+    unmasked law, W = 0). Slide 2, the gut-responsive cells' mean dF/F around the gut pulses (sites 2, 3, 5 pooled),
+    mean +- SD, recorded against the law and W = 0, one panel per fish."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    D = {d["fish"]: d for d in json.load(open(os.path.join(DATA, "design.json"))) if d["condition"] == "glucose"}
+    rows_, panels = [], []
+    for k in range(1, 7):
+        m_, u_ = f"gb_sx_f{k}_mask_nol1", ("gb_sx_nol1" if k == 1 else f"gb_sx_f{k}_nol1")
+        r = landed(m_)
+        if not (r and r["freetrial"] and "pulses" in r["freetrial"]["arms"]["full"]):
+            continue
+        ft = r["freetrial"]
+        pre = ft["window"][0]
+        dt = D[k]["volume_s"]
+        ev = lambda Y: float(np.mean(Y[:, pre:pre + int(round(20 / dt))].mean(1) - Y[:, :pre].mean(1)))
+        gut = [x for x in ft["arms"]["full"]["pulses"] if x["site"] != 1]
+        gw0 = [x for x in ft["arms"]["W0"]["pulses"] if x["site"] != 1]
+        Yr, Yl, Y0 = (np.array([x[key] for x in L]) for key, L in (("trace_rec", gut), ("trace_free", gut), ("trace_free", gw0)))
+        er, el, e0 = ev(Yr), ev(Yl), ev(Y0)
+        bz = json.load(open(os.path.join(DATA, f"baselines_gutbrain_glucose_f{k}.json")))
+        rows_.append(f"{k} & {D[k]['minutes']:.0f} & {D[k]['cells'] / 1e3:.0f}k & {bz['gut_responsive']:,} & {len(gut)} & "
+                     f"{er:+.3f} & {el / er:.2f} & {e0 / er:.2f} & {bm(r['dir'], m_)[0]:+.2f} & "
+                     f"{bm(landed(u_)['dir'], u_)[0] if landed(u_) else float('nan'):+.2f} & {bm(r['dir'], m_ + '_W0')[0]:+.2f} \\\\")
+        panels.append((k, Yr, Yl, Y0, dt, pre))
+    if not rows_:
+        return []
+    body = ("{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}r"
+            "@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
+            "& & & gut- & gut & \\multicolumn{3}{c}{evoked, 0-20 s (free rollout)} & \\multicolumn{3}{c}{brain-mean R$^2$} \\\\\n"
+            "fish & min & cells & responsive & pulses & recorded & law / rec. & W = 0 / rec. & masked & unmasked & W = 0 \\\\\n\\hline\n"
+            + "\n".join(rows_) + "\n\\end{tabular}\\par}\\vspace{10pt}\n"
+            "{\\scriptsize the nominal law (known ODE on the cell graph, no W prior, stimuli only) with each fish's own input mask; "
+            "evoked = the gut-responsive cells' mean dF/F 0-20 s after a gut pulse (sites 2, 3, 5) minus the 10 s before, mean "
+            "over the fish's gut pulses, inside the free rollout of its whole session; brain-mean R$^2$ of that rollout\\par}")
+    out = [("95_fish_table", f"% generated by tools/exp20_slides.py (fish to fish)\n\\begin{{frame}}[t]{{batch {b} $\\cdot$ "
+            f"six glucose fish, one law: the gut response and the network test, fish by fish}}\n\\vspace*{{\\bandgap}}"
+            f"\\vspace*{{1.5\\baselineskip}}\n{body}\n\\end{{frame}}\n")]
+    fig, ax = plt.subplots(2, 3, figsize=(12, 6.2), facecolor="black", sharey=True)
+    for a_, (k, Yr, Yl, Y0, dt, pre) in zip(ax.ravel(), panels):
+        _black(a_)
+        tt = (np.arange(Yr.shape[1]) - pre) * dt
+        for Y, c, lab in ((Yr, "#4caf50", "recorded"), (Yl, "white", "law"), (Y0, "#ff5252", "same law, W = 0")):
+            m, sd = Y.mean(0), Y.std(0)
+            a_.fill_between(tt, m - sd, m + sd, color=c, alpha=0.15, lw=0)
+            a_.plot(tt, m, color=c, lw=1.6, label=lab)
+        a_.axvline(0, color="#ffd54f", lw=0.8, ls=":")
+        a_.set_ylim(0, 0.7)
+        a_.set_title(f"glucose fish {k}: {len(Yr)} gut pulses", fontsize=10)
+        a_.set_xlabel("s from the pulse", fontsize=8)
+    ax[0, 0].set_ylabel("mean dF/F, gut-responsive cells", fontsize=8)
+    ax[1, 0].set_ylabel("mean dF/F, gut-responsive cells", fontsize=8)
+    ax[0, 0].legend(frameon=False, fontsize=8, labelcolor="white")
+    fig.tight_layout()
+    fig.savefig(os.path.join(PRES, "figs", "96_fish_traces.png"), dpi=170, facecolor="black")
+    plt.close(fig)
+    out.append(("96_fish_traces", f"% generated by tools/exp20_slides.py (fish to fish traces)\n\\begin{{frame}}[t]{{batch {b} "
+                f"$\\cdot$ six glucose fish, one law: the response to a gut pulse, recorded and learned}}\n\\vspace*{{\\bandgap}}\\vfill\n"
+                "\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.80\\textheight,keepaspectratio]{figs/96_fish_traces.png}"
+                "\\end{center}\n\\vfill\n\\end{frame}\n"))
+    return out
+
+
 def slide_overview():
     rw = md_rows()
     lines = []
@@ -1080,6 +1155,7 @@ def main():
             deck.append(slide_params(run, b, fish_tag))
             deck += slides_sites(ctrl, nw, b, fish_tag)            # replaces the one network slide (Cedric, 2026-10-03)
             deck += slides_controls(ctrl, nw, b, fish_tag)
+    deck += slides_fish_compare("3")
     deck.append(slide_overview())
     out = []
     for stem, body in deck:
