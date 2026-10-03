@@ -38,11 +38,15 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
 HIDDEN = {"04_fig3d"}
-NET_DECK = "batch {b} $\\cdot$ network dynamics, not a function of the stimulus"   # the control slides' title
-RUN_SHOWN = {"1": "gb_ng_mask"}   # the run whose movie and curves a batch shows (Cedric, 2026-10-03: slides 12-13)
+NET_DECK = "batch {b} $\\cdot$ network dynamics"   # the control slides' title
+# PER BATCH, ONE GROUP PER FISH (Cedric, 2026-10-03: "batch 2 on the template of batch 1, results for the two fish"):
+# (fish, the run whose movie and curves are shown, the run the network test is read on, its no-network twin or None)
+SHOWN = {"1": [("glucose fish 1", "gb_ng_mask", "gb_ng_nol1", "gb_ng_now")],
+         "2": [("glucose fish 1", "gb_ex_mask", "gb_ex_nol1", "gb_ex_now"),
+               ("glucose fish 4", "gb_ex_f4", "gb_ex_f4", None)]}
 # ONE TITLE PER BATCH, on every slide of it (Cedric, 2026-10-03)
 BATCH_DECK = {"1": "batch 1 $\\cdot$ gut-brain glucose fish 1 $\\cdot$ sweep of multi-level GNN models",
-              "2": "batch 2 $\\cdot$ gut-brain glucose fish 1 and 4 $\\cdot$ the same sweep, stable integrator"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
+              "2": "batch 2 $\\cdot$ gut-brain glucose fish 1 and 4 $\\cdot$ sweep of multi-level GNN models, stable integrator"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
 
 # THE PAPER'S NUMBERS, each with its figure and panel (read off papers/figs/*_crop.png, +-1 on the bars)
 PAPER = {
@@ -767,12 +771,16 @@ def slides_run(name, b, now=None):
     return out
 
 
-def slides_controls(name, now, b):
+def net_deck(b, fish=""):
+    return NET_DECK.format(b=b) if not fish else f"batch {b} $\\cdot$ {fish} $\\cdot$ network dynamics"
+
+
+def slides_controls(name, now, b, fish=""):
     """CEDRIC'S TWO CONTROLS (exp17 slides 26-27): the trained law with W = 0, and a law trained with no network."""
     import shutil
-    r, rn = landed(name), landed(now)
+    r, rn = landed(name), (landed(now) if now else None)
     out = []
-    dt = NET_DECK.format(b=b)
+    dt = net_deck(b, fish)
     if r and r["freetrial"] and "W0" in r["freetrial"]["arms"]:
         full, w0 = r["freetrial"]["arms"]["full"], r["freetrial"]["arms"]["W0"]
         nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
@@ -803,7 +811,7 @@ def slides_controls(name, now, b):
         out.append((f"{name}_controls", frame(f"{_tex(name)} with W = 0, and a law with no network: the gut response is the network's",
                                               left, right, f"{name}_freetrial.json, ablation_{name}.json", deck_title=dt)))
     if rn:
-        out += [(k.replace("_movie", "_nonet_movie"), v.replace(BATCH_DECK[b], NET_DECK.format(b=b)))
+        out += [(k.replace("_movie", "_nonet_movie"), v.replace(BATCH_DECK[b], net_deck(b, fish)))
                 for k, v in slides_run(now, b, now) if k.endswith("_movie")]
     return out
 
@@ -815,7 +823,7 @@ def figure_network(name, now, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    r, rn = landed(name), landed(now)
+    r, rn = landed(name), (landed(now) if now else None)
     ft = r["freetrial"]
     nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
     pre, post = ft["window"]
@@ -866,11 +874,11 @@ def figure_network(name, now, path):
     plt.close(fig)
 
 
-def slide_network(name, now, b):
-    r, rn = landed(name), landed(now)
+def slide_network(name, now, b, fish=""):
+    r, rn = landed(name), (landed(now) if now else None)
     if not (r and r["freetrial"] and "W0" in r["freetrial"]["arms"]):
         return ("", "")
-    png = f"batch_{b}_network.png"
+    png = f"batch_{b}_network_{name}.png"
     figure_network(name, now, os.path.join(PRES, "figs", png))
     full, w0 = r["freetrial"]["arms"]["full"], r["freetrial"]["arms"]["W0"]
     nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
@@ -879,25 +887,31 @@ def slide_network(name, now, b):
     lk = os.path.join(EXP, "data", f"leak_{name}.json")
     LK = json.load(open(lk)) if os.path.exists(lk) else None
     fr = lambda a: f"{a['evoked_gut_free_over_rec']:.2f}"
-    right = (head("the claim") + "{\\scriptsize the response to a held-out gut pulse is made by the network: "
-             "remove it, after training or from the start, and the response is gone\\par}\\vspace{6pt}\n"
+    f3 = lambda v: f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
+    keep_net, keep_w0 = full["evoked_gut_free_over_rec"], w0["evoked_gut_free_over_rec"]
+    claim = (f"the network law keeps {keep_net:.2f} of the recorded gut response; with W = 0 it keeps {keep_w0:.2f}"
+             + (f", trained with no network {nw['evoked_gut_free_over_rec']:.2f}" if nw else "")
+             + (": the response is the network's" if keep_net > 3 * max(keep_w0, 0.01) else
+                ": the network carries part of it"))
+    prov = json.load(open(os.path.join(GD, "graphs_data", "zebrafish", f"{r['freetrial']['recording']}_recording.json")))
+    swim = any(prov.get("swim_live", [False, False])) and "nosw" not in r["freetrial"]["recording"]
+    right = (head("the claim") + "{\\scriptsize " + claim + "\\par}\\vspace{6pt}\n"
              + head("gut response / recorded (free rollout)") + rows(
                  [("network law", f"{fr(full)}, pattern r {full['pattern_r_gut']:+.2f} over the cells"),
                   ("W = 0", f"{fr(w0)}, pattern r {w0['pattern_r_gut']:+.2f}")]
                  + ([("no network", f"{fr(nw)}, pattern r {nw['pattern_r_gut']:+.2f}")] if nw else []))
              + head("whole session: brain-mean R$^2$ (per-cell R$^2$)") + rows(
-                 [("network law", f"{brain_r2(r['dir'], name):+.2f} ({A['full']['r2_denoised']:+.2f})" if A else "--"),
-                  ("W = 0", f"{brain_r2(r['dir'], name + '_W0'):+.2f} ({A['W0']['r2_denoised']:+.2f})" if A else "--")]
-                 + ([("no network", f"{brain_r2(rn['dir'], now):+.2f} ({rn['test']['free']['r2_denoised']:+.2f}): the drift, "
-                                    "no response")] if rn else []))
+                 [("network law", f"{f3(bm(r['dir'], name)[0])} ({f3(cell_r2(r['dir'], name))})"),
+                  ("W = 0", f"{f3(bm(r['dir'], name + '_W0')[0])} ({f3(cell_r2(r['dir'], name + '_W0'))})")]
+                 + ([("no network", f"{f3(bm(rn['dir'], now)[0])} ({f3(cell_r2(rn['dir'], now))})")] if rn else []))
              + head("driven by the stimuli only") + rows(
                  [("start", "one recorded volume, then the inputs only"),
                   ("leak check", (f"recording after the start zeroed or noise: max {max(x['max_abs_zeroed'] for x in LK['rows']):.1e} dF/F, "
-                                  f"= run-to-run {max(x['max_abs_self'] for x in LK['rows']):.1e}") if LK else "--"),
-                  ("caveat", "swim power is still an input here (batch 3: none)")]))
-    return (f"batch_{b}_network", frame("Network dynamics, not a function of the stimulus",
+                                  f"= run-to-run {max(x['max_abs_self'] for x in LK['rows']):.1e}") if LK else "not run on this law"),
+                  ("swim", "still an input here (its swim channel has bouts)" if swim else "no swim input (none recorded)")]))
+    return (f"batch_{b}_network_{name}", frame("Network dynamics",
                                         f"\\panel{{figs/{png}}}", right, f"{name}_freetrial.json, {now}_freetrial.json, ablation_{name}.json",
-                                        deck_title=NET_DECK.format(b=b)))
+                                        deck_title=net_deck(b, fish)))
 
 
 def slide_overview():
@@ -934,9 +948,12 @@ def main():
         if not any(landed(n) for n in names):
             continue
         deck.append(slide_batch(b))
-        deck += slides_run(RUN_SHOWN.get(b, shown), b, now)
-        deck.append(slide_network(shown, now, b))
-        deck += slides_controls(shown, now, b)
+        groups = SHOWN.get(b, [("", shown, shown, now)])
+        for fish, run, ctrl, nw in groups:
+            fish_tag = fish if len(groups) > 1 else ""
+            deck += slides_run(run, b, nw)
+            deck.append(slide_network(ctrl, nw, b, fish_tag))
+            deck += slides_controls(ctrl, nw, b, fish_tag)
     deck.append(slide_overview())
     out = []
     for stem, body in deck:

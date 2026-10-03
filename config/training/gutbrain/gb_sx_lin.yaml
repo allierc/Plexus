@@ -1,5 +1,5 @@
-name: gb_ex_s1
-model: config/gutbrain/gb_ex_glucose_f1.yaml
+name: gb_sx_lin
+model: config/gutbrain/gb_sx_glucose_f1_lin.yaml
 learnable:
 - param: W_short
   op: state_diffuse
@@ -36,7 +36,7 @@ learnable:
   title: each cell's weights on the 6 forcings
 task:
   reference:
-    trace_recording: gutbrain_glucose_f1
+    trace_recording: gutbrain_glucose_f1_nosw
     split: recording
     test_stride: 8
   drive:
@@ -66,7 +66,7 @@ training:
   schedule: none
   clip: 1.0
   batch: 4
-  seed: 1
+  seed: 0
   save_every: 500
   select: last
   stages:

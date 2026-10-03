@@ -1,6 +1,14 @@
-name: gb_ex_s1
-model: config/gutbrain/gb_ex_glucose_f1.yaml
+name: gb_sx_lk_snd
+model: config/gutbrain/gb_sx_glucose_f1_lk.yaml
 learnable:
+- param: theta_g
+  op: state_diffuse
+  lr: 0.0018
+  prior:
+    l1: 0.14
+    monotone: 375.0
+    pin: 0.45
+  title: the message MLP g_phi
 - param: W_short
   op: state_diffuse
   lr: 0.0009
@@ -34,9 +42,13 @@ learnable:
   of: neuron
   lr: 0.0018
   title: each cell's weights on the 6 forcings
+- block: embedding
+  of: neuron
+  lr: 0.002325
+  title: each cell's 2-number embedding a_i
 task:
   reference:
-    trace_recording: gutbrain_glucose_f1
+    trace_recording: gutbrain_glucose_f1_nosw
     split: recording
     test_stride: 8
   drive:
@@ -66,7 +78,7 @@ training:
   schedule: none
   clip: 1.0
   batch: 4
-  seed: 1
+  seed: 0
   save_every: 500
   select: last
   stages:
