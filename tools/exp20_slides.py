@@ -37,7 +37,12 @@ PAPERS = os.path.join(EXP, "papers")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
-HIDDEN = {"04_fig3d"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
+HIDDEN = {"04_fig3d"}
+NET_DECK = "batch {b} $\\cdot$ network dynamics, not a function of the stimulus"   # the control slides' title
+RUN_SHOWN = {"1": "gb_ng_mask"}   # the run whose movie and curves a batch shows (Cedric, 2026-10-03: slides 12-13)
+# ONE TITLE PER BATCH, on every slide of it (Cedric, 2026-10-03)
+BATCH_DECK = {"1": "batch 1 $\\cdot$ gut-brain glucose fish 1 $\\cdot$ sweep of multi-level GNN models",
+              "2": "batch 2 $\\cdot$ gut-brain glucose fish 1 and 4 $\\cdot$ the same sweep, stable integrator"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
 
 # THE PAPER'S NUMBERS, each with its figure and panel (read off papers/figs/*_crop.png, +-1 on the bars)
 PAPER = {
@@ -682,7 +687,7 @@ def slide_batch(b):
                "to the held-out gut pulses INSIDE the free rollout of the whole session (stimuli and the first frame only), over "
                "the recorded one. brain R$^2$: the whole session's brain-mean dF/F, learned against recorded (exp17's headline).\\par}\n")
     return (f"batch_{b}_levers", frame(f"batch {b}: every arm", f"\\panel{{figs/batch_{b}_levers.png}}", right,
-                                       "the runs' _test, _trials, _freetrial json", deck_title=f"batch {b} ({_tex(title)}) $\\cdot$ every arm"))
+                                       "the runs' _test, _trials, _freetrial json", deck_title=BATCH_DECK[b]))
 
 
 def slides_run(name, b, now=None):
@@ -692,7 +697,7 @@ def slides_run(name, b, now=None):
         return []
     out, rw = [], md_rows()
     v, what = rw.get(name, ("", ""))
-    dt = f"batch {b} $\\cdot$ {_tex(name)}"
+    dt = BATCH_DECK[b]
     N = numbers(r)
     mv = os.path.join(r["dir"], "results", "movie.mp4")
     if os.path.exists(mv):
@@ -716,7 +721,7 @@ def slides_run(name, b, now=None):
                                             f"\\panel{{figs/{name}_test.png}}", head(_tex(name)) + "{\\scriptsize the trainer's "
                                             "test figure: MSE per step ahead on the held-out windows, the law against the best "
                                             "recent mean, persistence and the stimulus lookup; the free rollout's R$^2$ per frame.\\par}\n",
-                                            f"{name}_test.png", deck_title=dt)))
+                                            f"{name}_test.png", deck_title=dt, left_gap=4)))
     return out
 
 
@@ -725,7 +730,7 @@ def slides_controls(name, now, b):
     import shutil
     r, rn = landed(name), landed(now)
     out = []
-    dt = f"batch {b} $\\cdot$ network dynamics, not a function of the stimulus"
+    dt = NET_DECK.format(b=b)
     if r and r["freetrial"] and "W0" in r["freetrial"]["arms"]:
         full, w0 = r["freetrial"]["arms"]["full"], r["freetrial"]["arms"]["W0"]
         nw = rn["freetrial"]["arms"]["full"] if rn and rn["freetrial"] else None
@@ -756,7 +761,8 @@ def slides_controls(name, now, b):
         out.append((f"{name}_controls", frame(f"{_tex(name)} with W = 0, and a law with no network: the gut response is the network's",
                                               left, right, f"{name}_freetrial.json, ablation_{name}.json", deck_title=dt)))
     if rn:
-        out += [(k.replace("_movie", "_nonet_movie"), v) for k, v in slides_run(now, b, now) if k.endswith("_movie")]
+        out += [(k.replace("_movie", "_nonet_movie"), v.replace(BATCH_DECK[b], NET_DECK.format(b=b)))
+                for k, v in slides_run(now, b, now) if k.endswith("_movie")]
     return out
 
 
@@ -789,6 +795,7 @@ def figure_network(name, now, path):
         for k, y in cur.items():
             a.plot(tt, y, color=COL[k], lw=2.0 if k in ("rec", "full") else 1.4, label=LAB[k])
         a.axvline(0, color="#ffd54f", lw=0.8, ls=":")
+        a.set_ylim(0, 0.7)                                  # one axis for the three pulses (Cedric, 2026-10-03)
         a.set_title(f"{'control (off the fish)' if t0['kind'] == 'control' else 'gut'} pulse, held out\n"
                     f"volume {t0['onset']}", fontsize=8)
         a.set_xlabel("s from the UV pulse", fontsize=7)
@@ -848,7 +855,7 @@ def slide_network(name, now, b):
                   ("caveat", "swim power is still an input here (batch 3: none)")]))
     return (f"batch_{b}_network", frame("Network dynamics, not a function of the stimulus",
                                         f"\\panel{{figs/{png}}}", right, f"{name}_freetrial.json, {now}_freetrial.json, ablation_{name}.json",
-                                        deck_title=f"batch {b} $\\cdot$ network dynamics, not a function of the stimulus"))
+                                        deck_title=NET_DECK.format(b=b)))
 
 
 def slide_overview():
@@ -885,7 +892,7 @@ def main():
         if not any(landed(n) for n in names):
             continue
         deck.append(slide_batch(b))
-        deck += slides_run(shown, b, now)
+        deck += slides_run(RUN_SHOWN.get(b, shown), b, now)
         deck.append(slide_network(shown, now, b))
         deck += slides_controls(shown, now, b)
     deck.append(slide_overview())
