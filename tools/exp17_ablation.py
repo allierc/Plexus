@@ -288,7 +288,8 @@ def run_one(name, device="cuda:0", movie=True):
 
 
 # the learned panel's label, "learned (<this>)": short enough to fit above the panel
-MOVIE_LABEL = {"W0": "neuron graph, W = 0: no network", "Sleft0": "no stimulus into the left half"}
+MOVIE_LABEL = {"W0": "neuron graph, W = 0: no network", "Sleft0": "no stimulus into the left half",
+               "no_stimulus": "no stimulus (u = 0)", "lead_left_quarter": "left quarter given (recorded), rest free"}
 
 
 def render_arms(spec, out, rec=None):
@@ -460,7 +461,7 @@ def _cmp_frames(ks):
         lo_, hi_ = np.nanpercentile(np.concatenate([c for c, _ in curves]), [0.5, 99.5])
         m.set_ylim(lo_ - 0.1 * (hi_ - lo_), hi_ + 0.1 * (hi_ - lo_))
         m.set_yticks([])
-    if d["mode"] == "W0":
+    if d["mode"] != "Sleft0":                # W0 and the trainer's rollout variants (task.rollouts): a 2 x 2
         for j, key in enumerate(("full", "abl")):
             x0 = 0.05 + 0.5 * j
             m = strip(x0, 0.235)
@@ -468,7 +469,9 @@ def _cmp_frames(ks):
             for a_, b_, c_ in d["blocks"]:
                 m.text((a_ + b_) / 2, 1.02, d["names"][int(c_)], color="0.75", fontsize=6, ha="center", va="bottom",
                        transform=m.get_xaxis_transform())
-            fig.text(x0, 0.345, "brain-mean dF/F: recorded (green), this model (white)", color="0.7", fontsize=8)
+            fig.text(x0, 0.345, ("brain-mean dF/F of the FREE neurons (the given ones left out): recorded (green), "
+                                 "this model (white)" if d["given"] else "brain-mean dF/F: recorded (green), this model "
+                                 "(white)"), color="0.7", fontsize=8)
             r = strip(x0, 0.06)
             r.plot(d["t_all"], d[f"r2_{key}"], color="white", lw=0.6, zorder=2)
             r.set_ylim(0, 1)
@@ -516,7 +519,11 @@ def render_compare(name, arm, workers=16):
     fr = full["frames"]
     if not np.array_equal(fr, abl["frames"]):
         raise SystemExit(f"{name}: the full and the {arm} movies sample different frames")
-    left = np.load(os.path.join(out, "results", f"{name}_ablation_sides.npz"))["left"].astype(bool)
+    sides = os.path.join(out, "results", f"{name}_ablation_sides.npz")
+    left = (np.load(sides)["left"].astype(bool) if os.path.exists(sides)
+            else np.zeros(rec["dff"].shape[1], bool))       # a trainer rollout variant: no halves needed
+    # a variant with GIVEN elements (task.rollouts clamp): the brain means over the free elements only, in both panels
+    free_ = ~abl["clamped"].astype(bool) if "clamped" in abl else np.ones(rec["dff"].shape[1], bool)
     pos = _brain_view(np.asarray(rec["pos_um"], np.float64))
     order = np.argsort(pos[:, 2])
     X = rec["dff"][fr].astype(np.float32)
@@ -531,7 +538,8 @@ def render_compare(name, arm, workers=16):
                 cond=cond, names=[str(s) for s in rec["names"]], blocks=blocks, mode=arm,
                 label=MOVIE_LABEL.get(arm, arm), t_all=full["r2_t"] * FRAME_S / 60,
                 r2_full=np.asarray(full["r2_denoised_all"], float), r2_abl=np.asarray(abl["r2_denoised_all"], float),
-                mean_rec=np.nanmean(X, 1), mean_full=np.nanmean(pf, 1), mean_abl=np.nanmean(pa, 1),
+                mean_rec=np.nanmean(X[:, free_], 1), mean_full=np.nanmean(pf[:, free_], 1),
+                mean_abl=np.nanmean(pa[:, free_], 1), given=bool((~free_).any()),
                 left_rec=np.nanmean(X[:, left], 1), left_full=np.nanmean(pf[:, left], 1),
                 left_abl=np.nanmean(pa[:, left], 1), right_rec=np.nanmean(X[:, ~left], 1),
                 right_full=np.nanmean(pf[:, ~left], 1), right_abl=np.nanmean(pa[:, ~left], 1),

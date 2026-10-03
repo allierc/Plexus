@@ -211,7 +211,7 @@ def analyse(rec, device, variant="all"):
     lag = np.array([peak_lag(Xt[:, i], U[:, best[n_]]) for i, n_ in enumerate(top)])
     o = np.lexsort((lag, best[top]))
     top, Xt, lag = top[o], Xt[:, o], lag[o]
-    return dict(rec=rec, variant=variant, flabels=flabels, X=X, U=U, names=names, off=off, T=T, N=N, K=K, feat_cond=feat_cond, coh=coh, best=best,
+    return dict(rec=rec, variant=variant, flabels=flabels, pick=pick, X=X, U=U, names=names, off=off, T=T, N=N, K=K, feat_cond=feat_cond, coh=coh, best=best,
                 sel=sel, thr=thr, Suu=Suu, f=f, band=band, ex_sel=ex_sel, ex_un=ex_un, Cex=Cex, common=common,
                 rnd=rnd, idx_sel=idx_sel, r_sel=r_sel, r_rnd=r_rnd, cb_sel=cb_sel, cb_rnd=cb_rnd, top=top,
                 Zt=zscore(Xt).T, lag=lag, pos=brain_view(z["pos_um"]))
@@ -540,12 +540,11 @@ def fig_kymo_full(d):
     tmin = T * FRAME_S / 60
     m = lambda fr: fr * FRAME_S / 60
     fig = plt.figure(figsize=(13.33, 7.5), facecolor="black")
-    tag = ", 20 % mask: 10 % by visual coherence + 10 % by ephys coherence (50 + 50 shown)" if d.get("variant") == "mix" else "" if d.get("variant", "all") == "all" else (
-        ", mask from the 13 changing visual + 5 ephys features" if d["K"] > N_VISUAL else
-        ", mask from the 13 changing visual features")
+    tag = ", 20 % mask: 10 % visual + 10 % ephys" if d.get("variant") == "mix" else "" if d.get("variant", "all") == "all" else (
+        ", mask: 13 visual + 5 ephys features" if d["K"] > N_VISUAL else ", mask: 13 changing visual features")
     fig.text(0.015, 0.975, f"The input neurons and the stimulus over the whole recording ({LABEL[d['rec']]}{tag})",
-             color="white", fontsize=12, va="top")
-    L, R = 0.13, 0.90
+             color="white", fontsize=11, va="top")
+    L, R = 0.13, 0.69                         # the kymographs; the brain on the right (Cedric, 2026-10-02)
     axn = fig.add_axes([L, 0.885, R - L, 0.035])
     axs = fig.add_axes([L, 0.60, R - L, 0.25])
     axk = fig.add_axes([L, 0.08, R - L, 0.44])
@@ -583,17 +582,35 @@ def fig_kymo_full(d):
         axk.text(-0.008, (a_ + b_ - 1) / 2, f"best {d['flabels'][bt[a_]]} ({b_ - a_})",
                  transform=axk.get_yaxis_transform(), ha="right", va="center", fontsize=6.5, color="0.85")
     axk.set_xlabel("time since the recording's start, min", fontsize=9, color="0.8")
-    fig.text(L, 0.855, "stimulus features (rows, grouped by the condition that uses each): value -1 (blue) .. 0 "
-             "(black) .. +1 (orange)", color="white", fontsize=9.5, va="bottom")
-    fig.text(L, 0.525, "the 100 most coherent input neurons: dF/F, each row z-scored over the whole recording; "
-             "grouped by best feature (n), then by lag of peak cross-correlation", color="white", fontsize=9.5,
-             va="bottom")
-    cb1 = fig.add_axes([0.915, 0.62, 0.010, 0.21])
+    fig.text(L, 0.855, "stimulus features, grouped by condition: -1 (blue) .. 0 (black) .. +1 (orange)", color="white",
+             fontsize=9.5, va="bottom")
+    fig.text(L, 0.525, "the 100 most coherent input neurons: dF/F, rows z-scored, grouped by best feature (n), "
+             "then by lag", color="white", fontsize=9.5, va="bottom")
+    cb1 = fig.add_axes([0.70, 0.62, 0.008, 0.21])
     fig.colorbar(ims, cax=cb1).ax.tick_params(colors="0.75", labelsize=7)
     cb1.set_title("value", fontsize=7, color="0.75")
-    cb2 = fig.add_axes([0.915, 0.10, 0.010, 0.40])
+    cb2 = fig.add_axes([0.70, 0.10, 0.008, 0.40])
     fig.colorbar(imk, cax=cb2).ax.tick_params(colors="0.75", labelsize=7)
     cb2.set_title("z", fontsize=7, color="0.75")
+    # THE INPUT NEURONS ON THE BRAIN, vertical and head up, beside the kymographs: the mask's neurons coloured (the
+    # half-and-half mask: blue those picked by visual coherence, orange those picked by ephys), the others grey
+    P = d["pos"]
+    V = np.stack([P[:, 1], -P[:, 0]], 1)        # brain_view is horizontal, head left: turned to head up
+    axb = fig.add_axes([0.745, 0.06, 0.24, 0.84])
+    axb.set_facecolor("black")
+    axb.axis("off")
+    axb.set_aspect("equal")
+    sel = d["sel"]
+    axb.scatter(V[~sel, 0], V[~sel, 1], s=0.15, c="0.25", linewidths=0)
+    if d.get("pick") is not None:
+        for code, col, lab_ in ((0, "#56b4e9", "picked by visual coherence"), (1, "#ff9f1c", "picked by ephys coherence")):
+            m_ = d["pick"] == code
+            axb.scatter(V[m_, 0], V[m_, 1], s=0.5, c=col, linewidths=0)
+            fig.text(0.745, 0.035 - 0.022 * code, f"{lab_}: {int(m_.sum()):,}", color=col, fontsize=8.5)
+    else:
+        axb.scatter(V[sel, 0], V[sel, 1], s=0.5, c="#ff9f1c", linewidths=0)
+    fig.text(0.865, 0.92, f"the input neurons: {int(sel.sum()):,} of {len(sel):,}", color="white", fontsize=10,
+             ha="center", va="bottom")
     v_ = d.get("variant", "all")
     stem = f"input_neurons_{d['rec']}{'' if v_ == 'all' else '_' + v_}_kymo_full.png"
     out = os.path.join(FIGS, stem)

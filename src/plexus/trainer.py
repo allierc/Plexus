@@ -55,10 +55,12 @@ Output, one folder per run under the model's own folder, mirroring `config/train
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob
 import json
 import math
 import os
+import re
 import shutil
 import time
 
@@ -81,7 +83,10 @@ _KEYS = {
     "top": {"name", "model", "learnable", "task", "training"},
     "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
                   "prior", "field", "levels", "features", "log2_table", "base", "scale", "title"},
-    "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup"},
+    "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup", "rollouts"},
+    "rollout": {"name", "zero", "drive", "clamp"},
+    "clamp": {"rois"},
+    "roi": {"box", "sphere", "units"},
     "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
                   "recording", "beats", "field_recording", "coarsen", "points", "split", "normalise",
                   "trace_recording", "test_stride"},
@@ -117,6 +122,99 @@ def _refuse_unread(where, d, allowed):
         raise ValueError(f"{where}: key(s) {extra} are read by nothing; the keys read here are "
                          f"{sorted(allowed)}. An unread key would be dropped and the run would "
                          f"train something other than what the spec says.")
+
+
+def _check_rollouts(path, s, kind):
+    """`task.rollouts` (Cedric, 2026-10-03): the free rollouts the test phase makes besides the nominal one, each a
+    named VARIANT of the same learned model -- `zero:` learnables set to 0 (the network's W: "W = 0"), `drive: off`
+    (no known stimulus), `clamp: {rois: [...]}` (the elements inside the ROIs given their RECORDED value every frame:
+    measured leaders or hypothesised input neurons; they are left out of every score). Trace references only."""
+    ros = s["task"].get("rollouts")
+    if ros is None:
+        return
+    if kind != "trace_recording":
+        raise ValueError(f"{path}: task.rollouts is implemented for a trace_recording reference only")
+    names = {e.get("param") or e.get("block") for e in s["learnable"]}
+    seen = set()
+    for j, ro in enumerate(ros):
+        w = f"{path}: task.rollouts[{j}]"
+        _refuse_unread(w, ro, _KEYS["rollout"])
+        nm = str(ro.get("name", ""))
+        if not re.fullmatch(r"[A-Za-z0-9_]+", nm) or nm in seen:
+            raise ValueError(f"{w}: `name:` must be a unique word (letters, digits, _), it is {nm!r}")
+        seen.add(nm)
+        bad = [z for z in ro.get("zero", []) if z not in names]
+        if bad:
+            raise ValueError(f"{w}: zero {bad} are not learnables of this run (its learnables: {sorted(names)})")
+        if ro.get("drive", "on") not in ("on", "off"):
+            raise ValueError(f"{w}: `drive:` on (default) or off")
+        if ro.get("drive") == "off" and "drive" not in s["task"]:
+            raise ValueError(f"{w}: `drive: off` but the task has no drive")
+        if "clamp" in ro:
+            _refuse_unread(f"{w}.clamp", ro["clamp"], _KEYS["clamp"])
+            rois = ro["clamp"].get("rois") or []
+            if not rois:
+                raise ValueError(f"{w}.clamp needs `rois:` (a list of box / sphere)")
+            for i, r in enumerate(rois):
+                _refuse_unread(f"{w}.clamp.rois[{i}]", r, _KEYS["roi"])
+                if ("box" in r) == ("sphere" in r):
+                    raise ValueError(f"{w}.clamp.rois[{i}]: exactly one of `box:` [[lo, hi] per axis, 2 (x, y: every z) "
+                                     f"or 3] or `sphere:` [x, y, z, r]")
+                if r.get("units", "um") not in ("um", "fraction"):
+                    raise ValueError(f"{w}.clamp.rois[{i}]: `units:` um (default) or fraction (of the bounding box)")
+                if "box" in r and (len(r["box"]) not in (2, 3) or any(len(b) != 2 or b[0] > b[1] for b in r["box"])):
+                    raise ValueError(f"{w}.clamp.rois[{i}]: `box:` is [[lo, hi], [lo, hi]] or with a third [lo, hi]")
+                if "sphere" in r and len(r["sphere"]) != 4:
+                    raise ValueError(f"{w}.clamp.rois[{i}]: `sphere:` is [x, y, z, r]")
+
+
+def _brain_mean_metrics(obs, pred):
+    """R2 and RMSE (dF/F) of the learned brain-mean trace against the recorded one, over the free frames."""
+    obs, pred = np.asarray(obs, np.float64), np.asarray(pred, np.float64)
+    ok = np.isfinite(obs) & np.isfinite(pred)
+    o, p = obs[ok], pred[ok]
+    den = ((o - o.mean()) ** 2).sum()
+    return {"brain_mean_r2": float(1 - ((p - o) ** 2).sum() / den) if den > 0 else float("nan"),
+            "brain_mean_rmse": float(np.sqrt(((p - o) ** 2).mean())) if len(o) else float("nan")}
+
+
+def _roi_mask(rois, pos):
+    """bool [N]: the elements inside ANY of the ROIs. `units: fraction` reads a box or sphere in fractions of the
+    positions' bounding box along each axis (a sphere's radius in fractions of its largest side)."""
+    pos = np.asarray(pos, np.float64)
+    lo, ext = pos.min(0), np.ptp(pos, 0)
+    m = np.zeros(len(pos), bool)
+    for r in rois:
+        frac = r.get("units", "um") == "fraction"
+        if "box" in r:
+            k = np.ones(len(pos), bool)
+            for ax, (a, b) in enumerate(r["box"]):
+                a, b = (lo[ax] + a * ext[ax], lo[ax] + b * ext[ax]) if frac else (a, b)
+                k &= (pos[:, ax] >= a) & (pos[:, ax] <= b)
+        else:
+            c, rad = np.asarray(r["sphere"][:3], float), float(r["sphere"][3])
+            if frac:
+                c, rad = lo + c * ext, rad * ext.max()
+            k = ((pos - c) ** 2).sum(1) <= rad ** 2
+        m |= k
+    return m
+
+
+@contextlib.contextmanager
+def _zeroed(learn, spec, names):
+    """The learnables named in `names` (a `param:` or a `block:`) set to 0, restored on exit."""
+    keys = [Learnables.key(e) for e in spec["learnable"] if (e.get("param") or e.get("block")) in set(names)]
+    saved = {}
+    with torch.no_grad():
+        for k in keys:
+            saved[k] = learn.p[k].detach().clone()
+            learn.p[k].zero_()
+    try:
+        yield
+    finally:
+        with torch.no_grad():
+            for k, v in saved.items():
+                learn.p[k].copy_(v)
 
 
 def _loss_terms(task, kind):
@@ -265,6 +363,7 @@ def load(path_or_name) -> dict:
                                                                 and term["term"] not in ("mse", "trace_mse", "trace_increment")):
             raise ValueError(f"{path}: task.loss term {term['term']!r}: reduction "
                              f"{term.get('reduction')!r}; only `mse` takes one of {list(REDUCTIONS)}")
+    _check_rollouts(path, s, kind)
     tr = s["training"]
     _refuse_unread(f"{path}: training", tr, _KEYS["training"])
     if kind == "shape":
@@ -324,10 +423,11 @@ def load(path_or_name) -> dict:
         # seeded from the recording at each origin; the known stimulus, if any, is the drive -- a window of
         # frames written into a set's block before every step. The curriculum is a list of STAGES, one horizon
         # each (plexus2.tex: "a curriculum is a list of stages, each overriding the rollout's horizon").
-        if (ref.get("split") or "all") not in ("all", "zapbench"):
+        if (ref.get("split") or "all") not in ("all", "zapbench", "recording"):
             raise ValueError(f"{path}: a trace_recording task's `split:` is `all` (train and score on every frame, "
-                             f"Cedric 2026-09-30) or `zapbench` (ZAPBench's own split: train on its training frames, "
-                             f"score its unseen test frames, Cedric 2026-10-01)")
+                             f"Cedric 2026-09-30), `zapbench` (ZAPBench's own split: train on its training frames, "
+                             f"score its unseen test frames, Cedric 2026-10-01) or `recording` (the recording's own "
+                             f"per-frame `split` array, 0 train / 2 held out: exp20's held-out trials)")
         if set(t["observe"]) - {"set", "block"}:
             raise ValueError(f"{path}: a trace_recording task observes `set:` and `block:` only")
         if "drive" in t:
@@ -640,8 +740,10 @@ def rollout(sim, learn, u, task, device="cpu", grad=True, watch=None):
         if watch is not None:
             watch(H)
 
+    # `on_ready` hands every {param:, op:} learnable to its operator instance (`Learnables.ready`), as
+    # the recording trainer does; a spec with none is unaffected (exp18's broadcast angles needed it).
     H, _ = engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook,
-                      batch=batch, on_seeded=learn.inject)
+                      batch=batch, on_seeded=learn.inject, on_ready=learn.ready)
     if not trace:
         return H, None
     y = torch.stack(trace)
@@ -1074,6 +1176,22 @@ def analyse(spec, device="cpu", root=None):
     p = os.path.join(out, "results", f"{spec['name']}_{split}.png")
     fig.savefig(p, dpi=130, facecolor=BG, bbox_inches="tight")
     plt.close(fig)
+    # THE MOVIE THE WATCHER SHOWS (`tools/exp_record.py` links results/movie.mp4 of a training run).
+    # One held-out trial per condition cell, at most six, so a multi-law circuit shows every law it
+    # holds. A fit that lands without its movie is still a fit, so a failure here is printed, not raised.
+    try:
+        from plexus.tasks.plot_trainer import rollout_movie
+        cells = _c.tolist()
+        pick = [cells.index(c) for c in sorted(set(cells))][:6] or [0]
+        with torch.no_grad():
+            _, Ym = rollout(sim, learn, U[pick], task, device, grad=False)
+        n_m = min(Ym.shape[-2], Y.shape[1])
+        rollout_movie(U[pick][..., :1].cpu().numpy(), Y[pick][:, :n_m, :1].cpu().numpy(),
+                      Ym[..., :n_m, ch:ch + 1].cpu().numpy(), out=os.path.join(out, "results", "movie.mp4"),
+                      dt=dt, fps=48, unit=(task["observe"].get("unit") or ""), n_show=len(pick),
+                      title=f"{spec['name']}  ({split}, one trial per condition cell)")
+    except Exception as exc:                                       # noqa: BLE001
+        print(f"[analyse] movie not written: {type(exc).__name__}: {exc}")
     if poles is not None:
         res["poles"] = {"max_re_at_op": float(max(p.real for p in poles[0])),
                         "max_re_at_origin": float(max(p.real for p in poles[1])),
@@ -2272,16 +2390,25 @@ def _trace_setup(spec, device):
     # output in units of the one-step difference's standard deviation. Handed to the law at `on_ready`.
     norm = (float(X.mean()), float(X.std()), float(d1.std()))
     split, lab = t["reference"].get("split", "all"), None
-    if split == "zapbench":
-        # ZAPBENCH'S SPLIT: the labels per frame, and the normalisation from the TRAINING frames only (no statistic
-        # of a test frame reaches the law)
-        lab = TR.zapbench_split(rec["offsets"], int(X.shape[0]))
+    if split in ("zapbench", "recording"):
+        # ZAPBENCH'S SPLIT, or THE RECORDING'S OWN (`split` in its npz, 0 train / 2 held out: exp20's held-out trial
+        # windows, written by its exporter): the labels per frame, and the normalisation from the TRAINING frames
+        # only (no statistic of a test frame reaches the law)
+        lab = (TR.zapbench_split(rec["offsets"], int(X.shape[0])) if split == "zapbench"
+               else np.asarray(rec["split"]).astype(np.int64))
         tr_ = torch.as_tensor(lab == 0, device=X.device)
         Xt = X[tr_]
         norm = (float(Xt.mean()), float(Xt.std()), float(d1[tr_[1:] & tr_[:-1]].std()))
         del Xt
     del d1
     return dict(rec=rec, X=X, S=S, n_in=b - a, norm=norm, T=int(X.shape[0]), split=split, lab=lab)
+
+
+def _frame_s(rec) -> float:
+    """Seconds per recorded frame: the recording's own clock (`t_s`), else ZAPBench's 0.914 s (exp17's default; every
+    exp17 recording has t_s = frame x 0.914, so its numbers do not move). exp20's sessions run at 1.117 s."""
+    t = rec.get("t_s") if isinstance(rec, dict) else None
+    return float(np.median(np.diff(np.asarray(t)))) if t is not None and len(t) > 1 else 0.914
 
 
 def _clock(H, tc, T):
@@ -2425,7 +2552,7 @@ def _train_trace(spec, device="cpu", root=None):
     # get_training_frame_sampling): the curriculum is then the only thing that changes between stages.
     w = _warmup(spec)                       # the warm-up frames, behind each origin and inside the training frames
     origins = np.arange(n_in - 1 + w, T - 1 - kmax)
-    if box["split"] == "zapbench":            # every frame of every training window is a ZAPBench training frame
+    if box["lab"] is not None:               # every frame of every training window is a training frame
         origins = TR.split_origins(box["lab"], box["rec"]["condition"], "train", n_in + w, kmax)
     sims = {k: _trace_sim(spec, True, k) for k in sorted({k for k, _ in stages})}
     learn = Learnables(spec["learnable"], device)
@@ -2451,8 +2578,11 @@ def _train_trace(spec, device="cpu", root=None):
     if box["split"] == "zapbench":            # the live evaluation on ZAPBench's VALIDATION windows, never its test
         vo = TR.split_origins(box["lab"], rec_["condition"], "val", n_in + w, 32)
         ev_o = vo[np.linspace(0, len(vo) - 1, 16).astype(int)]
+    elif box["split"] == "recording":         # no validation part: the live evaluation on TRAINING windows, never
+        vo = TR.split_origins(box["lab"], rec_["condition"], "train", n_in + w, 32)    # a held-out one
+        ev_o = vo[np.linspace(0, len(vo) - 1, 16).astype(int)]
     # THE STIMULUS LOOKUP ON THOSE ORIGINS, once: the live figure draws its per-step skill beside the model's.
-    look = (TR.stimulus_lookup_fit(box["X"], kid_, box["lab"] == 0) if box["split"] == "zapbench"
+    look = (TR.stimulus_lookup_fit(box["X"], kid_, box["lab"] == 0) if box["lab"] is not None
             else TR.stimulus_lookup(box["X"], kid_))
     lk_mse = TR.mse_per_origin(lambda oo, h: look[oo + h], box["X"], torch.as_tensor(ev_o, device=box["X"].device)).mean(1)
     del look
@@ -2615,11 +2745,15 @@ def _test_trace(spec, device="cpu", root=None):
         # scored), which every test window has room for (the test segments follow 80 % of each condition)
         if origins.min() < box["n_in"] - 1 + _warmup(spec):
             raise ValueError(f"a ZAPBench window at frame {origins.min()} has no room for the warm-up")
+    elif box["split"] == "recording":         # every window whose 32 forecast frames lie in a held-out part
+        origins, stride = TR.split_origins(box["lab"], rec["condition"], "test", box["n_in"] + _warmup(spec), H_), 1
+        if not len(origins):
+            raise ValueError(f"the recording's held-out parts hold no window of {H_} frames")
     t0 = time.time()
     m, base = _trace_eval(spec, learn, box, device, origins, H_)
     ot = torch.as_tensor(origins, device=X.device)
     kid = TR.stimulus_keys(rec["stimulus"], rec["condition"])
-    look = TR.stimulus_lookup_fit(X, kid, box["lab"] == 0) if zb else TR.stimulus_lookup(X, kid)
+    look = TR.stimulus_lookup_fit(X, kid, box["lab"] == 0) if box["lab"] is not None else TR.stimulus_lookup(X, kid)
     lk = TR.mse_per_origin(lambda oo, h: look[oo + h], X, ot)
     oc, nc = rec["condition"][origins], len(rec["names"])
     # THE GRAND AVERAGE: every condition, or with ZAPBench's split its 8 training conditions' test windows (TAXIS,
@@ -2667,7 +2801,7 @@ def _test_trace(spec, device="cpu", root=None):
           f"{free['r2_raw_sd']:.3f}, denoised {free['r2_denoised']:+.3f} +- {free['r2_denoised_sd']:.3f}, "
           f"finite {bool(finite)}")
     out_j = {"name": spec["name"], "mode": "trace", "origins": int(len(origins)), "stride": stride,
-             "names": rec["names"], "offsets": rec["offsets"].tolist(), "frame_s": 0.914,
+             "names": rec["names"], "offsets": rec["offsets"].tolist(), "frame_s": _frame_s(rec),
              **res, "identity_gap": ident, "best_W": (best_w + 1).tolist(),
              "mse_model": model_c[gsel].mean(0).tolist(), "mse_mean": mean_c[gsel].mean(0).tolist(),
              "mse_persistence": pers_c[gsel].mean(0).tolist(), "mse_lookup": look_c[gsel].mean(0).tolist(),
@@ -2675,25 +2809,92 @@ def _test_trace(spec, device="cpu", root=None):
              "lookup_skill_short": sk_look["skill_short"], "lookup_skill_long": sk_look["skill_long"],
              "skill_long_minus_lookup": res["skill_long"] - sk_look["skill_long"],
              "noise_sigma2": sigma2, "one_step_msd": D1, "free": free,
-             "free_t_s": ((o0 + 1 + np.arange(n)) * 0.914).tolist(), "free_r2_raw": r2r.tolist(),
+             "free_t_s": ((o0 + 1 + np.arange(n)) * _frame_s(rec)).tolist(), "free_r2_raw": r2r.tolist(),
              "free_r2_denoised": r2d.tolist(), "free_silenced": n_dead.tolist(), "it": ck.get("it"), "select": ck.get("select", "last"), **zbj}
     out_j["checkpoint"] = ckn or "best"
     out_j["trace_recording"] = spec["task"]["reference"]["trace_recording"]   # which recording these scores are on
+    out_j["rollouts"] = _trace_variants(spec, learn, box, device, out, stem)
     json.dump(out_j, open(os.path.join(out, "results", f"{stem}_test.json"), "w"))
     return out_j
+
+
+def _trace_variants(spec, learn, box, device, out, stem, names=None):
+    """Every `task.rollouts` variant but the nominal one (made above): {name: its free-rollout summary}; each writes
+    results/<stem>_<name>_free.npz and _movie.npz, which `-o analyse` renders as results/movie_<name>.mp4."""
+    res = {}
+    for v in spec["task"].get("rollouts") or []:
+        if v["name"] == "nominal" or (names and v["name"] not in names):
+            continue
+        t1 = time.time()
+        fv = _trace_free(spec, learn, box, device, out, f"{stem}_{v['name']}", variant=v)[0]
+        res[v["name"]] = {**fv, "spec": v}
+        print(f"[test] rollout `{v['name']}` ({time.time() - t1:.0f} s): R2 denoised {fv['r2_denoised']:+.3f} over "
+              f"{box['X'].shape[1] - fv['n_clamped']:,} free elements ({fv['n_clamped']:,} given), brain-mean SD "
+              f"{fv['brain_mean_sd_pred']:.4f} against {fv['brain_mean_sd_obs']:.4f} recorded, r {fv['brain_mean_r']:.2f}, "
+              f"{fv['silenced']} silenced")
+    return res
+
+
+def trace_rollouts(name, device="cuda:0", root=None, names=None):
+    """A landed run's `task.rollouts` variants made from its best model without re-scoring the test windows (as
+    `trace_movie`), the test json's `rollouts` updated, and each variant's movie rendered."""
+    engine.quiet(True)
+    spec = load(name)
+    out = out_dir(spec, root)
+    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    box = _trace_setup(spec, device)
+    res = _trace_variants(spec, learn, box, device, out, spec["name"], names)
+    tj = os.path.join(out, "results", f"{spec['name']}_test.json")
+    if os.path.exists(tj):
+        j = json.load(open(tj))
+        j["rollouts"] = {**j.get("rollouts", {}), **res}
+        json.dump(j, open(tj, "w"))
+    del box
+    for nm in res:
+        _render_variant(spec, out, spec["name"], nm)
+    return res
+
+
+def _render_variant(spec, out, stem, nm):
+    """results/movie_<nm>.mp4: a rollout variant's movie, recorded LEFT and the variant RIGHT."""
+    from plexus.tasks import trace_recording as TR
+    rec = TR.load(spec["task"]["reference"]["trace_recording"])
+    mv = np.load(os.path.join(out, "results", f"{stem}_{nm}_movie.npz"))
+    fr = mv["frames"]
+    v = next(r for r in spec["task"]["rollouts"] if r["name"] == nm)
+    rec_ref = str(spec["task"]["reference"].get("trace_recording"))
+    what = ", ".join(([f"{', '.join(v['zero'])} = 0"] if v.get("zero") else []) + (["no stimulus"] if v.get("drive") == "off"
+                     else []) + ([f"{int(mv['clamped'].sum()):,} given"] if "clamp" in v else []))
+    TR.render_movie(rec["dff"][fr], mv["pred"].astype(np.float32), fr, rec.get("pos_view", rec["pos_um"]), mv["r2_raw"], mv["r2_denoised"],
+                    _frame_s(rec), rec["condition"][fr], rec["names"], os.path.join(out, "results", f"movie_{nm}.mp4"),
+                    r2_t=mv["r2_t"], r2_raw_all=mv["r2_raw_all"], r2_den_all=mv["r2_denoised_all"],
+                    silenced_all=mv["silenced_all"], mean_obs_all=mv["mean_obs_all"], mean_pred_all=mv["mean_pred_all"],
+                    cond_all=mv["cond_all"], split_all=mv["split_all"],
+                    split_name=spec["task"]["reference"].get("split", "all"), law=f"{_law_name(spec)}: {nm} ({what})",
+                    rec_name=("destriped" if "destripe" in rec_ref else rec_ref))
 
 
 SILENCE_RANGE = (-1.0, 3.0)   # dF/F; the free rollout freezes an element outside it (finding 21)
 
 
-def _trace_free(spec, learn, box, device, out, stem, n_movie=800):
+def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None):
     """ONE FREE ROLLOUT of the whole recording from the law's first `inputs` frames: R^2 per frame over the elements,
     raw and against the denoised recording (results/<stem>_free.npz), and THE MOVIE sampled from this same rollout
     (Cedric, 2026-10-02: the whole 2 h, not a 200-frame restart): `n_movie` frames evenly spaced over it, the learned
     frame and the recorded one (results/<stem>_movie.npz). Returns (free summary, r2 raw, r2 denoised, first origin,
-    frames, finite)."""
+    frames, finite). `variant`, one entry of `task.rollouts` (None: the nominal rollout): its `zero:` learnables at 0,
+    its `drive: off`, its `clamp:` elements given their recorded frames and left out of R2 and the brain mean."""
     from plexus.tasks import trace_recording as TR
     X, T = box["X"], box["T"]
+    variant = variant or {}
+    clamp = None
+    if "clamp" in variant:
+        clamp = torch.as_tensor(_roi_mask(variant["clamp"]["rois"], box["rec"]["pos_um"]), device=X.device)
+        if not bool(clamp.any()) or bool(clamp.all()):
+            raise ValueError(f"rollout `{variant.get('name')}`: its ROIs hold {int(clamp.sum())} of {len(clamp)} elements; "
+                             "a clamp needs some elements given and some free")
     w = _warmup(spec)
     o0 = box["n_in"] - 1 + w                # the free rollout's first origin, after its warm-up
     n = T - 1 - o0
@@ -2730,7 +2931,7 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800):
     def on_pred(k, p):
         nonlocal finite
         tt = o0 + k + 1
-        alive = ~dead
+        alive = ~dead if clamp is None else ~dead & ~clamp
         n_dead[k] = int(dead.sum())
         finite = finite and bool(torch.isfinite(p[alive]).all())
         r2r[k] = r2(p, X[tt], alive)
@@ -2740,20 +2941,31 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800):
             q = p.clone()
             q[dead] = float("nan")                  # drawn blank in the movie
             mv.append(q.half().cpu().numpy())
-    with torch.no_grad():
-        _trace_rollout_stream(sim, learn, spec, box, o0, n, device, on_pred, silence=silence, w=w)
+    with torch.no_grad(), _zeroed(learn, spec, variant.get("zero", [])):
+        _trace_rollout_stream(sim, learn, spec, box, o0, n, device, on_pred, silence=silence, w=w,
+                              drive_on=variant.get("drive", "on") == "on", clamp=clamp)
     free = {"r2_raw": float(np.nanmean(r2r)), "r2_raw_sd": float(np.nanstd(r2r)), "r2_denoised": float(np.nanmean(r2d)),
             "r2_denoised_sd": float(np.nanstd(r2d)), "finite": 1.0 if finite else 0.0, "origin": o0, "frames": n,
-            "silenced": int(n_dead[-1]), "silenced_first_t_s": (float((o0 + 1 + int(np.argmax(n_dead > 0))) * 0.914)
+            "silenced": int(n_dead[-1]), "silenced_first_t_s": (float((o0 + 1 + int(np.argmax(n_dead > 0))) * _frame_s(box["rec"]))
                                                                  if n_dead[-1] else None),
-            "silence_range": list(SILENCE_RANGE)}
+            "silence_range": list(SILENCE_RANGE),
+            # the brain-mean dF/F over the free (not given, not silenced) elements: its SD over the rollout, recorded and
+            # learned, and their correlation -- the network test of exp17 (finding 26)
+            "brain_mean_sd_obs": float(mean_obs.std()), "brain_mean_sd_pred": float(mean_pred.std()),
+            "brain_mean_r": float(np.corrcoef(mean_obs, mean_pred)[0, 1]) if mean_pred.std() > 0 else float("nan"),
+            # THE BRAIN-MEAN METRICS (Cedric, 2026-10-03: "better than the R2 on the volume, it shows the learning of the
+            # network dynamics"): R2 = 1 - sum_t (pred_t - obs_t)^2 / sum_t (obs_t - mean obs)^2 and the RMSE in dF/F,
+            # between the recorded and learned brain-mean traces over every free frame
+            **_brain_mean_metrics(mean_obs, mean_pred),
+            "variant": variant.get("name", "nominal"), "n_clamped": int(clamp.sum()) if clamp is not None else 0}
     np.savez_compressed(os.path.join(out, "results", f"{stem}_free.npz"), r2_raw=r2r, r2_denoised=r2d, silenced=n_dead)
     ks = np.array(sorted(keep))
     fr_m = o0 + 1 + ks
     np.savez_compressed(os.path.join(out, "results", f"{stem}_movie.npz"), frames=fr_m, pred=np.stack(mv),
                         r2_raw=r2r[ks], r2_denoised=r2d[ks], r2_t=o0 + 1 + np.arange(n), r2_raw_all=r2r,
                         r2_denoised_all=r2d, silenced=n_dead[ks], silenced_all=n_dead, kind="free",
-                        mean_obs_all=mean_obs, mean_pred_all=mean_pred,
+                        mean_obs_all=mean_obs, mean_pred_all=mean_pred, variant=variant.get("name", "nominal"),
+                        clamped=(clamp.cpu().numpy() if clamp is not None else np.zeros(X.shape[1], bool)),
                         cond_all=np.asarray(box["rec"]["condition"])[o0 + 1 + np.arange(n)],
                         split_all=(np.asarray(box["lab"])[o0 + 1 + np.arange(n)] if box.get("lab") is not None
                                    else np.zeros(n, np.int64)))
@@ -2776,17 +2988,19 @@ def trace_movie(name, device="cuda:0", root=None):
     if os.path.exists(tj):                  # the scores' free-rollout fields follow the rollout just made
         j = json.load(open(tj))
         j.update({"free": free, "free_r2_raw": r2r.tolist(), "free_r2_denoised": r2d.tolist(),
-                  "free_silenced": n_dead.tolist(), "free_t_s": ((o0 + 1 + np.arange(n)) * 0.914).tolist()})
+                  "free_silenced": n_dead.tolist(), "free_t_s": ((o0 + 1 + np.arange(n)) * _frame_s(box["rec"])).tolist()})
         json.dump(j, open(tj, "w"))
     print(f"[movie] {name}: free rollout of {free['frames']} frames in {time.time() - t1:.0f} s, R2 denoised "
           f"{free['r2_denoised']:+.3f}, {free['silenced']} element(s) silenced")
     return free
 
 
-def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=None, w=0):
+def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=None, w=0, drive_on=True, clamp=None):
     """A long rollout (the free one), each frame handed to `on_pred(k, frame)` and dropped, not stacked. `silence`,
     when given, edits the observed block before each frame is read (`silence(block) -> block or None`): the free
-    rollout freezes its runaway elements with it."""
+    rollout freezes its runaway elements with it. `drive_on` False writes the drive as 0 every frame (a rollout
+    variant with no stimulus); `clamp` (bool [N]) overwrites those elements with their RECORDED frames every tick,
+    before the frame is read and before the next step reads them (a rollout variant with given leaders)."""
     t = spec["task"]
     obs, drv, X, S, T = t["observe"], t.get("drive"), box["X"], box["S"], box["T"]
     o = o - w                                  # `w` warm-up ticks of recorded frames first, then n free ones
@@ -2800,7 +3014,7 @@ def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=
         a, b = lv.state_schema[drv["block"]]
         idx = (torch.arange(drv["window"][0], drv["window"][1] + 1, device=X.device) + tc).clamp(0, T - 1)
         st = lv.state.clone()
-        st[..., a:b] = S[idx].T
+        st[..., a:b] = S[idx].T if drive_on else 0.0
         lv.state = st
 
     def seeded(H):
@@ -2823,6 +3037,10 @@ def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=
             lv.state = st
             window(H, o + tick + 1)
             return
+        if clamp is not None:                  # the given elements: their recorded frames, newest first
+            st = lv.state.clone()
+            st[clamp, a:b] = torch.stack([X[o + tick + 1 - j][clamp] for j in range(box["n_in"])], 1).to(st.dtype)
+            lv.state = st
         if silence is not None:
             blk = silence(lv.state[..., a:b])
             if blk is not None:
@@ -2910,8 +3128,8 @@ def _analyse_trace(spec, device="cpu", root=None):
     json.dump(clus, open(os.path.join(out, "results", f"{name}_clusters.json"), "w"), indent=1)
     mv = np.load(os.path.join(out, "results", f"{name}_movie.npz"))
     frames = mv["frames"]
-    TR.render_movie(rec["dff"][frames], mv["pred"].astype(np.float32), frames, rec["pos_um"],
-                    mv["r2_raw"], mv["r2_denoised"], 0.914, rec["condition"][frames], rec["names"],
+    TR.render_movie(rec["dff"][frames], mv["pred"].astype(np.float32), frames, rec.get("pos_view", rec["pos_um"]),
+                    mv["r2_raw"], mv["r2_denoised"], _frame_s(rec), rec["condition"][frames], rec["names"],
                     os.path.join(out, "results", f"movie_{ckn}.mp4" if ckn else "movie.mp4"), emb=emb, labels=labels,
                     **({"r2_t": mv["r2_t"], "r2_raw_all": mv["r2_raw_all"], "r2_den_all": mv["r2_denoised_all"]}
                        if "r2_t" in mv else {}),
@@ -2922,7 +3140,12 @@ def _analyse_trace(spec, device="cpu", root=None):
                     emb_name="embedding" if src == "embedding" else "neuron constants " + src[len("parameters "):],
                     inputs=(fit["neuron.input"].float().norm(dim=1).numpy() if "neuron.input" in fit else None),
                     law=_law_name(spec),
-                    rec_name="destriped" if "destripe" in str(spec["task"]["reference"].get("trace_recording")) else "ZAPBench")
+                    rec_name=("destriped" if "destripe" in str(spec["task"]["reference"].get("trace_recording")) else "ZAPBench"
+                              if str(spec["task"]["reference"].get("trace_recording")).startswith("zapbench")
+                              else str(spec["task"]["reference"].get("trace_recording")).replace("gutbrain_", "gut-brain ")))
+    for v in spec["task"].get("rollouts") or []:          # the rollout variants' movies (`task.rollouts`)
+        if v["name"] != "nominal" and os.path.exists(os.path.join(out, "results", f"{name}_{v['name']}_movie.npz")):
+            _render_variant(spec, out, name, v["name"])
     print(f"[plot] {name}: {name}_test.png, {f'movie_{ckn}.mp4' if ckn else 'movie.mp4'} ({len(frames)} frames)" +
           (f", {src} AMI with tuning {clus.get('ami_tuning', clus.get('ami_tuning_params')):.3f}" if clus else ""))
     return clus

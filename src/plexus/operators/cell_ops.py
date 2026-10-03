@@ -2565,6 +2565,84 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
         return sd * (z - z0)
 
 
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_mlp_leak",
+                   title="A set's scalar through the known ODE's leak with a learned MLP message (per-element embedding) "
+                         "on the multi-scale graph between the elements",
+                   equation=r"""$$z_i\leftarrow z_i+\big(1-e^{-r_i/M}\big)\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j\in\mathcal N_s(i)}
+W^{s}_{ji}\,g_\phi(\cdot)^2+B_i\cdot u\big)$$""")
+class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
+    """THE LEAKY GNN-MLP (exp17 batch 12, arms 9-12; Cedric 2026-10-03: "a new model GNN class with known-ODE leak and MLP
+    message passing, two variants function of (a_j, v_j) and (a_i, a_j, v_i, v_j)"). The known ODE on the neuron graph
+    with its message W tanh(z_j) replaced by the GNN-MLP's learned message, and NO update MLP:
+
+        m_i = sum_s sum_{j->i} W^s_e g_phi(.)^2           `message: sender`  g_phi(z_j, a_j)
+                                                          `message: pair`    g_phi(z_i, z_j, a_i, a_j)
+        z_i <- z_i + frac(r_i) (-z_i + V_i + m_i + B_i . u),   r_i = softplus(tau_i), per substep
+
+    frac(r) = 1 - exp(-r / M) (`integrator: exponential`, this law's default; `euler` gives r / M). WHY: batch 12's
+    update z += f_theta(...) / M has nothing pulling a neuron back, and every free rollout drifted off the recording
+    past the trained horizon (50 frames) while its windows matched the known ODE's; the -z_i leak toward the learned
+    rest V_i is what kept batch 13's rollouts on the recording for 2 h. The leak is exactly the known ODE's, so with
+    every W = 0 this law IS the known ODE with W = 0 (each element's own leaky filter of the stimulus).
+    tau, rest, input, embedding are state blocks learned as `{block:, of:}`; theta_g and W^s as in neuron_graph_mlp,
+    with its priors on theta_g (`monotone`, `pin`, `input_group_l1`).
+    """
+    MECHANISM_TAGS = ["known_ode", "leaky_integrator", "proxy_connectome", "gnn"]
+    PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraphMLP.PARAM_ROLES.items() if k != "theta_f"},
+                   **{k: StateDiffuseNeuronGraph.PARAM_ROLES[k] for k in ("tau", "rest", "integrator", "rate_max")}}
+
+    def __init__(self, params, device="cpu"):
+        bad = [k for k in ("synapse", "adaptation", "modulation", "activation") if k in params]
+        if bad:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: {bad} are options of the known ODE (neuron_graph)")
+        params = {"integrator": "exponential", **params}
+        StateDiffuseNeuronGraph.__init__(self, params, device)
+        self.message = str(params.get("message", "sender"))
+        if self.message not in ("sender", "pair"):
+            raise ValueError("state_diffuse[neuron_graph_mlp_leak] `message:` sender (default) or pair")
+        self.hidden = int(params.get("hidden", 64))
+        self.embedding_dim = int(params.get("embedding_dim", 2))
+        self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "input", "embedding")}
+        self._a_last = None
+        self.init_theta()
+
+    def _shapes(self):
+        E = self.embedding_dim
+        return {"theta_g": (2 + 2 * E) if self.message == "pair" else (1 + E)}
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        E = self._E
+        if x.shape[0] != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: {x.shape[0]} elements, the graph was built on "
+                             f"{self.n_elements} (`positions_file`)")
+        if x.shape[1] != 1:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak] writes a 1-wide block, `{self.block}` is "
+                             f"{x.shape[1]} wide")
+        ae = nb["embedding"]
+        if ae.shape[1] != self.embedding_dim:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: the embedding block is {ae.shape[1]} wide, "
+                             f"`embedding_dim` {self.embedding_dim}")
+        self._a_last = ae.detach()
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
+        if self.input_mask is not None and self.forcing_dim:
+            drive = drive * self.input_mask.to(drive.device)
+        fz = self._frac(self._rate(nb["tau"]))
+        for _ in range(self.substeps):
+            agg = torch.zeros_like(z)
+            gn = self._g(z, z, ae, ae) if self.message == "sender" else None     # per sender: one MLP per element
+            for s in self.EDGE_SETS:
+                snd, rcv = E[s]
+                if snd.numel():
+                    w = getattr(self, f"W_{s}")[:, None]
+                    ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
+                    agg = agg.index_add(0, rcv, w * ge)
+            z = z + fz * (-z + nb["rest"] + agg + drive)
+        return sd * (z - z0)
+
+
 # --------------------------------------------------------------------------- motility
 #
 # HOW AN ADHERENT CELL MOVES: by gripping the substrate and pulling, not by being pushed.

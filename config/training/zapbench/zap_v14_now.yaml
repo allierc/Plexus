@@ -1,27 +1,6 @@
-name: zap_e15_cur_siren
-model: config/zapbench/zap_e15_cur_siren.yaml
+name: zap_v14_now
+model: config/zapbench/zap_v14_cur.yaml
 learnable:
-- param: W_short
-  op: state_diffuse
-  lr: 0.0009
-  prior:
-    l1: 7.5e-05
-    l2: 7.5e-07
-  title: one weight per short edge (6 nearest neurons)
-- param: W_mid
-  op: state_diffuse
-  lr: 0.0009
-  prior:
-    l1: 7.5e-05
-    l2: 7.5e-07
-  title: one weight per middle edge
-- param: W_long
-  op: state_diffuse
-  lr: 0.0009
-  prior:
-    l1: 7.5e-05
-    l2: 7.5e-07
-  title: one weight per long edge
 - block: tau
   of: neuron
   lr: 0.0018
@@ -33,14 +12,10 @@ learnable:
 - block: input
   of: neuron
   lr: 0.0018
-  title: each neuron's weights on the 27 stimulus features (22 visual + 5 ephys)
-- param: omega_mlp
-  op: state_diffuse
-  lr: 1.0e-06
-  title: the modulation's SIREN weights
+  title: each neuron's weights on the 22 stimulus features
 task:
   reference:
-    trace_recording: zapbench_destripe_ephys
+    trace_recording: zapbench_destripe
     split: all
     test_stride: 8
   drive:
@@ -56,24 +31,6 @@ task:
   - term: trace_mse
     reduction: norm2
   warmup: 10
-  rollouts:
-  - name: nominal
-  - name: W0
-    zero:
-    - W_short
-    - W_mid
-    - W_long
-  - name: no_stimulus
-    drive: 'off'
-  - name: lead_left_quarter
-    clamp:
-      rois:
-      - box:
-        - - 0.0
-          - 0.25
-        - - 0.0
-          - 1.0
-        units: fraction
 training:
   optimizer: adam
   lr: 0.0018
