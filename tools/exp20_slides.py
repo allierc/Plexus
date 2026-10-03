@@ -570,7 +570,7 @@ def md_rows():
     md = open(os.path.join(ROOT, "experiments", "exp20_gutbrain_graphcast.md")).read()
     out = {}
     for line in md.splitlines():
-        m = re.match(r"\\| (\\S+) \\| `training/gutbrain/(\\w+)` \\|(.*)\\|\\s*$", line)
+        m = re.match(r"\| (\S+) \| `training/gutbrain/(\w+)` \|(.*)\|\s*$", line)
         if m:
             cells = [c.strip() for c in m.group(3).split("|")]
             out[m.group(2)] = (m.group(1), cells[-2] if len(cells) >= 2 else "")
@@ -610,21 +610,32 @@ def cell_r2(d, stem):
     return float(np.nanmean(np.load(p)["r2_denoised"])) if os.path.exists(p) else None
 
 
+def bm(d, stem):
+    """Brain-mean R2 and RMSE of a free rollout (trainer `_brain_mean_metrics` on its movie npz); (None, None) if absent."""
+    from plexus import trainer as T
+    p = os.path.join(d, "results", f"{stem}_movie.npz")
+    if not os.path.exists(p):
+        return None, None
+    z = np.load(p)
+    q = T._brain_mean_metrics(z["mean_obs_all"], z["mean_pred_all"])
+    return q["brain_mean_r2"], q["brain_mean_rmse"]
+
+
 def control_table(name, now):
-    """THE CONTROLS TABLE on every results slide (Cedric, 2026-10-03): the full model, the same model with W = 0 at
-    inference, and the batch's model trained with no network -- brain-mean R2 and per-cell R2 of each free rollout.
-    A row is left out when its rollout does not exist yet."""
+    """THE NETWORK TEST, exp17's table (Cedric, 2026-10-03), first on every results slide: the full model, W = 0 at
+    inference, the batch's model trained with no network -- brain-mean R2 and RMSE (dF/F), per-cell R2."""
     r, rn = landed(name), landed(now) if now else None
-    f = lambda v: f"{v:+.2f}" if v is not None and np.isfinite(v) else "--"
-    rws = [(f"full model ({_tex(name)})", brain_r2(r["dir"], name), cell_r2(r["dir"], name))]
+    f = lambda v, fmt="{:+.3f}": fmt.format(v) if v is not None and np.isfinite(v) else "--"
+    rws = [("full model", r["dir"], name)]
     if os.path.exists(os.path.join(r["dir"], "results", f"{name}_W0_movie.npz")):
-        rws.append(("W = 0 at inference", brain_r2(r["dir"], f"{name}_W0"), cell_r2(r["dir"], f"{name}_W0")))
+        rws.append(("W = 0 at inference", r["dir"], f"{name}_W0"))
     if rn and now != name:
-        rws.append((f"trained with no network ({_tex(now)})", brain_r2(rn["dir"], now), cell_r2(rn["dir"], now)))
-    body = "".join(f"{a} & {f(b_)} & {f(c)} \\\\\n" for a, b_, c in rws)
-    return ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{}}\n"
-            "free rollout, whole session & brain-mean R$^2$ & per-cell R$^2$ \\\\\n\\hline\n" + body
-            + "\\end{tabular}\\par}\\vspace{6pt}\n")
+        rws.append(("trained with no network", rn["dir"], now))
+    body = "".join(f"{a} & {f(bm(d, st)[0])} & {f(bm(d, st)[1], '{:.4f}')} & {f(cell_r2(d, st))} \\\\\n"
+                   for a, d, st in rws)
+    return (head("the network test, free rollout") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
+            "@{\\hspace{5pt}}r@{}}\n& \\multicolumn{2}{c}{brain mean} & per-cell \\\\\n& R$^2$ & RMSE & R$^2$ \\\\\n\\hline\n"
+            + body + "\\end{tabular}\\par}\\vspace{6pt}\n")
 
 
 def numbers(r):
@@ -691,37 +702,68 @@ def slide_batch(b):
 
 
 def slides_run(name, b, now=None):
+    """Two slides per shown run, exp17's (tools/exp17_slides.py slides_run): the movie with the network test, the MSE
+    table, exp20's gut trials, the free rollout and the training; the curves with the per-trial MSE and the scale."""
     import shutil
     r = landed(name)
     if not r:
         return []
     out, rw = [], md_rows()
     v, what = rw.get(name, ("", ""))
+    names = BATCHES[b][1]
+    arm = names.index(name) + 1 if name in names else ""
+    tag = f"batch {b}, arm {arm}" if arm else f"batch {b}"
     dt = BATCH_DECK[b]
+    t, rep = r["test"], r["report"]
     N = numbers(r)
+    S_, L_ = slice(0, 3), slice(15, 32)
+    mse = {k: (np.mean(np.asarray(t[k])[S_]) * 1e3, np.mean(np.asarray(t[k])[L_]) * 1e3)
+           for k in ("mse_model", "mse_mean", "mse_lookup") if k in t}
+    fr = t["free"]
+    stages = rep.get("stages") or []
+    ft = r["freetrial"]["arms"]["full"] if r["freetrial"] else None
+    pm = lambda a, sd: f"{a:+.3f} $\\pm$ {sd:.3f}" if sd is not None else f"{a:+.3f}"
+    num = (head(f"{tag}: {_tex(name)}") + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n"
+           + control_table(name, now)
+           + head("MSE, $10^{-3}$ dF/F$^2$, held-out windows") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}r@{\\hspace{7pt}}r@{}}\n"
+           + "& h 1-3 & h 16-32 \\\\\n" + "".join(f"{lab} & {mse[k][0]:.1f} & {mse[k][1]:.1f} \\\\\n" for lab, k in (
+               ("learned law", "mse_model"), ("mean baseline", "mse_mean"), ("stimulus lookup", "mse_lookup")) if k in mse)
+           + "\\end{tabular}\\par}\\vspace{6pt}\n"
+           + head("the held-out gut trials") + rows(
+               [("from the pulse", f"{N['trial']:+.3f} skill over the STA (55 s)" if N["trial"] is not None else "--")]
+               + ([("free rollout", f"{ft['evoked_gut_free_over_rec']:.2f} of the recorded response, pattern r {ft['pattern_r_gut']:+.2f}"),
+                   ("control", f"{ft['evoked_ctrl_free_over_rec_gut']:+.2f} of the recorded gut response")] if ft else []))
+           + head("free rollout, whole session") + rows([
+               ("R$^2$ raw", pm(fr["r2_raw"], fr.get("r2_raw_sd"))),
+               ("R$^2$ denoised", pm(fr["r2_denoised"], fr.get("r2_denoised_sd"))),
+               ("exploding", f"{fr.get('silenced', 0)} cells silenced" if fr.get("silenced") else "none")])
+           + head("training") + rows([
+               ("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "--"),
+               ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]))
     mv = os.path.join(r["dir"], "results", "movie.mp4")
     if os.path.exists(mv):
         shutil.copyfile(mv, os.path.join(PRES, "Movies", f"{name}.mp4"))
         shutil.copyfile(mv.replace(".mp4", ".png"), os.path.join(PRES, "Movies", f"{name}.png"))
-        ft = r["freetrial"]["arms"]["full"] if r["freetrial"] else None
-        right = (head(_tex(name)) + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n" + rows(
-            [("short", f"{N['short']:+.3f} over the best recent mean, h 1-3"),
-             ("trial", f"{N['trial']:+.3f} over the STA (held-out gut trials)" if N["trial"] is not None else "--"),
-             ("free R$^2$", f"{N['free_r2']:+.3f} (whole session, denoised)")]
-            + ([("free gut", f"{ft['evoked_gut_free_over_rec']:.2f} of the recorded response, pattern r {ft['pattern_r_gut']:+.2f}"),
-                ("free ctrl", f"{ft['evoked_ctrl_free_over_rec_gut']:+.2f} of the recorded gut response"),
-                ("", ", ".join(f"{t['kind'][0]}{t['onset']}: {t['evoked_free']:+.3f} / {t['evoked_rec']:+.3f}" for t in ft["trials"]))]
-               if ft else [])) + control_table(name, now))
-        out.append((f"{name}_movie", frame("the free rollout of the whole session, recorded left, learned right",
-                                           f"\\playmovie{{Movies/{name}}}", right, f"{name}/results/movie.mp4", deck_title=dt)))
+        out.append((f"{name}_movie", frame(f"{tag}: the free rollout of the whole session, recorded left, learned right",
+                                           f"\\playmovie{{Movies/{name}}}", num, f"{name}/results/movie.mp4", deck_title=dt,
+                                           left_gap=True)))
     cp = os.path.join(r["dir"], "results", f"{name}_test.png")
     if os.path.exists(cp):
         shutil.copyfile(cp, os.path.join(PRES, "figs", f"{name}_test.png"))
-        out.append((f"{name}_curves", frame("its forecasts against the baselines, step by step",
-                                            f"\\panel{{figs/{name}_test.png}}", head(_tex(name)) + "{\\scriptsize the trainer's "
-                                            "test figure: MSE per step ahead on the held-out windows, the law against the best "
-                                            "recent mean, persistence and the stimulus lookup; the free rollout's R$^2$ per frame.\\par}\n",
-                                            f"{name}_test.png", deck_title=dt, left_gap=4)))
+        tj = r["trials"]["trials"] if r["trials"] else []
+        per = "".join(f"{x['kind']} {x['onset']} & {np.mean(x['mse_resp']) * 1e3:.1f} & {np.mean(x['mse_sta_resp']) * 1e3:.1f} \\\\\n"
+                      for x in tj)
+        right = (head(f"{tag}: {_tex(name)}") + head("held-out trials: window MSE, $10^{-3}$")
+                 + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}r@{\\hspace{7pt}}r@{}}\ntrial & law & STA \\\\\n\\hline\n"
+                 + per + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                 + head("the scale") + rows([
+                     ("persistence, h 1", f"{t['mse_persistence'][0]:.4f}"), ("mean, h 1", f"{t['mse_mean'][0]:.4f}"),
+                     ("model, h 1", f"{t['mse_model'][0]:.4f}"), ("mean, h 32", f"{t['mse_mean'][-1]:.4f}"),
+                     ("model, h 32", f"{t['mse_model'][-1]:.4f}")])
+                 + rows([("brain-mean R$^2$", f"{bm(r['dir'], name)[0]:+.3f}" if bm(r['dir'], name)[0] is not None else "--"),
+                         ("brain-mean RMSE", f"{bm(r['dir'], name)[1]:.4f} dF/F" if bm(r['dir'], name)[1] is not None else "--")]))
+        out.append((f"{name}_curves", frame(f"{tag}: the prediction against the mean baseline, step by step",
+                                            f"\\panel{{figs/{name}_test.png}}", right, f"{name}_test.png", deck_title=dt, left_gap=4)))
     return out
 
 
