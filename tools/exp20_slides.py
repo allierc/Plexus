@@ -369,7 +369,7 @@ def _tex(t):
     return str(t).replace("_", "\\_").replace("%", "\\%").replace("&", "\\&").replace("#", "\\#")
 
 
-def figure_graph(op, P, path, n_show=80, seed=0, box_um=140.0):
+def figure_graph(op, P, path, n_show=80, seed=0, box_um=300.0):
     """The cell graph the law trains on (the operator's own edges), TOP VIEW, HEAD LEFT (pos_view): a, the whole brain,
     every cell a faint dot and the middle and long edges INTO `n_show` random cells; b, a box around one cell, the
     short edges between the cells inside it and that cell's own 18 edges drawn thick."""
@@ -473,6 +473,82 @@ def slide_baselines():
                                   "\\panel{figs/06_input_mask.png}", right, f"data/baselines_{REC1}.json",
                                   deck_title="Before training: the references, and the input mask (the cells each "
                                              "input enters)"))
+
+
+def slides_kymo(rec_name=REC1, n_rows=100):
+    """ONE SLIDE PER INPUT (Cedric, 2026-10-03: "a kymograph as in exp17's slide 32, one slide per stimulus, the fish
+    vertical"): left, the input over the session and the n_rows cells most locked to it (the input mask's own score:
+    uv |t|, visual / swim coherence), dF/F rows z-scored, sorted by the lag of their response; the UV pulses (site
+    colours) and the held-out windows (red) drawn through; right, the brain HEAD UP, that input's mask cells coloured on
+    every cell in grey."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from plexus.tasks import trace_recording as TR
+    rec = TR.load(rec_name)
+    X, S, tr, sp = rec["dff"], rec["stimulus"], rec["trials"], rec["split"]
+    t = rec["t_s"] / 60
+    dt = float(np.median(np.diff(rec["t_s"])))
+    M = np.load(os.path.join(GD, "graphs_data", "zebrafish", f"input_mask_{rec_name}.npz"))
+    Pv = rec["pos_view"]
+    up = np.stack([Pv[:, 1], -Pv[:, 0]], 1)                 # head left -> head UP
+    INP = [("uv", "UV pulse", M["score_uv"], S[:, 0], "#ff4040", "trial-locked |t| over the training pulses"),
+           ("visual", "grating speed", M["score_visual"], S[:, 3], "#4fc3f7", "coherence with the grating"),
+           ("swim", "swim power (left)", M["score_swim"], S[:, 4], "#81c784", "coherence with the swim power")]
+    out = []
+    for key, label, score, u, col, how in INP:
+        top = np.argsort(score)[::-1][:n_rows]
+        Z = X[:, top]
+        Z = (Z - Z.mean(0)) / (Z.std(0) + 1e-9)
+        if key == "uv":                                     # lag = the time to peak of the trial-locked mean response
+            on = [int(f) for f, h in zip(tr[:, 0], tr[:, 6]) if not h and f + 50 < len(X)]
+            resp = np.mean([Z[f:f + 50] for f in on], 0)
+            lag = resp.argmax(0)
+        else:                                               # lag of the largest cross-correlation within 20 s
+            uu = (u - u.mean()) / (u.std() + 1e-9)
+            L = int(20 / dt)
+            cc = np.stack([(uu[:len(uu) - k][:, None] * Z[k:]).mean(0) for k in range(L)], 0)
+            lag = np.abs(cc).argmax(0)
+        Z = Z[:, np.argsort(lag)]
+        fig = plt.figure(figsize=(12, 6.2), facecolor="black")
+        gs = fig.add_gridspec(2, 2, width_ratios=[3.2, 1], height_ratios=[0.6, 4], hspace=0.12, wspace=0.05)
+        a0, a1, b_ = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[:, 1])
+        _black(a0); _black(a1)
+        a0.plot(t, u, color=col, lw=0.7)
+        a0.set_xlim(t[0], t[-1]); a0.set_xticks([]); a0.set_yticks([])
+        a0.set_title(f"{label} over the session", fontsize=10, loc="left", color="white")
+        im = a1.imshow(Z.T, aspect="auto", cmap="inferno", vmin=-1, vmax=3, extent=[t[0], t[-1], n_rows, 0],
+                       interpolation="nearest")
+        for a_ in (a0, a1):
+            for f, site, held in zip(tr[:, 0], tr[:, 2], tr[:, 6]):
+                a_.axvline(t[int(f)], color=SITE_COLS.get(int(site), "w"), lw=0.6, alpha=0.8, ls="--" if held else "-")
+            for f0 in np.where(np.diff(np.r_[0, (sp == 2).astype(int)]) == 1)[0]:
+                f1 = f0 + int(np.argmax(sp[f0:] != 2)) if (sp[f0:] != 2).any() else len(sp)
+                a_.axvspan(t[f0], t[min(f1, len(t) - 1)], color="#d62728", alpha=0.18, lw=0)
+        a1.set_xlabel("time since the session's start, min", color="white")
+        a1.set_ylabel(f"the {n_rows} cells most locked to the {label}\n(z-scored dF/F, sorted by lag)", fontsize=9)
+        a1.set_title(f"rows: {how}; red bands: held-out trial windows", fontsize=9, loc="left", color="white")
+        b_.set_facecolor("black"); b_.axis("off"); b_.set_aspect("equal")
+        m = M["mask_by_input"][:, {"uv": 0, "visual": 3, "swim": 4}[key]] > 0
+        b_.scatter(up[::8, 0], up[::8, 1], s=0.3, c="0.3", lw=0)
+        b_.scatter(up[m, 0], up[m, 1], s=0.5, c=col, lw=0)
+        b_.scatter(up[top, 0], up[top, 1], s=9, c="white", lw=0)
+        b_.set_title(f"its input cells: top 10 % ({int(m.sum()):,}),\nthe {n_rows} rows in white; head up", fontsize=9,
+                     color="white")
+        y0 = up[:, 1].min() - 20
+        b_.plot([up[:, 0].min(), up[:, 0].min() + 100], [y0, y0], color="white", lw=2)
+        b_.text(up[:, 0].min() + 50, y0 - 8, "100 \u00b5m", color="white", fontsize=8, ha="center", va="top")
+        png = f"06_kymo_{key}.png"
+        fig.savefig(os.path.join(PRES, "figs", png), dpi=180, facecolor="black", bbox_inches="tight")
+        plt.close(fig)
+        right_rows = [("input", label), ("score", how), ("cells", f"top 10 %: {int(m.sum()):,} of {len(m):,}"),
+                      ("rows", f"the {n_rows} highest scores, sorted by lag")]
+        body = (f"% generated by tools/exp20_slides.py (input kymograph {key})\n\\begin{{frame}}[t]{{{DECK_TITLE} "
+                f"$\\cdot$ the input cells of the {_tex(label)}}}\n\\vspace*{{\\bandgap}}\n"
+                f"\\begin{{center}}\\includegraphics[width=0.98\\textwidth,height=0.80\\textheight,keepaspectratio]"
+                f"{{figs/{png}}}\\end{{center}}\n\\end{{frame}}\n")
+        out.append((f"06_kymo_{key}", body))
+    return out
 
 
 # ============================================================================== batches, runs, controls
@@ -801,6 +877,10 @@ def main():
             deck.append(fn())
         except Exception as e:                      # one slide's failure must not lose the deck
             print(f"[slides] {fn.__name__} FAILED: {e}")
+    try:
+        deck += slides_kymo()
+    except Exception as e:
+        print(f"[slides] slides_kymo FAILED: {e}")
     for b, (_, names, shown, now) in BATCHES.items():
         if not any(landed(n) for n in names):
             continue
