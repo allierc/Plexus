@@ -613,12 +613,9 @@ def slide_baselines():
     png = os.path.join(EXP, "png", f"input_mask_{REC1}.png")
     import shutil
     shutil.copyfile(png, os.path.join(PRES, "figs", "06_input_mask.png"))
-    g = b["gut_window_mse_resp"]
     right = (head("the references, before any training") + rows([
         ("gut-responsive", f"{b['gut_responsive']:,} cells (the paper's selection, training frames)"),
         ("noise", f"$\\sigma^2$ {b['noise_sigma2']:.3f} dF/F$^2$ over all cells (ZAPBench 0.0005)"),
-        ("held-out gut", f"window MSE ($10^{{-3}}$): STA {g['sta'] * 1e3:.0f}, regression {g['reg'] * 1e3:.0f},"),
-        ("", f"best recent mean {g['mean'] * 1e3:.0f}, persistence {g['pers'] * 1e3:.0f}"),
         ("control / gut", f"{b['evoked_ratio_ctrl_over_gut']:.2f}: the brain barely answers the off-fish UV"),
         ("replicable", f"{b['top1_cells']:,} cells, held-out gut evoked {b['evoked_top1_heldout_gut']:+.3f}")])
         + head("the input mask (exp17's, per input)") + rows([
@@ -787,10 +784,10 @@ def control_table(name, now):
         rws.append(("W = 0 at inference", r["dir"], f"{name}_W0"))
     if rn and now != name:
         rws.append(("trained with no network", rn["dir"], now))
-    body = "".join(f"{a} & {f(bm(d, st)[0])} & {f(bm(d, st)[1], '{:.4f}')} & {f(cell_r2(d, st))} \\\\\n"
+    body = "".join(f"{a} & {f(bm(d, st)[0])} & {f(bm(d, st)[1], '{:.4f}')} \\\\\n"
                    for a, d, st in rws)
     return (head("the network test, free rollout") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
-            "@{\\hspace{5pt}}r@{}}\n& \\multicolumn{2}{c}{brain mean} & per-cell \\\\\n& R$^2$ & RMSE & R$^2$ \\\\\n\\hline\n"
+            "@{}}\n& \\multicolumn{2}{c}{brain-mean dF/F} \\\\\n& R$^2$ & RMSE \\\\\n\\hline\n"
             + body + "\\end{tabular}\\par}\\vspace{6pt}\n")
 
 
@@ -888,18 +885,6 @@ def slides_run(name, b, now=None, fish=""):
     pm = lambda a, sd: f"{a:+.3f} $\\pm$ {sd:.3f}" if sd is not None else f"{a:+.3f}"
     num = (head(f"{tag}: {_tex(name)}") + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n"
            + control_table(name, now)
-           + head("MSE, $10^{-3}$ dF/F$^2$, held-out windows") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}r@{\\hspace{7pt}}r@{}}\n"
-           + "& h 1-3 & h 16-32 \\\\\n" + "".join(f"{lab} & {mse[k][0]:.1f} & {mse[k][1]:.1f} \\\\\n" for lab, k in (
-               ("learned law", "mse_model"), ("mean baseline", "mse_mean"), ("stimulus lookup", "mse_lookup")) if k in mse)
-           + "\\end{tabular}\\par}\\vspace{6pt}\n"
-           + head("the held-out gut trials") + rows(
-               [("from the pulse", f"{N['trial']:+.3f} skill over the STA (55 s)" if N["trial"] is not None else "--")]
-               + ([("free rollout", f"{ft['evoked_gut_free_over_rec']:.2f} of the recorded response, pattern r {ft['pattern_r_gut']:+.2f}"),
-                   ("control", f"{ft['evoked_ctrl_free_over_rec_gut']:+.2f} of the recorded gut response")] if ft else []))
-           + head("free rollout, whole session") + rows([
-               ("R$^2$ raw", pm(fr["r2_raw"], fr.get("r2_raw_sd"))),
-               ("R$^2$ denoised", pm(fr["r2_denoised"], fr.get("r2_denoised_sd"))),
-               ("exploding", f"{fr.get('silenced', 0)} cells silenced" if fr.get("silenced") else "none")])
            + head("training") + rows([
                ("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "--"),
                ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]))
