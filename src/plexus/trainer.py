@@ -3208,9 +3208,11 @@ def _law_name(spec) -> str:
         return "learned law"
     m = re.search(r"op:\s*state_diffuse,\s*model:\s*(\w+)", txt)
     ind = " + calcium indicator" if re.search(r"op:\s*calcium_indicator", txt) else ""
+    model = m.group(1) if m else ""
+    if model == "neuron_graph" and not any(str(e.get("param", "")).startswith("W_") for e in spec.get("learnable", [])):
+        return "known ODE, no network" + ind          # no edge weight learned: W = 0 from the start (exp17 / exp20 *_now)
     return {"graphcast": "GraphCast law", "connectome": "connectome law", "known_ode": "known ODE on the mesh",
-            "neuron_graph": "known ODE on the neuron graph"}.get(
-        m.group(1) if m else "", "learned law") + ind
+            "neuron_graph": "known ODE on the neuron graph"}.get(model, "learned law") + ind
 
 
 def _analyse_trace(spec, device="cpu", root=None):
