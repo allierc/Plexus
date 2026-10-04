@@ -121,6 +121,34 @@ def test_input_mask_keeps_the_stimulus_out_of_masked_elements(tmp_path):
     assert float(d[n // 10:].abs().max()) == 0.0 and float(d[: n // 10].min()) > 0
 
 
+def test_a_per_input_mask_lets_each_input_enter_only_its_own_elements(tmp_path):
+    """input_mask_array of shape [N, F] (exp20 batch 6): input 0 enters the first tenth of the elements only, input 1
+    the second tenth only, the rest none; W = 0, one input on at a time; and with every column equal it is the
+    one-per-element mask exactly."""
+    n = 2000
+    by = np.zeros((n, 22), np.float32)
+    by[: n // 10, 0] = 1.0
+    by[n // 10: n // 5, 1] = 1.0
+    f = os.path.join(str(tmp_path), "mask.npz")
+    np.savez(f, mask=by.max(1), mask_by_input=by, same=np.repeat(by.max(1)[:, None], 22, 1))
+    o, P, nb = setup(str(tmp_path), input_mask=f, input_mask_array="mask_by_input")
+    nb["input"] = torch.ones(n, 22)
+    nb["rest"] = torch.zeros(n, 1)
+    for k, sl in ((0, slice(0, n // 10)), (1, slice(n // 10, n // 5))):
+        u = torch.zeros(22, 1)
+        u[k] = 1.0
+        d = o.step(torch.zeros(n, 1), P, None, u, nb=nb)
+        on = torch.zeros(n, dtype=torch.bool)
+        on[sl] = True
+        assert float(d[on].min()) > 0 and float(d[~on].abs().max()) == 0.0
+    o1, _, _ = setup(str(tmp_path), input_mask=f)                         # [N]: the union, every input
+    o2, _, _ = setup(str(tmp_path), input_mask=f, input_mask_array="same")  # [N, F], every column the union
+    u = torch.randn(22, 1)
+    nb2 = {"tau": torch.full((n, 1), -1.0), "rest": 0.1 * torch.randn(n, 1), "input": 0.1 * torch.randn(n, 22)}
+    assert torch.allclose(o1.step(torch.zeros(n, 1), P, None, u, nb=nb2), o2.step(torch.zeros(n, 1), P, None, u, nb=nb2),
+                          atol=1e-6)
+
+
 def _iterate(o, x, P, nb, n=200):
     """n ticks of the law alone, the increment added each tick (W = 0, no forcing): the element's own relaxation."""
     u = torch.zeros(22, 1)
