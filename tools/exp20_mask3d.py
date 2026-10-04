@@ -2,7 +2,8 @@
 cells a faint cloud, the cells each input enters coloured -- left the batch 1-5 mask (uv: |t| over every training
 pulse, control included; grating and swim: coherence; tools/exp20_input_mask.py), right the batch-6 mask closer to
 biology (uv: the cells EXCITED by the training gut pulses and not by the control pulses; grating as before; no swim,
-the motor output) -- both from the same oblique camera turning once about the vertical, head left at the start.
+the motor output), then the paper's own gut-responsive rule at 2 and 3 SD (exp20_input_mask.py --paper) -- all
+from the same oblique camera turning once about the vertical, head left at the start.
 
     PYTHONPATH=src:tools python tools/exp20_mask3d.py
 Writes presentation/Movies/mask3d_f1.mp4 (+ .png) and a copy in png/.
@@ -32,15 +33,17 @@ def main(rec="gutbrain_glucose_f1", n_frames=200, fps=25):
     pv.OFF_SCREEN = True
     P = np.asarray(TR.load(rec)["pos_view"], np.float64)                  # head left (x mirrored, drawing only)
     Q = (P - (P.max(0) + P.min(0)) / 2).astype(np.float32)
-    old, bio = (np.load(os.path.join(ZF, f"input_mask_{rec}{t}.npz")) for t in ("", "_bio"))
-    sets = [("the batch 1-5 mask", old["mask_by_input"], (("uv", 0), ("visual", 3), ("swim", 4))),
-            ("closer to biology (batch 6)", bio["mask_by_input"], (("uv", 0), ("visual", 3)))]
+    ld = lambda t: np.load(os.path.join(ZF, f"input_mask_{rec}{t}.npz"))["mask_by_input"]     # noqa: E731
+    sets = [("batches 1-5", ld(""), (("uv", 0), ("visual", 3), ("swim", 4))),           # the four UV rules (batch 6)
+            ("batch 6, 10 %", ld("_bio"), (("uv", 0), ("visual", 3))),
+            ("batch 6, the paper's rule, 2 SD", ld("_paper2sd"), (("uv", 0), ("visual", 3))),
+            ("batch 6, the paper's rule, 3 SD", ld("_paper3sd"), (("uv", 0), ("visual", 3)))]
     rr = 1.75 * float(np.ptp(P, 0).max())
     az0, el = np.deg2rad(-60.0), np.deg2rad(32.0)
     tmp = tempfile.mkdtemp(prefix="mask3d_")
     pls = []
     for title, by, ins in sets:
-        pl = pv.Plotter(off_screen=True, window_size=(1000, 760))
+        pl = pv.Plotter(off_screen=True, window_size=(900, 600))
         pl.set_background("black")
         pl.add_mesh(pv.PolyData(Q[::4]), color="#6a6a6a", point_size=1.2, opacity=0.18)
         for k, j in ins:
@@ -59,18 +62,18 @@ def main(rec="gutbrain_glucose_f1", n_frames=200, fps=25):
             pl.camera.position = (rr * np.cos(el) * np.cos(az), rr * np.cos(el) * np.sin(az), rr * np.sin(el))
             pl.render()
             shots.append(pl.screenshot(return_img=True))
-        fig = plt.figure(figsize=(14, 5.6), facecolor="black")
+        fig = plt.figure(figsize=(14, 9.2), facecolor="black")
         for j, ((title, by, ins), im) in enumerate(zip(sets, shots)):
-            ax = fig.add_axes([0.5 * j, 0.10, 0.5, 0.80])
+            x0, y0 = 0.5 * (j % 2), 0.5 * (1 - j // 2)
+            ax = fig.add_axes([x0, y0 + 0.04, 0.5, 0.40])
             ax.imshow(im)
             ax.axis("off")
-            fig.text(0.5 * j + 0.01, 0.965, f"{'ab'[j]}   {title}: {union[title]:,} cells", color="white", fontsize=12, va="top")
-            fig.text(0.5 * j + 0.01, 0.06, "   ".join(f"{k} {n[title][k]:,}" for k, _ in ins), color="0.8", fontsize=9)
+            fig.text(x0 + 0.01, y0 + 0.48, f"{'abcd'[j]}   {title}", color="white", fontsize=12, va="top")
+            fig.text(x0 + 0.01, y0 + 0.03, "   ".join(f"{k} {n[title][k]:,}" for k, _ in ins), color="0.8", fontsize=9)
             for q, (k, _) in enumerate(ins):
-                fig.text(0.5 * j + 0.30 + 0.06 * q, 0.06, k, color=COL[k], fontsize=10, weight="bold")
-        fig.text(0.5, 0.015, "uv (a): |t| over every training pulse, the off-fish control included; uv (b): excited by the gut "
-                 "pulses and not by the control; grating: coherence; swim (a only): coherence -- a motor output, not an input",
-                 color="0.7", fontsize=8, ha="center")
+                fig.text(x0 + 0.30 + 0.05 * q, y0 + 0.03, k, color=COL[k], fontsize=10, weight="bold")
+        fig.text(0.5, 0.005, "red: the cells the UV pulse and the beam position enter; blue: the grating's; green: the swim's "
+                 "(batches 1-5 only)", color="0.7", fontsize=9, ha="center")
         f_ = os.path.join(tmp, f"g{i:05d}.png")
         fig.savefig(f_, dpi=100, facecolor="black")
         plt.close(fig)

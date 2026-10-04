@@ -67,6 +67,8 @@ def main():
     ap.add_argument("--top", type=float, default=0.10)
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--bio", action="store_true", help="the mask closer to biology (batch 6): see the docstring")
+    ap.add_argument("--paper", type=float, default=None,
+                    help="batch 6: uv into the paper's gut-responsive cells at mode + K sd (K = 3 the paper's); see the docstring")
     a = ap.parse_args()
     from plexus.paths import graphs_data_path
     z = np.load(graphs_data_path("zebrafish", f"{a.recording}_recording.npz"))
@@ -115,6 +117,20 @@ def main():
         tag = "_bio"
         print(f"[mask] bio: uv from {len(gut_on)} gut and {len(ctl_on)} control training pulses; "
               f"{int(((t_gut > thr['uv']) & (t_ctl >= 2.0)).sum()):,} top-gut cells dropped as control-excited")
+    if a.paper is not None:
+        # THE PAPER'S OWN SELECTION AS THE UV CELLS (Cedric, 2026-10-04: "the +2SD rule and the +3SD rule"): a cell
+        # takes the uv inputs when it is gut-responsive by the paper's rule at mode + K sd (tools/gutbrain_baselines.py,
+        # training frames: the gut + all-UV regression tracks the cell above the threshold, better than all-UV alone,
+        # and the cell changes more after the gut pulses than after the control pulses); no quota. The grating keeps
+        # its coherent cells; the swim none.
+        bz = np.load(os.path.join(EXP, "data", f"baselines_{a.recording}_cells.npz"))
+        bj = json.load(open(os.path.join(EXP, "data", f"baselines_{a.recording}.json")))["threshold"]
+        thr["uv"] = float(bj["mode"] + a.paper * bj["left_sd"])
+        m["uv"] = (bz["r_full"] > thr["uv"]) & (bz["r_full"] > bz["r_part"]) & (bz["evoked_gut"] > bz["evoked_ctrl"])
+        m["swim"] = np.zeros(N, bool)
+        scores.update({"uv": bz["r_full"]})
+        tag = f"_paper{a.paper:g}sd"
+        print(f"[mask] paper rule at mode + {a.paper:g} sd: r_full > {thr['uv']:.3f}: {int(m['uv'].sum()):,} uv cells")
     by = np.stack([m["uv"], m["uv"], m["uv"], m["visual"], m["swim"], m["swim"]], 1).astype(np.float32)
     union = by.max(1)
     out = graphs_data_path("zebrafish", f"input_mask_{a.recording}{tag}.npz")
@@ -139,7 +155,9 @@ def main():
         a_.scatter(P[::10, 0], P[::10, 1], s=0.3, c="0.3", lw=0)
         a_.scatter(P[m[k], 0], P[m[k], 1], s=0.6, c=col, lw=0)
         a_.set_aspect("equal"); a_.axis("off")
-        what = ({"uv": "UV on the gut: excited by the gut pulses, not by the control", "visual": "grating: coherence",
+        what = ({"uv": f"UV: the paper's gut-responsive cells, mode + {a.paper:g} sd", "visual": "grating: coherence",
+                 "swim": "swim: none (motor output)"} if a.paper is not None else
+                {"uv": "UV on the gut: excited by the gut pulses, not by the control", "visual": "grating: coherence",
                  "swim": "swim: none (motor output)"} if a.bio else
                 {"uv": "UV pulse: trial-locked |t| over the training pulses", "visual": "grating: coherence",
                  "swim": "swim power: coherence"})[k]
