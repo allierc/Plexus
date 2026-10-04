@@ -424,6 +424,146 @@ class NeuronSignalTypePairwise(_NeuronSignal):
                 - x_pre * torch.log(p_pre[:, 4:5]) / 50.0)
 
 
+@register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
+                   model="phase_rotated",
+                   equation=r"""$$\psi_{ij}(x_j)=\phi(x_j)\,\Re\!\big(e^{i\varphi_{t(j)t(i)}}\,\bar z\big),\quad z=\sum_k c_k e^{i\alpha_k}$$""")
+class NeuronSignalPhaseRotated(_NeuronSignal):
+    """A broadcast angle rotates every synapse's response, by an amount set by the cell-type pair:
+
+        psi_ij(x_j) = phi(x_j) * Re(exp(i varphi_ab) * conj(z)),   z = sum_k c_k exp(i alpha_k)
+
+    a = type of the sender j, b = type of the receiver i; varphi_ab is the cell-type-pair PHASE, one
+    angle per ordered pair of types (radians, an [n_types, n_types] table); alpha_k is the broadcast
+    angle of context k (radians), and c_k the context's weight, read from lines `context_channels`
+    of the `context_set`'s `context_block` (the trainer writes a constant one-hot there). For a
+    one-hot context the factor is cos(varphi_ab - alpha_k): 1 when the angle sits on the pair's
+    phase, 0 at quadrature, -1 half a turn away. With no context named, z = exp(i alpha_0).
+
+    This is the modulation of GNN_Transformer.tex Part II (Eq. polar), with the edge's amplitude the
+    synapse's own weight: the connectome W and its Dale signs stay fixed, and only the POSTSYNAPTIC
+    response turns. At varphi = 0 and alpha = 0 it is `shared` exactly (tests/test_neuron_phase.py).
+    It is a MODEL of `neuron_signal`, not a new operator, because its contract is the same (per-edge
+    message, summed onto the receiver, gain and field as in `_NeuronSignal`); only psi gains a factor
+    -- but the factor reads a second set (the context), so `forward` is restated here rather than
+    `psi` overridden, and the base class is left as it is. `alpha` and `phi` are tensors on the
+    instance so a training spec frees them as {param: alpha, op: neuron_signal} / {param: phi, ...}.
+
+    `n_axes: L > 1` is the note's TORUS T^L (Part II, "Climbing the manifold ladder"): L independent angles
+    per context and L pair-phase tables, the factor the MEAN over axes of cos(varphi^(l)_ab - alpha_kl) --
+    the mean, so that at varphi = 0, alpha = 0 it is still `shared`. `alpha` is then [K, L] (one list of L
+    angles per context) and `phi` [L, n_types, n_types]; L = 1 (the default) keeps the shapes [K] and
+    [n_types, n_types] of every spec and checkpoint written before (exp18 batch 3).
+
+    IMPRECISE BROADCAST (exp18 batch 5, GNN_Transformer.tex Sec. coherence), both off by default:
+    `alpha_jitter: s` adds to every angle a Gaussian offset of standard deviation s (rad), drawn once per trial
+    (per batch element) and held for the whole trial -- a neuromodulator level that is never set exactly;
+    `alpha_spread: s` gives every RECEIVING cell its own offset (rad), drawn once per trial -- volume transmission
+    that does not reach all cells alike, coherence R = exp(-s^2 / 2). Drawn from torch's global generator when the
+    instance first runs; an instance is made per rollout, so every rollout draws anew.
+
+    `nonneg: true` (exp18 batch 6, the control of GNN_Transformer.tex Table 5's "gain modulation" row) replaces the
+    factor by (1 + factor) / 2 in [0, 1]: the angle can still silence a pair but no longer reverse its sign. At
+    varphi = 0 and alpha = 0 it is still `shared`.
+    """
+
+    READS = ["voltage", "w", "omega", "signal"]
+    PARAM_ROLES = dict(_NeuronSignal.PARAM_ROLES, n_types="cell_type_count",
+                       context_set="broadcast_context_set", context_block="broadcast_context_block",
+                       context_channels="broadcast_context_lines", alpha="broadcast_angles_rad",
+                       phi_init="pair_phase_initialisation", phi_seed="pair_phase_seed",
+                       n_axes="torus_dimension", alpha_jitter="per_trial_angle_noise_rad",
+                       alpha_spread="per_receiver_angle_noise_rad", nonneg="gain_only_no_sign_reversal")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        nt = int(params["n_types"])
+        self.ctx_set = params.get("context_set")
+        self.ctx_block = params.get("context_block", "signal")
+        lo, hi = (params.get("context_channels") or [1, 1])
+        self.ctx_lines = (int(lo), int(hi))                  # elements lo .. hi-1 of the context set
+        k = max(1, self.ctx_lines[1] - self.ctx_lines[0])
+        self.n_axes = L = int(params.get("n_axes", 1))
+        a0 = params.get("alpha", [0.0] * k if L == 1 else [[0.0] * L] * k)
+        if len(a0) != k:
+            raise ValueError(f"neuron_signal[phase_rotated]: `alpha` has {len(a0)} angles for {k} "
+                             f"context line(s) {self.ctx_lines}")
+        a = torch.tensor(a0, dtype=torch.float32, device=device)
+        if tuple(a.shape) != ((k,) if L == 1 else (k, L)):
+            raise ValueError(f"neuron_signal[phase_rotated]: `alpha` must be {k} angles"
+                             + ("" if L == 1 else f" x {L} axes") + f", got shape {tuple(a.shape)}")
+        self.alpha = a
+        init = params.get("phi_init", "zero")
+        shape = (nt, nt) if L == 1 else (L, nt, nt)
+        if init == "zero":
+            phi = torch.zeros(shape)
+        elif init == "uniform":
+            g = torch.Generator().manual_seed(int(params.get("phi_seed", 0)))
+            phi = torch.rand(shape, generator=g) * (2.0 * np.pi)
+        else:
+            raise ValueError(f"neuron_signal[phase_rotated]: phi_init {init!r}; zero | uniform")
+        self.phi = phi.to(device=device, dtype=torch.float32)
+        self.alpha_jitter = float(params.get("alpha_jitter", 0.0))
+        self.alpha_spread = float(params.get("alpha_spread", 0.0))
+        self._jit = self._spr = None                                            # drawn on first use
+        self.nonneg = bool(params.get("nonneg", False))
+
+    def psi(self, x_pre, p_pre, p_post):
+        return self.act(x_pre)
+
+    def broadcast(self, H):
+        """(Re z, Im z) per axis for a one-hot context, batch-shaped [..., 1, L] ([..., 1, 1] on a circle)."""
+        a = self.alpha.to(H.level(self.at).state.device)
+        a = a[:, None] if a.dim() == 1 else a                                    # [K, L]
+        if self.ctx_set is None:
+            if self.alpha_jitter > 0:
+                if self._jit is None:
+                    self._jit = torch.randn(a.shape[-1:], device=a.device) * self.alpha_jitter
+                return torch.cos(a[0] + self._jit), torch.sin(a[0] + self._jit)
+            return torch.cos(a[0]), torch.sin(a[0])
+        lo, hi = self.ctx_lines
+        c = H.level(self.ctx_set).get(self.ctx_block)[..., lo:hi, 0]            # [..., K]
+        if self.alpha_jitter > 0:
+            if self._jit is None:
+                self._jit = torch.randn(c.shape + a.shape[-1:], device=a.device) * self.alpha_jitter
+            a = a + self._jit                                                    # [..., K, L]
+        return ((c[..., :, None] * torch.cos(a)).sum(-2)[..., None, :],
+                (c[..., :, None] * torch.sin(a)).sum(-2)[..., None, :])
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        es = H.level(self.edge_set)
+        p = _type_params(lvl, self.params)
+        nt = getattr(lvl, "node_type", None)
+        if nt is None or int(nt.max()) >= self.phi.shape[-1]:
+            raise ValueError(f"neuron_signal[phase_rotated]: `{self.at}` has "
+                             f"{0 if nt is None else int(nt.max()) + 1} cell types; n_types is "
+                             f"{self.phi.shape[-1]}")
+        x_pre = H.gather(self.edge_set, "pre", self.block)
+        w_e = es.get(self.weight_block)
+        if self.dale:
+            w_e = w_e.abs() * self._dale_sign(lvl, es).to(w_e.dtype)
+        phi = self.phi.to(w_e.device)
+        phi = phi[None] if phi.dim() == 2 else phi                               # [L, T, T]
+        ph = phi[:, nt[es.pre], nt[es.post]].transpose(0, 1)                    # [E, L] varphi^(l)_ab
+        zr, zi = self.broadcast(H)
+        if self.alpha_spread > 0:
+            if self._spr is None:
+                self._spr = torch.randn(x_pre.shape[:-2] + (lvl.n,), device=ph.device) * self.alpha_spread
+            ph = ph - self._spr[..., es.post][..., None]                         # cos(ph - (alpha + xi_post))
+        rot = (torch.cos(ph) * zr + torch.sin(ph) * zi).mean(-1, keepdim=True)  # mean_l Re(e^{i ph_l} conj z_l)
+        if self.nonneg:
+            rot = 0.5 * (1.0 + rot)                                              # a gain in [0, 1]: no sign reversal
+        edge_msg = w_e * self.act(x_pre) * rot
+        msg = H.scatter_along(self.edge_set, "post", edge_msg)
+        g = p[:, 2:3]
+        omega = lvl.get(self.field_block) if self.field_block else 1.0
+        dx = g * omega * msg
+        dx = dx * lvl.occ[:, None]
+        if mask is not None:
+            dx = dx * mask[:, None].float()
+        return {self.at: dx}
+
+
 # --------------------------------------------------------------------------- #
 #  Omega -- the external field, onto the neurons
 # --------------------------------------------------------------------------- #

@@ -94,7 +94,7 @@ def test_contracts_and_signatures():
     # psi's three variants are MODELS -- different claims about the synapse, not different
     # arithmetic for one claim -- so they must live on the model axis, and naming one as an
     # implementation must be refused.
-    assert s.models() == ["shared", "type_pairwise", "type_pre"] and s.impls() == []
+    assert s.models() == ["phase_rotated", "shared", "type_pairwise", "type_pre"] and s.impls() == []
     with pytest.raises(KeyError):
         get_operator("neuron_signal", implementation="type_pre")
     # The signature carries the sets and the state blocks, and no longer a `maps` field.

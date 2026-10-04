@@ -1,0 +1,25 @@
+name: exp18_m5_onehot_s1_zf285
+model: config/neural/zf_circuit_285.yaml
+learnable:
+- {block: w, of: synapse}
+- {block: w, of: afferent}
+- {block: w, of: motor}
+- {block: tau, of: neuron}
+- {block: bias, of: neuron}
+- {block: bias, of: output}
+task:
+  reference: {corpus: m5_six, n_train: 3072, n_val: 192, n_test: 384}
+  drive: {set: sensor, block: signal}
+  observe: {set: output, block: value, channel: 0}
+  loss: mse
+training:
+  optimizer: adam
+  lr: 0.005
+  schedule: cosine
+  clip: 1.0
+  epochs: 150
+  batch: 32
+  seed: 1
+  horizon: [0.25, 0.5, 0.75, 1.0]
+  horizon_min: 60
+  snapshot_every: 25
