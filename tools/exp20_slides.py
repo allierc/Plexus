@@ -456,28 +456,153 @@ def figure_graph(op, P, path, n_show=80, seed=0, box_um=300.0):
     plt.close(fig)
 
 
+MID_TURN_DEG = 45.0       # the middle edges DRAWN turned about the vertical (Cedric, 2026-10-04): in the law they lie along
+                          # x, y, z like the long ones, so drawn true they hide inside them
+
+
+def figure_graph3d(op, P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed=0):
+    """THE CELL GRAPH IN 3-D, exp17's slide-6 turntable (tools/exp17_slides.py figure_neuron_graph, adapted): to scale in
+    um, VTK off-screen, black, head LEFT (pos_view). a: the whole brain, the cells a faint cloud and the middle (orange)
+    and long (red) edges INTO `n_show` random cells; b: a 60-um box around one cell, the short edges between the cells
+    inside and that cell's own 18 edges thick. The middle edges are drawn turned MID_TURN_DEG about the vertical through
+    their receiver, so they do not hide behind the long ones (the caption says so). `mp4`: a full turn of panel a."""
+    import shutil
+    import subprocess
+    import tempfile
+    import pyvista as pv
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from plexus.tasks import trace_recording as TR
+    pv.OFF_SCREEN = True
+    COL = {"short": "#9ecae1", "mid": "#fd8d3c", "long": "#ff4040"}
+    E = {k: (op._E[k][0].cpu().numpy(), op._E[k][1].cpu().numpy()) for k in ("short", "mid", "long")}
+    Q = (P - (P.max(0) + P.min(0)) / 2).astype(np.float32)
+    th = np.deg2rad(MID_TURN_DEG)
+    R = np.array([[np.cos(th), -np.sin(th), 0], [np.sin(th), np.cos(th), 0], [0, 0, 1]], np.float32)
+    rng = np.random.default_rng(seed)
+    show = set(rng.choice(len(P), n_show, replace=False).tolist())
+
+    def ends(k, s, r):
+        a_, b_ = Q[s], Q[r]
+        if k == "mid":                                     # drawn turned about the receiver's vertical
+            a_ = b_ + (a_ - b_) @ R.T
+        return a_, b_
+
+    def lines(pl, a_, b_, col, w, al):
+        if not len(a_):
+            return
+        n = len(a_)
+        pl.add_mesh(pv.PolyData(np.concatenate([a_, b_]), lines=np.column_stack([np.full(n, 2), np.arange(n),
+                                                                                 np.arange(n) + n]).ravel()),
+                    color=col, line_width=w, opacity=al)
+
+    def cam(pl, az, r_, f=(0.0, 0.0, 0.0)):
+        el = np.deg2rad(32.0)
+        pl.camera.position = (f[0] + r_ * np.cos(el) * np.cos(az), f[1] + r_ * np.cos(el) * np.sin(az), f[2] + r_ * np.sin(el))
+        pl.render()
+
+    tmp = tempfile.mkdtemp(prefix="ngraph20_")
+    pa = pv.Plotter(off_screen=True, window_size=(1400, 1000))
+    pa.set_background("black")
+    pa.add_mesh(pv.PolyData(Q[::3]), color="#8a8a8a", point_size=1.5, opacity=0.3)
+    for k, w, al in (("mid", 2.5, 0.95), ("long", 2.0, 0.85)):
+        s, r = E[k]
+        sel = np.fromiter((i in show for i in r), bool, len(r))
+        lines(pa, *ends(k, s[sel], r[sel]), COL[k], w, al)
+    pa.add_mesh(pv.PolyData(Q[np.array(sorted(show))]), color="white", point_size=7, render_points_as_spheres=True)
+    pa.camera.focal_point = (0.0, 0.0, 0.0)
+    pa.camera.up = (0.0, 0.0, 1.0)
+    rr = 1.75 * float(np.ptp(P, 0).max())               # the whole brain in view at every turn
+    az0 = np.deg2rad(-60.0)                             # from +x, -y: x (head to tail) runs left to right on screen
+    cam(pa, az0, rr)
+    fa = os.path.join(tmp, "a.png")
+    pa.screenshot(fa)
+    frames = []
+    if mp4:
+        for i in range(n_frames):
+            cam(pa, az0 + 2 * np.pi * i / n_frames, rr)
+            pa.screenshot(os.path.join(tmp, f"f{i:05d}.png"))
+            frames.append(os.path.join(tmp, f"f{i:05d}.png"))
+    pa.close()
+    c = int(np.argmin(np.linalg.norm(Q - np.median(Q, 0), axis=1)))
+    inbox = np.all(np.abs(Q - Q[c]) < 30.0, axis=1)
+    pb = pv.Plotter(off_screen=True, window_size=(1000, 1000))
+    pb.set_background("black")
+    pb.add_mesh(pv.PolyData(Q[inbox]), color="#aaaaaa", point_size=5, render_points_as_spheres=True)
+    s, r = E["short"]
+    sel = inbox[s] & inbox[r]
+    lines(pb, Q[s[sel]], Q[r[sel]], COL["short"], 1.0, 0.35)
+    for k in ("short", "mid", "long"):
+        s, r = E[k]
+        sel = r == c
+        a_, b_ = ends(k, s[sel], r[sel])
+        lines(pb, a_, b_, COL[k], 4.0, 1.0)
+        pb.add_mesh(pv.PolyData(a_), color=COL[k], point_size=12, render_points_as_spheres=True)
+    pb.add_mesh(pv.PolyData(Q[c:c + 1]), color="white", point_size=18, render_points_as_spheres=True)
+    pb.camera.focal_point = tuple(Q[c].tolist())
+    pb.camera.up = (0.0, 0.0, 1.0)
+    cam(pb, az0, 420.0, tuple(Q[c].tolist()))
+    fb = os.path.join(tmp, "b.png")
+    pb.screenshot(fb)
+    pb.close()
+    st = op.graph_stats
+    note = (f"middle edges drawn turned {MID_TURN_DEG:.0f}° about the vertical, to show them apart from the long "
+            "ones; in the law both lie along x, y, z")
+
+    def compose(fa_, out):
+        fig = plt.figure(figsize=(12, 5.4), facecolor="black")
+        for j, (f, lab) in enumerate(((fa_, f"a   the whole brain, head left: middle and long edges into {n_show} cells"),
+                                      (fb, "b   one cell (white), its 18 senders, the short edges around it"))):
+            ax = fig.add_axes([0.0 if j == 0 else 0.58, 0.10, 0.58 if j == 0 else 0.42, 0.82])
+            ax.imshow(plt.imread(f))
+            ax.axis("off")
+            fig.text(0.01 if j == 0 else 0.59, 0.955, lab, color="white", fontsize=10, va="top")
+        fig.text(0.01, 0.045, "   ".join(f"{k}: {st[k]['edges']:,} edges, {st[k]['per_element']:.1f} per cell, mean "
+                                         f"{st[k]['mean_um']:.1f} µm" for k in ("short", "mid", "long")),
+                 color="0.75", fontsize=8)
+        fig.text(0.01, 0.012, note, color="#fd8d3c", fontsize=8)
+        for k, x in zip(("short", "mid", "long"), (0.60, 0.72, 0.84)):
+            fig.text(x, 0.10, k, color=COL[k], fontsize=11, weight="bold")
+        fig.savefig(out, dpi=150, facecolor="black")
+        plt.close(fig)
+
+    compose(fa, path)
+    if mp4:
+        for i, f in enumerate(frames):
+            compose(f, os.path.join(tmp, f"g{i:05d}.png"))
+        subprocess.run([TR._ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "g%05d.png"),
+                        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", mp4], check=True)
+        shutil.copy(path, mp4.replace(".mp4", ".png"))
+    shutil.rmtree(tmp)
+    return st
+
+
 def slide_law():
     """The neuron graph on this fish, from the operator itself (the picture IS the graph trained), head left."""
     import exp17_slides as X17
     from plexus.tasks import trace_recording as TR
     png = os.path.join(PRES, "figs", "05_neuron_graph.png")
+    mp4 = os.path.join(PRES, "Movies", "05_neuron_graph.mp4")
     pf = f"zebrafish/{REC1}_recording.npz"
     op = X17.neuron_graph_op(positions_file=pf)
     rec = TR.load(REC1)
-    figure_graph(op, rec["pos_view"], png)
+    if not os.path.exists(mp4):          # the turntable (Cedric, 2026-10-04: "rotate 3D the view as in exp17"), made once
+        figure_graph3d(op, np.asarray(rec["pos_view"], np.float64), png, mp4=mp4)
     E = {s: int(op._E[s][0].numel()) for s in ("short", "mid", "long") if s in op._E}
     right = (head("the law: a known ODE on a cell graph") + rows([
         ("state", "one per cell: dF/F"),
         ("cell", "its own time constant $\\tau_i$, rest $c_i$, 6 input weights $B_i$"),
         ("edges", ", ".join(f"{k} {v / 1e6:.2f}M" for k, v in E.items()) + ", one $W$ each"),
         ("", "6 nearest, 6 at 32 \\textmu m, 6 at 128 \\textmu m"),
-        ("step", "$\\tau_i\\, dz_i/dt = -z_i + c_i + \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u$"),
-        ("inputs", "$u$: UV pulse, beam x, y, grating, swim L, R"),
-        ("", "nothing recorded is read after the start")])
-        + head("training") + rows([("", "horizons 1..30, every step scored (exp17)"),
+        ("step", "$\\tau_i\\, dz_i/dt = -z_i + c_i + \\Omega_i(t) \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u$"),
+        ("", "$\\Omega_i(t)$: a SIREN of position and time scaling the messages (batch 4)"),
+        ("inputs", "$u$: UV pulse, beam x, y, grating; the swim zeroed (batch 3 on)"),
+        ("", "into the input-mask cells only; nothing recorded is read after the start")])
+        + head("training") + rows([("", "exp17's rig: warm-up 10, horizons 1-5 then 10..50, 49,000 updates"),
                                     ("", "held-out trial windows never trained on")]))
     return ("05_law", frame("The law: a leaky ODE per cell, coupled by a learned graph, driven by the known inputs",
-                            "\\panel{figs/05_neuron_graph.png}", right, "state_diffuse[neuron_graph] on glucose fish 1",
+                            "\\playmovie{Movies/05_neuron_graph}", right, "state_diffuse[neuron_graph] on glucose fish 1",
                             left_gap=3, deck_title="The law: a known ODE per cell, coupled by a learned graph, driven "
                                                    "by the known inputs"))
 
