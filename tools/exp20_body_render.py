@@ -79,10 +79,11 @@ def main():
     np.save(os.path.join(EXP, "data", "anatomy", "markers.npy"), {k: v.tolist() for k, v in M.items()}, allow_pickle=True)
 
 
-SITE_KINDS = {"off": "off the fish (control)", "gutA": "foregut", "gutB": "midgut"}
+SITE_KINDS = {"off": "off the fish (control)", "gutA": "foregut", "gutB": "midgut",
+              "vessel": "hepatic portal system"}              # blood glucose (batch 4): the paper's Fig. 5a spot
 
 
-def render_sites():
+def render_sites(kinds=None):
     """One SMALL lateral diagram per kind of site, only its marker drawn (the deck's per-site slides): off the fish,
     the gut spot of site 2 (and 3), the other gut spot of fish 4's site 5. Region names are the paper's; which label
     went where is inferred (tools/exp20_slides.py SITE_REGION)."""
@@ -91,6 +92,8 @@ def render_sites():
     z = np.load(NPZ)
     M = markers(z)
     for kind, mk in SITE_KINDS.items():
+        if kinds and kind not in kinds:
+            continue
         p = pv.Plotter(off_screen=True, window_size=(1200, 420))
         p.set_background("black")
         for k in ("skin", "gut", "liver", "swim_bladder", "brain", "eye", "heart"):
@@ -110,5 +113,8 @@ def render_sites():
 
 
 if __name__ == "__main__":
-    main()
-    render_sites()
+    if sys.argv[1:] and sys.argv[1] == "sites":
+        render_sites(sys.argv[2:] or None)
+    else:
+        main()
+        render_sites()

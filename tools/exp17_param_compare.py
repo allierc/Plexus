@@ -72,7 +72,7 @@ def combined(C, P, order, m, doc):
         cb = fig.colorbar(sc, cax=cax)
         cb.ax.tick_params(colors="0.8", labelsize=7)
     path = os.path.join(EXP, "presentation", "figs", "param_compare_all.png")
-    fig.savefig(path, dpi=130, facecolor="black")
+    fig.savefig(path, dpi=130, facecolor="black", bbox_inches="tight", pad_inches=0.03)     # no black margin: the slide fills
     plt.close(fig)
     shutil.copy(path, os.path.join(EXP, "png", os.path.basename(path)))
 

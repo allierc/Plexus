@@ -95,27 +95,25 @@ def circuit(run: str, device: str):
     return out
 
 
-def main():
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+COLS_DARK = {"integrate": "#5b8ff9", "delay": "#ff6b5b", "lowpass": "#c38df0", "highpass": "#ffa14a",
+             "resonator": "#3ddbb5", "differentiate": "#d0d0d0"}
+DECK = os.path.join(ROOT, "experiments", "exp18_phase_modulation", "presentation", "figs")
+
+
+def draw(ax, kind, c, title, laws, dark=False):
+    """One panel: kind 'angles' / 'eig' / 'freq', column c (letter), for one run's laws."""
     from matplotlib.lines import Line2D
-    import torch
-    dev = "cuda:0" if torch.cuda.is_available() else "cpu"
-    fig, axes = plt.subplots(3, 3, figsize=(12.0, 12.6), gridspec_kw={"height_ratios": [1.25, 1, 1]})
-    data = [circuit(r, dev) for r, _ in RUNS]
-    summary = {}
-    for c, ((run, title), laws) in enumerate(zip(RUNS, data)):
-        # a-c: the angles
-        ax = axes[0, c]
+    cols = COLS_DARK if dark else COLS
+    grey, light, edge = ("0.55", "0.3", "white") if dark else ("0.6", "0.88", "black")
+    if kind == "angles":
         th = np.linspace(0, 2 * np.pi, 400)
-        ax.plot(np.cos(th), np.sin(th), color="0.6", lw=1)
-        ax.plot([-1.05, 1.05], [0, 0], color="0.88", lw=0.6)
-        ax.plot([0, 0], [-1.05, 1.05], color="0.88", lw=0.6)
+        ax.plot(np.cos(th), np.sin(th), color=grey, lw=1)
+        ax.plot([-1.05, 1.05], [0, 0], color=light, lw=0.6)
+        ax.plot([0, 0], [-1.05, 1.05], color=light, lw=0.6)
         hs = []
         for L in laws:
-            ax.plot([0, np.cos(L["alpha"])], [0, np.sin(L["alpha"])], color=COLS[L["name"]], lw=2.2)
-            hs.append(Line2D([0], [0], color=COLS[L["name"]], lw=2.2,
+            ax.plot([0, np.cos(L["alpha"])], [0, np.sin(L["alpha"])], color=cols[L["name"]], lw=2.2)
+            hs.append(Line2D([0], [0], color=cols[L["name"]], lw=2.2,
                              label=f"{L['name']:<13} {L['alpha']:+.2f} rad   {L['err']:.4f}"))
         ax.set_aspect("equal")
         ax.set_xlim(-1.15, 1.15)
@@ -125,26 +123,22 @@ def main():
         ax.legend(handles=hs, loc="upper center", bbox_to_anchor=(0.5, -0.0), frameon=False,
                   prop={"family": "monospace", "size": 7},
                   title="law, $\\alpha_k$, held-out error / own variance", title_fontsize=7)
-        # d-f: the spectra of J(alpha_k)
-        ax = axes[1, c]
-        lead = []
+    elif kind == "eig":
         for L in laws:
             e = L["eig"]
-            ax.scatter(e.real, e.imag, s=4, color=COLS[L["name"]], alpha=0.35, lw=0)
+            ax.scatter(e.real, e.imag, s=4, color=cols[L["name"]], alpha=0.35, lw=0)
             top = e[np.argsort(-e.real)[:3]]
-            ax.scatter(top.real, top.imag, s=42, color=COLS[L["name"]], edgecolor="black", lw=0.5, zorder=5)
-            lead.append(float(e.real.max()))
-        ax.axvline(0, color="0.8", lw=0.6)
-        ax.axhline(0, color="0.8", lw=0.6)
+            ax.scatter(top.real, top.imag, s=42, color=cols[L["name"]], edgecolor=edge, lw=0.5, zorder=5)
+        ax.axvline(0, color=light, lw=0.6)
+        ax.axhline(0, color=light, lw=0.6)
         ax.set_xlabel(r"Re $\lambda$ of $J(\alpha_k)$ (1/s)", fontsize=8)
         ax.set_ylabel(r"Im $\lambda$ (1/s)", fontsize=8)
         ax.tick_params(labelsize=7)
         ax.set_title(f"{'def'[c]}   eigenvalues of $J(\\alpha_k)$; large: three leading", fontsize=9, loc="left")
-        # g-i: the frequency response of the circuit under each law's angle, with the target's
-        ax = axes[2, c]
+    else:
         for L in laws:
-            ax.loglog(L["H"]["f"], L["H"]["target"], color=COLS[L["name"]], lw=1.0, ls="--", alpha=0.8)
-            ax.loglog(L["H"]["f"], L["H"]["circuit"], color=COLS[L["name"]], lw=1.8)
+            ax.loglog(L["H"]["f"], L["H"]["target"], color=cols[L["name"]], lw=1.0, ls="--", alpha=0.8)
+            ax.loglog(L["H"]["f"], L["H"]["circuit"], color=cols[L["name"]], lw=1.8)
         ax.set_xticks([0.2, 0.5, 1.0, 2.0])
         ax.set_xticklabels(["0.2", "0.5", "1", "2"])
         ax.minorticks_off()
@@ -152,11 +146,46 @@ def main():
         ax.set_ylabel("gain $|H(f)|$, output / stimulus", fontsize=8)
         ax.tick_params(labelsize=7)
         ax.set_title(f"{'ghi'[c]}   frequency response: circuit (solid), target law (dashed)", fontsize=9, loc="left")
-        summary[run] = {"lead_re": {L["name"]: round(lr, 3) for L, lr in zip(laws, lead)}}
+
+
+def main():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import torch
+    dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+    data = [circuit(r, dev) for r, _ in RUNS]
+    # THE PAPER: one 3 x 3 figure, white
+    fig, axes = plt.subplots(3, 3, figsize=(12.0, 12.6), gridspec_kw={"height_ratios": [1.25, 1, 1]})
+    for c, ((run, title), laws) in enumerate(zip(RUNS, data)):
+        for r, kind in enumerate(("angles", "eig", "freq")):
+            draw(axes[r, c], kind, c, title, laws)
     fig.tight_layout()
     fig.savefig(OUT + ".pdf", bbox_inches="tight")
     fig.savefig(OUT + ".png", dpi=110, bbox_inches="tight")
-    print(json.dumps(summary, indent=1))
+    plt.close(fig)
+    # THE DECK: one row per slide, black (Cedric 2026-10-04)
+    os.makedirs(DECK, exist_ok=True)
+    with plt.style.context("dark_background"):
+        for kind, h in (("angles", 5.2), ("eig", 3.9), ("freq", 3.9)):
+            fig, axes = plt.subplots(1, 3, figsize=(12.0, h), facecolor="black")
+            for c, ((run, title), laws) in enumerate(zip(RUNS, data)):
+                draw(axes[c], kind, c, title, laws, dark=True)
+            fig.tight_layout()
+            fig.savefig(os.path.join(DECK, f"fig1_{kind}.png"), dpi=150, facecolor="black", bbox_inches="tight")
+            plt.close(fig)
+    # the numbers the slides' conclusion lines quote, computed here (the one rule)
+    summary = {}
+    for (run, _), laws in zip(RUNS, data):
+        a = np.array([L["alpha"] for L in laws])
+        d = np.abs(np.angle(np.exp(1j * (a[:, None] - a[None, :]))))
+        np.fill_diagonal(d, np.inf)
+        g = [float(np.sqrt(np.mean((np.log(L["H"]["circuit"]) - np.log(L["H"]["target"])) ** 2))) for L in laws]
+        summary[run] = {"n": len(laws), "worst": max(L["err"] for L in laws), "closest_pair_rad": float(d.min()),
+                        "lead_re": [float(L["eig"].real.max()) for L in laws], "gain_log_rms_max": max(g),
+                        "names": [L["name"] for L in laws], "errs": [L["err"] for L in laws]}
+    json.dump(summary, open(os.path.join(DECK, "fig1_summary.json"), "w"), indent=1)
+    print(json.dumps({r: {k: v for k, v in x.items() if k in ("worst", "closest_pair_rad", "gain_log_rms_max")} for r, x in summary.items()}, indent=1))
 
 
 if __name__ == "__main__":

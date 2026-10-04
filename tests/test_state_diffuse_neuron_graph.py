@@ -244,3 +244,41 @@ def test_graph_topologies(tmp_path):
         setup(str(tmp_path), reach_rotation_deg=30.0)                                 # an angle needs `rotated`
     with pytest.raises(ValueError):
         setup(str(tmp_path), graph="smallworld")
+
+
+def test_mesh_graph(tmp_path):
+    """exp17 batch 17: the multi-level mesh (GraphCast's construction on the neurons) -- the node sets nested coarse to
+    fine and the finest every element; each level a Delaunay mesh whose median edge roughly halves from level to level;
+    no node left without an edge; every edge both ways, none to itself; the levels in the three sets."""
+    import pytest
+    from plexus.operators.cell_ops import neuron_mesh_levels
+    g = np.random.default_rng(1)
+    P = g.uniform(0, 1, (20000, 3)) * [300.0, 200.0, 150.0]                    # ~7.7 um apart, as the brain's neurons
+    lv = neuron_mesh_levels(P, 4, 16.0)
+    assert [round(b) for _, b, _, _ in lv] == [64, 32, 16, 8] and len(lv[-1][2]) == len(P)
+    for (_, _, a, _), (_, _, b, _) in zip(lv, lv[1:]):
+        assert np.isin(a, b).all() and np.array_equal(b[:len(a)], a)          # nested, the coarser nodes first
+    med = [np.median(np.linalg.norm(P[e[:, 0]] - P[e[:, 1]], axis=1)) for *_, e in lv]
+    for m0, m1 in zip(med, med[1:]):
+        assert 1.4 < m0 / m1 < 3.0, med                                       # the edge halves, level to level
+    from scipy.spatial import cKDTree
+    for _, b, nodes, e in lv:
+        assert np.isin(nodes, e.ravel()).all()                                # no isolated node
+        ln = np.linalg.norm(P[e[:, 0]] - P[e[:, 1]], axis=1)
+        nn = np.full(len(P), np.inf)
+        nn[nodes] = cKDTree(P[nodes]).query(P[nodes], k=2)[0][:, 1]          # each node's nearest node of its level
+        far = ln > 2 * b + 1e-9                                               # past the 2-bin cut: only a node's shortest
+        assert np.all(np.isclose(ln[far], nn[e[far, 0]]) | np.isclose(ln[far], nn[e[far, 1]]))
+        assert far.mean() < 0.01, (b, far.mean())
+    o3 = setup(str(tmp_path), graph="mesh", mesh_levels=3, mesh_bin_um=16.0)[0]
+    o5 = setup(str(tmp_path), graph="mesh", mesh_levels=5, mesh_bin_um=16.0)[0]
+    for o in (o3, o5):
+        for k, (s_, r_) in _edges(o).items():
+            pairs = set(zip(s_.tolist(), r_.tolist()))
+            assert all((b_, a_) in pairs for a_, b_ in pairs) and not np.any(s_ == r_)
+    assert len(_edges(o3)["long"][0]) == 0 and len(_edges(o5)["long"][0]) > 0    # 64 um and up: long
+    assert len(_edges(o3)["mid"][0]) > 0 and len(_edges(o3)["short"][0]) > 0
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), graph="mesh")                                        # levels needed
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), mesh_levels=3)                                       # only with graph: mesh

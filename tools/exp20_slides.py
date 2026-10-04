@@ -38,7 +38,11 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
 HIDDEN = {"04_fig3d", "90_overview"}
-HIDDEN_PAT = ("gb_ex_f4",)       # batch 2's fish 4 slides: another law than fish 1's shown one (W prior), not comparable (Cedric)
+HIDDEN_BATCHES = {"1", "2", "3"}  # Cedric, 2026-10-04: "comment batch 1 2 and 3 slides" (kept in slides/, out of the deck)
+HIDDEN_PAT = ("gb_ex_f4",)
+# batch 4's per-fish W = 0 slide and no-network-twin movie (Cedric, 2026-10-04: "put in comments slide W=0 and no_W"):
+# the 24-fish table and the site slides carry both controls' numbers
+HIDDEN_RE = re.compile(r"^b4_.*_(controls|nonet_movie)$")       # batch 2's fish 4 slides: another law than fish 1's shown one (W prior), not comparable (Cedric)
 NET_DECK = "batch {b} $\\cdot$ network dynamics"   # the control slides' title
 # PER BATCH, ONE GROUP PER FISH (Cedric, 2026-10-03: "batch 2 on the template of batch 1, results for the two fish"):
 # (fish, the run whose movie and curves are shown, the run the network test is read on, its no-network twin or None)
@@ -50,7 +54,7 @@ SHOWN = {"3": [(f"glucose fish {k}", f"gb_sx_f{k}_mask_nol1", f"gb_sx_f{k}_mask_
 # ONE TITLE PER BATCH, on every slide of it (Cedric, 2026-10-03)
 BATCH_DECK = {"1": "batch 1 $\\cdot$ gut-brain glucose fish 1 $\\cdot$ sweep of multi-level GNN models",
               "2": "batch 2 $\\cdot$ gut-brain glucose fish 1 and 4 $\\cdot$ sweep of multi-level GNN models, stable integrator",
-              "3": "batch 3 $\\cdot$ gut-brain glucose fish 1-6 $\\cdot$ stimuli only, the nominal law with its input mask"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
+              "3": "batch 3 $\\cdot$ gut-brain glucose fish 1-6 $\\cdot$ the nominal law with its input mask"}            # slides written but commented out of all.tex (Cedric, 2026-10-03: slide 6, Fig. 3d)
 
 # THE PAPER'S NUMBERS, each with its figure and panel (read off papers/figs/*_crop.png, +-1 on the bars)
 PAPER = {
@@ -65,6 +69,14 @@ COND_ORDER = ["glucose", "glutamate", "Lglucose", "fish_water", "blood_glucose"]
 COND_LABEL = {"glucose": "D-glucose, gut", "glutamate": "glutamate, gut", "Lglucose": "L-glucose, gut (control)",
               "fish_water": "fish water, gut (control)", "blood_glucose": "D-glucose, blood (portal)"}
 SITE_COL = {1: "#9e9e9e", 2: "#ff4040", 3: "#ffa040"}
+
+
+def no_stimuli_only(t):
+    """Cedric, 2026-10-04: "remove stimuli only in all slides" -- every law since batch 3 is driven by the stimuli only,
+    so no slide says it; applied to every slide's text as it is written, the md's "what changed" cells included."""
+    t = re.sub(r"\s*[,+;]\s*stimuli only(?![\w-])", "", t, flags=re.I)
+    t = re.sub(r"\(\s*stimuli only\s*\)\s*", "", t, flags=re.I)
+    return re.sub(r"stimuli only[,;:]?\s*", "", t, flags=re.I)
 
 
 def frame(title, left, right, src, deck_title=None, left_gap=False):
@@ -444,28 +456,153 @@ def figure_graph(op, P, path, n_show=80, seed=0, box_um=300.0):
     plt.close(fig)
 
 
+MID_TURN_DEG = 45.0       # the middle edges DRAWN turned about the vertical (Cedric, 2026-10-04): in the law they lie along
+                          # x, y, z like the long ones, so drawn true they hide inside them
+
+
+def figure_graph3d(op, P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed=0):
+    """THE CELL GRAPH IN 3-D, exp17's slide-6 turntable (tools/exp17_slides.py figure_neuron_graph, adapted): to scale in
+    um, VTK off-screen, black, head LEFT (pos_view). a: the whole brain, the cells a faint cloud and the middle (orange)
+    and long (red) edges INTO `n_show` random cells; b: a 60-um box around one cell, the short edges between the cells
+    inside and that cell's own 18 edges thick. The middle edges are drawn turned MID_TURN_DEG about the vertical through
+    their receiver, so they do not hide behind the long ones (the caption says so). `mp4`: a full turn of panel a."""
+    import shutil
+    import subprocess
+    import tempfile
+    import pyvista as pv
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from plexus.tasks import trace_recording as TR
+    pv.OFF_SCREEN = True
+    COL = {"short": "#9ecae1", "mid": "#fd8d3c", "long": "#ff4040"}
+    E = {k: (op._E[k][0].cpu().numpy(), op._E[k][1].cpu().numpy()) for k in ("short", "mid", "long")}
+    Q = (P - (P.max(0) + P.min(0)) / 2).astype(np.float32)
+    th = np.deg2rad(MID_TURN_DEG)
+    R = np.array([[np.cos(th), -np.sin(th), 0], [np.sin(th), np.cos(th), 0], [0, 0, 1]], np.float32)
+    rng = np.random.default_rng(seed)
+    show = set(rng.choice(len(P), n_show, replace=False).tolist())
+
+    def ends(k, s, r):
+        a_, b_ = Q[s], Q[r]
+        if k == "mid":                                     # drawn turned about the receiver's vertical
+            a_ = b_ + (a_ - b_) @ R.T
+        return a_, b_
+
+    def lines(pl, a_, b_, col, w, al):
+        if not len(a_):
+            return
+        n = len(a_)
+        pl.add_mesh(pv.PolyData(np.concatenate([a_, b_]), lines=np.column_stack([np.full(n, 2), np.arange(n),
+                                                                                 np.arange(n) + n]).ravel()),
+                    color=col, line_width=w, opacity=al)
+
+    def cam(pl, az, r_, f=(0.0, 0.0, 0.0)):
+        el = np.deg2rad(32.0)
+        pl.camera.position = (f[0] + r_ * np.cos(el) * np.cos(az), f[1] + r_ * np.cos(el) * np.sin(az), f[2] + r_ * np.sin(el))
+        pl.render()
+
+    tmp = tempfile.mkdtemp(prefix="ngraph20_")
+    pa = pv.Plotter(off_screen=True, window_size=(1400, 1000))
+    pa.set_background("black")
+    pa.add_mesh(pv.PolyData(Q[::3]), color="#8a8a8a", point_size=1.5, opacity=0.3)
+    for k, w, al in (("mid", 2.5, 0.95), ("long", 2.0, 0.85)):
+        s, r = E[k]
+        sel = np.fromiter((i in show for i in r), bool, len(r))
+        lines(pa, *ends(k, s[sel], r[sel]), COL[k], w, al)
+    pa.add_mesh(pv.PolyData(Q[np.array(sorted(show))]), color="white", point_size=7, render_points_as_spheres=True)
+    pa.camera.focal_point = (0.0, 0.0, 0.0)
+    pa.camera.up = (0.0, 0.0, 1.0)
+    rr = 1.75 * float(np.ptp(P, 0).max())               # the whole brain in view at every turn
+    az0 = np.deg2rad(-60.0)                             # from +x, -y: x (head to tail) runs left to right on screen
+    cam(pa, az0, rr)
+    fa = os.path.join(tmp, "a.png")
+    pa.screenshot(fa)
+    frames = []
+    if mp4:
+        for i in range(n_frames):
+            cam(pa, az0 + 2 * np.pi * i / n_frames, rr)
+            pa.screenshot(os.path.join(tmp, f"f{i:05d}.png"))
+            frames.append(os.path.join(tmp, f"f{i:05d}.png"))
+    pa.close()
+    c = int(np.argmin(np.linalg.norm(Q - np.median(Q, 0), axis=1)))
+    inbox = np.all(np.abs(Q - Q[c]) < 30.0, axis=1)
+    pb = pv.Plotter(off_screen=True, window_size=(1000, 1000))
+    pb.set_background("black")
+    pb.add_mesh(pv.PolyData(Q[inbox]), color="#aaaaaa", point_size=5, render_points_as_spheres=True)
+    s, r = E["short"]
+    sel = inbox[s] & inbox[r]
+    lines(pb, Q[s[sel]], Q[r[sel]], COL["short"], 1.0, 0.35)
+    for k in ("short", "mid", "long"):
+        s, r = E[k]
+        sel = r == c
+        a_, b_ = ends(k, s[sel], r[sel])
+        lines(pb, a_, b_, COL[k], 4.0, 1.0)
+        pb.add_mesh(pv.PolyData(a_), color=COL[k], point_size=12, render_points_as_spheres=True)
+    pb.add_mesh(pv.PolyData(Q[c:c + 1]), color="white", point_size=18, render_points_as_spheres=True)
+    pb.camera.focal_point = tuple(Q[c].tolist())
+    pb.camera.up = (0.0, 0.0, 1.0)
+    cam(pb, az0, 420.0, tuple(Q[c].tolist()))
+    fb = os.path.join(tmp, "b.png")
+    pb.screenshot(fb)
+    pb.close()
+    st = op.graph_stats
+    note = (f"middle edges drawn turned {MID_TURN_DEG:.0f}° about the vertical, to show them apart from the long "
+            "ones; in the law both lie along x, y, z")
+
+    def compose(fa_, out):
+        fig = plt.figure(figsize=(12, 5.4), facecolor="black")
+        for j, (f, lab) in enumerate(((fa_, f"a   the whole brain, head left: middle and long edges into {n_show} cells"),
+                                      (fb, "b   one cell (white), its 18 senders, the short edges around it"))):
+            ax = fig.add_axes([0.0 if j == 0 else 0.58, 0.10, 0.58 if j == 0 else 0.42, 0.82])
+            ax.imshow(plt.imread(f))
+            ax.axis("off")
+            fig.text(0.01 if j == 0 else 0.59, 0.955, lab, color="white", fontsize=10, va="top")
+        fig.text(0.01, 0.045, "   ".join(f"{k}: {st[k]['edges']:,} edges, {st[k]['per_element']:.1f} per cell, mean "
+                                         f"{st[k]['mean_um']:.1f} µm" for k in ("short", "mid", "long")),
+                 color="0.75", fontsize=8)
+        fig.text(0.01, 0.012, note, color="#fd8d3c", fontsize=8)
+        for k, x in zip(("short", "mid", "long"), (0.60, 0.72, 0.84)):
+            fig.text(x, 0.10, k, color=COL[k], fontsize=11, weight="bold")
+        fig.savefig(out, dpi=150, facecolor="black")
+        plt.close(fig)
+
+    compose(fa, path)
+    if mp4:
+        for i, f in enumerate(frames):
+            compose(f, os.path.join(tmp, f"g{i:05d}.png"))
+        subprocess.run([TR._ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "g%05d.png"),
+                        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", mp4], check=True)
+        shutil.copy(path, mp4.replace(".mp4", ".png"))
+    shutil.rmtree(tmp)
+    return st
+
+
 def slide_law():
     """The neuron graph on this fish, from the operator itself (the picture IS the graph trained), head left."""
     import exp17_slides as X17
     from plexus.tasks import trace_recording as TR
     png = os.path.join(PRES, "figs", "05_neuron_graph.png")
+    mp4 = os.path.join(PRES, "Movies", "05_neuron_graph.mp4")
     pf = f"zebrafish/{REC1}_recording.npz"
     op = X17.neuron_graph_op(positions_file=pf)
     rec = TR.load(REC1)
-    figure_graph(op, rec["pos_view"], png)
+    if not os.path.exists(mp4):          # the turntable (Cedric, 2026-10-04: "rotate 3D the view as in exp17"), made once
+        figure_graph3d(op, np.asarray(rec["pos_view"], np.float64), png, mp4=mp4)
     E = {s: int(op._E[s][0].numel()) for s in ("short", "mid", "long") if s in op._E}
     right = (head("the law: a known ODE on a cell graph") + rows([
         ("state", "one per cell: dF/F"),
         ("cell", "its own time constant $\\tau_i$, rest $c_i$, 6 input weights $B_i$"),
         ("edges", ", ".join(f"{k} {v / 1e6:.2f}M" for k, v in E.items()) + ", one $W$ each"),
         ("", "6 nearest, 6 at 32 \\textmu m, 6 at 128 \\textmu m"),
-        ("step", "$\\tau_i\\, dz_i/dt = -z_i + c_i + \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u$"),
-        ("inputs", "$u$: UV pulse, beam x, y, grating, swim L, R"),
-        ("", "nothing recorded is read after the start")])
-        + head("training") + rows([("", "horizons 1..30, every step scored (exp17)"),
+        ("step", "$\\tau_i\\, dz_i/dt = -z_i + c_i + \\Omega_i(t) \\sum_j W_{ij}\\tanh z_j + B_i\\cdot u$"),
+        ("", "$\\Omega_i(t)$: a SIREN of position and time scaling the messages (batch 4)"),
+        ("inputs", "$u$: UV pulse, beam x, y, grating; the swim zeroed (batch 3 on)"),
+        ("", "into the input-mask cells only; nothing recorded is read after the start")])
+        + head("training") + rows([("", "exp17's rig: warm-up 10, horizons 1-5 then 10..50, 49,000 updates"),
                                     ("", "held-out trial windows never trained on")]))
     return ("05_law", frame("The law: a leaky ODE per cell, coupled by a learned graph, driven by the known inputs",
-                            "\\panel{figs/05_neuron_graph.png}", right, "state_diffuse[neuron_graph] on glucose fish 1",
+                            "\\playmovie{Movies/05_neuron_graph}", right, "state_diffuse[neuron_graph] on glucose fish 1",
                             left_gap=3, deck_title="The law: a known ODE per cell, coupled by a learned graph, driven "
                                                    "by the known inputs"))
 
@@ -476,12 +613,9 @@ def slide_baselines():
     png = os.path.join(EXP, "png", f"input_mask_{REC1}.png")
     import shutil
     shutil.copyfile(png, os.path.join(PRES, "figs", "06_input_mask.png"))
-    g = b["gut_window_mse_resp"]
     right = (head("the references, before any training") + rows([
         ("gut-responsive", f"{b['gut_responsive']:,} cells (the paper's selection, training frames)"),
         ("noise", f"$\\sigma^2$ {b['noise_sigma2']:.3f} dF/F$^2$ over all cells (ZAPBench 0.0005)"),
-        ("held-out gut", f"window MSE ($10^{{-3}}$): STA {g['sta'] * 1e3:.0f}, regression {g['reg'] * 1e3:.0f},"),
-        ("", f"best recent mean {g['mean'] * 1e3:.0f}, persistence {g['pers'] * 1e3:.0f}"),
         ("control / gut", f"{b['evoked_ratio_ctrl_over_gut']:.2f}: the brain barely answers the off-fish UV"),
         ("replicable", f"{b['top1_cells']:,} cells, held-out gut evoked {b['evoked_top1_heldout_gut']:+.3f}")])
         + head("the input mask (exp17's, per input)") + rows([
@@ -576,7 +710,7 @@ BATCHES = {
                                                 "gb_ng_wide", "gb_ng_h50", "gb_gc_base", "gb_ng_base_lglu"], "gb_ng_nol1", "gb_ng_now"),
     "2": ("the same levers, without runaway cells", ["gb_ex_base", "gb_ex_s1", "gb_ex_nol1", "gb_ex_now", "gb_ex_mask", "gb_ex_h50",
                                      "gb_ex_base_lglu", "gb_ex_f4"], "gb_ex_nol1", "gb_ex_now"),
-    "3": ("stimuli only, six fish", ["gb_sx_base", "gb_sx_lin", "gb_sx_nol1", "gb_sx_now", "gb_sx_lk_snd", "gb_sx_siren",
+    "3": ("the nominal law, six fish", ["gb_sx_base", "gb_sx_lin", "gb_sx_nol1", "gb_sx_now", "gb_sx_lk_snd", "gb_sx_siren",
                                      "gb_sx_base_lglu"] + [f"gb_sx_f{k}_nol1" for k in (2, 3, 4, 5, 6)]
                                     + [f"gb_sx_f{k}_mask_nol1" for k in range(1, 7)]
                                     + ["gb_sx_f4_base", "gb_sx_f4_lin", "gb_sx_f4_now", "gb_sx_f4_lk_snd", "gb_sx_f4_siren"],
@@ -650,10 +784,10 @@ def control_table(name, now):
         rws.append(("W = 0 at inference", r["dir"], f"{name}_W0"))
     if rn and now != name:
         rws.append(("trained with no network", rn["dir"], now))
-    body = "".join(f"{a} & {f(bm(d, st)[0])} & {f(bm(d, st)[1], '{:.4f}')} & {f(cell_r2(d, st))} \\\\\n"
+    body = "".join(f"{a} & {f(bm(d, st)[0])} & {f(bm(d, st)[1], '{:.4f}')} \\\\\n"
                    for a, d, st in rws)
     return (head("the network test, free rollout") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
-            "@{\\hspace{5pt}}r@{}}\n& \\multicolumn{2}{c}{brain mean} & per-cell \\\\\n& R$^2$ & RMSE & R$^2$ \\\\\n\\hline\n"
+            "@{}}\n& \\multicolumn{2}{c}{brain-mean dF/F} \\\\\n& R$^2$ & RMSE \\\\\n\\hline\n"
             + body + "\\end{tabular}\\par}\\vspace{6pt}\n")
 
 
@@ -722,6 +856,8 @@ def slide_batch(b):
 
 def run_deck(b, fish=""):
     """A batch's title, naming the fish when the batch runs more than one (Cedric, 2026-10-03)."""
+    if b == "4" and fish:
+        return f"batch 4 $\\cdot$ {fish} $\\cdot$ the SIREN law"
     return BATCH_DECK[b] if not fish else BATCH_DECK[b].replace("glucose fish 1 and 4", fish).replace("glucose fish 1-6", fish)
 
 
@@ -736,7 +872,7 @@ def slides_run(name, b, now=None, fish=""):
     v, what = rw.get(name, ("", ""))
     names = BATCHES[b][1]
     arm = names.index(name) + 1 if name in names else ""
-    tag = f"batch {b}, arm {arm}" if arm else f"batch {b}"
+    tag = f"batch {b}, arm {arm}" if arm and b != "4" else f"batch {b}"      # batch 4: the fish names the run
     dt = run_deck(b, fish)
     t, rep = r["test"], r["report"]
     N = numbers(r)
@@ -749,18 +885,6 @@ def slides_run(name, b, now=None, fish=""):
     pm = lambda a, sd: f"{a:+.3f} $\\pm$ {sd:.3f}" if sd is not None else f"{a:+.3f}"
     num = (head(f"{tag}: {_tex(name)}") + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n"
            + control_table(name, now)
-           + head("MSE, $10^{-3}$ dF/F$^2$, held-out windows") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}r@{\\hspace{7pt}}r@{}}\n"
-           + "& h 1-3 & h 16-32 \\\\\n" + "".join(f"{lab} & {mse[k][0]:.1f} & {mse[k][1]:.1f} \\\\\n" for lab, k in (
-               ("learned law", "mse_model"), ("mean baseline", "mse_mean"), ("stimulus lookup", "mse_lookup")) if k in mse)
-           + "\\end{tabular}\\par}\\vspace{6pt}\n"
-           + head("the held-out gut trials") + rows(
-               [("from the pulse", f"{N['trial']:+.3f} skill over the STA (55 s)" if N["trial"] is not None else "--")]
-               + ([("free rollout", f"{ft['evoked_gut_free_over_rec']:.2f} of the recorded response, pattern r {ft['pattern_r_gut']:+.2f}"),
-                   ("control", f"{ft['evoked_ctrl_free_over_rec_gut']:+.2f} of the recorded gut response")] if ft else []))
-           + head("free rollout, whole session") + rows([
-               ("R$^2$ raw", pm(fr["r2_raw"], fr.get("r2_raw_sd"))),
-               ("R$^2$ denoised", pm(fr["r2_denoised"], fr.get("r2_denoised_sd"))),
-               ("exploding", f"{fr.get('silenced', 0)} cells silenced" if fr.get("silenced") else "none")])
            + head("training") + rows([
                ("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "--"),
                ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]))
@@ -924,7 +1048,7 @@ def slide_network(name, now, b, fish=""):
                  [("network law", f"{f3(bm(r['dir'], name)[0])} ({f3(cell_r2(r['dir'], name))})"),
                   ("W = 0", f"{f3(bm(r['dir'], name + '_W0')[0])} ({f3(cell_r2(r['dir'], name + '_W0'))})")]
                  + ([("no network", f"{f3(bm(rn['dir'], now)[0])} ({f3(cell_r2(rn['dir'], now))})")] if rn else []))
-             + head("driven by the stimuli only") + rows(
+             + head("what drives the rollout") + rows(
                  [("start", "one recorded volume, then the inputs only"),
                   ("leak check", (f"recording after the start zeroed or noise: max {max(x['max_abs_zeroed'] for x in LK['rows']):.1e} dF/F, "
                                   f"= run-to-run {max(x['max_abs_self'] for x in LK['rows']):.1e}") if LK else "not run on this law"),
@@ -1027,12 +1151,7 @@ def slides_sites(name, now, b, fish=""):
         right = (head(f"site {site}: {REGION_TXT[reg].split(':')[0]}") + "{\\scriptsize " + REGION_TXT[reg] + "\\par}\\vspace{6pt}\n"
                  + head(f"evoked change, 0-20 s, mean of {n} pulses") + rows(
                      [("recorded", f"{rec:+.3f} dF/F"), ("network law", frac("full")), ("W = 0", frac("W0"))]
-                     + ([("no\\_W", frac("now"))] if "now" in ev else []))
-                 + head("read") + rows([
-                     ("", "free rollout from one recorded volume, inputs only;"),
-                     ("", "every pulse of the site, held-out ones included;"),
-                     ("", "the law never sees the site label, only the beam"),
-                     ("", "position: off-fish pulses must stay flat")]))
+                     + ([("no\\_W", frac("now"))] if "now" in ev else [])))
         out.append((f"batch_{b}_site{site}_{name}", frame(f"site {site}", f"\\panel{{figs/{png}}}", right,
                                                           f"{name}_freetrial.json", deck_title=net_deck(b, fish) + f" $\\cdot$ site {site}")))
     return out
@@ -1083,17 +1202,13 @@ def slides_fish_compare(b="3"):
         panels.append((k, Yr, Yl, Y0, dt, pre))
     if not rows_:
         return []
-    for key, lab in (("tau_s", "leak time constant"), ("V", "rest V"), ("W_in", "summed W into the cell"),
-                     ("B_norm", "input weight |B|")):
-        png = os.path.join(PRES, "figs", f"param_fish_{key}.png")
-        if os.path.exists(png):                             # tools/exp20_param_compare.py (Cedric: 2x2 -> 3x2 per constant)
-            rows_.append(None)
-            panels.append(None)
-            out_extra = (f"97_param_fish_{key}", f"% generated by tools/exp20_slides.py (six-fish {key})\n\\begin{{frame}}[t]"
-                         f"{{batch {b} $\\cdot$ six glucose fish, one law: {lab}}}\n\\vspace*{{\\bandgap}}\\vfill\n"
-                         f"\\begin{{center}}\\includegraphics[width=0.96\\textwidth,height=0.80\\textheight,keepaspectratio]"
-                         f"{{figs/param_fish_{key}.png}}\\end{{center}}\n\\vfill\n\\end{{frame}}\n")
-            PARAM_FISH.append(out_extra)
+    # ONE SLIDE, one row per constant (Cedric, 2026-10-04: "merge 75 to 78, one row per heatmap type"; it was one slide
+    # per constant, the six fish 3 x 2): tools/exp20_param_compare.py grid24 b3
+    if os.path.exists(os.path.join(PRES, "figs", "param_24_b3.png")):
+        PARAM_FISH[:] = [("97_param_fish_all", f"% generated by tools/exp20_slides.py (six-fish constants)\n\\begin{{frame}}[t]"
+                          f"{{batch {b} $\\cdot$ six glucose fish, one law: the learned constants}}\n\\vspace*{{\\bandgap}}\\vfill\n"
+                          "\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,keepaspectratio]"
+                          "{figs/param_24_b3.png}\\end{center}\n\\vfill\n\\end{frame}\n")]
     rows_ = [x for x in rows_ if x is not None]
     panels = [x for x in panels if x is not None]
     body = ("{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}r"
@@ -1101,7 +1216,7 @@ def slides_fish_compare(b="3"):
             "& & & gut- & gut & \\multicolumn{3}{c}{evoked, 0-20 s (free rollout)} & \\multicolumn{3}{c}{brain-mean R$^2$} \\\\\n"
             "fish & min & cells & responsive & pulses & recorded & law / rec. & W = 0 / rec. & masked & unmasked & W = 0 \\\\\n\\hline\n"
             + "\n".join(rows_) + "\n\\end{tabular}\\par}\\vspace{10pt}\n"
-            "{\\scriptsize the nominal law (known ODE on the cell graph, no W prior, stimuli only) with each fish's own input mask; "
+            "{\\scriptsize the nominal law (known ODE on the cell graph, no W prior) with each fish's own input mask; "
             "evoked = the gut-responsive cells' mean dF/F 0-20 s after a gut pulse (sites 2, 3, 5) minus the 10 s before, mean "
             "over the fish's gut pulses, inside the free rollout of its whole session; brain-mean R$^2$ of that rollout\\par}")
     out = [("95_fish_table", f"% generated by tools/exp20_slides.py (fish to fish)\n\\begin{{frame}}[t]{{batch {b} $\\cdot$ "
@@ -1152,6 +1267,538 @@ def slide_overview():
                             f"\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n"))
 
 
+# ============================================================================== batch 4: the 24 fish (Cedric, 2026-10-04)
+# "compile the 24 fish results in the md and the pdf, reuse the per fish results slides template and add the siren
+# slides (exp17's slide 17), comparison slides (exp17's slide 31, in two slides), a comparison flux movie (slides 28
+# and 29), a comprehensive summary against the paper"
+B4 = [("glucose", 6), ("glutamate", 5), ("Lglucose", 4), ("fish_water", 4), ("blood_glucose", 5)]
+B4_NAME = {"glucose": "D-glucose", "glutamate": "glutamate", "Lglucose": "L-glucose", "fish_water": "fish water",
+           "blood_glucose": "blood glucose"}
+B4_FISH = [(c, k) for c, n in B4 for k in range(1, n + 1)]
+
+
+def b4_runs(cond, k):
+    """(the SIREN law, its no-network twin) of a batch-4 fish; the glucose network arms are batch 3's gb_sx_f<k>_mask_siren."""
+    return ((f"gb_sx_f{k}_mask_siren", f"gb_b4_glucose_f{k}_now") if cond == "glucose"
+            else (f"gb_b4_{cond}_f{k}", f"gb_b4_{cond}_f{k}_now"))
+
+
+BATCHES["4"] = ("24 fish: the SIREN law and its no-network twin", [r for c, k in B4_FISH for r in b4_runs(c, k)],
+                "gb_sx_f1_mask_siren", "gb_b4_glucose_f1_now")
+BATCH_DECK["4"] = "batch 4 $\\cdot$ 24 fish $\\cdot$ the SIREN law (input mask) and its no-network twin"
+REGION_SHORT = {"off": "off the fish", "gutA": "gut (foregut?)", "gutB": "gut (midgut?)", "vessel": "vessel (portal)"}
+
+
+def site_region(rec, site):
+    """WHICH SPOT A PULSE SITE IS, every condition (inferred from the galvo voltages of data/design.json; the labels are
+    not calibrated to the body): site 1 off the fish in every condition -- in blood glucose by the block design and
+    its flat response (its galvo read-back is one value for every site); the gut's spot of sites 2-4; a second gut spot
+    (midgut?) where the beam sits 1 V further along x (glucose site 5, L-glucose site 4: galvo x -0.6 to -1.2 V against
+    -1.9 to -2.4 V); the portal vessel in blood glucose (the paper's Fig. 5a)."""
+    cond = re.match(r"gutbrain_(\w+?)_f\d+", rec).group(1)
+    if site == 1:
+        return "off"
+    if cond == "blood_glucose":
+        return "vessel"
+    return "gutB" if (cond, site) in (("glucose", 5), ("Lglucose", 4)) else "gutA"
+
+
+def frame_full(title, body, src, deck_title=None):
+    return (f"% generated by tools/exp20_slides.py from {src} ({title})\n\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n"
+            f"\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n")
+
+
+def _small(t):
+    """The text under a wide figure, one size down everywhere (Cedric, 2026-10-04: "fontsize too big" on these slides):
+    heads scriptsize, everything else tiny."""
+    t = t.replace("{\\normalsize\\textbf{", "{\\scriptsize\\textbf{").replace("{\\scriptsize ", "{\\tiny ")
+    t = t.replace("{\\scriptsize\\begin", "{\\tiny\\begin")
+    return "{\\tiny " + t + "}"
+
+
+def frame_top(title, png, w, left, right, src, deck_title=None):
+    """A wide figure across the slide, two text columns under it (the batch-4 comparison slides)."""
+    left, right = _small(left), _small(right)
+    body = (f"\\vspace*{{0.2\\baselineskip}}{{\\centering\\includegraphics[width={w}\\textwidth]{{{png}}}\\par}}\\vspace{{4pt}}\n"
+            "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\n" + left + "\n\\end{column}\n"
+            "\\begin{column}{0.49\\textwidth}\n" + right + "\n\\end{column}\n\\end{columns}")
+    return frame_full(title, body, src, deck_title)
+
+
+def _pic(png, h=0.80, w=0.96):
+    return (f"\\vfill\n\\begin{{center}}\\includegraphics[width={w}\\textwidth,height={h}\\textheight,keepaspectratio]"
+            f"{{{png}}}\\end{{center}}\n\\vfill")
+
+
+def figure_sites_grid(name, now, path):
+    """BATCH 4's SITE SLIDE, one per fish (the fish have 2 to 6 sites): top, one panel per pulse site, the
+    gut-responsive cells' mean dF/F around every pulse of the site, mean +- SD over its pulses, inside the free rollout
+    (recorded, the network law, the same law W = 0, the no-network twin); bottom left the body diagram of the fish's
+    stimulated spot, bottom right the whole session's brain mean with the pulses, coloured by site."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    r, rn = landed(name), (landed(now) if now else None)
+    ft = r["freetrial"]
+    pre, post = ft["window"]
+    rec = ft["recording"].replace("_nosw", "")
+    z = np.load(os.path.join(GD, "graphs_data", "zebrafish", f"{rec}_recording.npz"))
+    dt = float(np.median(np.diff(z["t_s"])))
+    tt = np.arange(-pre, post + 1) * dt
+    n_ev = int(round(20 / dt))
+    COL = {"rec": "#4caf50", "full": "white", "W0": "#ff5252", "now": "#42a5f5"}
+    LAB = {"rec": "recorded", "full": "network law", "W0": "same law, W = 0", "now": "trained with no network (no_W)"}
+    sites = sorted({p_["site"] for p_ in ft["arms"]["full"]["pulses"]})
+    n = len(sites)
+    fig = plt.figure(figsize=(max(9.0, 2.7 * n), 6.4), facecolor="black")
+    gs = fig.add_gridspec(2, n, height_ratios=[1.35, 1], hspace=0.42, wspace=0.10)
+    ev, regs = {}, {}
+    for j, site in enumerate(sites):
+        a = fig.add_subplot(gs[0, j])
+        _black(a)
+        sel = lambda arm, key: np.array([p_[key] for p_ in arm["pulses"] if p_["site"] == site])
+        S = {"rec": sel(ft["arms"]["full"], "trace_rec"), "full": sel(ft["arms"]["full"], "trace_free")}
+        if "W0" in ft["arms"]:
+            S["W0"] = sel(ft["arms"]["W0"], "trace_free")
+        if rn and rn["freetrial"] and "pulses" in rn["freetrial"]["arms"]["full"]:
+            S["now"] = sel(rn["freetrial"]["arms"]["full"], "trace_free")
+        for k, Y in S.items():
+            if len(Y) == 0:
+                continue
+            m_, s_ = Y.mean(0), Y.std(0)
+            a.fill_between(tt, m_ - s_, m_ + s_, color=COL[k], alpha=0.15, lw=0)
+            a.plot(tt, m_, color=COL[k], lw=1.8 if k in ("rec", "full") else 1.2, label=LAB[k])
+        a.axvline(0, color="#ffd54f", lw=0.8, ls=":")
+        a.set_ylim(0, 0.7)
+        reg = regs[site] = site_region(rec, site)
+        a.set_title(f"site {site}: {REGION_SHORT[reg]}\n{len(S['rec'])} pulses", fontsize=9,
+                    color="0.75" if reg == "off" else "#ffeb3b")
+        a.set_xlabel("s from the UV pulse", fontsize=7)
+        if j == 0:
+            a.set_ylabel(f"mean dF/F, {ft['responsive_cells']:,}\ngut-responsive cells", fontsize=7)
+            a.legend(frameon=False, fontsize=6.5, labelcolor="white", loc="upper left")
+        else:
+            a.set_yticklabels([])
+        ev[site] = {k: float(np.mean(Y[:, pre:pre + n_ev].mean(1) - Y[:, :pre].mean(1))) for k, Y in S.items() if len(Y)}
+    main_reg = max((r_ for r_ in regs.values() if r_ != "off"), key=list(regs.values()).count, default="off")
+    nd = max(1, n // 3)
+    d = fig.add_subplot(gs[1, :nd])
+    d.axis("off")
+    im = plt.imread(os.path.join(DATA, "anatomy", f"site_{main_reg}.png"))
+    d.imshow(im[int(0.22 * im.shape[0]):int(0.82 * im.shape[0]), :int(0.92 * im.shape[1])])
+    d.set_title(f"stimulated: {REGION_SHORT[main_reg]}", color="#ffeb3b", fontsize=9)
+    b = fig.add_subplot(gs[1, nd:])
+    _black(b)
+    mf = np.load(os.path.join(r["dir"], "results", f"{name}_movie.npz"))
+    T_ = mf["r2_t"] * dt / 60
+    b.plot(T_, mf["mean_obs_all"], color=COL["rec"], lw=0.8)
+    b.plot(T_, mf["mean_pred_all"], color=COL["full"], lw=0.8)
+    w0p = os.path.join(r["dir"], "results", f"{name}_W0_movie.npz")
+    if os.path.exists(w0p):
+        b.plot(T_, np.load(w0p)["mean_pred_all"], color=COL["W0"], lw=0.7)
+    if rn:
+        b.plot(T_, np.load(os.path.join(rn["dir"], "results", f"{now}_movie.npz"))["mean_pred_all"], color=COL["now"], lw=0.7)
+    for f, st_ in zip(z["trials"][:, 0], z["trials"][:, 2]):
+        b.axvline(f * dt / 60, color="0.55" if site_region(rec, int(st_)) == "off" else "#ffd54f", lw=0.8, alpha=0.8)
+    b.set_xlabel("min (the whole session; UV pulses: yellow stimulated, grey off the fish)", fontsize=7)
+    b.set_ylabel("whole-brain\nmean dF/F", fontsize=7)
+    fig.savefig(path, dpi=180, facecolor="black", bbox_inches="tight")
+    plt.close(fig)
+    return ev, regs
+
+
+def slide_sites_b4(name, now, fish):
+    r = landed(name)
+    if not (r and r["freetrial"] and "pulses" in r["freetrial"]["arms"]["full"]):
+        return ("", "")
+    png = f"batch_4_sites_{name}.png"
+    ev, regs = figure_sites_grid(name, now, os.path.join(PRES, "figs", png))
+    f = lambda e, k: f"{e[k]:+.3f}" if k in e else "--"
+    fr = lambda e, k: f"{e[k] / e['rec']:.2f}" if k in e and abs(e["rec"]) > 0.02 else "--"
+    body = "".join(f"{s} & {_tex(REGION_SHORT[regs[s]])} & {f(e, 'rec')} & {fr(e, 'full')} & {fr(e, 'W0')} & {fr(e, 'now')} \\\\\n"
+                   for s, e in ev.items())
+    right = (head("evoked change at every pulse, 0-20 s") + "{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{4pt}}l@{\\hspace{5pt}}r"
+             "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n& & recorded & \\multicolumn{3}{c}{over the recorded} \\\\\n"
+             "site & spot & dF/F & law & W = 0 & no\\_W \\\\\n\\hline\n" + body + "\\end{tabular}\\par}")
+    return (f"b4_{name}_sites", frame("the pulse sites", f"\\panel{{figs/{png}}}", right, f"{name}_freetrial.json",
+                                      deck_title=f"batch 4 $\\cdot$ {fish} $\\cdot$ network dynamics, every site"))
+
+
+def slide_omega(name, fish):
+    """exp17's slide 17 on a batch-4 fish: the learned modulation Omega_i(t) beside the recorded activity
+    (tools/exp20_modulation.py)."""
+    import shutil
+    res = os.path.join(RUNS, name, "results")
+    js = os.path.join(DATA, f"omega_{name}.json")
+    if not (os.path.exists(os.path.join(res, "movie_omega.mp4")) and os.path.exists(js)):
+        return ("", "")
+    for ext in ("mp4", "png"):
+        shutil.copyfile(os.path.join(res, f"movie_omega.{ext}"), os.path.join(PRES, "Movies", f"{name}_omega.{ext}"))
+    O = json.load(open(js))
+    right = (head("the learned modulation $\\Omega_i(t)$")
+             + "{\\scriptsize each cell's message sum is multiplied by $\\Omega_i(t) = 1 + f(x_i, y_i, z_i, t)$, $f$ a SIREN "
+               "of the position and the absolute time; 1 = no modulation, 0 = no input from the network at that frame\\par}\\vspace{6pt}\n"
+             + rows([("mean over all", f"{O['mean']:.2f}"),
+                     ("5th-95th pct", f"{O['p5']:.2f} .. {O['p95']:.2f}"),
+                     ("brain mean over time", f"{O['brain_mean_min']:.2f} .. {O['brain_mean_max']:.2f}"),
+                     ("below 1", f"{100 * O['frac_below_1']:.1f} \\% of cell-frames")])
+             + f"{{\\tiny\\color{{gray}} the movie's {O['frames']} frames over the session; left the recorded dF/F, right "
+               "$\\Omega$ per cell, one colour scale centred on 1\\par}\n")
+    return (f"b4_{name}_omega", frame("the learned modulation of the messages", f"\\playmovie{{Movies/{name}_omega}}", right,
+                                      "tools/exp20_modulation.py", left_gap=True,
+                                      deck_title=f"batch 4 $\\cdot$ {fish} $\\cdot$ modulation"))
+
+
+def slides_b4_fish(cond, k):
+    """THE PER-FISH TEMPLATE (batches 2-3) on a batch-4 fish: the movie with the network test, the SIREN modulation,
+    the learned constants, the pulse sites (one slide, every site), W = 0 and the no-network twin's movie. The curves
+    slide (MSE by step) is left out: 24 fish x 8 slides, and its numbers are in the 24-fish table."""
+    net, now = b4_runs(cond, k)
+    fish = f"{B4_NAME[cond]} fish {k}"
+    if not landed(net):
+        return []
+    out = [s for s in slides_run(net, "4", now, fish) if s[0].endswith("_movie")]
+    out.append(slide_omega(net, fish))
+    out.append(slide_params(net, "4", fish))
+    out.append(slide_sites_b4(net, now, fish))
+    out += slides_controls(net, now, "4", fish)
+    return [(s if s.startswith("b4_") else f"b4_{s}", b) for s, b in out if b]
+
+
+def _f(v, fmt="{:+.2f}"):
+    return fmt.format(v) if isinstance(v, (int, float)) and v is not None and np.isfinite(v) else "--"
+
+
+def slides_b4_compare():
+    """THE 24 FISH SIDE BY SIDE (data/compare24.json, tools/exp20_compare24.py), exp17's slides 28, 29 and 31."""
+    import shutil
+    out = []
+    cj = os.path.join(DATA, "compare24.json")
+    if not os.path.exists(cj):
+        return out
+    C = json.load(open(cj))
+    dt_ = BATCH_DECK["4"]
+    halves = {"a": ("glucose", "glutamate"), "b": ("Lglucose", "fish_water", "blood_glucose")}
+    for h, conds in halves.items():
+        lines = []
+        for r in C["rows"]:
+            if r["condition"] not in conds:
+                continue
+            g = r.get("gut") or {}
+            ratio = lambda k: (_f(g[k] / g["rec"], "{:.2f}") if g.get(k) is not None and g.get("rec") and abs(g["rec"]) > 0.02 else "--")
+            lines.append(f"{_tex(B4_NAME[r['condition']])} {r['fish']} & {_f(r.get('minutes'), '{:.0f}')} & "
+                         f"{(r.get('cells') or 0) / 1e3:.0f}k & {_f(r.get('gut_responsive'), '{:,}')} & {g.get('n', '--')} & "
+                         f"{_f(r.get('top1_heldout'), '{:+.3f}')} & {_f(g.get('rec'), '{:+.3f}')} & {ratio('law')} & {ratio('W0')} & {ratio('now')} & "
+                         f"{_f(r.get('brain_r2'))} & {_f(r.get('brain_r2_W0'))} & {_f(r.get('brain_r2_now'))} & "
+                         f"{_f(r.get('omega_mean'), '{:.2f}')} \\\\")
+        body = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r"
+                "@{\\hspace{6pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r@{}}\n"
+                "& & & gut- & & replicable & \\multicolumn{4}{c}{evoked, 0-20 s, free rollout} & \\multicolumn{3}{c}{brain-mean R$^2$} & \\\\\n"
+                "fish & min & cells & responsive & pulses & held out & recorded & law/rec & W = 0 & no\\_W & law & W = 0 & no\\_W & $\\bar\\Omega$ \\\\\n"
+                "\\hline\n" + "\n".join(lines) + "\n\\end{tabular}\\par}\\vspace{8pt}\n"
+                "{\\tiny replicable: the top-1 \\% cells (chosen on the training pulses) on the HELD-OUT gut pulses, recorded (the "
+                "paper's test of a response); evoked: the gut-responsive cells' mean dF/F 0-20 s after a stimulated pulse minus "
+                "the 10 s before, mean over the fish's stimulated pulses (blood glucose: the vessel), inside the free rollout of "
+                "the whole session; law / rec: the law's over the recorded; no\\_W: the twin trained with no network; "
+                "$\\bar\\Omega$: the SIREN modulation's mean (1 = none)\\par}")
+        title = ("the nutrients: D-glucose and glutamate" if h == "a" else
+                 "the controls (L-glucose, fish water) and the vessel (blood glucose)")
+        out.append((f"b4_table_{h}", frame_full(title, "\\vspace*{1.0\\baselineskip}" + body, "data/compare24.json",
+                                                deck_title=dt_ + f" $\\cdot$ the table ({'1' if h == 'a' else '2'}/2)")))
+    for h, lab in (("a", "D-glucose and glutamate"), ("b", "L-glucose, fish water, blood glucose")):
+        if os.path.exists(os.path.join(PRES, "figs", f"compare24_traces_{h}.png")):
+            out.append((f"b4_traces_{h}", frame_full(lab, _pic(f"figs/compare24_traces_{h}.png"), "tools/exp20_compare24.py",
+                                                     deck_title=f"batch 4 $\\cdot$ the response to a stimulated pulse, every fish: {lab}")))
+    T = C.get("tests", {})
+    if os.path.exists(os.path.join(PRES, "figs", "compare24_conditions.png")):
+        fm = T.get("foregut_midgut", [])
+        wd = T.get("fwhm", {})
+        from scipy.stats import mannwhitneyu
+        md2 = lambda v: f"{np.median(v):.1f} s ({min(v):.0f}-{max(v):.0f}, n {len(v)})" if v else "--"
+        g_, v_ = wd.get("gut", []), wd.get("vessel", [])
+        pr = lambda a_, b_: f"{mannwhitneyu(a_, b_, alternative='greater').pvalue:.3f}" if a_ and b_ else "--"
+        left = (head("Fig. 2g: the second gut spot against the first")
+                + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}r@{\\hspace{8pt}}r@{}}\nfish & recorded & the law \\\\\n\\hline\n"
+                + "".join(f"{_tex(x['fish'])} & {x['site5_over_site2_rec']:.2f} & {_f(x['site5_over_site2_law'], '{:.2f}')} \\\\\n" for x in fm)
+                + "\\end{tabular}\\par}\\vspace{3pt}{\\tiny the evoked change at the second spot (glucose site 5, L-glucose site 4, "
+                  "galvo x 1 V further along) over the first's (site 2); the paper: the midgut evokes about a quarter of the "
+                  "foregut (350 / 1440 cells); L-glucose, which evokes little, shows no difference\\par}")
+        right = (head("Fig. 5d: the response width (FWHM)")
+                 + rows([("gut (glucose, glutamate)", md2([x["fwhm_rec"] for x in g_]) + " recorded"),
+                         ("", md2([x["fwhm_law"] for x in g_ if x.get("fwhm_law") is not None]) + " the laws"),
+                         ("vessel (blood glucose)", md2([x["fwhm_rec"] for x in v_]) + " recorded"),
+                         ("", md2([x["fwhm_law"] for x in v_ if x.get("fwhm_law") is not None]) + " the laws"),
+                         ("gut longer than vessel", f"p {pr([x['fwhm_rec'] for x in g_], [x['fwhm_rec'] for x in v_])} recorded, "
+                          f"{pr([x['fwhm_law'] for x in g_ if x.get('fwhm_law')], [x['fwhm_law'] for x in v_ if x.get('fwhm_law')])} "
+                          "the laws (Mann-Whitney)")])
+                 + "{\\tiny FWHM of the gut-responsive cells' mean response to the fish's stimulated pulses; the paper: "
+                   "shorter for the portal system than for the gut lumen, p < 0.001\\par}")
+        out.append(("b4_conditions", frame_top("the five conditions", "figs/compare24_conditions.png", 0.98, left, right,
+                                               "tools/exp20_compare24.py", deck_title="batch 4 $\\cdot$ the five conditions: "
+                                               "the paper's Fig. 2 and Fig. 5 on the recordings and the laws")))
+    for h, lab in (("a", "D-glucose and glutamate"), ("b", "L-glucose, fish water, blood glucose")):
+        if os.path.exists(os.path.join(PRES, "figs", f"param_24_{h}.png")):
+            out.append((f"b4_params_{h}", frame_full(lab, _pic(f"figs/param_24_{h}.png", h=0.82, w=1.0), "tools/exp20_param_compare.py grid24",
+                                                     deck_title=f"batch 4 $\\cdot$ the learned constants on every fish: {lab}")))
+    mv = os.path.join(PRES, "Movies", "flow_fish.mp4")
+    fj = os.path.join(DATA, "flow_gut_fish.json")
+    if os.path.exists(os.path.join(PRES, "Movies", "omega_fish.mp4")):            # Cedric, 2026-10-04: before the flow
+        out.append(("b4_omega_fish", frame_full("the SIREN modulation on each fish",
+                    "\\vspace*{1.0\\baselineskip}\\centering\\playmovie[0.80\\textwidth]{Movies/omega_fish}\\par"
+                    "{\\tiny\\color{gray} each cell: the learned modulation $\\Omega_i(t)$ of the messages into each cell (1 = none; "
+                    "red above 1, blue below), the fish's whole session in the same 800 frames, its mean over cells and frames "
+                    "beside its name; each fish on its own colour scale centred on 1 (tools/exp20\\_modulation.py, "
+                    "exp17\\_modulation.py), head left\\par}",
+                    "tools/exp20_flow_montage.py omega",
+                    deck_title="batch 4 $\\cdot$ the learned modulation $\\Omega$ (SIREN) on each fish")))
+    if os.path.exists(mv):
+        out.append(("b4_flow_fish", frame_full("the flow on each fish",
+                    "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.74\\textwidth]{Movies/flow_fish}\\par"
+                    "{\\tiny\\color{gray} each cell: excitatory flow above, inhibitory below, smoothed over 25 \\textmu m "
+                    "(tools/exp20\\_wind.py); each fish its own session, the same 800 frames; the paper's stations in yellow\\par}",
+                    "tools/exp20_flow_montage.py", deck_title="batch 4 $\\cdot$ the flow (the learned messages as wind) on each fish")))
+    if os.path.exists(fj) and os.path.exists(os.path.join(PRES, "figs", "flow_gut_fish.png")):
+        F = json.load(open(fj))
+        short = lambda t: (t.replace("D-glucose fish ", "D-glc ").replace("glutamate fish ", "glut ")
+                           .replace("L-glucose fish ", "L-glc ").replace("fish water fish ", "water ")
+                           .replace("blood glucose fish ", "blood "))
+        body = "".join(f"{_tex(short(x['fish']))} & {x['ratio_ex']:.2f} & {x['ratio_in']:.2f} & {x['toward_tail_gut']:+.2f} & "
+                       f"{x['toward_tail_rest']:+.2f} \\\\\n" for x in F)
+        tab = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{}}\n"
+               "& \\multicolumn{2}{c}{speed, gut / rest} & \\multicolumn{2}{c}{toward the tail (ex.)} \\\\\n"
+               "fish & excitatory & inhibitory & gut windows & rest \\\\\n\\hline\n" + body + "\\end{tabular}\\par}")
+        out.append(("b4_flow_gut", frame_top("the flow during the gut response", "figs/flow_gut_fish.png", 0.80, tab,
+                    "{\\tiny the fish's brains differ, so no mean over fish (exp17's slide 29 averages graphs on one "
+                    "brain); per fish, the frames 0-20 s after a stimulated pulse against the rest. speed: the mean flow speed "
+                    "over the brain, gut windows over the rest. toward the tail: the net direction of the excitatory flow "
+                    "along the body, +1 all toward the tail, -1 all toward the head (the head drawn left)\\par}",
+                    "tools/exp20_wind.py gut_flow, exp20_flow_montage.py gut",
+                    deck_title="batch 4 $\\cdot$ the flow during the gut windows against the rest")))
+    ij = os.path.join(DATA, "integration.json")
+    if os.path.exists(ij) and os.path.exists(os.path.join(PRES, "figs", "integration.png")):
+        I = json.load(open(ij))
+        rws = []
+        for o in I["fish"]:
+            pb = o.get("per_bin") or []
+            gv = [b_.get("GV_over_GM") for b_ in pb]
+            if any(v is not None for v in gv):
+                rws.append((_tex(o["recording"].replace("gutbrain_", "")),
+                            ", ".join(_f(v, "{:.2f}") for v in gv) + f" ({o['cells_used']:,} cells)"))
+        left = ("{\\scriptsize the gut-responsive cells' gain in model correlation when the swim (GM) or the grating (GV) "
+                "joins the gut regressors (the paper's distributed-lag regression), by fifth of the brain from head to tail "
+                "(no atlas: the axis stands in for the regions); white, the median over the fish. The paper: OT (midbrain) "
+                "GV/GM 1.18; PBN, medial idMO, DVC (hindbrain) 0.26-0.35\\par}")
+        right = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{}}\nfish & GV / GM, head to tail fifth (cells) \\\\\n\\hline\n"
+                 + "".join(f"{a_} & {b_} \\\\\n" for a_, b_ in rws) + "\\end{tabular}\\par}")
+        out.append(("b4_integration", frame_top("Fig. 3d on the recordings", "figs/integration.png", 0.80, left, right,
+                                                "tools/exp20_integration.py",
+                                                deck_title="batch 4 $\\cdot$ visuo-motor integration of the gut-responsive cells "
+                                                           "(the recordings, swim kept)")))
+    out += slides_timescales()
+    return out
+
+
+def slides_timescales():
+    """THE PAPER'S FIG. 4d-g (tools/exp20_timescales.py): glucose fish 1's five clusters by decay, recorded against the
+    law's forecast from each pulse; then every fish side by side."""
+    out = []
+    ex = os.path.join(DATA, "timescales_gb_sx_f1_mask_siren.json")
+    if os.path.exists(ex) and os.path.exists(os.path.join(PRES, "figs", "timescales_gb_sx_f1_mask_siren.png")):
+        E = json.load(open(ex))
+        left = (head("glucose fish 1, the law forecast from each pulse")
+                + rows([("cells", f"{E['cells_used']:,} gut-responsive, {E['pulses']} stimulated pulses"),
+                        ("time to peak", f"{E['rec']['t_peak_median']:.1f} s recorded, {E['law']['t_peak_median']:.1f} s the law (median)"),
+                        ("decay", f"{E['rec']['decay_median']:.1f} s recorded, {E['law']['decay_median']:.1f} s the law "
+                                  f"(10-90 \\%: {E['rec']['decay_p10']:.0f}-{E['rec']['decay_p90']:.0f} s recorded)"),
+                        ("per cell, r", f"peak {E['r_cells']['peak']:+.2f}, decay {E['r_cells']['decay']:+.2f}, "
+                                        f"time to peak {E['r_cells']['t_peak']:+.2f}")]))
+        right = ("{\\scriptsize the paper (Fig. 4d-g): most cells start within 5 s; decays from about 10 s to over a minute; "
+                 "five k-means clusters split by decay; every region holds every timescale. Here the law starts from the "
+                 "recorded volume at the pulse and runs on the inputs only for the 56-s window; the clusters are the "
+                 "recorded responses scaled by their own peak, the law's mean over the same cells dashed\\par}")
+        out.append(("b4_timescales_f1", frame_top("the response time courses", "figs/timescales_gb_sx_f1_mask_siren.png", 0.92,
+                                                  left, right, "tools/exp20_timescales.py",
+                                                  deck_title="batch 4 $\\cdot$ the response time courses (Fig. 4d-g), glucose fish 1")))
+    aj = os.path.join(DATA, "timescales_all.json")
+    if os.path.exists(aj) and os.path.exists(os.path.join(PRES, "figs", "timescales_all.png")):
+        A = json.load(open(aj))
+        nut = [r for r in A if r["condition"] in ("glucose", "glutamate")]
+        ves = [r for r in A if r["condition"] == "blood_glucose"]
+        ctl = [r for r in A if r["condition"] in ("Lglucose", "fish_water")]
+        rg = lambda v, f="{:.1f}": f"{f.format(min(v))}-{f.format(max(v))}" if v else "--"
+        left = (head("every fish: medians over the cells")
+                + rows([("nutrients, gut", f"decay {rg([r['decay_rec'] for r in nut])} s recorded, {rg([r['decay_law'] for r in nut])} s the laws"),
+                        ("", f"time to peak {rg([r['t_peak_rec'] for r in nut])} s recorded, {rg([r['t_peak_law'] for r in nut])} s the laws"),
+                        ("vessel", f"decay {rg([r['decay_rec'] for r in ves])} s recorded, {rg([r['decay_law'] for r in ves])} s the laws"),
+                        ("controls", f"decay {rg([r['decay_rec'] for r in ctl])} s recorded, {rg([r['decay_law'] for r in ctl])} s the laws"),
+                        ("over the window", f"{rg([100 * r['censored_rec'] for r in A], '{:.0f}')} \\% of the cells last the 56 s (recorded)")]))
+        right = (head("per cell, recorded against the law (r)")
+                 + rows([("peak", f"{min(r['r_peak'] for r in A):+.2f} to {max(r['r_peak'] for r in A):+.2f}"),
+                         ("decay", f"{min(r['r_decay'] for r in A):+.2f} to {max(r['r_decay'] for r in A):+.2f}"),
+                         ("time to peak", f"{min(r['r_t_peak'] for r in A):+.2f} to {max(r['r_t_peak'] for r in A):+.2f}")])
+                 + "{\\scriptsize the laws keep which cells answer and by how much, and the order of the conditions' "
+                   "timescales (the vessel and the controls short, the nutrients long); their decays run 2-4 s longer in "
+                   "the nutrient fish; a cell's own timing is matched only loosely\\par}")
+        out.append(("b4_timescales_all", frame_top("the time courses, every fish", "figs/timescales_all.png", 0.92, left, right,
+                                                   "tools/exp20_timescales.py summary",
+                                                   deck_title="batch 4 $\\cdot$ the response time courses, every fish: recorded against the laws")))
+    return out
+
+
+def _b4_stats():
+    """The summary's numbers, from data/compare24.json, flow_gut_fish.json and integration.json (so a fish that lands
+    later updates them)."""
+    from scipy.stats import mannwhitneyu
+    C = json.load(open(os.path.join(DATA, "compare24.json")))
+    S = {"n": 0, "law": [], "W0": [], "now": [], "bm": [], "bm_W0": [], "bm_now": [], "frac": {}, "top1": {}, "fw": {},
+         "fw_law": {}, "om": []}
+    for r in C["rows"]:
+        g, c = r.get("gut") or {}, r["condition"]
+        if r.get("gut_responsive") and r.get("cells"):
+            S["frac"].setdefault(c, []).append(100.0 * r["gut_responsive"] / r["cells"])
+        if r.get("top1_heldout") is not None:
+            S["top1"].setdefault(c, []).append(r["top1_heldout"])
+        if g.get("rec") and abs(g["rec"]) > 0.02:
+            S["n"] += 1
+            S["law"].append(g["law"] / g["rec"])
+            if g.get("W0") is not None:
+                S["W0"].append(g["W0"] / g["rec"])
+            if g.get("now") is not None:
+                S["now"].append(g["now"] / g["rec"])
+            if g.get("fwhm_rec") is not None and g["rec"] > 0.03:
+                S["fw"].setdefault(c, []).append(g["fwhm_rec"])
+                if g.get("fwhm_law") is not None:
+                    S["fw_law"].setdefault(c, []).append(g["fwhm_law"])
+        for k, kk in (("brain_r2", "bm"), ("brain_r2_W0", "bm_W0"), ("brain_r2_now", "bm_now"), ("omega_mean", "om")):
+            if r.get(k) is not None and (kk != "bm_now" or r.get("brain_r2") is not None):
+                S[kk].append(r[k])
+    gut = S["fw"].get("glucose", []) + S["fw"].get("glutamate", [])
+    ves = S["fw"].get("blood_glucose", [])
+    gl = S["fw_law"].get("glucose", []) + S["fw_law"].get("glutamate", [])
+    vl = S["fw_law"].get("blood_glucose", [])
+    S["fwhm"] = {"gut": gut, "vessel": ves, "gut_law": gl, "vessel_law": vl,
+                 "p": float(mannwhitneyu(gut, ves, alternative="greater").pvalue) if gut and ves else None,
+                 "p_law": float(mannwhitneyu(gl, vl, alternative="greater").pvalue) if gl and vl else None}
+    S["fm"] = [x for x in C["tests"]["foregut_midgut"] if x["fish"].startswith("glucose")]
+    fj = os.path.join(DATA, "flow_gut_fish.json")
+    S["flow"] = json.load(open(fj)) if os.path.exists(fj) else []
+    ij = os.path.join(DATA, "integration.json")
+    S["integ"] = json.load(open(ij))["fish"] if os.path.exists(ij) else []
+    return S
+
+
+def slides_summary():
+    """THE SESSION AGAINST THE PAPER (Cedric, 2026-10-04: "make a comprehensive summary, compare the full experiment
+    session insight with the original paper: what is in line, what differs, what new jobs are needed")."""
+    if not os.path.exists(os.path.join(DATA, "compare24.json")):
+        return []
+    S = _b4_stats()
+    md_ = lambda v, f="{:.2f}": f.format(np.median(v)) if v else "--"
+    rg = lambda v, f="{:.2f}": f"{f.format(min(v))}-{f.format(max(v))}" if v else "--"
+    fr = S["frac"]
+    nut = [x for x in S["flow"] if x["fish"].startswith(("D-glucose", "glutamate"))]
+    ctl = [x for x in S["flow"] if "control" in x["fish"]]
+    fast = [x for x in S["flow"] if x["fish"].startswith("D-glucose") and x["ratio_ex"] > 1.05]
+    glc = [x for x in S["flow"] if x["fish"].startswith("D-glucose")]
+    tail = [o for o in S["integ"] if "glucose" in o["recording"] and (o.get("per_bin") or [{}])[-1].get("GV_over_GM") is not None]
+    tail_ok = [o for o in tail if 0 < o["per_bin"][-1]["GV_over_GM"] < 0.5]
+    head_ok = [o for o in tail if (o["per_bin"][0].get("GV_over_GM") or 0) > 1.0]
+    tail_v = [o["per_bin"][-1]["GV_over_GM"] for o in tail_ok]
+    p_ = lambda v: f"{v:.3f}" if v is not None and v >= 0.001 else ("< 0.001" if v is not None else "--")
+    found = (
+        "\\begin{itemize}\\setlength{\\itemsep}{2pt}\n"
+        f"\\item \\textbf{{The gut response is the network's.}} In the {S['n']} fish where the law and its twin landed, the "
+        f"SIREN law's free rollout -- one recorded volume, then the beam and the grating only -- keeps {md_(S['law'])} of the "
+        f"gut-responsive cells' recorded response (median; {rg(S['law'])}); the same law with W = 0 keeps {md_(S['W0'])} "
+        f"(at most {max(S['W0']):.2f}), the twin trained with no network {md_(S['now'])} ({rg(S['now'])}). Whole brain: "
+        f"brain-mean R$^2$ {md_(S['bm'], '{:+.2f}')} for the law against {md_(S['bm_W0'], '{:+.2f}')} with W = 0 and "
+        f"{md_(S['bm_now'], '{:+.2f}')} with no network.\n"
+        "\\item \\textbf{Fish to fish.} The law fits glucose 1-3, glutamate 1-5 and blood glucose 1-4 (12-50 min sessions: "
+        "brain-mean R$^2$ 0.61-0.93), not the long glucose 4-6 (83-107 min: 0.01-0.14) nor blood glucose 5 (0.12) nor fish "
+        "water (0.15-0.51), even on exp17's rig: batch 3's guess, too few long-horizon updates, is not the whole story.\n"
+        f"\\item \\textbf{{The law keeps the paper's spatial and route effects from the beam position alone:}} the second gut "
+        f"spot (midgut?) evokes {rg([x['site5_over_site2_rec'] for x in S['fm']])} of the foregut spot's change recorded, "
+        f"{rg([x['site5_over_site2_law'] for x in S['fm']])} in the law (glucose 4-6); the vessel's response is half as long "
+        f"as the gut's: FWHM {md_(S['fwhm']['vessel'], '{:.0f}')} s against {md_(S['fwhm']['gut'], '{:.0f}')} s recorded "
+        f"(p {p_(S['fwhm']['p'])}), {md_(S['fwhm']['vessel_law'], '{:.0f}')} s against {md_(S['fwhm']['gut_law'], '{:.0f}')} s "
+        f"in the laws (p {p_(S['fwhm']['p_law'])}).\n"
+        + (f"\\item \\textbf{{The flow runs head-ward.}} In the nutrient fish the learned excitatory messages run toward the "
+           f"head ({rg([x['toward_tail_gut'] for x in nut], '{:+.2f}')} net toward the tail, -1 all head-ward), the direction "
+           f"of the paper's DVC/AP to PBN to forebrain pathway; the gut windows speed it up in {len(fast)} of {len(glc)} glucose fish (x"
+           f"{rg([x['ratio_ex'] for x in fast])}) but leave its direction as at rest; in the controls it is not faster "
+           f"(x{rg([x['ratio_ex'] for x in ctl])}).\n" if nut else "")
+        + "\\item \\textbf{The controls.} L-glucose and fish water have 7-13x fewer gut-responsive cells "
+        f"({md_(fr.get('Lglucose', []), '{:.2f}')} \\% and {md_(fr.get('fish_water', []), '{:.2f}')} \\% of the brain, against "
+        f"{md_(fr.get('glucose', []), '{:.1f}')} \\% in glucose); their laws reproduce what the UV evokes there, a smaller, "
+        f"shorter change (FWHM {md_(S['fw'].get('Lglucose', []) + S['fw'].get('fish_water', []), '{:.0f}')} s).\n"
+        f"\\item \\textbf{{The SIREN modulation}} $\\Omega$ averages {rg(S['om'])} (1 = none): it scales the messages up, "
+        "most in the controls; its scale trades against W's, only its changes in time and space carry information.\n"
+        "\\end{itemize}")
+    out = [("99a_summary", frame_full("what the session found",
+                                      "\\vspace*{0.4\\baselineskip}{\\fontsize{7}{8.6}\\selectfont " + found + "}",
+                                      "data/compare24.json, flow_gut_fish.json, integration.json",
+                                      deck_title="summary $\\cdot$ what 4 batches and 24 fish say"))]
+    T_ = [("brain-wide gut response: DVC, PBN, medial idMO, OT, LH, nodose (Fig. 1e)",
+           f"{md_(fr.get('glucose', []), '{:.1f}')} \\% of the cells respond to gut glucose ({rg(fr.get('glucose', []), '{:.1f}')} \\%); "
+           "clusters at the inferred DVC/AP and both PBN", "in line (no atlas)"),
+          ("glutamate evokes too (Fig. 2b)", f"the largest replicable held-out response: {md_(S['top1'].get('glutamate', []), '{:.2f}')} "
+           f"dF/F against {md_(S['top1'].get('glucose', []), '{:.2f}')} in glucose", "in line"),
+          ("L-glucose and fish water evoke little (Fig. 2c, d)",
+           f"{md_(fr.get('Lglucose', []), '{:.2f}')} and {md_(fr.get('fish_water', []), '{:.2f}')} \\% of the cells respond; "
+           f"replicable {md_(S['top1'].get('Lglucose', []), '{:.2f}')} / {md_(S['top1'].get('fish_water', []), '{:.2f}')} dF/F", "in line"),
+          ("the midgut evokes less than the foregut (Fig. 2g: 350 / 1440 cells)",
+           f"{rg([x['site5_over_site2_rec'] for x in S['fm']])} of the foregut's change; the law {rg([x['site5_over_site2_law'] for x in S['fm']])}",
+           "in line, the law too"),
+          ("gut cells integrate vision and motion: OT GV/GM 1.18, hindbrain 0.26-0.35 (Fig. 3d)",
+           f"tail fifth {rg(tail_v)} in {len(tail_ok)} of {len(tail)} glucose fish; head fifth above 1 in {len(head_ok)}",
+           "partly; laws not tested (swim off)"),
+          ("most cells start within 5 s; decays 10 s to over a minute; every region holds every timescale (Fig. 4d-g)",
+           (lambda A: (f"time to peak {min(r['t_peak_rec'] for r in A if r['condition'] in ('glucose', 'glutamate')):.0f}-"
+                       f"{max(r['t_peak_rec'] for r in A if r['condition'] in ('glucose', 'glutamate')):.0f} s, decay "
+                       f"{min(r['decay_rec'] for r in A if r['condition'] in ('glucose', 'glutamate')):.0f}-"
+                       f"{max(r['decay_rec'] for r in A if r['condition'] in ('glucose', 'glutamate')):.0f} s (median per "
+                       "nutrient fish), under 1 \\% of the cells past 56 s; the laws: amplitude per cell r 0.68-0.93, "
+                       "decays 2-4 s longer")
+            )(json.load(open(os.path.join(DATA, "timescales_all.json"))))
+           if os.path.exists(os.path.join(DATA, "timescales_all.json")) else "--",
+           "in line at the short end; laws partly"),
+          ("a tightly coupled network across areas (Fig. 4, inter-region correlation)",
+           f"W = 0 keeps {md_(S['W0'])} of the response, no network {md_(S['now'])}: cells talking make it", "in line, stronger"),
+          ("portal (vessel) responses are shorter, FWHM (Fig. 5d)",
+           f"{md_(S['fwhm']['vessel'], '{:.0f}')} against {md_(S['fwhm']['gut'], '{:.0f}')} s (p {p_(S['fwhm']['p'])}); the laws "
+           f"{md_(S['fwhm']['vessel_law'], '{:.0f}')} against {md_(S['fwhm']['gut_law'], '{:.0f}')} s", "in line, the law too"),
+          ("a ventro-medial idMO answers the vessel only (Fig. 5b)", "needs the regions: no atlas registration in the deposit",
+           "open"),
+          ("each cell modelled alone: per-cell regression kernels (Fig. 3)",
+           "a per-cell law (the no-network twin) loses the response and the brain mean", "differs")]
+    tab = ("{\\fontsize{6.5}{7.8}\\selectfont\\begin{tabular}{@{}p{0.33\\textwidth}@{\\hspace{8pt}}p{0.45\\textwidth}@{\\hspace{8pt}}p{0.17\\textwidth}@{}}\n"
+           "\\textbf{the paper} & \\textbf{this session (recordings; laws)} & \\textbf{verdict} \\\\\n\\hline\n"
+           + "".join(f"{a} & {b} & {c} \\\\[2pt]\n" for a, b, c in T_) + "\\end{tabular}\\par}")
+    out.append(("99b_paper", frame_full("the paper against the session", "\\vspace*{0.6\\baselineskip}" + tab,
+                                        "Chen 2026; data/compare24.json, integration.json",
+                                        deck_title="summary $\\cdot$ Chen 2026 against the session")))
+    jobs = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.48\\textwidth}\n"
+            + "{\\small\\textbf{what differs, or is not shown yet}}\\\\[4pt]\n" + "{\\fontsize{7}{8.6}\\selectfont\\begin{itemize}\\setlength{\\itemsep}{2pt}\n"
+            "\\item the response needs the network: the paper's per-cell kernels fit each cell, our per-cell law cannot "
+            "carry the response through a free rollout\n"
+            "\\item the long sessions (83-107 min) and fish water are fitted badly (brain-mean R$^2$ under 0.4)\n"
+            "\\item no region test in the laws: the swim is no input since batch 3 (the leak review), so Fig. 3d's "
+            "integration is measured on the recordings only (G-region unset)\n"
+            "\\item the stations are inferred from clusters: no atlas, no ventro-medial idMO, the nodose a guess\n"
+            "\\end{itemize}}\n\\end{column}\n\\begin{column}{0.48\\textwidth}\n"
+            + "{\\small\\textbf{new jobs}}\\\\[4pt]\n" + "{\\fontsize{7}{8.6}\\selectfont\\begin{itemize}\\setlength{\\itemsep}{2pt}\n"
+            "\\item the long sessions: glucose 4 with twice the updates per stage, and on its first 41 min only "
+            "(data length against drift)\n"
+            "\\item the swim back as an input on glucose 1 and 3 (the paper's GM model): Fig. 3d in the laws, G-region\n"
+            "\\item a second seed on glucose 1, glutamate 1, blood glucose 3: the seed spread of the gut response\n"
+            "\\item data: the atlas registration of the 24 fish (Z-Brain or mapzebrain), if the authors have it: the "
+            "regions, the vessel-only idMO, the nodose\n"
+            "\\end{itemize}}\n\\end{column}\n\\end{columns}")
+    out.append(("99c_next", frame_full("what differs and the next jobs", "\\vspace*{0.8\\baselineskip}" + jobs,
+                                       "the session", deck_title="summary $\\cdot$ what differs, and the next jobs")))
+    return out
+
+
 def main():
     for d in ("slides", "Movies", "figs"):
         os.makedirs(os.path.join(PRES, d), exist_ok=True)
@@ -1165,9 +1812,11 @@ def main():
         deck += slides_kymo()
     except Exception as e:
         print(f"[slides] slides_kymo FAILED: {e}")
+    hidden_b = []
     for b, (_, names, shown, now) in BATCHES.items():
-        if not any(landed(n) for n in names):
+        if b == "4" or not any(landed(n) for n in names):      # batch 4: its own slides below
             continue
+        n0 = len(deck)
         deck.append(slide_batch(b))
         groups = SHOWN.get(b, [("", shown, shown, now)])
         for fish, run, ctrl, nw in groups:
@@ -1176,18 +1825,33 @@ def main():
             deck.append(slide_params(run, b, fish_tag))
             deck += slides_sites(ctrl, nw, b, fish_tag)            # replaces the one network slide (Cedric, 2026-10-03)
             deck += slides_controls(ctrl, nw, b, fish_tag)
+        if b in HIDDEN_BATCHES:
+            hidden_b += [st for st, _ in deck[n0:]]
+    n0 = len(deck)
     deck += slides_fish_compare("3")
+    if "3" in HIDDEN_BATCHES:
+        hidden_b += [st for st, _ in deck[n0:]]
+    for fn in (slides_b4_compare, slides_summary):
+        try:
+            deck += fn()
+        except Exception as e:
+            print(f"[slides] {fn.__name__} FAILED: {e!r}")
+    for c, k in B4_FISH:                                   # batch 4 fish by fish, after the summary (an appendix)
+        try:
+            deck += slides_b4_fish(c, k)
+        except Exception as e:
+            print(f"[slides] batch 4 {c} {k} FAILED: {e!r}")
     deck.append(slide_overview())
     out = []
     for stem, body in deck:
         if not body:
             print(f"[slides] {stem}: no data yet, skipped")
             continue
-        open(os.path.join(PRES, "slides", f"{stem}.tex"), "w").write(body)
+        open(os.path.join(PRES, "slides", f"{stem}.tex"), "w").write(no_stimuli_only(body))
         out.append(stem)
         print(f"[slides] {stem}")
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(
-        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN or any(h in s for h in HIDDEN_PAT) else ''}\\input{{slides/{s}.tex}}\n"
+        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN or s in hidden_b or any(h in s for h in HIDDEN_PAT) or HIDDEN_RE.match(s) else ''}\\input{{slides/{s}.tex}}\n"
                                                            for s in out))
 
 

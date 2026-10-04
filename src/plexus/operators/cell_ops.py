@@ -2064,6 +2064,79 @@ _NG_GRAPH_CACHE: dict = {}
 _NG_MOD_CACHE: dict = {}
 
 
+def neuron_mesh_levels(P, levels, bin_um):
+    """THE MULTI-LEVEL MESH over element positions P (exp17 batch 17, Cedric 2026-10-04: "a proper multi-level mesh",
+    GraphCast's construction -- papers/graphcast_code_v0.2/graphcast/icosahedral_mesh.py -- on the neurons, no
+    encoder / decoder). [(label, bin_um, nodes, edges)], COARSE TO FINE as GraphCast's M0..M_R:
+      - `levels` - 1 binned levels, cubes of bin_um x 2^(levels-2) .. bin_um, all on ONE origin so every cube splits
+        into 8 of the next level's; a cube's node is the coarser level's node when it holds one, else the element nearest
+        the cube's centroid -- the node sets are NESTED (GraphCast: a coarse vertex is a vertex of every finer level) and
+        each level lists the coarser nodes first;
+      - the finest level: every element (the mesh's finest nodes are the neurons themselves);
+      - each level's mesh: the Delaunay tetrahedralisation of its nodes (the 3-D triangles), its edges; the edges longer
+        than 2 of the level's bins dropped (the hull's edges across the brain's concavities), every node keeping at least
+        its shortest edge (bin of the finest level: bin_um / 2, the neurons' own spacing);
+      - edges undirected here ([E, 2], node indices into P); the edge length halves from level to level.
+    The multi-mesh is the union of every level's edges (GraphCast's merge_meshes)."""
+    import numpy as np
+    from scipy.spatial import Delaunay, cKDTree
+    P = np.asarray(P, dtype=np.float64)
+    N, lo = len(P), P.min(0)
+    tree = cKDTree(P)
+
+    def nested(b, prev):
+        key = np.floor((P - lo) / b).astype(np.int64)
+        _, inv = np.unique(key, axis=0, return_inverse=True)
+        inv = inv.reshape(-1)
+        cnt = np.bincount(inv)
+        cen = np.stack([np.bincount(inv, P[:, d]) / cnt for d in range(3)], 1)
+        rep = tree.query(cen)[1]
+        if len(prev):
+            hold = np.full(len(cnt), -1, np.int64)
+            hold[inv[prev]] = prev
+            rep = np.where(hold >= 0, hold, rep)
+        return np.concatenate([prev, np.setdiff1d(np.unique(rep), prev)])
+
+    def edges(idx, b):
+        if len(idx) < 5:
+            return np.zeros((0, 2), np.int64)
+        s = Delaunay(P[idx]).simplices
+        e = np.unique(np.sort(np.concatenate([s[:, [i, j]] for i in range(4) for j in range(i + 1, 4)]), 1), axis=0)
+        e = idx[e]
+        ln = np.linalg.norm(P[e[:, 0]] - P[e[:, 1]], axis=1)
+        keep = ln <= 2.0 * b
+        # every node keeps its shortest edge: both ends' edges sorted by length, the first per node. (Not a fancy
+        # assignment in sorted order: with repeated indices numpy keeps the LAST write, the node's LONGEST edge -- the
+        # hull edges up to 935 um the first mesh kept, 2026-10-04.)
+        nd, ei = e.T.reshape(-1), np.tile(np.arange(len(e)), 2)
+        o = np.argsort(ln[ei], kind="stable")
+        keep[ei[o[np.unique(nd[o], return_index=True)[1]]]] = True
+        return e[keep]
+    out, prev = [], np.zeros(0, np.int64)
+    for lv in range(levels - 1):
+        b = bin_um * 2 ** (levels - 2 - lv)
+        prev = nested(b, prev)
+        out.append((f"{b:g} um cubes", b, prev, edges(prev, b)))
+    allp = np.concatenate([prev, np.setdiff1d(np.arange(N), prev)])      # every element, the coarser nodes first
+    out.append(("every neuron", bin_um / 2, allp, edges(allp, bin_um / 2)))
+    return out
+
+
+def _neuron_mesh_edges(P, levels, bin_um):
+    """{short, mid, long: (senders, receivers)} of the multi-level mesh (neuron_mesh_levels), every edge both ways:
+    short = the finest level (every neuron), mid = the 16- and 32-um levels, long = 64 um and coarser."""
+    import numpy as np
+    sets = {"short": [], "mid": [], "long": []}
+    for lab, b, _, e in neuron_mesh_levels(P, levels, bin_um):
+        k = "short" if lab == "every neuron" else ("mid" if b <= 2 * bin_um else "long")
+        sets[k].append(e)
+    out = {}
+    for k, es in sets.items():
+        e = np.unique(np.concatenate(es), axis=0) if es else np.zeros((0, 2), np.int64)
+        out[k] = (np.concatenate([e[:, 0], e[:, 1]]), np.concatenate([e[:, 1], e[:, 0]]))
+    return out
+
+
 @register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph",
                    title="A set's scalar through a known ODE on a multi-scale graph between the elements themselves",
                    equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j\in\mathcal N_s(i)}
@@ -2133,7 +2206,9 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
                    "siren_omega": "siren: omega_0 of its sines (30, Sitzmann et al.; coordinates in [-1, 1])",
                    "reach_dirs": "mid / long partners along the axes (default), the axes rotated, or 6 random directions per element",
                    "reach_rotation_deg": "with reach_dirs: rotated, the turn of the axes about z, degrees",
-                   "graph": "spatial (default) or random: the same degrees, senders drawn uniformly (the null)",
+                   "graph": "spatial (default), random (the same degrees, senders drawn uniformly: the null) or mesh",
+                   "mesh_levels": "graph: mesh -- the levels (level 0 every element; level l the cubes of mesh_bin_um x 2^(l-1))",
+                   "mesh_bin_um": "graph: mesh -- the finest bin, um (16)",
                    "graph_seed": "the seed of the random directions or the random graph"}
     EDGE_SETS = ("short", "mid", "long")
 
@@ -2168,9 +2243,17 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         if (self.reach_rot != 0.0) != (self.reach_dirs == "rotated"):
             raise ValueError("state_diffuse[neuron_graph] `reach_rotation_deg:` goes with `reach_dirs: rotated` only")
         self.graph_kind = str(params.get("graph", "spatial"))
-        if self.graph_kind not in ("spatial", "random"):
-            raise ValueError("state_diffuse[neuron_graph] `graph:` spatial (default) or random")
+        if self.graph_kind not in ("spatial", "random", "mesh"):
+            raise ValueError("state_diffuse[neuron_graph] `graph:` spatial (default), random or mesh")
         self.graph_seed = int(params.get("graph_seed", 0))
+        # THE MULTI-LEVEL MESH (exp17 batch 17, Cedric 2026-10-04: GraphCast's nested multi-mesh, on the neurons):
+        # `mesh_levels` levels, coarse to fine -- binned in cubes of `mesh_bin_um` x 2^(levels-2) .. `mesh_bin_um`,
+        # nested, then every neuron -- each a Delaunay tetrahedralisation; the multi-mesh the union of their edges
+        # (neuron_mesh_levels). Sets: short = every neuron's level, mid = the 16 / 32 um levels, long = 64 um and up.
+        self.mesh_levels = int(params.get("mesh_levels", 0))
+        self.mesh_bin = float(params.get("mesh_bin_um", 16.0))
+        if (self.graph_kind == "mesh") != (self.mesh_levels > 0):
+            raise ValueError("state_diffuse[neuron_graph] `graph: mesh` needs `mesh_levels:` (>= 1), and only it")
         self.norm = (0.0, 1.0, 1.0)
         self.device_ = device
         self.theta = torch.zeros(0, device=device)
@@ -2373,7 +2456,7 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         """{set: (senders, receivers)} as long tensors on this device, and `stats` (edges and mean length, um)."""
         import numpy as np
         key = (self._pos_file, self.short_k, self.reach["mid"], self.reach["long"], len(pos), self.reach_dirs,
-               self.reach_rot, self.graph_kind, self.graph_seed)
+               self.reach_rot, self.graph_kind, self.graph_seed, self.mesh_levels, self.mesh_bin)
         if key not in _NG_GRAPH_CACHE:
             from scipy.spatial import cKDTree
             P = np.asarray(pos, dtype=np.float64)
@@ -2381,7 +2464,9 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
             N = len(P)
             out, stats = {}, {}
             rng = np.random.default_rng(self.graph_seed)
-            if self.graph_kind == "random":                              # the null: the degrees, no space
+            if self.graph_kind == "mesh":
+                out = _neuron_mesh_edges(P, self.mesh_levels, self.mesh_bin)
+            elif self.graph_kind == "random":                            # the null: the degrees, no space
                 for name, k in (("short", self.short_k), ("mid", 6 if self.reach["mid"] > 0 else 0),
                                 ("long", 6 if self.reach["long"] > 0 else 0)):
                     s = rng.integers(0, N - 1, N * k)
@@ -2627,12 +2712,18 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
     """
     MECHANISM_TAGS = ["known_ode", "leaky_integrator", "proxy_connectome", "gnn"]
     PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraphMLP.PARAM_ROLES.items() if k != "theta_f"},
-                   **{k: StateDiffuseNeuronGraph.PARAM_ROLES[k] for k in ("tau", "rest", "integrator", "rate_max")}}
+                   **{k: StateDiffuseNeuronGraph.PARAM_ROLES[k] for k in ("tau", "rest", "integrator", "rate_max", "modulation",
+                                                                         "mod_levels", "mod_features", "mod_log2_table",
+                                                                         "mod_res_space", "mod_res_time", "mod_hidden",
+                                                                         "mod_layers", "siren_omega", "omega_table",
+                                                                         "omega_ttable", "omega_mlp")}}
 
     def __init__(self, params, device="cpu"):
-        bad = [k for k in ("synapse", "adaptation", "modulation", "activation") if k in params]
+        bad = [k for k in ("synapse", "adaptation", "activation") if k in params]
         if bad:
             raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: {bad} are options of the known ODE (neuron_graph)")
+        # the modulation Omega(x, y, z, t) scales the message sum as in the known ODE (exp17 batch 18, Cedric 2026-10-04:
+        # "the best MLP with SIREN + mask")
         params = {"integrator": "exponential", **params}
         StateDiffuseNeuronGraph.__init__(self, params, device)
         self.message = str(params.get("message", "sender"))
@@ -2668,6 +2759,7 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
         if self.input_mask is not None and self.forcing_dim:
             drive = drive * self.input_mask.to(drive.device)
         fz = self._frac(self._rate(nb["tau"]))
+        om = self._omega(nb.get("_omega_fs")) if self.modulation != "none" else None   # once per tick
         for _ in range(self.substeps):
             agg = torch.zeros_like(z)
             gn = self._g(z, z, ae, ae) if self.message == "sender" else None     # per sender: one MLP per element
@@ -2677,6 +2769,8 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
                     w = getattr(self, f"W_{s}")[:, None]
                     ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
                     agg = agg.index_add(0, rcv, w * ge)
+            if om is not None:
+                agg = om * agg
             z = z + fz * (-z + nb["rest"] + agg + drive)
         return sd * (z - z0)
 
