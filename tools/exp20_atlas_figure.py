@@ -41,6 +41,15 @@ def main():
         ax.scatter(xy[0][::12], xy[1][::12], s=0.15, c="#4fc3f7", alpha=0.35, lw=0)
         ax.scatter(xy[0][resp], xy[1][resp], s=0.8, c="#ffeb3b", lw=0)
         ax.scatter(xy[0][entry], xy[1][entry], s=3.0, c="#ff4040", lw=0)
+        if j == 0:                                          # the legend (Cedric, 2026-10-04: "what are yellow vs red")
+            from matplotlib.lines import Line2D
+            mk = lambda c: Line2D([], [], marker="o", ls="", color=c, markersize=7)   # noqa: E731
+            ax.legend([mk("#ffeb3b"), mk("#ff4040"), mk("#4fc3f7")],
+                      [f"gut-responsive ({int(resp.sum()):,}, the paper's rule)",
+                       f"area postrema + vagal ganglia ({int(entry.sum()):,}, atlas)",
+                       "fish 1's cells (1 in 12)"],
+                      loc="lower left", bbox_to_anchor=(0.0, -0.02), frameon=True, facecolor="black", edgecolor="0.5",
+                      labelcolor="white", fontsize=8)
         ax.set_title(f"Z-Brain {title}", color="white", fontsize=10)
         ax.set_aspect("equal")
     ax = fig.add_axes([0.63, 0.08, 0.35, 0.84])
@@ -50,7 +59,7 @@ def main():
     R = S["regions"]
     keys = list(R.keys())
     v = [R[k]["frac_responsive"] * 100 for k in keys]
-    ax.barh(range(len(keys)), v, color=["#ff4040" if k.startswith(("area postrema", "vagal")) else "#ffd54f" for k in keys])
+    ax.barh(range(len(keys)), v, color=["#ff4040" if k.startswith(("area postrema", "vagal")) else "0.6" for k in keys])
     for i, k in enumerate(keys):
         ax.text(v[i] + 1, i, f"{R[k]['gut_responsive']:,} of {R[k]['cells']:,} cells", color="white", fontsize=9, va="center")
     ax.set_yticks(range(len(keys)), keys, color="0.9", fontsize=9)
@@ -58,10 +67,10 @@ def main():
     ax.tick_params(colors="0.8")
     ax.set_xlabel("% of the region's cells that are gut-responsive", color="0.9")
     ax.set_xlim(0, 115)
-    ax.set_title(f"glucose fish 1 in Z-Brain: 30 BigWarp landmarks, leave-one-out error {S['loo_um_median']:.0f} um "
+    ax.set_title(f"glucose fish 1 in Z-Brain: 30 BigWarp landmarks,\nleave-one-out error {S['loo_um_median']:.0f} um "
                  f"(max {S['loo_um_max']:.0f})", color="white", fontsize=10)
-    fig.text(0.01, 0.005, "blue: fish 1's cells (1 in 12); yellow: the 2,538 gut-responsive cells; red: the cells in the area "
-             "postrema and the vagal ganglia (the gut's entry points, 527)", color="0.8", fontsize=9)
+    fig.text(0.63, 0.005, "bars: red the gut's entry regions (area postrema, vagal ganglia), grey the others", color="0.8",
+             fontsize=9)
     out = os.path.join(EXP, "presentation", "figs", "atlas_f1.png")
     fig.savefig(out, dpi=150, facecolor="black")
     plt.close(fig)
