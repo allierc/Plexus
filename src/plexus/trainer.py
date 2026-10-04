@@ -83,7 +83,8 @@ _KEYS = {
     "top": {"name", "model", "learnable", "task", "training"},
     "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
                   "prior", "field", "levels", "features", "log2_table", "base", "scale", "title"},
-    "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup", "rollouts"},
+    "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup", "rollouts",
+             "movie_metric"},
     "rollout": {"name", "zero", "drive", "clamp", "messages"},
     "clamp": {"rois"},
     "roi": {"box", "sphere", "units"},
@@ -3009,7 +3010,8 @@ def _render_variant(spec, out, stem, nm):
                     silenced_all=mv["silenced_all"], mean_obs_all=mv["mean_obs_all"], mean_pred_all=mv["mean_pred_all"],
                     cond_all=mv["cond_all"], split_all=mv["split_all"],
                     split_name=spec["task"]["reference"].get("split", "all"), law=f"{_law_name(spec)}: {nm} ({what})",
-                    rec_name=("destriped" if "destripe" in rec_ref else rec_ref))
+                    rec_name=("destriped" if "destripe" in rec_ref else rec_ref),
+                    metric=spec["task"].get("movie_metric", "cells"))
 
 
 SILENCE_RANGE = (-1.0, 3.0)   # dF/F; the free rollout freezes an element outside it (finding 21)
@@ -3277,7 +3279,7 @@ def _analyse_trace(spec, device="cpu", root=None):
                         "split_name": spec["task"]["reference"].get("split", "all")} if "mean_obs_all" in mv else {}),
                     emb_name="embedding" if src == "embedding" else "neuron constants " + src[len("parameters "):],
                     inputs=(fit["neuron.input"].float().norm(dim=1).numpy() if "neuron.input" in fit else None),
-                    law=_law_name(spec),
+                    law=_law_name(spec), metric=spec["task"].get("movie_metric", "cells"),
                     rec_name=("destriped" if "destripe" in str(spec["task"]["reference"].get("trace_recording")) else "ZAPBench"
                               if str(spec["task"]["reference"].get("trace_recording")).startswith("zapbench")
                               else str(spec["task"]["reference"].get("trace_recording")).replace("gutbrain_", "gut-brain ")))
