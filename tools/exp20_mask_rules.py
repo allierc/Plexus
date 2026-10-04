@@ -32,7 +32,9 @@ ZF = os.path.join(os.environ["GNN_OUTPUT_ROOT"], "graphs_data", "zebrafish")
 RULES = [("batches 1-5: top 10 %, |t| after every pulse (control included)", ""),
          ("batch 6: top 10 %, excited after gut pulses, not after control", "_bio"),
          ("batch 6: the paper's rule, mode + 2 SD, no quota", "_paper2sd"),
-         ("batch 6: the paper's rule, mode + 3 SD = the gut-responsive cells", "_paper3sd")]
+         ("batch 6: the paper's rule, mode + 3 SD = the gut-responsive cells", "_paper3sd"),
+         ("batch 6: atlas, area postrema + vagal ganglia", "_anat_apvg"),
+         ("batch 6: atlas, + X vagus motor + noradrenergic vagal area (DVC)", "_anat_dvc")]
 PRE_S, POST_S, EV_S = 10.0, 40.0, 20.0
 
 
@@ -51,22 +53,22 @@ def main(rec="gutbrain_glucose_f1"):
     on = [(int(f), int(s)) for f, s, h in zip(tr[:, 0], tr[:, 2], tr[:, 6]) if not h and f - pre >= 0 and f + post < len(X)]
     sets = {t: np.load(os.path.join(ZF, f"input_mask_{rec}{t}.npz"))["mask_by_input"][:, 0] > 0 for _, t in RULES}
     stats = {}
-    fig, ax = plt.subplots(2, 2, figsize=(15, 7.6), facecolor="black")       # 2 x 2: the brains large (Cedric)
+    fig, ax = plt.subplots(2, 3, figsize=(19, 6.8), facecolor="black")       # 2 x 3: the brains large (Cedric)
     ax = ax.ravel()
     for a, (lab, t) in zip(ax, RULES):
         m = sets[t]
         a.set_facecolor("black"); a.axis("off"); a.set_aspect("equal")
         a.scatter(P[o[::6], 0], P[o[::6], 1], s=0.12, c="0.28", lw=0)
-        a.scatter(P[o][m[o], 0], P[o][m[o], 1], s=0.8 if m.sum() > 8000 else 1.6, c="#ff4040", lw=0)
+        a.scatter(P[o][m[o], 0], P[o][m[o], 1], s=0.8 if m.sum() > 8000 else (1.6 if m.sum() > 1500 else 4.0), c="#ff4040", lw=0)
         a.scatter(P[resp, 0], P[resp, 1], s=1.2, c="#ffeb3b", lw=0, alpha=0.8)
         inside = int((m & resp).sum())
         a.set_title(f"{lab}\n{int(m.sum()):,} cells; {100 * inside / resp.sum():.0f} % of the {int(resp.sum()):,} "
-                    "gut-responsive (yellow) inside", color="white", fontsize=11)
+                    "gut-responsive (yellow) inside", color="white", fontsize=10)
         stats[t or "_batch1_5"] = {"rule": lab, "cells": int(m.sum()), "gut_responsive_inside": inside}
     x0, y0 = P[:, 0].min(), P[:, 1].min() - 25
-    ax[2].plot([x0, x0 + 100], [y0, y0], color="white", lw=2)
-    ax[2].text(x0 + 50, y0 - 8, "100 µm", color="white", fontsize=9, ha="center", va="top")
-    fig.text(0.5, 0.01, "red: the cells the UV pulse and the beam position enter; yellow: the gut-responsive cells; batch 6: "
+    ax[3].plot([x0, x0 + 100], [y0, y0], color="white", lw=2)
+    ax[3].text(x0 + 50, y0 - 8, "100 µm", color="white", fontsize=9, ha="center", va="top")
+    fig.text(0.5, 0.01, "red: the gut-input cells (the law's UV-pulse and beam inputs enter them); yellow: the gut-responsive cells; batch 6: "
              "each input only its own cells (the grating 19,035 coherent cells, the swim none); glucose fish 1 from above, "
              "head left", color="0.75", fontsize=10, ha="center")
     fig.tight_layout(rect=(0, 0.04, 1, 1))
@@ -75,7 +77,8 @@ def main(rec="gutbrain_glucose_f1"):
     plt.close(fig)
     # the traces: each rule's UV cells around the training gut and control pulses
     tt = (np.arange(-pre, post) + 0.5) * dt
-    fig, ax = plt.subplots(1, 4, figsize=(18, 3.4), facecolor="black", sharey=True)
+    fig, ax = plt.subplots(2, 3, figsize=(18, 6.6), facecolor="black", sharey=True)
+    ax = ax.ravel()
     for a, (lab, t) in zip(ax, RULES):
         m = np.where(sets[t])[0]
         a.set_facecolor("black")
@@ -97,7 +100,8 @@ def main(rec="gutbrain_glucose_f1"):
                     color="white", fontsize=8.5)
         a.set_xlabel("s from the UV pulse (training pulses)", color="0.9", fontsize=8)
         stats[t or "_batch1_5"].update({"evoked_gut": res.get("gut"), "evoked_control": res.get("control")})
-    ax[0].set_ylabel("mean dF/F change of the rule's\nUV cells (mean +- SD over pulses)", color="0.9", fontsize=8)
+    for k_ in (0, 3):
+        ax[k_].set_ylabel("mean dF/F change of the rule's\ngut-input cells (mean +- SD)", color="0.9", fontsize=8)
     ax[0].legend(frameon=False, labelcolor="white", fontsize=8)
     fig.tight_layout()
     out2 = os.path.join(EXP, "presentation", "figs", "mask_rules_traces_f1.png")

@@ -17,7 +17,7 @@ export
     and data/atlas/bigwarp/frame.json: how a cell's raw position (pos_um x, y, z) maps into the moving stack's
             physical frame: (X, Y, Z) = (y, 831.19 - x, z) um.
 
-apply (needs data/atlas/bigwarp/fish1_landmarks.csv, BigWarp's File > Export landmarks)
+apply (needs data/atlas/bigwarp/fish_1_landmarks.csv, BigWarp's File > Export landmarks)
     a thin-plate spline (kernel r^2 log r, BigWarp's) fitted from the moving landmarks to the fixed ones carries every
     cell into the atlas; each cell then gets the Z-Brain regions (MaskDatabase.mat, 294 masks, overlapping) its atlas
     voxel lies in. Writes data/atlas/fish1_regions.npz (atlas position per cell, region indices) and a summary of the
@@ -115,7 +115,7 @@ def read_landmarks(path):
 def apply():
     import h5py
     from plexus.tasks import trace_recording as TR
-    mv, fx = read_landmarks(os.path.join(BW, "fish1_landmarks.csv"))
+    mv, fx = read_landmarks(os.path.join(BW, "fish_1_landmarks.csv"))
     print(f"[bigwarp] {len(mv)} landmark pairs")
     model = tps_fit(mv, fx)
     loo = []                                            # leave-one-out error: how well the landmarks agree

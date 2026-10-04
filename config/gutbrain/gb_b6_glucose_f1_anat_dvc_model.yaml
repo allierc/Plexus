@@ -1,5 +1,5 @@
 general:
-  name: gb_b6_glucose_f1_bio_model
+  name: gb_b6_glucose_f1_anat_dvc_model
   seed: 0
   n_frames: 1
   dt: 1.0
@@ -35,6 +35,6 @@ seed:
 - {op: seed_state_random, at: neuron, block: input, lo: 0.0, hi: 0.0}
 - {op: seed_state_random, at: stimulus, block: u, lo: 0.0, hi: 0.0}
 operators:
-- {op: state_diffuse, model: neuron_graph, integrator: exponential, modulation: siren, input_mask: zebrafish/input_mask_gutbrain_glucose_f1_bio.npz, input_mask_array: mask_by_input, at: neuron, block: dff, positions: xyz, positions_file: zebrafish/gutbrain_glucose_f1_nosw_recording.npz, short_k: 6, mid_um: 32.0, long_um: 128.0, substeps: 4, inputs: 1, forcing: stimulus.u, forcing_dim: 6, seed: 0, checkpoint: true, title: "each cell's dF/F through a known ODE on a graph between the cells: 6 nearest, 6 at 32 um, 6 at 128 um, one weight per edge"}
+- {op: state_diffuse, model: neuron_graph, integrator: exponential, modulation: siren, input_mask: zebrafish/input_mask_gutbrain_glucose_f1_anat_dvc.npz, input_mask_array: mask_by_input, at: neuron, block: dff, positions: xyz, positions_file: zebrafish/gutbrain_glucose_f1_nosw_recording.npz, short_k: 6, mid_um: 32.0, long_um: 128.0, substeps: 4, inputs: 1, forcing: stimulus.u, forcing_dim: 6, seed: 0, checkpoint: true, title: "each cell's dF/F through a known ODE on a graph between the cells: 6 nearest, 6 at 32 um, 6 at 128 um, one weight per edge"}
 schedule: [state_diffuse]
 plotting: {renderer: none, max_frames: 0}

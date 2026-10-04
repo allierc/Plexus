@@ -37,7 +37,9 @@ def main(rec="gutbrain_glucose_f1", n_frames=200, fps=25):
     sets = [("batches 1-5", ld(""), (("uv", 0), ("visual", 3), ("swim", 4))),           # the four UV rules (batch 6)
             ("batch 6, 10 %", ld("_bio"), (("uv", 0), ("visual", 3))),
             ("batch 6, the paper's rule, 2 SD", ld("_paper2sd"), (("uv", 0), ("visual", 3))),
-            ("batch 6, the paper's rule, 3 SD", ld("_paper3sd"), (("uv", 0), ("visual", 3)))]
+            ("batch 6, the paper's rule, 3 SD", ld("_paper3sd"), (("uv", 0), ("visual", 3))),
+            ("batch 6, atlas: area postrema + vagal ganglia", ld("_anat_apvg"), (("uv", 0), ("visual", 3))),
+            ("batch 6, atlas: + DVC", ld("_anat_dvc"), (("uv", 0), ("visual", 3)))]
     rr = 1.75 * float(np.ptp(P, 0).max())
     az0, el = np.deg2rad(-60.0), np.deg2rad(32.0)
     tmp = tempfile.mkdtemp(prefix="mask3d_")
@@ -62,17 +64,17 @@ def main(rec="gutbrain_glucose_f1", n_frames=200, fps=25):
             pl.camera.position = (rr * np.cos(el) * np.cos(az), rr * np.cos(el) * np.sin(az), rr * np.sin(el))
             pl.render()
             shots.append(pl.screenshot(return_img=True))
-        fig = plt.figure(figsize=(14, 9.2), facecolor="black")
+        fig = plt.figure(figsize=(18, 9.2), facecolor="black")
         for j, ((title, by, ins), im) in enumerate(zip(sets, shots)):
-            x0, y0 = 0.5 * (j % 2), 0.5 * (1 - j // 2)
-            ax = fig.add_axes([x0, y0 + 0.04, 0.5, 0.40])
+            x0, y0 = (j % 3) / 3, 0.5 * (1 - j // 3)
+            ax = fig.add_axes([x0, y0 + 0.04, 1 / 3, 0.40])
             ax.imshow(im)
             ax.axis("off")
-            fig.text(x0 + 0.01, y0 + 0.48, f"{'abcd'[j]}   {title}", color="white", fontsize=12, va="top")
+            fig.text(x0 + 0.01, y0 + 0.48, f"{'abcdef'[j]}   {title}", color="white", fontsize=11, va="top")
             fig.text(x0 + 0.01, y0 + 0.03, "   ".join(f"{k} {n[title][k]:,}" for k, _ in ins), color="0.8", fontsize=9)
             for q, (k, _) in enumerate(ins):
-                fig.text(x0 + 0.30 + 0.05 * q, y0 + 0.03, k, color=COL[k], fontsize=10, weight="bold")
-        fig.text(0.5, 0.005, "red: the cells the UV pulse and the beam position enter; blue: the grating's; green: the swim's "
+                fig.text(x0 + 0.20 + 0.04 * q, y0 + 0.03, k, color=COL[k], fontsize=10, weight="bold")
+        fig.text(0.5, 0.005, "red: the gut-input cells (the law's UV-pulse and beam inputs); blue: the grating's; green: the swim's "
                  "(batches 1-5 only)", color="0.7", fontsize=9, ha="center")
         f_ = os.path.join(tmp, f"g{i:05d}.png")
         fig.savefig(f_, dpi=100, facecolor="black")

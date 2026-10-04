@@ -67,6 +67,9 @@ def main():
     ap.add_argument("--top", type=float, default=0.10)
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--bio", action="store_true", help="the mask closer to biology (batch 6): see the docstring")
+    ap.add_argument("--anat", choices=["apvg", "dvc"], default=None,
+                    help="batch 6: uv into atlas regions (BigWarp, data/atlas/fish1_regions.npz): apvg = area postrema + "
+                         "vagal ganglia; dvc = those + the X vagus motor nucleus + the noradrenergic vagal area")
     ap.add_argument("--paper", type=float, default=None,
                     help="batch 6: uv into the paper's gut-responsive cells at mode + K sd (K = 3 the paper's); see the docstring")
     a = ap.parse_args()
@@ -117,6 +120,20 @@ def main():
         tag = "_bio"
         print(f"[mask] bio: uv from {len(gut_on)} gut and {len(ctl_on)} control training pulses; "
               f"{int(((t_gut > thr['uv']) & (t_ctl >= 2.0)).sum()):,} top-gut cells dropped as control-excited")
+    if a.anat is not None:
+        # THE ANATOMICAL ENTRY POINTS (Cedric, 2026-10-04): the cells fish 1's BigWarp registration to Z-Brain places in the
+        # gut's own entry regions (Chen 2026: the vagal sensory neurons of the nodose / vagal ganglia and the area
+        # postrema; `dvc` adds the X vagus motor nucleus and the noradrenergic vagal area, the dorsal vagal complex)
+        z = np.load(os.path.join(EXP, "data", "atlas", "fish1_regions.npz"), allow_pickle=True)
+        nm = [str(n) for n in z["names"]]
+        pats = ["Area Postrema", "Ganglia - Vagal Ganglia"] + (
+            ["X Vagus motorneuron cluster", "Noradrendergic neurons of the Interfascicular and Vagal areas"] if a.anat == "dvc" else [])
+        cols = [i for i, n in enumerate(nm) if any(p_ in n for p_ in pats)]
+        m["uv"] = z["regions"][:, cols].any(1)
+        m["swim"] = np.zeros(N, bool)
+        thr["uv"] = float("nan")
+        tag = f"_anat_{a.anat}"
+        print(f"[mask] anatomy ({a.anat}): {', '.join(nm[i] for i in cols)}: {int(m['uv'].sum()):,} uv cells")
     if a.paper is not None:
         # THE PAPER'S OWN SELECTION AS THE UV CELLS (Cedric, 2026-10-04: "the +2SD rule and the +3SD rule"): a cell
         # takes the uv inputs when it is gut-responsive by the paper's rule at mode + K sd (tools/gutbrain_baselines.py,
@@ -155,7 +172,9 @@ def main():
         a_.scatter(P[::10, 0], P[::10, 1], s=0.3, c="0.3", lw=0)
         a_.scatter(P[m[k], 0], P[m[k], 1], s=0.6, c=col, lw=0)
         a_.set_aspect("equal"); a_.axis("off")
-        what = ({"uv": f"UV: the paper's gut-responsive cells, mode + {a.paper:g} sd", "visual": "grating: coherence",
+        what = ({"uv": f"UV: atlas regions ({a.anat})", "visual": "grating: coherence",
+                 "swim": "swim: none (motor output)"} if a.anat is not None else
+                {"uv": f"UV: the paper's gut-responsive cells, mode + {a.paper:g} sd", "visual": "grating: coherence",
                  "swim": "swim: none (motor output)"} if a.paper is not None else
                 {"uv": "UV on the gut: excited by the gut pulses, not by the control", "visual": "grating: coherence",
                  "swim": "swim: none (motor output)"} if a.bio else
