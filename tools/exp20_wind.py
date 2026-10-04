@@ -52,6 +52,10 @@ def render(name, D, n_part=6000, seed=0):
         ax = fig.add_axes([0.005 + 0.5 * j_, 0.30, 0.49, 0.60])
         ax.axis("off")
         ims[k] = ax.imshow(np.zeros((ny * S, nx * S, 3)), origin="lower", interpolation="bilinear")
+        if D.get("landmarks"):                              # the paper's stations, yellow (Cedric, 2026-10-04)
+            from exp20_landmarks import annotate
+            gx0, gy0, gh = D["grid"]
+            annotate(ax, D["landmarks"], lambda x, y: ((x - gx0) / gh * S, (y - gy0) / gh * S))
         fig.text(0.01 + 0.5 * j_, 0.965, lab, color="white", fontsize=12, va="top")
     fig.text(0.20, 0.925, f"wind = the messages, sender to receiver, smoothed over {SIGMA_UM:g} um; brighter = stronger, one scale for both maps; under "
              "them the learned dF/F", color="0.8", fontsize=9, va="top")
@@ -129,10 +133,16 @@ def gut_flow(name, D, ev_s=20.0):
         dmap[~ins] = np.nan
         lim = np.nanpercentile(np.abs(dmap), 99)
         a_.imshow(dmap, cmap="RdBu_r" if k == "ex" else "PuOr_r", vmin=-lim, vmax=lim, origin="lower")
+        if D.get("landmarks"):
+            from exp20_landmarks import annotate
+            gx0, gy0, gh = D["grid"]
+            annotate(a_, D["landmarks"], lambda x, y: ((x - gx0) / gh, (y - gy0) / gh), fontsize=8)
         a_.set_title(f"{'excitatory' if k == 'ex' else 'inhibitory'} flow speed: gut windows - rest "
                      f"(x{out[k]['ratio']:.2f})", color="white", fontsize=9)
         a_.axis("off")
-    fig.tight_layout()
+    fig.text(0.5, 0.01, "yellow: the paper's stations, inferred from this fish's gut-responsive clusters (no atlas)",
+             color="#ffeb3b", fontsize=8, ha="center")
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(os.path.join(EXP, "png", f"gutflow_{name}.png"), dpi=130, facecolor="black")
     plt.close(fig)
     json.dump(out, open(os.path.join(EXP, "data", f"gutflow_{name}.json"), "w"), indent=1)
@@ -145,7 +155,13 @@ def run(name, cells=160, particles=6000, device="cuda:0"):
     from plexus import trainer as T
     from plexus.tasks import trace_recording as TR
     D = fields(name, cells, device)
-    D["frame_s"] = float(np.median(np.diff(TR.load(T.load(name)["task"]["reference"]["trace_recording"])["t_s"])))
+    rn = T.load(name)["task"]["reference"]["trace_recording"]
+    D["frame_s"] = float(np.median(np.diff(TR.load(rn)["t_s"])))
+    from exp20_landmarks import landmarks
+    try:
+        D["landmarks"] = landmarks(rn)                     # inferred from the fish's gut-responsive clusters
+    except FileNotFoundError:
+        D["landmarks"] = None
     os.makedirs(os.path.join(EXP, "png"), exist_ok=True)
     gut_flow(name, D)
     return render(name, D, particles)
