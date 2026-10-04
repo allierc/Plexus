@@ -28,7 +28,11 @@ GRAPHS = [("base: axes, 32 / 128 um", {}),
           ("no highways", {"long_um": 0.0}),
           ("reaches 16 / 64 um", {"mid_um": 16.0, "long_um": 64.0}),
           ("reaches 64 / 256 um", {"mid_um": 64.0, "long_um": 256.0}),
-          ("random graph (the null)", {"graph": "random", "graph_seed": 0})]
+          ("random graph (the null)", {"graph": "random", "graph_seed": 0}),
+          ("mesh, 3 levels", {"graph": "mesh", "mesh_levels": 3, "mesh_bin_um": 16.0}),
+          ("mesh, 4 levels", {"graph": "mesh", "mesh_levels": 4, "mesh_bin_um": 16.0}),
+          ("mesh, 5 levels", {"graph": "mesh", "mesh_levels": 5, "mesh_bin_um": 16.0})]
+GRID = GRAPHS[:8]                 # the 4 x 2 overview figures; the insets cover every graph
 COL = {"short": "#f4c430", "mid": "#22d3ee", "long": "#e040fb"}
 POS = "zebrafish/zapbench_destripe_recording.npz"
 
@@ -66,7 +70,7 @@ def grid_aligned(V, cloud, ex, pos, plt, Line3DCollection, LineCollection):
     ylim = (y0g - oy / kx, y0g + (BH - oy) / kx)
     W_, H_ = 1568, 840
     fig = plt.figure(figsize=(W_ / 100, H_ / 100), dpi=100, facecolor="black")
-    for g, (title, kw) in enumerate(GRAPHS):
+    for g, (title, kw) in enumerate(GRID):
         E, _ = build(kw)
         cx, cy = (g % 4) * 392, (g // 4) * 420
         fig.text((cx + 8) / W_, 1 - (cy + 8) / H_, title, color="white", fontsize=13, va="top")
@@ -114,7 +118,7 @@ def main():
     cloud = np.random.default_rng(0).choice(len(V), 12000, replace=False)
     fig = plt.figure(figsize=(16, 9.0), facecolor="black")
     stats = {}
-    for g, (title, kw) in enumerate(GRAPHS):
+    for g, (title, kw) in enumerate(GRID):
         E, _ = build(kw)
         stats[title] = {k: {"edges": int(len(s)), "mean_um": float(np.linalg.norm(pos[s] - pos[r], axis=1).mean()) if len(s) else 0.0}
                         for k, (s, r) in E.items()}

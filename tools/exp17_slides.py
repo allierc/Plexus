@@ -360,7 +360,7 @@ def op_mesh(P, L0=MESH_L0_UM, levels=MESH_LEVELS, mirror=0):
             "stats": G["stats"], "L0": L0, "mid": G["lattice"]["mid_um"]}
 
 
-def render_multimesh_3d(P, M, png, mp4=None, n_frames=200, fps=25, labels=True):
+def render_multimesh_3d(P, M, png, mp4=None, n_frames=200, fps=25, labels=True, window=None):
     """The multi-mesh in 3-D, to scale in um (VTK, off-screen): the neurons a faint cloud, each level's edges in its
     own colour, wider as the level coarsens, so the long edges that cross the brain in one message stand out over
     the fine lattice. A still at an oblique view (`png`) and, when `mp4` is given, a full turn about the vertical."""
@@ -370,6 +370,12 @@ def render_multimesh_3d(P, M, png, mp4=None, n_frames=200, fps=25, labels=True):
     pv.OFF_SCREEN = True
     C = M["C"]
     mm_s, mm_r, lev = M["mm"]
+    if window is not None:          # a cube (centre, half-width um): the slide-3 window turning (Cedric, 2026-10-04)
+        c0_, h_ = window
+        inw = np.all(np.abs(C - c0_) <= h_ + 1e-6, axis=1)
+        k_ = inw[mm_s] & inw[mm_r]
+        mm_s, mm_r, lev = mm_s[k_], mm_r[k_], lev[k_]
+        P = P[np.all(np.abs(P - c0_) <= h_, axis=1)]
     cols = ["#9ecae1", "#6baed6", "#fd8d3c", "#e6550d", "#ffffff"][:len(M["nodes_per_level"])]
     width = [1.0, 1.8, 3.0, 4.5, 7.0]
     alpha = [0.18, 0.45, 0.85, 1.0, 1.0]
@@ -389,6 +395,8 @@ def render_multimesh_3d(P, M, png, mp4=None, n_frames=200, fps=25, labels=True):
         pl.add_mesh(pv.PolyData(pts, lines=lines), color=cols[k], line_width=width[k], opacity=alpha[k])
         if k >= 2:
             used = M["level_nodes"][k]
+            if window is not None:
+                used = used[inw[used]]
             pl.add_mesh(pv.PolyData((C[used] - mid).astype(np.float32)), color=cols[k], point_size=4 + 3 * k,
                         render_points_as_spheres=True)
     if labels:
@@ -399,13 +407,17 @@ def render_multimesh_3d(P, M, png, mp4=None, n_frames=200, fps=25, labels=True):
     pl.camera.focal_point = (0.0, 0.0, 0.0)
     pl.camera.up = (0.0, 0.0, 1.0)
     r = 1.9 / 0.9 * float(ext.max())             # dezoomed by 0.9 (Cedric): the whole mesh, uncropped
+    if window is not None:
+        pl.camera.focal_point = tuple((np.asarray(window[0]) - mid).tolist())
+
+    f_ = np.asarray(pl.camera.focal_point)
 
     def cam(az):
         el = np.deg2rad(32.0)
-        pl.camera.position = (r * np.cos(el) * np.cos(az), r * np.cos(el) * np.sin(az), r * np.sin(el))
+        pl.camera.position = tuple(f_ + np.array([r * np.cos(el) * np.cos(az), r * np.cos(el) * np.sin(az), r * np.sin(el)]))
     cam(np.deg2rad(-60.0))
     pl.screenshot(png)
-    if mp4:
+    if mp4 and not os.path.exists(mp4):            # a turntable is rendered once (VTK, 200 frames) and reused
         tmp = tempfile.mkdtemp(prefix="multimesh_")
         for i in range(n_frames):
             cam(np.deg2rad(-60.0) + 2 * np.pi * i / n_frames)
@@ -413,7 +425,8 @@ def render_multimesh_3d(P, M, png, mp4=None, n_frames=200, fps=25, labels=True):
         subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
                         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", mp4],
                        check=True)
-        shutil.copy(png, mp4.replace(".mp4", ".png"))
+        if os.path.abspath(png) != os.path.abspath(mp4.replace(".mp4", ".png")):
+            shutil.copy(png, mp4.replace(".mp4", ".png"))
         shutil.rmtree(tmp)
     pl.close()
 
@@ -674,14 +687,14 @@ def figure_step(P, M, path, t=2600, kind="graphcast"):
 NG_COLS = {"short": "#9ecae1", "mid": "#fd8d3c", "long": "#ff4040"}
 
 
-def neuron_graph_op(mid_um=32.0, long_um=128.0, positions_file="zebrafish/zapbench_recording.npz"):
+def neuron_graph_op(mid_um=32.0, long_um=128.0, positions_file="zebrafish/zapbench_recording.npz", **kw):
     """The operator itself (state_diffuse[neuron_graph]) builds the graph the slide draws: the picture IS the graph trained."""
     sys.path.insert(0, os.path.join(ROOT, "src"))
     import plexus.operators  # noqa: F401
     from plexus.models.registry import get_contract
     C = get_contract("state_diffuse").implementations["neuron_graph"]
     return C({"_at": "neuron", "block": "dff", "positions": "xyz", "positions_file": positions_file,
-              "inputs": 1, "short_k": 6, "mid_um": mid_um, "long_um": long_um})
+              "inputs": 1, "short_k": 6, "mid_um": mid_um, "long_um": long_um, **kw})
 
 
 def figure_neuron_graph(P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed=0, op=None):
@@ -701,7 +714,11 @@ def figure_neuron_graph(P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed
     mid = (P.max(0) + P.min(0)) / 2
     Q = (P - mid).astype(np.float32)
     rng = np.random.default_rng(seed)
-    show = set(rng.choice(len(P), n_show, replace=False).tolist())
+    if getattr(op, "graph_kind", "spatial") == "mesh":        # a mesh: the coarse levels' own neurons (exp17 batch 17)
+        coarse = np.unique(np.concatenate([E["mid"][1], E["long"][1]]))
+        show = set(rng.choice(coarse, min(n_show, len(coarse)), replace=False).tolist())
+    else:
+        show = set(rng.choice(len(P), n_show, replace=False).tolist())
 
     def lines(pl, s, r, col, w, a):
         if not len(s):
@@ -734,7 +751,7 @@ def figure_neuron_graph(P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed
     cam(pa, np.deg2rad(-60.0), rr)
     fa = os.path.join(tmp, "a.png")
     pa.screenshot(fa)
-    if mp4:
+    if mp4 and not os.path.exists(mp4):            # a turntable is rendered once and reused
         for i in range(n_frames):
             cam(pa, np.deg2rad(-60.0) + 2 * np.pi * i / n_frames, rr)
             pa.screenshot(os.path.join(tmp, f"f{i:05d}.png"))
@@ -755,6 +772,8 @@ def figure_neuron_graph(P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed
     for k, w in (("short", 4.0), ("mid", 4.0), ("long", 4.0)):
         s, r = E[k]
         sel = r == c
+        if not sel.any():                           # a mesh: the centre neuron may have no coarse edge
+            continue
         lines(pb, s[sel], r[sel], NG_COLS[k], w, 1.0)
         pb.add_mesh(pv.PolyData(Q[s[sel]]), color=NG_COLS[k], point_size=12, render_points_as_spheres=True)
     pb.add_mesh(pv.PolyData(Q[c:c + 1]), color="white", point_size=18, render_points_as_spheres=True)
@@ -2001,8 +2020,11 @@ def main():
         ("", "mirror-symmetric about the midline"),
         ("grid2mesh", f"each neuron to the corners within {math.sqrt(3) / 2 * MO['L0']:.1f} \\textmu m ({st['g2m_edges']:,})"),
         ("mesh2grid", f"each neuron from its cube's 8 corners ({st['m2g_edges']:,})")]))
+    # Cedric, 2026-10-04: slide 3 turning about the vertical -- the whole multi-mesh, every level labelled
+    render_multimesh_3d(P, MO, os.path.join(PRES, "Movies", "02_graphcast_turn.png"),
+                        mp4=os.path.join(PRES, "Movies", "02_graphcast_turn.mp4"), labels=True)
     s2 = frame("The multi-mesh: a nested lattice over the brain, the neurons as the grid",
-               "\\panel{figs/02_graphcast_graph.png}", right2, "the law's own mesh (state_diffuse[graphcast].mesh)")
+               "\\playmovie{Movies/02_graphcast_turn}", right2, "the law's own mesh (state_diffuse[graphcast].mesh)")
     # ---- the '2 process' panel of the one-step figure alone and large (Cedric, 2026-10-02)
     mg = figure_multimesh_gnn(P, MO, os.path.join(PRES, "figs", "02c_multimesh_gnn.png"))
     right2c = (head("the multi-mesh GNN") + rows([
@@ -2094,7 +2116,8 @@ def main():
                  "state_diffuse[model: connectome]", left_gap=True, deck_title="multi-level GNN\\_current")
     s_ko = frame("One step of the known ODE", "\\panel{figs/06_one_step_known_ode.png}", right_ko,
                  "state_diffuse[model: known_ode]", left_gap=True, deck_title="multi-level GNN-known\\_ODE")
-    st = figure_neuron_graph(P, os.path.join(PRES, "figs", "07_neuron_graph.png"))
+    st = figure_neuron_graph(P, os.path.join(PRES, "figs", "07_neuron_graph.png"),
+                             mp4=os.path.join(PRES, "Movies", "07_neuron_graph.mp4"))      # turning (Cedric, 2026-10-04)
     right_ng = (head("the laws on the neuron graph (no mesh), M substeps per frame") + rows([
         ("known ODE", r"$z_i \mathrel{+}= \frac{1}{M}(-z_i + V_i + m_i + B_i \cdot u)/\tau_i$"),
         ("current", r"$m_i = \sum_{s} \sum_{j \in \mathcal{N}_s(i)} W^{s}_{ji} \tanh(z_j)$"),
@@ -2113,7 +2136,7 @@ def main():
             (r"$W^s_{ji}$", "one weight per edge, every law"),
             ("known ODE", r"$\tau_i$, $V_i$, $B_i$ (22) per neuron; $E_j$ (conductance)"),
             ("GNN-MLP", r"$a_i$ (2) and $B_i$ (22) per neuron; the MLPs $g_\phi$, $f_\theta$")]))
-    s_ng = frame("The neuron graph: one weight per edge between two neurons", "\\panel{figs/07_neuron_graph.png}",
+    s_ng = frame("The neuron graph: one weight per edge between two neurons", "\\playmovie{Movies/07_neuron_graph}",
                  right_ng, "state_diffuse[model: neuron_graph]", left_gap=True, deck_title=f"{DECK_TITLE} - known-ODE-GNN on distance graphs")
     # ---- the twin of the neuron-graph slide on the DESTRIPED traces (Cedric, 2026-10-01): the graph the batch-9 law
     # builds from the destriped positions, drawn head-up as the destriped movie (x_plot = y, y_plot = -x)
@@ -2180,7 +2203,8 @@ def main():
             base = pick if pick in landed else next(n for _, n in arms if n in landed)   # the base, or the first landed
             if title.startswith("batch 17"):                          # every graph's results slide, its graph inset
                 ix_ = {"zap_g17_s1": 0, "zap_g17_rot45": 1, "zap_g17_randdir": 2, "zap_g17_knn18": 3, "zap_g17_nolong": 4,
-                       "zap_g17_r16_64": 5, "zap_g17_r64_256": 6, "zap_g17_random": 7}
+                       "zap_g17_r16_64": 5, "zap_g17_r64_256": 6, "zap_g17_random": 7, "zap_g17_mesh3": 8,
+                       "zap_g17_mesh4": 9, "zap_g17_mesh5": 10}
                 for _, n17 in arms:
                     if n17 in landed:
                         deck += slides_run(landed[n17], landed, inset=f"figs/graph_example_{ix_[n17]}.png")
@@ -2540,13 +2564,35 @@ def main():
                                           deck_title="multi-level GNN on fish 2 $\\cdot$ summary and outlook")))
     except (KeyError, FileNotFoundError) as e_:
         print(f"[summary] not made: {e_}")
+    # Cedric, 2026-10-04: the GraphCast-like meshes of batch 17 (graph: mesh), one slide each, turning about the vertical
+    if os.path.exists(fds):
+        pdsv = np.stack([pds[:, 1], -pds[:, 0], pds[:, 2]], 1)           # head-up, as the destriped graph slide
+        for L_ in (3, 4, 5):
+            opm = neuron_graph_op(positions_file="zebrafish/zapbench_destripe_recording.npz", graph="mesh",
+                                  mesh_levels=L_, mesh_bin_um=16.0)
+            stm = figure_neuron_graph(pdsv, os.path.join(PRES, "figs", f"mesh_{L_}.png"),
+                                      mp4=os.path.join(PRES, "Movies", f"mesh_{L_}.mp4"), op=opm)
+            bins = ", ".join(f"{16 * 2 ** (l - 1):g}" for l in range(1, L_))
+            right_m = (head(f"a GraphCast-like mesh, {L_} levels")
+                       + "{\\scriptsize level 0: the Delaunay triangulation of every neuron; level $l \\geq 1$: the neuron "
+                         f"nearest the centroid of each occupied cube of {bins} \\textmu m, triangulated; edges longer than "
+                         "3 bins dropped; every edge both ways\\par}\\vspace{4pt}\n"
+                       + rows([(k, f"{v['edges']:,} edges, {v['per_element']:.2f} per neuron, {v['mean_um']:.0f} \\textmu m")
+                               for k, v in stm.items() if v["edges"]])
+                       + "{\\scriptsize short = level 0, mid = levels 1-2, long = levels 3+; the movie: the mid and long "
+                         "edges into 80 of the coarse levels' neurons\\par}\\vspace{4pt}\n"
+                       + f"\\includegraphics[width=\\linewidth]{{figs/mesh_{L_}.png}}\\par\n")
+            deck.append((f"11h_mesh{L_}", frame(f"the mesh, {L_} levels", f"\\playmovie{{Movies/mesh_{L_}}}", right_m,
+                                               "state_diffuse[neuron_graph] graph: mesh", left_gap=True,
+                                               deck_title=f"batch 17 $\\cdot$ a GraphCast-like mesh, {L_} levels")))
     MOVE_TO_END = ("08b_calcium_result", "02b_models", "99_summary")      # Cedric, 2026-10-03: the models table closes the deck       # Cedric, 2026-10-03: the latent-calcium slide now opens batch 16   # Cedric, 2026-10-02 / 10-03: calcium closes the deck
     deck = [x for x in deck if x[0] not in MOVE_TO_END] + [x for x in deck if x[0] in MOVE_TO_END]
     # Cedric, 2026-10-02: one slide of GraphCast results right after the GraphCast slides -- the best GraphCast run's
     # movie (batch 4's curriculum to 40), shown although batch 4's own slides are hidden
     MOVE_AFTER = {"08_latent_calcium": "batch_16_levers", "11b_graph_examples": "batch_17_levers",
                   "11c_flow_graphs": "11b_graph_examples", "11d_flow_summary": "11c_flow_graphs",
-                  "11f_graph_curves": "11d_flow_summary", "11e_param_all": "11f_graph_curves", "zap_gc_cur40_movie": "02d_transfer",   # Cedric: the graphs open batch 17 "13_clusters_3d_dm": "zap_dm_ng_rl1lo_movie",
+                  "11f_graph_curves": "11d_flow_summary", "11e_param_all": "11f_graph_curves",
+                  "11h_mesh3": "zap_g17_random_movie", "11h_mesh4": "11h_mesh3", "11h_mesh5": "11h_mesh4", "zap_gc_cur40_movie": "02d_transfer",   # Cedric: the graphs open batch 17 "13_clusters_3d_dm": "zap_dm_ng_rl1lo_movie",
                   "13_clusters_k4_montage_dm": "13_clusters_3d_dm", "13_clusters_k8_montage_dm": "13_clusters_k4_montage_dm",
                   "13_clusters_k16_montage_dm": "13_clusters_k8_montage_dm", "13_clusters_k32_montage_dm": "13_clusters_k16_montage_dm",
                   "13_edges_amp_dm": "13_clusters_k32_montage_dm",
