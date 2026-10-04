@@ -1864,14 +1864,14 @@ def slides_b6():
                 "only). Each input enters only its own cells: a per-input mask (input\\_mask\\_array: mask\\_by\\_input, "
                 "state\\_diffuse's \\_input\\_drive); batch 6 trains it on the neuron graph and on the 4-level mesh "
                 "(gb\\_b6\\_glucose\\_f1\\_bio, \\_mesh4\\_bio).\\par}")
-        right = ("{\\scriptsize\\textbf{the cells each input enters}}\\\\[2pt]{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}p{0.42\\textwidth}@{}}\n"
+        right = ("{\\scriptsize\\textbf{the cells each input enters}}\\\\[2pt]{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}p{0.46\\textwidth}@{}}\n"
                  f"UV pulse, beam & {int(ib[:, 0].sum()):,} cells EXCITED by the gut pulses (top 10 \\% by t), not by the control (t $<$ 2) \\\\\n"
                  f"grating & {int(ib[:, 3].sum()):,} cells, its coherence (top 10 \\%), as before \\\\\n"
                  "swim & none: a motor output, not an input \\\\\n"
                  f"in all & {int(bio['mask'].sum()):,} cells, against {int(old['mask'].sum()):,} in batches 1-5 \\\\\n"
                  f"gut cells & {100 * ib[r_, 0].mean():.0f} \\% of the {int(r_.sum()):,} gut-responsive cells are UV inputs \\\\\n"
                  "\\end{tabular}\\par}")
-        body = ("\\vspace*{0.3\\baselineskip}{\\centering\\playmovie[0.86\\textwidth]{Movies/mask3d_f1}\\par}\\vspace{4pt}\n"
+        body = ("\\vspace*{0.3\\baselineskip}{\\centering\\playmovie[0.74\\textwidth]{Movies/mask3d_f1}\\par}\\vspace{4pt}\n"
                 "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.44\\textwidth}\n" + left + "\n\\end{column}\n"
                 "\\begin{column}{0.54\\textwidth}\n" + right + "\n\\end{column}\n\\end{columns}")
         out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_input_mask.py --bio, tools/exp20_mask3d.py",
