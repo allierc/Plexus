@@ -323,14 +323,18 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
                  r2_raw_all: np.ndarray | None = None, r2_den_all: np.ndarray | None = None, workers: int = 16,
                  silenced_all: np.ndarray | None = None, mean_obs_all: np.ndarray | None = None,
                  mean_pred_all: np.ndarray | None = None, cond_all: np.ndarray | None = None,
-                 split_all: np.ndarray | None = None, split_name: str = "all", mean_obs=None, mean_pred=None):
+                 split_all: np.ndarray | None = None, split_name: str = "all", mean_obs=None, mean_pred=None,
+                 metric: str = "cells"):
     """TWO PANELS, recorded LEFT and learned RIGHT: every neuron a point at its position (dorsal view, deeper
     drawn first, the brain vertical and head up) coloured by dF/F on one scale; black background, labels above.
     `frames` sample the FREE ROLLOUT of the whole recording (Cedric, 2026-10-02: the full 2 h, ~800 movie frames, not
     a 200-frame restart). Under the learned panel the free rollout's R2 per frame over the whole recording (`r2_t` the
     frames, `r2_*_all` the values; denoised white, raw grey, axis 0..1) with a cursor; top right its mean +- SD up to
     the cursor, or the time it diverged. A strip of insets below when the law has neuron constants or an embedding:
-    PC1-PC2 by cluster, PCA as RGB on the brain, the clusters on the brain, the stimulus input map."""
+    PC1-PC2 by cluster, PCA as RGB on the brain, the clusters on the brain, the stimulus input map.
+    `metric` "brain_mean" (exp20, Cedric 2026-10-04: "the main metric is the brain-mean dF/F R2"; needs mean_obs_all and
+    mean_pred_all): top right the brain-mean R2 and RMSE of the free rollout up to the cursor, and under the learned
+    panel the brain-mean R2 in a 5-min window centred on each frame, in place of the per-cell R2 and its divergence."""
     import os
     import shutil
     import subprocess
@@ -354,7 +358,7 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
                        r2_t=np.asarray(r2_t), r2r=np.asarray(r2_raw_all, float), r2d=np.asarray(r2_den_all, float),
                        sil=None if silenced_all is None else np.asarray(silenced_all),
                        mo=mean_obs_all, mp_=mean_pred_all, cond=cond_all, split=split_all, split_name=split_name,
-                       tmp=tmp))
+                       metric=metric if mean_obs_all is not None else "cells", tmp=tmp))
     ks = np.arange(len(frames))
     workers = min(workers, len(os.sched_getaffinity(0)))          # a cluster job's slots, not the node's cores
     chunks = [c for c in np.array_split(ks, max(1, min(workers, len(ks)))) if len(c)]
@@ -455,14 +459,30 @@ def _movie_frames(ks):
             if int(v_) in SPLIT:
                 m.axvspan(tm[a_], tm[b_], color=SPLIT[int(v_)][1], alpha=0.22, lw=0, zorder=0)
                 seen.append(int(v_))
-    m.plot(tm, d["r2r"], color="0.55", lw=0.6, zorder=2)
-    m.plot(tm, d["r2d"], color="white", lw=0.8, zorder=3)
-    m.set_ylim(0, 1)
-    m.set_yticks([0, 1])
+    bm = d["metric"] == "brain_mean"
+    if bm:                                          # the brain-mean R2 in a 5-min window centred on each frame
+        o_, p_ = np.asarray(d["mo"], np.float64), np.asarray(d["mp_"], np.float64)
+        h_ = max(2, int(round(150.0 / d["frame_s"])))
+        r2w = np.full(len(o_), np.nan)
+        for i_ in range(len(o_)):
+            a_, b_ = max(0, i_ - h_), min(len(o_), i_ + h_ + 1)
+            den = ((o_[a_:b_] - o_[a_:b_].mean()) ** 2).sum()
+            if den > 0:
+                r2w[i_] = 1 - ((p_[a_:b_] - o_[a_:b_]) ** 2).sum() / den
+        m.plot(tm, np.clip(r2w, -1, 1), color="white", lw=0.8, zorder=3)
+        m.axhline(0, color="0.5", lw=0.5, zorder=1)
+        m.set_ylim(-1, 1)
+        m.set_yticks([-1, 0, 1])
+    else:
+        m.plot(tm, d["r2r"], color="0.55", lw=0.6, zorder=2)
+        m.plot(tm, d["r2d"], color="white", lw=0.8, zorder=3)
+        m.set_ylim(0, 1)
+        m.set_yticks([0, 1])
     cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=4))
     split_txt = ("; behind: " + ", ".join(f"{SPLIT[v][0]}" for v in sorted(set(seen)))) if seen else \
         ("; every frame trained (no split)" if d["split_name"] not in ("zapbench", "recording") else "")
-    fig.text(0.55, top - 0.005, "free rollout R$^2$: denoised (white), raw (grey)" + split_txt, color="0.7",
+    fig.text(0.55, top - 0.005, ("brain-mean R$^2$ in a 5-min window (white)" if bm else
+                                 "free rollout R$^2$: denoised (white), raw (grey)") + split_txt, color="0.7",
              fontsize=8, va="bottom")
     if seen:                                        # the split's colours, named in their own colour, left to right
         for i_, v in enumerate(sorted(set(seen))):
@@ -491,6 +511,10 @@ def _movie_frames(ks):
                      linespacing=1.1)
     r2t, r2r, r2d = d["r2_t"], d["r2r"], d["r2d"]
     bad = ~np.isfinite(r2d) | (r2d < -1)
+    if bm:                                          # the brain-mean R2 and RMSE up to each frame, from running sums
+        okb = np.isfinite(o_) & np.isfinite(p_)
+        o0, p0 = np.where(okb, o_, 0.0), np.where(okb, p_, 0.0)
+        n_c, s1, s2, e2 = np.cumsum(okb), np.cumsum(o0), np.cumsum(o0 ** 2), np.cumsum((p0 - o0) ** 2)
     for k in ks:
         f = frames[k]
         sc[0].set_array(np.asarray(d["obs"][k], np.float32)[order])
@@ -499,7 +523,13 @@ def _movie_frames(ks):
         upto = r2t <= f
         nsil = int(d["sil"][upto][-1]) if d["sil"] is not None and upto.any() else 0
         sil_txt = f"\n{nsil:,} exploding neuron{'s' if nsil != 1 else ''} silenced" if nsil else ""
-        if (bad & upto).any():
+        if bm:
+            j_ = int(np.flatnonzero(upto)[-1]) if upto.any() else 0
+            den = s2[j_] - s1[j_] ** 2 / max(n_c[j_], 1)
+            r_txt.set_text(f"brain-mean R2 {1 - e2[j_] / den:+.3f}, RMSE {np.sqrt(e2[j_] / max(n_c[j_], 1)):.3f} dF/F\n"
+                           "(the free rollout up to t)" if den > 0 and n_c[j_] > 2 else "")
+            r_txt.set_color("white")
+        elif (bad & upto).any():
             r_txt.set_text(f"diverged at t = {tm[int(np.argmax(bad))]:.0f} min\n(R2 denoised < -1)" + sil_txt)
             r_txt.set_color("#ff6b6b")
         else:
