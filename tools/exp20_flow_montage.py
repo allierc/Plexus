@@ -8,8 +8,12 @@
            fish, the excitatory flow speed during the gut windows (0-20 s after a gut pulse) minus the rest
            (data/gutflow_<run>.npz), the paper's stations in yellow (tools/exp20_landmarks.py)
 
-    PYTHONPATH=src:tools python tools/exp20_flow_montage.py
-Writes presentation/Movies/flow_fish.mp4 (+ .png still), presentation/figs/flow_gut_fish.png, copies in png/.
+  omega    the SIREN modulation Omega of every fish (the Omega panel of its movie_omega.mp4), 6 x 4, each fish on its own
+           colour scale centred on 1 (exp17_modulation: +- the 98th percentile of |Omega - 1| of that run)
+
+    PYTHONPATH=src:tools python tools/exp20_flow_montage.py [fish] [gut] [omega]
+Writes presentation/Movies/flow_fish.mp4, omega_fish.mp4 (+ .png stills), presentation/figs/flow_gut_fish.png, copies
+in png/.
 """
 import json
 import os
@@ -103,9 +107,45 @@ def gut():
     return rows
 
 
+# THE SIREN MODULATION OF EVERY FISH (Cedric, 2026-10-04: "a montage of the siren omega movies per fish", beside the
+# flow montage): the Omega panel of each fish's movie_omega.mp4 (tools/exp20_modulation.py), 6 x 4 in batch 4's order
+OM_COND = [("glucose", 6, "D-glc"), ("glutamate", 5, "glut"), ("Lglucose", 4, "L-glc"), ("fish_water", 4, "water"),
+           ("blood_glucose", 5, "blood")]
+OM_CROP = "510:270:555:75"            # the Omega map inside a 1080 x 594 movie_omega frame (exp17_modulation's layout)
+OM_W, OM_H, OM_LAB = 256, 136, 26
+
+
+def omega():
+    from exp17_flow_montage import _labels
+    cells = [(f"{lab} {k}", f"gb_sx_f{k}_mask_siren" if c == "glucose" else f"gb_b4_{c}_f{k}")
+             for c, n, lab in OM_COND for k in range(1, n + 1)]
+    ins, f, pos, txt = [], [], [], []
+    for i, (title, n) in enumerate(cells):
+        x, y = (i % 6) * OM_W, (i // 6) * (OM_H + OM_LAB)
+        mv = os.path.join(G, n, "results", "movie_omega.mp4")
+        js = os.path.join(EXP, "data", f"omega_{n}.json")
+        if not os.path.exists(mv):
+            txt.append(((x + 6, y + 4), f"{title}: still training"))
+            continue
+        o = json.load(open(js)) if os.path.exists(js) else None
+        txt.append(((x + 6, y + 4), f"{title}" + (f"   mean {o['mean']:.2f}" if o else "")))
+        j = len(pos)
+        ins += ["-i", mv]
+        f.append(f"[{j}:v]crop={OM_CROP},scale={OM_W}:{OM_H},pad={OM_W}:{OM_H + OM_LAB}:0:{OM_LAB}:black[c{j}]")
+        pos.append(f"{x}_{y}")
+    k = len(pos)
+    W, H = 6 * OM_W, 4 * (OM_H + OM_LAB)
+    ins += ["-loop", "1", "-i", _labels((W, H), txt, 15)]
+    fc = (";".join(f) + ";" + "".join(f"[c{i}]" for i in range(k))
+          + f"xstack=inputs={k}:layout={'|'.join(pos)}:fill=black,pad={W}:{H}:0:0:black[g];[g][{k}:v]overlay=0:0:shortest=1[v]")
+    _run(ins + ["-filter_complex", fc, "-map", "[v]", "-r", "25"], os.path.join(EXP, "presentation", "Movies", "omega_fish.mp4"))
+
+
 if __name__ == "__main__":
-    what = sys.argv[1:] or ["fish", "gut"]
+    what = sys.argv[1:] or ["fish", "gut", "omega"]
     if "fish" in what:
         fish()
     if "gut" in what:
         gut()
+    if "omega" in what:
+        omega()
