@@ -1432,13 +1432,7 @@ def slides_b4_compare():
                                                      deck_title=f"batch 4 $\\cdot$ the learned constants on every fish: {lab}")))
     mv = os.path.join(PRES, "Movies", "flow_fish.mp4")
     fj = os.path.join(DATA, "flow_gut_fish.json")
-    if os.path.exists(mv):
-        out.append(("b4_flow_fish", frame_full("the flow on each fish",
-                    "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.74\\textwidth]{Movies/flow_fish}\\par"
-                    "{\\tiny\\color{gray} each cell: excitatory flow above, inhibitory below, smoothed over 25 \\textmu m "
-                    "(tools/exp20\\_wind.py); each fish its own session, the same 800 frames; the paper's stations in yellow\\par}",
-                    "tools/exp20_flow_montage.py", deck_title="batch 4 $\\cdot$ the flow (the learned messages as wind) on each fish")))
-    if os.path.exists(os.path.join(PRES, "Movies", "omega_fish.mp4")):            # Cedric, 2026-10-04: beside the flow
+    if os.path.exists(os.path.join(PRES, "Movies", "omega_fish.mp4")):            # Cedric, 2026-10-04: before the flow
         out.append(("b4_omega_fish", frame_full("the SIREN modulation on each fish",
                     "\\vspace*{1.0\\baselineskip}\\centering\\playmovie[0.80\\textwidth]{Movies/omega_fish}\\par"
                     "{\\tiny\\color{gray} each cell: the learned modulation $\\Omega_i(t)$ of the messages into each cell (1 = none; "
@@ -1447,6 +1441,12 @@ def slides_b4_compare():
                     "exp17\\_modulation.py), head left\\par}",
                     "tools/exp20_flow_montage.py omega",
                     deck_title="batch 4 $\\cdot$ the learned modulation $\\Omega$ (SIREN) on each fish")))
+    if os.path.exists(mv):
+        out.append(("b4_flow_fish", frame_full("the flow on each fish",
+                    "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.74\\textwidth]{Movies/flow_fish}\\par"
+                    "{\\tiny\\color{gray} each cell: excitatory flow above, inhibitory below, smoothed over 25 \\textmu m "
+                    "(tools/exp20\\_wind.py); each fish its own session, the same 800 frames; the paper's stations in yellow\\par}",
+                    "tools/exp20_flow_montage.py", deck_title="batch 4 $\\cdot$ the flow (the learned messages as wind) on each fish")))
     if os.path.exists(fj) and os.path.exists(os.path.join(PRES, "figs", "flow_gut_fish.png")):
         F = json.load(open(fj))
         short = lambda t: (t.replace("D-glucose fish ", "D-glc ").replace("glutamate fish ", "glut ")
