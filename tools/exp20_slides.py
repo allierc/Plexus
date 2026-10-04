@@ -1857,22 +1857,25 @@ def slides_b6():
         old = np.load(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1.npz"))
         bio = np.load(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1_bio.npz"))
         r_ = np.load(os.path.join(DATA, "baselines_gutbrain_glucose_f1_cells.npz"))["responsive"]
-        right = (head("the input mask, closer to biology")
-                 + "{\\scriptsize Chen 2026: the gut response is chemosensory -- the beam off the gut, fish water and caged "
-                   "L-glucose evoke ~nothing; the true inputs are the vagal (nodose) neurons and the area postrema, the "
-                   "rest are relays. No atlas yet, so the data choose:\\par}\\vspace{4pt}\n"
-                 + rows([("uv, beam", f"{int(bio['mask_by_input'][:, 0].sum()):,} cells EXCITED by the training gut pulses "
-                                      "(top 10 \\% by t) and not by the control pulses (t $<$ 2)"),
-                         ("grating", f"{int(bio['mask_by_input'][:, 3].sum()):,} cells, its coherence (top 10 \\%), as before"),
-                         ("swim", "none: a motor output, not an input"),
-                         ("in all", f"{int(bio['mask'].sum()):,} cells, against {int(old['mask'].sum()):,} in batches 1-5"),
-                         ("gut cells", f"{100 * bio['mask_by_input'][r_, 0].mean():.0f} \\% of the {int(r_.sum()):,} "
-                                       "gut-responsive cells are uv inputs")])
-                 + "{\\scriptsize every input enters every cell of the mask (the law's mask is one per cell); batch 6 "
-                   "trains it on the neuron graph and on the 4-level mesh (gb\\_b6\\_glucose\\_f1\\_bio, \\_mesh4\\_bio)\\par}\n")
-        out.append(("b6_mask3d", frame("the input masks in 3-D", "\\playmovie{Movies/mask3d_f1}", right,
-                                       "tools/exp20_input_mask.py --bio, tools/exp20_mask3d.py", left_gap=True,
-                                       deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input mask closer to biology")))
+        ib = bio["mask_by_input"]
+        left = ("{\\scriptsize\\textbf{why}}\\\\[2pt]{\\tiny Chen 2026: the gut response is chemosensory -- the beam off the "
+                "gut, fish water and caged L-glucose evoke ~nothing; the true inputs are the vagal (nodose) neurons and the "
+                "area postrema, the rest relays. No atlas registration yet, so the data choose the cells (training pulses "
+                "only). Each input enters only its own cells: a per-input mask (input\\_mask\\_array: mask\\_by\\_input, "
+                "state\\_diffuse's \\_input\\_drive); batch 6 trains it on the neuron graph and on the 4-level mesh "
+                "(gb\\_b6\\_glucose\\_f1\\_bio, \\_mesh4\\_bio).\\par}")
+        right = ("{\\scriptsize\\textbf{the cells each input enters}}\\\\[2pt]{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}p{0.42\\textwidth}@{}}\n"
+                 f"UV pulse, beam & {int(ib[:, 0].sum()):,} cells EXCITED by the gut pulses (top 10 \\% by t), not by the control (t $<$ 2) \\\\\n"
+                 f"grating & {int(ib[:, 3].sum()):,} cells, its coherence (top 10 \\%), as before \\\\\n"
+                 "swim & none: a motor output, not an input \\\\\n"
+                 f"in all & {int(bio['mask'].sum()):,} cells, against {int(old['mask'].sum()):,} in batches 1-5 \\\\\n"
+                 f"gut cells & {100 * ib[r_, 0].mean():.0f} \\% of the {int(r_.sum()):,} gut-responsive cells are UV inputs \\\\\n"
+                 "\\end{tabular}\\par}")
+        body = ("\\vspace*{0.3\\baselineskip}{\\centering\\playmovie[0.86\\textwidth]{Movies/mask3d_f1}\\par}\\vspace{4pt}\n"
+                "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.44\\textwidth}\n" + left + "\n\\end{column}\n"
+                "\\begin{column}{0.54\\textwidth}\n" + right + "\n\\end{column}\n\\end{columns}")
+        out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_input_mask.py --bio, tools/exp20_mask3d.py",
+                                            deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input mask closer to biology")))
     return out
 
 
