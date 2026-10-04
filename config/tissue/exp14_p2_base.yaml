@@ -71,6 +71,7 @@ schedule: [cell_geometry, cell_grow, cell_mechanics, edge_flip, cell_divide, cel
 plotting:
   renderer: vtk_points
   subject: vertex
+  also_sets: [supra]
   background: black
   mesh_style: surface
   mesh_edges: true

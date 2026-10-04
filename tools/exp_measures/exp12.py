@@ -291,8 +291,23 @@ def spheroid(T, dim=3, plane_axis=2, c_starve=None, c_cycle=None, cycling_age=No
     return out
 
 
+def _wide(x, idx, centre, d, min_width_cd):
+    """Is the cluster of cells `idx` at least `min_width_cd` cell diameters wide ACROSS its own radial
+    axis? The axis is the mean outward direction of its cells from `centre`; the width is the largest
+    distance between two of its cells after projecting out that axis. A single-file chain of stretched
+    cells (a needle) has width ~0; a finger two cells abreast has ~1 diameter."""
+    v = x[idx] - centre
+    a = v.mean(0)
+    a = a / max(np.linalg.norm(a), 1e-12)
+    tr = v - np.outer(v @ a, a)
+    if len(idx) < 2:
+        return False
+    w = np.max(np.linalg.norm(tr[:, None, :] - tr[None, :, :], axis=2))
+    return bool(w >= min_width_cd * d)
+
+
 def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=20, um_per_unit=None, body="filled",
-            **_):
+            min_width_cd=1.0, **_):
     """Clusters of cells more than `beyond_cd` cell diameters outside the body's radius, linked when
     closer than `link` diameters; clusters of at least `min_cells` count as strands.
 
@@ -315,11 +330,12 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
     from scipy.spatial import cKDTree
     s = _um(T, um_per_unit)
     ts = _rows(T, every)
-    counts, reach = [], []
+    counts, reach, ncell, wide = [], [], [], []
     for t in ts:
         c = cells(T, t)
+        ncell.append(len(c))
         if len(c) < 8:
-            counts.append(None); reach.append(None)
+            counts.append(None); reach.append(None); wide.append(None)
             continue
         r = _radii(c.x, dim, plane_axis)
         d = _diameter(T, t, c)
@@ -330,19 +346,33 @@ def strands(T, dim=3, plane_axis=2, beyond_cd=3.0, link=1.5, min_cells=3, every=
             Rb = (float(np.sqrt(np.nansum(area[:, 0]) / np.pi)) if area is not None
                   else float(np.median(r) / 0.5 ** (1.0 / dim)))
         out_i = np.flatnonzero(r > Rb + beyond_cd * d)
-        n = 0
+        n = nw = 0
         if len(out_i) >= min_cells:
             G = cKDTree(c.x[out_i]).sparse_distance_matrix(cKDTree(c.x[out_i]), link * d)
             _, lab = connected_components(G, directed=False)
-            n = int(np.sum(np.bincount(lab) >= min_cells))
+            big = np.flatnonzero(np.bincount(lab) >= min_cells)
+            n = int(len(big))
+            ctr = c.x.mean(0)
+            nw = int(sum(_wide(c.x, out_i[lab == b], ctr, d, min_width_cd) for b in big))
         counts.append(n)
+        wide.append(nw)
         reach.append(finite((r.max() - Rb) / d))
     last = counts[-1]
+    # THE CELL COUNT, BESIDE THE STRANDS: an outgrowth that multiplies the tissue is budding, not
+    # migration. exp12 Phase 2 batch 2: the leader spheroid went 200 -> 1,825-2,015 cells in 72 h (the
+    # leaderless one 200 -> 205-207) and its "strands" were proliferating buds (finding 58).
     return {"strands_last": last, "strands_max": max((v for v in counts if v is not None), default=None),
-            "reach_last_cd": reach[-1], "series": counts, "rows": ts, "um_per_unit": s}
+            "reach_last_cd": reach[-1], "series": counts, "rows": ts, "um_per_unit": s,
+            "cells_first": ncell[0] if ncell else None, "cells_last": ncell[-1] if ncell else None,
+            "cell_gain": (ncell[-1] / ncell[0]) if ncell and ncell[0] else None,
+            # THE WIDE COUNT: strands at least `min_width_cd` diameters across their own axis. The plain
+            # count also counts a single-file chain along a stretched needle cell (exp12 F74: 8 "strands"
+            # on a run whose movie shows needles to the box edge); Cheung's are multicellular strands.
+            "strands_wide_last": wide[-1], "strands_wide_max": max((v for v in wide if v is not None), default=None),
+            "series_wide": wide}
 
 
-def mesh_sanity(T, every=5, **_):
+def mesh_sanity(T, every=5, radial_line=True, **_):
     """`tools/mesh_sanity.py` (exp 14's per-cell geometry check) over the run: `sane` 1.0 when no sampled
     row breaks a line -- Euler characteristic, longest edge 8x the median, largest cell 10x the median
     area, a vertex 4 edges off a closed shell -- else 0.0, with the first broken row and the worst
@@ -352,6 +382,13 @@ def mesh_sanity(T, every=5, **_):
     import mesh_sanity as MS
     rows = [MS.row(T, t) for t in range(0, T.n_rows(), max(1, int(every)))]
     for r in rows:
+        # THE SHELL-RADIUS LINE IS WAIVED WHERE OUTGROWTH IS THE CLAIM (`radial_line: false`, the invading
+        # spheroid of Phase 2 only). "A vertex 4 edges off the shell" catches a vertex flying off a closed
+        # surface; an invasive strand is, by construction, cells leaving the shell (p2_leader_s1: strands
+        # reaching 4.8 cell diameters out read "4.1 edge lengths off"). The edge, area and Euler lines still
+        # hold, and would catch a flying vertex (its edges stretch).
+        if not radial_line:
+            r["bad"] = [b for b in r["bad"] if "off the shell" not in b]
         # THE TOOL'S EULER COUNT ASSUMES A CLOSED SURFACE: E = half-edges // 2, true only when every edge
         # has a twin. A disc's rim edges have one half-edge each, so every exp12 disc read chi = 305
         # (= 1 + 608 rim half-edges / 2) on every row. Recounted here with undirected edges; the flag is

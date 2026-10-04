@@ -1,0 +1,367 @@
+general:
+  name: exp04_vT8a
+  seed: 0
+  n_frames: 300000
+  dt: 1.398194651066543e-07
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  record_cap: 3001
+  field_record_cap: 2
+  units: {length_um: 0.023, time_s: 7.278405169703653e-07, force_nN: 0.00017869565217391303}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      psi: {width: 1, integration: first_order, unit: voltage, title: membrane potential}
+      j_channel: {width: 1, integration: none, unit: current, title: channel current}
+      g_channel: {width: 1, integration: none, unit: '1', title: channel conductance}
+      tension: {width: 1, integration: none, unit: tension, title: membrane tension}
+      tension_applied: {width: 1, integration: none, unit: tension, title: applied tension}
+      strain: {width: 1, integration: none, unit: '1', title: membrane strain}
+      pore_r: {width: 1, integration: none, unit: length, title: pore radius}
+      w_open: {width: 1, integration: none, unit: '1', title: gate's open fraction}
+      f_gate: {width: 1, integration: none, unit: energy}
+    title: the cell's interior (the voltage-clamped compartment)
+  MscS_1:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 1
+  MscS_2:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 2
+  MscS_3:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 3
+  MscS_4:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 4
+  MscS_5:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 5
+  MscS_6:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 6
+  MscS_7:
+    n: 280
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      domain: {width: 1, integration: none, unit: '1', title: protein domain}
+    title: MscS, chain 7
+  lipid:
+    n: 512
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+    title: membrane lipids
+  frame:
+    n: 276
+    start:
+    - [0.5, 0.5, 0.690128]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      force: {width: 3, integration: none, unit: force, title: force from the ions}
+    title: frozen lipids at the patch's rim (they hold the tension)
+fields:
+  elec: {frame: grid, res: 128, components: 1, title: electric potential in the electrolyte}
+seed:
+- op: cloud_seed
+  at: MscS_1
+  cloud: exp04r_mscs_c_vT8a/c0
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: MscS_2
+  cloud: exp04r_mscs_c_vT8a/c1
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: MscS_3
+  cloud: exp04r_mscs_c_vT8a/c2
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: MscS_4
+  cloud: exp04r_mscs_c_vT8a/c3
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: MscS_5
+  cloud: exp04r_mscs_c_vT8a/c4
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: MscS_6
+  cloud: exp04r_mscs_c_vT8a/c5
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: MscS_7
+  cloud: exp04r_mscs_c_vT8a/c6
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: seed_state_from_file
+  at: MscS_1
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c0_domain}
+- op: seed_state_from_file
+  at: MscS_2
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c1_domain}
+- op: seed_state_from_file
+  at: MscS_3
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c2_domain}
+- op: seed_state_from_file
+  at: MscS_4
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c3_domain}
+- op: seed_state_from_file
+  at: MscS_5
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c4_domain}
+- op: seed_state_from_file
+  at: MscS_6
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c5_domain}
+- op: seed_state_from_file
+  at: MscS_7
+  file: shapes/exp04r_mscs_c_vT8a/blocks.npz
+  blocks: {domain: c6_domain}
+- op: cloud_seed
+  at: lipid
+  cloud: exp04r_mscs_c_vT8a/lipid
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+- op: cloud_seed
+  at: frame
+  cloud: exp04r_mscs_c_vT8a/frame
+  origin: [0.5, 0.5, 0.690128]
+  scale: 43478260.86956522
+operators:
+- op: morph_gate
+  at: MscS_1
+  sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7]
+  open_reference: exp04r_mscs_path
+  open_parts: [c0, c1, c2, c3, c4, c5, c6]
+  open_scale: 43478260.86956522
+  origin: [0.5, 0.5, 0.690128]
+  gate_block: [cell, w_open]
+  mobility: 1.0
+  model: clamp
+  waypoints: 21
+  lambda0: 0.0
+  force_block: [cell, f_gate]
+- op: membrane_potential
+  at: cell
+  capacitance: 9606.657000853653
+  pump_max: 0.0
+  pump_rev: 1.0
+  leak: 0.0
+  psi0: -3.8982399854014598
+  h0: [0.0, 0.0]
+  flux: j_channel
+- op: pair_potential
+  at: MscS_1
+  sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7]
+  law: wca
+  sigma: 0.01956521739130435
+  epsilon: 1.0
+  exclude_same_set: true
+  mobility: 1.0
+  f_max: 6219.2
+- {op: pair_potential, at: lipid, law: cooke, tail: 0.05369235686423239, sigma: 0.03355772304014524, epsilon: 1.5,
+  mobility: 1.0, f_max: 6219.2}
+- op: pair_potential
+  at: lipid
+  with_sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7]
+  law: lj
+  sigma: 0.03260869565217391
+  epsilon: 1.0
+  mobility: 1.0
+  mobility_with: 1.0
+  react: true
+  f_max: 6219.2
+- {op: pair_potential, at: lipid, with: frame, law: cooke, tail: 0.05369235686423239, sigma: 0.03355772304014524,
+  epsilon: 1.5, mobility: 1.0, react: false, f_max: 6219.2}
+- op: tether
+  at: lipid
+  k: 52900.0
+  axes: [2]
+  mobility: 1.0
+- {op: brownian, at: lipid, kT: 1.0, mobility: 1.0, seed: 1}
+- {op: brownian, at: MscS_1, kT: 0.0, mobility: 1.0, seed: 10}
+- {op: brownian, at: MscS_2, kT: 0.0, mobility: 1.0, seed: 11}
+- {op: brownian, at: MscS_3, kT: 0.0, mobility: 1.0, seed: 12}
+- {op: brownian, at: MscS_4, kT: 0.0, mobility: 1.0, seed: 13}
+- {op: brownian, at: MscS_5, kT: 0.0, mobility: 1.0, seed: 14}
+- {op: brownian, at: MscS_6, kT: 0.0, mobility: 1.0, seed: 15}
+- {op: brownian, at: MscS_7, kT: 0.0, mobility: 1.0, seed: 16}
+- op: radial_drive
+  at: frame
+  protocol:
+  - [0, 0.0]
+  - [20000, 0.0]
+  - [80000, 1029.683698296837]
+  - [300000, 1029.683698296837]
+  mode: tension
+  mobility_R: 0.00972877684510888
+  cell: cell
+  axis: 2
+  centre: [0.5, 0.5, 0.690128]
+  max_step: 0.0003766721634318694
+  avg_frames: 2000.0
+  affine_sets: [lipid]
+- op: pore_probe
+  at: MscS_1
+  sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7]
+  bead_radius: 0.021739130434782608
+  z: [0.5814321352087932, 0.7988234395566194]
+  h: 0.013043478260869565
+  slices: 21
+  cell: cell
+- op: electrolyte_conduction
+  at: cell
+  field: elec
+  insulators:
+  - {set: MscS_1, radius: 0.021739130434782608}
+  - {set: MscS_2, radius: 0.021739130434782608}
+  - {set: MscS_3, radius: 0.021739130434782608}
+  - {set: MscS_4, radius: 0.021739130434782608}
+  - {set: MscS_5, radius: 0.021739130434782608}
+  - {set: MscS_6, radius: 0.021739130434782608}
+  - {set: MscS_7, radius: 0.021739130434782608}
+  - {set: lipid, radius: 0.02391304347826087}
+  sigma: 2.5
+  volt_per_sim: 0.025652602296033736
+  dx_m: 1.796875e-10
+  sim_current_per_A: 4542823191430.748
+  slab: [0.6166495265131411, 0.7636060482522715]
+  seal: frame
+  seal_margin: 0.018833608171593467
+  cell: cell
+  lining: {block: domain, value: 1}
+  axis_sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7]
+  every: 50000
+  iters: 150
+  iters_first: 6000
+  omega: 1.0
+  probe_radius: 0.006086956521739131
+schedule: [morph_gate, membrane_potential, pair_potential, pair_potential, pair_potential, pair_potential, tether,
+  brownian, brownian, brownian, brownian, brownian, brownian, brownian, brownian, radial_drive, pore_probe, electrolyte_conduction]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7, lipid]
+  hide_sets: [frame, cell]
+  surface:
+    MscS_1: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MscS_2: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MscS_3: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MscS_4: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MscS_5: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MscS_6: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    MscS_7: {render: surface, spacing: 0.013043, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72}
+    lipid: {render: surface, spacing: 0.017391, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+  surface_min_points: 30
+  opacity: {MscS_1: 1.0, MscS_2: 1.0, MscS_3: 1.0, MscS_4: 1.0, MscS_5: 1.0, MscS_6: 1.0, MscS_7: 1.0, lipid: 0.5}
+  colors:
+    MscS_1: [0.36, 0.58, 0.8]
+    MscS_2: [0.9, 0.62, 0.36]
+    MscS_3: [0.47, 0.72, 0.52]
+    MscS_4: [0.84, 0.47, 0.47]
+    MscS_5: [0.66, 0.56, 0.79]
+    MscS_6: [0.62, 0.5, 0.42]
+    MscS_7: [0.86, 0.6, 0.74]
+    lipid: [0.82, 0.82, 0.84]
+  field_iso:
+    field: elec
+    channel: 0
+    levels: [9.325997, 31.086658]
+    colors: ['#ff7b1c', '#ffe27a']
+    opacity: [0.28, 0.75]
+    smooth: 15
+  camera: {elev: 40.0, azim: 30.0}
+  zoom: 1.0
+  near_side_centre: [0.5, 0.5, 0.690128]
+  curve:
+  - {quantity: 'block:cell:f_gate', smooth: 200.0, ymin: -600.0, ymax: 200.0, ylabel: push along path (kT), font_size: 21,
+    tick_font_size: 16, fixed_range: true}
+  - {quantity: 'block:cell:tension', unit: tension_mN_m, smooth: 50.0, ymin: -5.0, ymax: 16.0, ylabel: membrane
+      tension, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:pore_r', unit: length_nm, factor: 2.0, ymin: 0.0, ymax: 2.1, ylabel: pore diameter, font_size: 21,
+    tick_font_size: 16}
+  subject: MscS_1
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  curve_time: {per_frame_s: 1.0176627176574722e-13, unit: ns}
+  replay_curves: true
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a multi-colored protein structure embedded within a translucent
+      grey membrane. Over time, the membrane undergoes a deformation process as a push force is applied
+      along the z-axis. The membrane tension increases significantly during the first 15 nanoseconds before
+      stabilizing. Throughout the sequence, the pore diameter remains constant at approximately 0.9 nm.
+    objects: The central protein complex consists of several subunits colored in shades of blue, green,
+      orange, pink, and purple. These subunits are arranged in a compact, globular cluster with a central
+      pore. The surrounding membrane is a large, translucent grey sphere that encapsulates the protein.
+      The entire system is contained within a 3D bounding box representing a 0.023 μm cube.

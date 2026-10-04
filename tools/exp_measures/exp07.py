@@ -305,6 +305,22 @@ def domains(T, genes=None, cols=None, axis=0, side="low", threshold=0.5, nbins=2
         g, b0 = Ls[-1] / max(Ls[win[0]], 1e-12), float(b[win[0]])
         fixed = b0 * (1.0 - 1.0 / g) if g > 1.0 else 0.0
         out[f"scaling_index_{n}"] = finite(d / fixed) if (g >= 1.05 and fixed > 1e-9) else None
+        # THE TREND, NOT THE RANGE (exp 7 finding 47): max - min of a boundary sampled every `every` rows
+        # grows with the boundary's own noise (sd 0.002-0.0045 on the tube, ptp 3-4 sd), and on a tissue
+        # that grows 1.46x the denominator b0 (1 - 1/g) is ~0.03 -- noise read as drift. Kicheva's 0.135
+        # is a change of MEANS between stages; the least-squares line's change over the window is its
+        # analogue. b0 is the line's value at the window's start.
+        rw = np.asarray([ts[j] for j in win], float)
+        if len(rw) >= 3 and g >= 1.05:
+            k1, k0 = np.polyfit(rw, b[win], 1)
+            lin = abs(k1 * (rw[-1] - rw[0]))
+            b0f = k0 + k1 * rw[0]
+            den = b0f * (1.0 - 1.0 / g)
+            out[f"drift_lin_{n}"] = finite(lin)
+            out[f"scaling_index_lin_{n}"] = finite(lin / den) if den > 1e-9 else None
+        else:
+            out[f"drift_lin_{n}"] = None
+            out[f"scaling_index_lin_{n}"] = None
     out["drift_max"] = finite(max(drifts)) if drifts else None
     frames = dict(at_frames or {})
     if at_lambda_frac:
@@ -387,6 +403,105 @@ def movie_bands(T, still="3d.png", margin=40, min_value=40, **_):
     return out
 
 
+def interior_jumps(pos, Nv, off, es, et, t0, strip=0.5, axis=2, exclude_division=False, excluded=None):
+    """Largest vertex move per frame, in median edge lengths, over the vertices whose position at t - 1
+    lies in the central `strip` of the tube's current extent along `axis` -- the part the rulers read.
+
+    Returns (frames, jumps) for t = t0 + 1 .. T - 1. Vertices are matched by index over the common
+    prefix, as `growth_audit._jump` matches them; the median edge length is over all live edges.
+
+    `exclude_division` (the human's decision, md finding 60): a vertex a division or flip TOUCHED is not
+    read -- one born on the previous frame (settling onto its septum on its first frame) or one whose
+    neighbours changed between t - 1 and t, or between t - 2 and t - 1 (a septum split one of its
+    edges, or a flip, on this frame or the one before: "during and on the frame after", as decided).
+    The move of such a vertex is the topology event's own geometry, not an instability of the mesh.
+    (The frame-after case for a REWIRED vertex was missing from the first version and found on
+    tubep2wt_s4, frame 293: vertex 1150, split by a septum at frame 292, settling 1.03; md finding 63.)
+    """
+    def _nbr_sig(t, nv):
+        s, e = np.asarray(es[off[t]:off[t + 1]]), np.asarray(et[off[t]:off[t + 1]])
+        m = (s < nv) & (e < nv)
+        s, e = s[m].astype(np.int64), e[m].astype(np.int64)
+        h1 = np.zeros(nv); h2 = np.zeros(nv)
+        np.add.at(h1, s, e.astype(float)); np.add.at(h1, e, s.astype(float))
+        np.add.at(h2, s, (e.astype(float) + 1) ** 2); np.add.at(h2, e, (s.astype(float) + 1) ** 2)
+        return h1, h2
+    ts, js = [], []
+    for t in range(max(int(t0), 0) + 1, len(Nv)):
+        nv = min(int(Nv[t - 1]), int(Nv[t]))
+        a = np.asarray(pos[t - 1][:nv], float); b = np.asarray(pos[t][:nv], float)
+        x = a[:, axis]; lo, hi = np.nanmin(x), np.nanmax(x)
+        mid, half = 0.5 * (lo + hi), 0.5 * (hi - lo)
+        keep = np.abs(x - mid) <= strip * half
+        if exclude_division:
+            if t >= 2:
+                keep &= np.arange(nv) < int(Nv[t - 2])                          # not born on frame t - 1
+            a1, a2 = _nbr_sig(t - 1, nv); b1, b2 = _nbr_sig(t, nv)
+            keep &= (a1 == b1) & (a2 == b2)                                     # neighbours unchanged
+            if t >= 2:                                                          # ... and on the frame
+                nv0 = min(nv, int(Nv[t - 2]))                                   # before: a vertex rewired
+                c1, c2 = _nbr_sig(t - 2, nv0); p1, p2 = _nbr_sig(t - 1, nv0)    # at t - 1 settles at t,
+                keep[:nv0] &= (c1 == p1) & (c2 == p2)                           # as a newborn one does
+        s, e = np.asarray(es[off[t]:off[t + 1]]), np.asarray(et[off[t]:off[t + 1]])
+        m = (s < nv) & (e < nv)
+        L = float(np.median(np.linalg.norm(b[e[m]] - b[s[m]], axis=1))) if m.any() else 1.0
+        if excluded is not None:                                                # share of the interior left out
+            n_in = int((np.abs(x - mid) <= strip * half).sum())
+            excluded.append(1.0 - float(keep.sum()) / max(n_in, 1))
+        d = np.linalg.norm(b[keep] - a[keep], axis=1)
+        ts.append(t); js.append(float(d.max()) / max(L, 1e-9) if d.size else 0.0)
+    return np.asarray(ts), np.asarray(js)
+
+
+def tube_audit(T, strip=0.5, tube_axis=2, every=20, window=60, exclude_division=False, report_excluded=False, **_):
+    """exp 3's growth auditor with its JUMP test moved to the tube's interior and to EVERY frame.
+
+    The human's decision (2026-09-27, md finding 58): the two open-end rims are an artefact of cutting a
+    finite tube, and their vertices snap 1.07-1.24 edge lengths after a division or flip nearby in
+    every rig built (findings 54-57); the rulers already read only the central `strip` of the length.
+    So: `growth_audit.audit` runs unchanged except that its sampled jump test is switched off
+    (X_JUMP = inf, restored after), and the same limit, X_JUMP = 1.0 median edge lengths per frame, is
+    applied to the interior vertices on every frame after the settle window -- denser than the
+    auditor's every-20th-frame sampling. An interior jump scores as the auditor scores an explosion,
+    2 x (fraction of the run before it). Every other test (non-finite, inverted, size drift, the
+    flicker and uniformity bands) is the auditor's own. `exclude_division` (finding 60) leaves out the
+    vertices a division or flip touched on that frame -- see `interior_jumps`.
+    """
+    import growth_audit as GA
+    from .exp_shared import _spec_name
+    spec = _spec_name(T)
+    x_jump = GA.X_JUMP
+    try:
+        GA.X_JUMP = float("inf")
+        r = GA.audit(spec, every=every, window=window)
+    except Exception as e:                                                   # noqa: BLE001
+        return {"available": False, "why": f"{type(e).__name__}: {e}"}
+    finally:
+        GA.X_JUMP = x_jump
+    _, z, t0 = GA._load(spec)
+    Nv = np.asarray(z["vertex__mesh_Nv"]); off = np.asarray(z["vertex__mesh_offsets"])
+    ts, js = interior_jumps(z["vertex__pos"], Nv, off, z["vertex__mesh_E_srce"], z["vertex__mesh_E_trgt"],
+                            t0, strip=strip, axis=tube_axis, exclude_division=bool(exclude_division),
+                            excluded=(ex := []) if report_excluded else None)
+    score, band, why = r.get("score"), r.get("band"), r.get("reason")
+    over = np.flatnonzero(js > x_jump)
+    if over.size:
+        tw = int(ts[over[0]]); n = len(Nv)
+        s_ex = 2.0 * (tw - t0) / max(n - 1 - t0, 1)
+        if score is None or s_ex < score:
+            score, band = round(s_ex, 2), "explosion / chaotic"
+            why = f"wrecked at frame {tw}: an interior vertex jumped {js[over[0]]:.2f} edge lengths in one frame"
+    return {"available": True, "score": finite(score), "band": band, "why": why, "growth": finite(r.get("growth")),
+            "interior_jump_max": finite(float(js.max()) if js.size else 0.0),
+            "interior_jump_p99": finite(float(np.percentile(js, 99)) if js.size else 0.0),
+            "interior_frames_over": int(over.size),
+            # `report_excluded`: how much of the interior the exclusion leaves unread, per frame (md
+            # finding 65) -- a test that skipped most vertices could not see a wreck.
+            **({"excluded_share_median": finite(float(np.median(ex))), "excluded_share_p95": finite(float(np.percentile(ex, 95))),
+                "excluded_share_max": finite(float(np.max(ex)))} if report_excluded and ex else {})}
+
+
 register_run("exp07.gradient", gradient, "fraction", "morphogen exponential fit along the source axis")
 register_run("exp07.domains", domains, "fraction", "fate domains: order, boundaries, drift, induced fraction")
 register_run("exp07.movie_bands", movie_bands, "fraction", "share of the still's tissue pixels in each band colour")
+register_run("exp07.tube_audit", tube_audit, None, "exp 3's growth auditor, jump test on the tube interior, every frame")

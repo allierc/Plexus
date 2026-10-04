@@ -1,0 +1,10 @@
+name: wl_gc_S
+model: config/redox/wl_f338_in4_S.yaml
+learnable:
+- {param: theta, op: diffuse, title: GraphCast model of whole-body calcium (exp19)}
+- {param: I_mlp, op: diffuse, title: "s(t) the learned stimulus, a SIREN of time (3 channels, omega_0 30)"}
+task:
+  reference: {field_recording: wholistic_f338_gcamp, coarsen: 1, split: all, n_val: 20}
+  observe: {field: ratio}
+  loss: masked_mse
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 2000, horizon: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], batch: 4, seed: 0, save_every: 200}

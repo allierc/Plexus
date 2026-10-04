@@ -174,3 +174,7 @@ jobs/logs/
 prototype/eye/archive/_cluster/
 bsub_*.out
 bsub_*.err
+
+# tools/exp_smoke.py writes these one-off smoke / canary copies of a spec (2026-09-27)
+config/*/smoke_*.yaml
+config/*/canary_*.yaml

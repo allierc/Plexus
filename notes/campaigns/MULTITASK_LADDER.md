@@ -51,7 +51,7 @@ holds the integrator and loses the delay" is invisible in a pooled number.
 
 ## The ladder
 
-Each rung is a task spec in `config/task/` and a run spec in `config/run/`, fitted with the
+Each rung is a task spec in `config/task/` and a run spec in `config/training/neural/`, fitted with the
 zebrafish circuit (`config/neural/zf_circuit_285.yaml`) and, as the control, the free 64-unit
 ctRNN. Results land in `log/task/<run>/` as every other fit does.
 

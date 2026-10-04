@@ -1,0 +1,65 @@
+general:
+  name: exp11_mc_slide_base
+  seed: 1
+  n_frames: 150
+  dt: 1.0
+  record_cap: 151
+  boundary: free
+  dim: 3
+  world: [200.0, 200.0, 200.0]
+  units: {length_um: 10.0, time_s: 600.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 10, per_parent: icell, cell_box: 4.7}
+sets:
+  icell:
+    n: 370
+    types:
+      interior: {fraction: 1.0, shape: ball, youngs: 2.0, material: elastic, density: 1.0}
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+  ipt:
+    entity: mpm_particle
+    parent: icell
+    per_parent: 64
+    particle_mass: 0.0109
+    density: 1.0
+    radius: 0.55
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      cellc: {width: 1}
+      pid: {width: 1}
+operators:
+- {op: active_force, model: persistent_walk, at: ipt, cell_set: icell, f: 0.4, Dr: 0.24, seed: 1,
+   speed_cv: 0.17, speed_noise: 0.3, speed_tau: 3.0, front_bias: 0.5, front_width: 0.5}
+- {op: mpm_strain, at: ipt, implementation: default}
+- {op: mpm_scatter, at: ipt, to: mpm_grid, drag: 2.0, polar: higham, implementation: default}
+- {op: mpm_grid_update, at: mpm_grid, implementation: default}
+- {op: mpm_gather, at: ipt, from: mpm_grid, implementation: default}
+- {op: pair_potential, at: ipt, law: harmonic, sigma: 0.22, epsilon: 0.3, mobility: 100.0, exclude: pid, emit: mpm_acceleration}
+- {op: aggregate_centroid, at: icell, child: ipt}
+schedule:
+- active_force
+- steps: [pair_potential, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+  substep_dt: 0.05
+  capture: false
+- aggregate_centroid
+seed:
+- {op: seed_positions, model: packed_ball, at: icell, spacing: 0.94, jitter: 0.2, centre: [0.0, 0.0, 0.0], seed: 1}
+- {op: seed_positions, model: voronoi_parent, at: ipt, reach: 1.3, clip_radius: 4.6, centre: [0.0, 0.0, 0.0], seed: 1, label: cellc, parent_id: pid}
+plotting:
+  renderer: vtk_points
+  subject: ipt
+  color_field: cellc
+  field_cmap: tab20
+  color_range: [0, 19]
+  background: black
+  dot_size: 7
+  zoom: 14
+  cutaway: {axis: z, at: 0.5, thickness: 0.005}
+  camera: {elev: 90, azim: 0}
+  duration_s: 10
+  slow_motion: 1
+  keep_stills: true
+  stills: 8

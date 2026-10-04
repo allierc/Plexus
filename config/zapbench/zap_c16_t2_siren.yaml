@@ -1,0 +1,42 @@
+general:
+  name: zap_c16_t2_siren
+  seed: 0
+  n_frames: 1
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: false
+sets:
+  brain: {n: 1}
+  neuron:
+    parent: brain
+    per_parent: 100759
+    grow_reserve: 0
+    title: "the 100,759 neurons of the destriped ZAPBench traces (zap-inr), at their anatomy-frame positions"
+    state:
+      dff: {width: 6, role: coordinate, integration: first_order, boundary: free, title: "the recorded dF/F now and the five frames before, newest first: the indicator's read-out"}
+      v: {width: 1, integration: first_order, boundary: free, record: false, title: "the latent activity the indicator reads, in dF/F units"}
+      xyz: {width: 3, integration: none, boundary: free, record: false, title: "soma centroid, um"}
+      tau: {width: 1, integration: none, boundary: free, record: false, title: "raw rate, 1/tau = softplus"}
+      rest: {width: 1, integration: none, boundary: free, record: false, title: "rest value, normalised dF/F"}
+      input: {width: 27, integration: none, boundary: free, record: false, title: "weights on the 27 stimulus features (22 visual + 5 ephys)"}
+  stimulus:
+    parent: brain
+    per_parent: 27
+    grow_reserve: 0
+    title: "the 22 visual stimulus features of ZAPBench and 5 ephys (swim / turn power left and right, bout fraction)"
+    state:
+      u: {width: 1, integration: none, boundary: free, record: false, title: "each feature at frame t"}
+fields: {}
+seed:
+- {op: seed_state_from_file, at: neuron, file: zebrafish/zapbench_destripe_recording.npz, blocks: {xyz: pos_um}}
+- {op: seed_state_random, at: neuron, block: tau, lo: -2.97, hi: -2.97}
+- {op: seed_state_random, at: neuron, block: rest, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: neuron, block: input, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: stimulus, block: u, lo: 0.0, hi: 0.0}
+operators:
+- {op: state_diffuse, model: neuron_graph, integrator: exponential, input_mask: zebrafish/input_mask_destripe_mix_coh20.npz, modulation: siren, at: neuron, block: v, positions: xyz, positions_file: zebrafish/zapbench_destripe_recording.npz, short_k: 6, mid_um: 32.0, long_um: 128.0, substeps: 4, inputs: 1, forcing: stimulus.u, forcing_dim: 27, seed: 0, checkpoint: true, title: "each neuron's dF/F through a known ODE on a graph between the neurons: 6 nearest, 6 at 32 um, 6 at 128 um, one weight per edge"}
+- {op: calcium_indicator, at: neuron, block: dff, latent: v, width: 6, tau_s: 2.0, frame_s: 0.914, encoder_init: identity, title: "the H2B-GCaMP7f read-out: the recorded dF/F relaxes toward the latent activity with a time constant fixed at 2 s"}
+schedule: [state_diffuse, calcium_indicator]
+plotting: {renderer: none, max_frames: 0}

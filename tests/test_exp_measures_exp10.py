@@ -435,3 +435,17 @@ def test_lstree_reader_on_a_planted_organoid(tmp_path):
     assert abs(a["lumen_frac"] - 0.125) < 0.01 and abs(a["thick_over_R"] - 0.5) < 0.01
     assert abs(a["axis_ratio"] - 1) < 0.01 and abs(b["axis_ratio"] - 1 / 1.5) < 0.01
     assert abs(b["lumen_frac"] - 0.125) < 0.01
+
+
+def test_patch_col_reads_the_named_column_and_lumen_last_over_max(tmp_path):
+    p = str(tmp_path / "pc")
+    write_run(p, [U * 1.1 * R, dome(U, [0, 0, 1], 0.8 * R)])
+    nF = len(TRI)
+    ch = np.zeros((2, nF, 4))
+    ch[:, cap_cells([0, 0, 1], 25), 3] = 1.0                        # the patch in column 3 only
+    T = with_chem(p, ch)
+    r0 = crypt(T, patch_block="chem")
+    r3 = crypt(T, patch_block="chem", patch_col=3)
+    assert r0["one_crypt_at_patch"] == 0.0 and r3["one_crypt_at_patch"] == 1.0
+    assert r3["one_crypt_if_budded"] == 1.0
+    assert r3["lumen_frac_last_over_max"] == pytest.approx(min(1.0, r3["lumen_frac_last"] / r3["lumen_frac_max"]))

@@ -396,9 +396,10 @@ def _basal_lookup():
     return geo
 
 
-def _live_basal(H, surface, sep_block, geo, dev, dt_):
+def _live_basal(H, surface, sep_block, geo, dev, dt_, side="basal"):
     """(mesh table, centroid c, lookup M) of the tissue's basal surface `pos - sep` this frame,
-    about its own centroid -- or None before the tissue is seeded."""
+    about its own centroid -- or None before the tissue is seeded. `side="apical"`: the other ring,
+    `pos + sep` (the lumen-facing one of an `apical: in` shell)."""
     tl = H.level(surface)
     m = getattr(tl, "_mesh", None)
     if m is None or not int(m.get("Nv", 0)):
@@ -408,7 +409,10 @@ def _live_basal(H, surface, sep_block, geo, dev, dt_):
     # A MID-SURFACE TISSUE (the default `cell_mechanics` shape energy) HAS NO SEPARATION: its one
     # surface is the one the membrane rests on, and the standoff stands for half the cell thickness.
     if sep_block in tl.state_schema:
-        B = B - tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
+        if side == "apical":
+            B = B + tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
+        else:
+            B = B - tl.get(sep_block)[:nv].to(device=dev, dtype=dt_)
     c = B.mean(0)
     V = B - c
     M = geo._build_from(V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev),
@@ -551,12 +555,17 @@ class BasementMembraneSeedLive(BasementMembraneSeed):
     starts where a different run's tissue was. Seeded from the live set it starts on the tissue it
     will hold, at the declared standoff, every bond at rest.
 
+    `reserve` (default 0): dormant slots per sheet slot, as in the base `bm_seed`. The sheet (laid +
+    hole) is the first round(n / (1 + reserve)) slots; the rest are parked at c, not alive, with no
+    direction, published as `H.membrane_reserve` for `bm_secrete[live]` -- the hole's nodes are
+    never reserve. The hole itself is published as `H.membrane_hole` = (unit axis, half-angle deg).
+
     Reference: Harunaga, J. S., Doyle, A. D. & Yamada, K. M. (2014). Dev. Biol. 394:197-205
     (perforations in the basement membrane at the tips of branching salivary-gland buds).
     """
     REQUIRES_PARAMS = ["tissue"]
     PARAM_ROLES = {"offset": "standoff_outside_the_basal_surface", "hole": "declared_hole",
-                   "tissue": "the_live_vertex_set"}
+                   "tissue": "the_live_vertex_set", "reserve": "dormant_slots_per_sheet_slot"}
 
     def __init__(self, params, device="cpu"):
         Structural.__init__(self, params, device)
@@ -566,6 +575,12 @@ class BasementMembraneSeedLive(BasementMembraneSeed):
         self.offset = float(params.get("offset", 0.0))
         self.relax_iters = int(params.get("relax_iters", 24))
         self.seed = int(params.get("seed", 0))
+        # `reserve` (default 0 = every slot is laid or left in the hole, bit-identical to before): the
+        # base `bm_seed`'s own convention, reserve slots PER SHEET SLOT -- the sheet takes the first
+        # round(n / (1 + reserve)) slots (laid + hole), the rest are parked dormant at c for
+        # `bm_secrete[live]`. The sheet is relaxed ON ITS OWN (a thinned blue-noise set is Poisson), so
+        # n = n_sheet (1 + reserve) lays the same sheet, node for node, as n_sheet with no reserve.
+        self.reserve = float(params.get("reserve", 0.0))
         hole = params.get("hole", None)
         self.hole = None
         if hole:
@@ -588,6 +603,9 @@ class BasementMembraneSeedLive(BasementMembraneSeed):
             raise RuntimeError(f"bm_seed[live]: the tissue set {self.tissue!r} has no mesh yet. List "
                                f"its `seed_mesh` BEFORE `bm_seed` in `seed:`.")
         m, c, M = got
+        n_all = n
+        if self.reserve > 0:
+            n = max(1, int(round(n_all / (1.0 + self.reserve))))
         u = _relaxed_directions(n, self.seed, self.relax_iters, dev).to(dt_)
         from plexus.operators.contact_ops import MeshContact
         hit, tri, t, w = MeshContact._query(self._geo, M, u, u, torch.ones(n, device=dev, dtype=dt_))
@@ -600,18 +618,32 @@ class BasementMembraneSeedLive(BasementMembraneSeed):
             a, half = self.hole
             alive = (u @ a.to(dev, dt_)) < math.cos(math.radians(half))
             P[~alive] = c
+        reserve = torch.zeros(n_all, dtype=torch.bool, device=dev)
+        if n < n_all:
+            # THE RESERVE: parked at c, dormant, unoccupied, with no direction (u0 = 0) -- distinct from
+            # the hole's left-out nodes, which keep theirs, so `bm_secrete[live]` never draws on the hole
+            k = n_all - n
+            P = torch.cat([P, c.expand(k, 3)])
+            alive = torch.cat([alive, torch.zeros(k, dtype=torch.bool, device=dev)])
+            u = torch.cat([u, torch.zeros(k, 3, device=dev, dtype=dt_)])
+            reserve[n:] = True
         lvl.get("pos")[:] = P
         oc = getattr(lvl, "occ", None)
         if oc is not None:
             oc[~alive] = 0.0
         H.membrane_alive = alive
         H.membrane_u0 = u.clone()
+        # published for `bm_secrete[live]`: the declared hole (unit axis, half-angle in degrees) or None,
+        # and which dormant slots are reserve
+        H.membrane_hole = self.hole
+        H.membrane_reserve = reserve
         self._done = True
         hs = ("no hole" if self.hole is None else
               f"hole of half-angle {self.hole[1]:g} deg about {[round(float(v), 3) for v in self.hole[0]]}")
         print(f"[bm_seed/live] {n} nodes on the live basal surface of `{self.tissue}` + {self.offset:g} "
               f"(radius {float(t.median()):.4g} about its centroid); {hs}: {int(alive.sum())} laid "
-              f"down, {n - int(alive.sum())} left out", flush=True)
+              f"down, {n - int(alive[:n].sum())} left out"
+              + (f", {n_all - n} held in reserve" if n < n_all else ""), flush=True)
         return {}
 
 
@@ -686,6 +718,12 @@ class BasementMembraneBond(Lateral):
         self.snapshot_every = int(params.get("snapshot_every", 20))
         self.rebond_every = int(params.get("rebond_every", 20))   # ongoing crosslinking
         self.aniso = float(params.get("aniso", 1.0))          # circumferential : meridional stiffness
+        # `k_block` (default none): each bond's stiffness scaled by the mean of a width-1 block of its two
+        # nodes -- the membrane's own mass `bm_M` (exp 11 Phase 3 B3, 2026-09-29), so a thicker membrane is a
+        # stiffer one (collagen IV is its stiffness, Topfer 2022) -- capped at `k_block_cap` (default 3.0)
+        # times k, and the explicit-integration guard below is checked at the cap
+        self.k_block = params.get("k_block", None)
+        self.k_block_cap = float(params.get("k_block_cap", 3.0))
         self.record_hoop = bool(params.get("record_hoop", False))
         self.centre_t = torch.tensor([float(v) for v in params.get("centre", [0.5, 0.5, 0.5])])
         # the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it
@@ -694,6 +732,11 @@ class BasementMembraneBond(Lateral):
         self.cutoff = float(params.get("cutoff", 0.020))
         self.max_nb = int(params.get("max_neighbours", 6))
         self.damp = float(params.get("damp", 0.0))
+        # `guard_dt: spec` -- THE GUARD READS THE RUN'S OWN TIME STEP (exp 11, 2026-09-27). Called without
+        # one, `_check_stability` assumes the archive's 0.004 per frame, so on a live-coupling spec at dt 1
+        # its ceiling is 250x too generous: exp 11 batch 2 (overdamped_gamma 5, k 5, z 6.4, k·z·dt/gamma
+        # 6.4 > 2) passed it and every node went NaN by frame 40 (exp11 Finding 38). Default: unchanged.
+        self.guard_dt = str(params.get("guard_dt", "archive")).lower()
         self.i = self.j = self.rest = self.alive = None
         self._said = False
 
@@ -735,9 +778,10 @@ class BasementMembraneBond(Lateral):
             k_max = (2.0 * self.gamma / dt_frame - self.k_adh_hint) / z
         else:
             k_max = (1.0 / dt_frame ** 2 - self.k_adh_hint) / z
-        if self.k > k_max:
+        _k_top = self.k * (self.k_block_cap if self.k_block else 1.0)
+        if _k_top > k_max:
             raise RuntimeError(
-                f"bm_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "
+                f"bm_bond: k = {_k_top:.3g} (k x the k_block cap when a block scales it) exceeds the explicit-integration ceiling "
                 f"{k_max:.3g} for graph mode at dt = {dt_frame:g} with {bonds_per_node:.1f} bonds per "
                 f"node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "
                 f"cannot carry the stiffness the MPM path could: this run would return an infinite "
@@ -907,7 +951,11 @@ class BasementMembraneBond(Lateral):
             # includes material which does not exist yet is not a coordination number.
             _live = getattr(H, "membrane_alive", None)
             _n = int(_live.sum()) if _live is not None else pos.shape[0]
-            self._check_stability(self.i.numel() / max(_n, 1) * 2.0)
+            if self.guard_dt == "spec":
+                self._check_stability(self.i.numel() / max(_n, 1) * 2.0,
+                                      dt_frame=float(getattr(H, "dt", 1.0) or 1.0))
+            else:
+                self._check_stability(self.i.numel() / max(_n, 1) * 2.0)
             print(f"[bm_bond] {self.i.numel()} bonds on {pos.shape[0]} particles "
                   f"({self.i.numel() / max(pos.shape[0], 1):.1f} per particle), k={self.k:g}, "
                   f"cutoff={self.cutoff:g}", flush=True)
@@ -946,6 +994,28 @@ class BasementMembraneBond(Lateral):
             par = par / sin_th.clamp_min(1e-12)
             circ = ((d / L[:, None]) * par).sum(1).abs() * sin_th[:, 0]
             kk = self.k * (1.0 + (self.aniso - 1.0) * circ)
+        if self.k_block:
+            if self.k_block not in lvl.state_schema:
+                raise ValueError(f"bm_bond: k_block {self.k_block!r} is not a block of {self.at!r}")
+            _mb = lvl.get(self.k_block)[:, 0]
+            kk_base = kk
+            kk = kk * (0.5 * (_mb[self.i] + _mb[self.j])).clamp(0.0, self.k_block_cap)
+            # THE NODE'S OWN CEILING (exp 11 Finding 149): an overdamped explicit node is stable while
+            # deg_n k + k_contact < 2 gamma / dt, and the DEGREE is the node's, not the mean -- secretion keeps
+            # bonding new nodes to old ones, and at 2x stiffness a node with 12 bonds (12 x 0.2 + 0.5 = 2.9) flung
+            # itself to 1e19 at frame 156 of BB-94 while the mean (6.4) passed the guard. The scaled stiffness
+            # of a bond is held to 0.9 of what BOTH its nodes can carry; never below the base k, so a run at mass 1
+            # is unchanged; the share of bonds held is `H.bm_k_capped_frac`.
+            if self.gamma > 0:
+                _dtf = float(getattr(H, "dt", 1.0) or 1.0)
+                _ones = torch.ones(int(self.alive.sum()), device=dev, dtype=dt_)
+                _deg = torch.zeros(pos.shape[0], device=dev, dtype=dt_)
+                _deg.index_add_(0, self.i[self.alive], _ones).index_add_(0, self.j[self.alive], _ones)
+                _kn = 0.9 * (2.0 * self.gamma / _dtf - self.k_adh_hint) / _deg.clamp_min(1.0)
+                _lim = torch.maximum(torch.minimum(_kn[self.i], _kn[self.j]),
+                                     kk_base if torch.is_tensor(kk_base) else torch.full_like(kk, float(kk_base)))
+                H.bm_k_capped_frac = float(((kk > _lim) & self.alive).sum()) / max(int(self.alive.sum()), 1)
+                kk = torch.minimum(kk, _lim)
         f = (kk * (L - self.rest) * self.alive.to(dt_))[:, None] * (d / L[:, None])
         # the sheet's own hoop tension, by direction -- this is what a corset would press with, and it is
         # what the growth gate can read in the next pass. Without it the corset cannot reach the tissue.
@@ -1461,6 +1531,16 @@ class BasementMembraneRemodel(Lateral):
         self.cap = float(params.get("cap", 0.02))
         self.target = str(params.get("target", "own")).lower()    # "own" | "mesh" | "fixed"
         self.mesh_w = float(params.get("mesh_w", 1.0))            # how far toward the common spacing
+        # `tau_block` (default none; exp 11 Phase 3 B6e, 2026-09-29): each bond's turnover time scaled by the mean of
+        # a width-1 block of its two nodes -- the membrane's mass `bm_M` -- raised to `tau_power` (default 1),
+        # clipped to [`tau_min_frac`, `tau_max_frac`] (0.1, 10) of tau. A membrane the protease has thinned FORGETS
+        # ITS STRAIN FASTER: under a long base tau the sheet holds the tissue, and yields where it is cut
+        # (Villeneuve 2024: proteolytic softening releases pressure; Harunaga 2014: the tip's distensibility needs
+        # protease). Absent, every bond keeps the one tau.
+        self.tau_block = params.get("tau_block", None)
+        self.tau_power = float(params.get("tau_power", 1.0))
+        self.tau_min_frac = float(params.get("tau_min_frac", 0.1))
+        self.tau_max_frac = float(params.get("tau_max_frac", 10.0))
         lst = params.get("l_star", 0.0)
         self._l_star = float(lst) if lst else None                # None = freeze it from frame 0
         self._said = False
@@ -1508,7 +1588,14 @@ class BasementMembraneRemodel(Lateral):
             tgt = (1.0 - self.mesh_w) * L + self.mesh_w * l_star
         else:
             tgt = L
-        d = ((tgt - rest) / max(self.tau, 1e-9)).clamp(-self.cap * rest, self.cap * rest)
+        tau = max(self.tau, 1e-9)
+        if self.tau_block:
+            if self.tau_block not in lvl.state_schema:
+                raise ValueError(f"bm_remodel: tau_block {self.tau_block!r} is not a block of {self.at!r}")
+            _mb = lvl.get(self.tau_block)[:, 0].to(rest.dtype)
+            _m = (0.5 * (_mb[i] + _mb[j])).clamp_min(1e-6)
+            tau = (self.tau * _m ** self.tau_power).clamp(self.tau_min_frac * self.tau, self.tau_max_frac * self.tau)
+        d = ((tgt - rest) / tau).clamp(-self.cap * rest, self.cap * rest)
         rest += d * alive.to(rest.dtype)
         if not self._said:
             print(f"[bm_remodel] crosslink turnover tau={self.tau} frames "
@@ -1670,6 +1757,19 @@ class BasementMembraneContactLive(Lateral):
     deficit that gates growth -- counted from the same lookup, so the membrane a cell senses is the
     one holding it.
 
+    THE OTHER SIDE, `side` (default `basal` = all of the above): with `side: apical` the set this
+    operator is placed on -- any particle set, e.g. the INNER CELLS of a stratified bud (exp 11,
+    Wang et al. 2021's surface layer wrapping an interior of packed cells) -- is held INSIDE the
+    tissue: the surface looked up is the apical ring a = pos + sep (the lumen-facing ring of an
+    `apical: in` shell), the normal of each contact is the one pointing INTO the lumen, so a node
+    that crosses into the cell layer is pushed back into the lumen and the layer is pushed outward
+    by the reaction (on a: -F on pos and -F on sep, `cell_mechanics[apicobasal_contact]`). The list
+    carries `side: apical` and sits beside the membrane's in `m["basal_contacts"]`, keyed by this
+    set; the ledger books its pair the same way. An apical list publishes no ligand density and
+    writes no CONTACT_TRACE row (both are the membrane's); its live mask is the set's own occupancy,
+    not `membrane_alive`, and its drag is `overdamped_gamma`, required (no `bm_bond` acts on it).
+    `offset` is then the inner cell's radius -- the distance its centre is held from the apical face.
+
     Reference: Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the
     particle-to-surface contact and its barycentric reaction); Yurchenco, P. D. (2011). Cold Spring
     Harb. Perspect. Biol. 3:a004911 (the membrane sits on the basal cell surface).
@@ -1681,7 +1781,8 @@ class BasementMembraneContactLive(Lateral):
                       "anchorage_sensing"]
     PARAM_ROLES = {"k": "contact_stiffness_per_node", "offset": "standoff_the_sheet_is_held_at",
                    "band": "ligand_reach", "surface": "the_live_vertex_set",
-                   "k_adh": "cell_matrix_tether_stiffness"}
+                   "k_adh": "cell_matrix_tether_stiffness",
+                   "side": "basal_membrane_outside_or_apical_inner_cells_inside"}
     REFERENCE = ("Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Comput. Methods Appl. Mech. Engrg. "
                  "293:1-19; Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911.")
 
@@ -1697,6 +1798,12 @@ class BasementMembraneContactLive(Lateral):
         self.band = float(params.get("band", 0.3))
         self.margin_contact = float(params.get("margin_contact", 0.5))
         self.k_adh = float(params.get("k_adh", 0.0))
+        self.side = str(params.get("side", "basal")).lower()
+        if self.side not in ("basal", "apical"):
+            raise ValueError(f"bm_contact[live]: side is basal or apical, got {self.side!r}")
+        if self.side == "apical" and self.gamma is None:
+            raise ValueError("bm_contact[live]: side apical needs `overdamped_gamma` -- the drag of the "
+                             "set it holds inside the tissue (no `bm_bond` acts on it)")
         if self.k_adh > 0 and self.band > self.margin_contact:
             raise ValueError("bm_contact[live]: the tether's reach `band` must lie inside "
                              "`margin_contact`, or a tethered node could miss the frame's list")
@@ -1704,6 +1811,8 @@ class BasementMembraneContactLive(Lateral):
         self._said = False
 
     def _node_gamma(self, H):
+        if self.side == "apical":                   # its own drag; bm_bond's belongs to the membrane
+            return self.gamma
         bb = H.__dict__.get("_bm_bond_op", None)
         g_b = float(getattr(bb, "gamma", 0.0) or 0.0) if bb is not None else 0.0
         if self.gamma is None:
@@ -1723,13 +1832,15 @@ class BasementMembraneContactLive(Lateral):
         f = getattr(H, "frame", None)
         f = -1 if f is None else int(f)
         vel = torch.zeros_like(pos)
-        got = _live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_)
+        apical = self.side == "apical"
+        got = (_live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_, side="apical") if apical
+               else _live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_))
         if got is None:
             return {self.at: vel}
         m, c, M = got
         nv, nF = M["nv"], int(M["nF"])
         gamma = self._node_gamma(H)
-        alive = getattr(H, "membrane_alive", None)
+        alive = getattr(H, "membrane_alive", None) if not apical else (lvl.occ > 0)
         alive = (torch.ones(pos.shape[0], dtype=torch.bool, device=dev) if alive is None
                  else alive.to(dev))
         if mask is not None:
@@ -1747,6 +1858,8 @@ class BasementMembraneContactLive(Lateral):
         if idx.numel():
             hit, tri, w, n_hat, gap = _nearest_faces(M, c, pos[idx])
             idx, tri, w, n_hat, gap = idx[hit], tri[hit], w[hit], n_hat[hit], gap[hit]
+            if apical:                              # the normal INTO the lumen, the height along it
+                n_hat, gap = -n_hat, -gap
             bound = gap <= (self.offset + self.band)
             lig.index_add_(0, M["ef"][tri][bound], torch.ones_like(gap[bound]))
             if gap.numel():
@@ -1762,6 +1875,14 @@ class BasementMembraneContactLive(Lateral):
         if not isinstance(bc, dict):
             bc = m["basal_contacts"] = {}
         bc[self.at] = C
+        if apical:                                  # the ligand density and the trace are the membrane's
+            C["side"] = "apical"
+            if not self._said:
+                self._said = True
+                print(f"[bm_contact/live] set `{self.at}` held INSIDE the apical surface of "
+                      f"`{self.surface}`: k={self.k:g}, gamma={gamma:g}, offset={self.offset:g}; frame {f}: "
+                      f"{n_list} nodes in the contact list, deepest {pmax:.3g} past the standoff", flush=True)
+            return {self.at: vel}
         # THE LIGAND DENSITY: bound nodes per unit BASAL area of each cell, so a big cell is not
         # read as a well-anchored one.
         area = 0.5 * torch.cross(M["B"] - M["A"], M["C"] - M["A"], dim=1).norm(dim=1)
@@ -2426,6 +2547,353 @@ class BasementMembraneSecrete(Structural):
                 pos[slot] = c + dirn * rad
         SECRETE_TRACE.append((n_live, add, int(live.sum()), R))
         return {}
+
+
+@register_operator("bm_secrete", implementation="live", family="population", set="particle",
+                   kind="structural",
+                   equation=r"""$$n_{\mathrm{want}}(t)=n_0\,\frac{A_b(t)}{A_b(0)},\qquad \Delta n=\min\!\big(n_{\mathrm{want}}(t)-n_{\mathrm{live}}(t),\ \lceil r\,n_{\mathrm{live}}(t)\rceil\big)$$""")
+class BasementMembraneSecreteLive(BasementMembraneSecrete):
+    """New membrane from the cells that hold it, keeping the sheet's AREAL NODE DENSITY at its
+    first-frame value as the LIVE tissue's basal surface grows -- and never inside a declared hole.
+
+    basement_membrane_node -> basement_membrane_node: activates reserve slots on the tissue's basal
+    surface; `bm_bond` crosslinks them at its next call (through `H.membrane_new`).
+
+        n_want(t) = n0 * A_b(t) / A_b(0)
+        add(t)    = min(n_want(t) - n_live(t), ceil(rate * n_live(t)))
+
+    A_b(t) is the area of the tissue's basal surface this frame -- `pos - sep` for an apico-basal
+    tissue, `pos` for a mid-surface one, as `_live_basal` builds it (the sum of its fan-triangle
+    areas); A_b(0) and n0 are that area and the live node count at the FIRST call (which lays
+    nothing); n_live(t) the live node count now; `rate` the per-frame cap as a fraction of n_live.
+    So n_live / A_b is held at n0 / A_b(0), the density the sheet was laid at.
+
+    WHERE, per frame:
+      * WHO SECRETES: cell f with weight w_f = max(0, a_f(t) - a_f(t_prev)) * [rho_f > 0], where a_f
+        is cell f's basal area, t_prev the previous call, and rho_f = m["bm_ligand"][f] the membrane
+        nodes bound per unit basal area that `bm_contact[live]` published THIS frame. A cell that
+        holds no membrane (under a hole) never secretes; a cell that grew secretes in proportion to
+        what it grew. (All gains zero -- first call after a division, say -- falls back to w_f =
+        a_f [rho_f > 0].) A cell born this frame has no previous area and reads a gain of 0.
+      * CANDIDATES: cand_mult * add points drawn uniformly per unit area over the secreting cells'
+        basal triangles (triangle weight w_f * area_t / a_f), each moved to the nearest point of the
+        basal surface + `offset` along its outward normal (the same nearest-face lookup and the same
+        standoff `bm_contact[live]` holds nodes at).
+      * NOT IN THE HOLE: a candidate whose direction from the basal centroid c lies within the
+        declared cone, (x - c) . a / |x - c| >= cos(alpha) -- a the hole's unit axis, alpha its
+        half-angle, read from `H.membrane_hole` as `bm_seed[live]` published it -- is rejected. The
+        same test rejects a jitter or relaxation step that would carry a new node into the cone.
+      * SPARSEST FIRST: greedy farthest-point choice among the candidates, by distance to the nearest
+        live node (the sheet's largest local gaps near the secreting cells), each pick counting as a
+        node for the next; then a tangential jitter of `jitter` * l* (Gaussian, in the local tangent
+        plane, re-projected), and `relax_new` repulsion sweeps -- the base operator's rule: 7 nearest
+        live nodes, push weight (l* - d)/l*, step 0.3 l* -- re-projected onto the offset surface.
+        l* = sqrt(A_b(0) / n0), the first frame's spacing, which the setpoint holds.
+
+    FROM THE RESERVE, NEVER FROM THE HOLE. Slots are taken only from `H.membrane_reserve` (the
+    dormant slots `bm_seed[live]`'s `reserve` parks), dormant and never used before; the hole's
+    left-out nodes stay dormant. With no reserve published, any dormant slot whose seeded direction
+    is outside the cone. A new node's velocity is zero, its `occ` 1; its crosslinks are `bm_bond`'s
+    own new-node bonding (every live neighbour within `bm_bond`'s cutoff, up to its max_neighbours,
+    each at rest) -- one spring model.
+
+    SCHEDULE between `bm_contact[live]` and `cell_mechanics`: it needs this frame's `bm_ligand`, and
+    the cell count must be the one that ligand was counted on (it raises otherwise).
+
+    WHY NOT THE BASE `bm_secrete`: it treats every dormant node as reserve (it would scatter the
+    hole's), its `uniform` directions cover the whole sphere about a fixed `centre` (it would refill
+    the hole), and its setpoint n0 (R/R0)^2 reads the mean radius about that centre, which a bud
+    breaks (BM_EPITHELIUM_AUDIT.md, "Piece by piece").
+
+    Reference: Ku, K. & Bilder, D. (2023) Dev. Cell 58:522 (basement membrane is deposited by the
+    epithelium it underlies, basally); Harunaga, J. S., Doyle, A. D. & Yamada, K. M. (2014) Dev.
+    Biol. 394:197-205 (perforations at bud tips).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    # `exclude_block` (default None = unchanged): NOT UNDER THE CELLS THAT DIGEST IT. A candidate whose nearest basal
+    # face belongs to a cell whose width-1 block `exclude_block` (on `cell_set`) is above 0.5 is rejected, as a
+    # candidate in the declared cone is. Without it the sparsest-first rule refills a hole CUT BY CELLS
+    # (`bm_unbond[model: release]`, whose leaders carry `mutant`) as fast as they digest it: exp 11 Finding 70 --
+    # the cell-made hole's bud 0.11 / 0.18 with secretion, 0.41 / 0.38 without. Harunaga 2014: the gland's holes are
+    # dynamic and stay open only while proteases act.
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["secretion", "material_addition", "areal_density_setpoint", "basal_deposition"]
+    PARAM_ROLES = {"rate": "max_fraction_secreted_per_frame", "offset": "standoff_the_sheet_is_held_at",
+                   "surface": "the_live_vertex_set", "relax_new": "repulsion_sweeps_on_new_nodes",
+                   "jitter": "tangential_jitter_in_spacings", "cand_mult": "candidates_per_new_node"}
+
+    def __init__(self, params, device="cpu"):
+        Structural.__init__(self, params, device)
+        self.at = params.get("_at", "bm_node")
+        self.surface = str(params["surface"])
+        self.sep_block = str(params.get("sep_block", "sep"))
+        self.rate = float(params.get("rate", 0.02))
+        self.offset = float(params.get("offset", 0.05))
+        self.relax_new = int(params.get("relax_new", 4))
+        self.jitter = float(params.get("jitter", 0.25))
+        self.cand_mult = int(params.get("cand_mult", 12))
+        self.exclude_block = params.get("exclude_block", None)
+        self.cell_set = str(params.get("cell_set", "cell"))
+        self.seed = int(params.get("seed", 0))
+        self._gen = torch.Generator().manual_seed(self.seed)
+        self._geo = _basal_lookup()
+        self._n0 = self._a0 = self._lstar = self._farea = self._spent = None
+        self._said_spent = False
+
+    def _count(self, want, n_live, lig, farea):
+        """How many nodes to lay this call: up to the areal setpoint `want`, at most `rate` x n_live."""
+        return min(want - n_live, int(math.ceil(self.rate * n_live)))
+
+    def _weights(self, gain, lig, farea):
+        """Per cell, its share of the new nodes: the basal area it gained, if it holds membrane (else its area)."""
+        bound = (lig > 0).to(farea.dtype)
+        w = gain * bound
+        if float(w.sum()) <= 0:
+            w = farea * bound
+        return w
+
+    def _onto(self, M, c, y):
+        """y moved along the nearest face's outward normal to the basal surface + offset; found [n]."""
+        found, _, _, nh, gap = _nearest_faces(M, c, y)
+        return torch.where(found[:, None], y - (gap - self.offset)[:, None] * nh, y), found, nh
+
+    def _in_excluded(self, M, c, y, excl):
+        """[n] True where y's nearest basal face belongs to an excluded cell (`exclude_block`)."""
+        if excl is None or y.shape[0] == 0:
+            return torch.zeros(y.shape[0], dtype=torch.bool, device=y.device)
+        found, tri, _, _, _ = _nearest_faces(M, c, y)
+        cell = M["ef"][tri]
+        return found & excl[cell.clamp(max=excl.numel() - 1)]
+
+    @staticmethod
+    def _in_cone(hole, c, y):
+        if hole is None or y.shape[0] == 0:
+            return torch.zeros(y.shape[0], dtype=torch.bool, device=y.device)
+        a, half = hole
+        d = y - c
+        cs = (d @ a.to(y.device, y.dtype)) / d.norm(dim=1).clamp_min(1e-12)
+        return cs >= math.cos(math.radians(float(half)))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        live = getattr(H, "membrane_alive", None)
+        if live is None:
+            return {}
+        got = _live_basal(H, self.surface, self.sep_block, self._geo, dev, dt_)
+        if got is None:
+            return {}
+        m, c, M = got
+        f = getattr(H, "frame", None)
+        f = -1 if f is None else int(f)
+        nF = int(M["nF"])
+        lig = m.get("bm_ligand")
+        if lig is None or lig.numel() != nF or m.get("bm_ligand_frame") != f:
+            raise RuntimeError("bm_secrete[live]: needs this frame's per-cell bound density "
+                               "m['bm_ligand'] from `bm_contact[live]`, counted on the current cells -- "
+                               "schedule it AFTER bm_contact and BEFORE cell_mechanics / cell_divide")
+        ef = M["ef"]
+        tri_a = 0.5 * torch.cross(M["B"] - M["A"], M["C"] - M["A"], dim=1).norm(dim=1)
+        farea = torch.zeros(nF, device=dev, dtype=dt_).index_add_(0, ef, tri_a)
+        A = float(tri_a.sum())
+        n_live = int(live.sum())
+        n = pos.shape[0]
+        if self._n0 is None:
+            self._n0, self._a0 = n_live, A
+            self._lstar = math.sqrt(A / max(n_live, 1))
+            self._farea = farea.clone()
+            self._spent = torch.zeros(n, dtype=torch.bool, device=dev)
+            SECRETE_LIVE_TRACE.append((f, n_live, 0, n_live, A))
+            print(f"[bm_secrete/live] holding {n_live} live nodes per {A:.4g} of basal area "
+                  f"(spacing {self._lstar:.3g}); rate cap {self.rate:g} per frame", flush=True)
+            return {}
+        prev, self._farea = self._farea, farea.clone()
+        gain = torch.zeros(nF, device=dev, dtype=dt_)
+        k_ = min(prev.numel(), nF)
+        gain[:k_] = (farea[:k_] - prev[:k_]).clamp_min(0.0)
+        want = int(round(self._n0 * A / max(self._a0, 1e-30)))
+        add = self._count(want, n_live, lig.to(dev), farea)
+        if add <= 0:
+            SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
+            return {}
+
+        # THE SLOTS: reserve only, each used once; never a hole node
+        elig = ~live.to(dev) & ~self._spent
+        res = getattr(H, "membrane_reserve", None)
+        hole = getattr(H, "membrane_hole", None)
+        if res is not None:
+            elig = elig & res.to(dev)
+        else:
+            u0 = getattr(H, "membrane_u0", None)
+            if hole is not None and u0 is not None:
+                elig = elig & ~((u0.norm(dim=1) > 0) & self._in_cone(hole, torch.zeros_like(c),
+                                                                      u0.to(dev, dt_)))
+        slots = elig.nonzero(as_tuple=True)[0][:add]
+        if slots.numel() == 0:
+            if not self._said_spent:
+                self._said_spent = True
+                print(f"[bm_secrete/live] frame {f}: the reserve is spent -- {n_live} live nodes "
+                      f"against {want} wanted", flush=True)
+            SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
+            return {}
+        add = int(slots.numel())
+
+        # WHO: cells that grew and hold membrane (`_weights`; a variant may choose otherwise)
+        w = self._weights(gain, lig.to(dev), farea)
+        if float(w.sum()) <= 0:
+            SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
+            return {}
+        wt = (w[ef] * tri_a / farea[ef].clamp_min(1e-20)).detach().to("cpu", torch.float64)
+        n_cand = max(add * self.cand_mult, add)
+        ti = torch.multinomial(wt, n_cand, replacement=True, generator=self._gen).to(dev)
+        r = torch.rand(n_cand, 2, generator=self._gen, dtype=torch.float64)
+        fl = r.sum(1) > 1.0
+        r[fl] = 1.0 - r[fl]
+        r = r.to(dev, dt_)
+        Aa = M["A"][ti]
+        Q = c + Aa + r[:, 0:1] * (M["B"][ti] - Aa) + r[:, 1:2] * (M["C"][ti] - Aa)
+        Y, found, _ = self._onto(M, c, Q)
+        excl = None
+        if self.exclude_block:
+            _cl = H.level(self.cell_set)
+            if self.exclude_block not in _cl.state_schema:
+                raise ValueError(f"bm_secrete[live]: exclude_block {self.exclude_block!r} is not a block of "
+                                 f"the {self.cell_set!r} set")
+            excl = (_cl.get(self.exclude_block)[:nF, 0] > 0.5).to(dev)
+        Y = Y[found & ~self._in_cone(hole, c, Y) & ~self._in_excluded(M, c, Y, excl)]
+        if Y.shape[0] == 0:
+            SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
+            return {}
+
+        # WHERE: the sparsest candidates, greedily (each pick is a node for the next)
+        P_live = pos[live].detach()
+        dmin = torch.empty(Y.shape[0], device=dev, dtype=dt_)
+        for a0 in range(0, Y.shape[0], 1024):
+            dmin[a0:a0 + 1024] = torch.cdist(Y[a0:a0 + 1024], P_live).min(1).values
+        pick = []
+        for _ in range(min(add, Y.shape[0])):
+            j = int(dmin.argmax())
+            pick.append(j)
+            dmin = torch.minimum(dmin, (Y - Y[j]).norm(dim=1))
+        newp = Y[torch.tensor(pick, device=dev)]
+        add = newp.shape[0]
+        slots = slots[:add]
+        ls = self._lstar
+        if self.jitter > 0:
+            _, _, nh = self._onto(M, c, newp)
+            g = torch.randn(add, 3, generator=self._gen, dtype=torch.float64).to(dev, dt_)
+            g = g - (g * nh).sum(1, keepdim=True) * nh
+            cand, ok, _ = self._onto(M, c, newp + g * (self.jitter * ls))
+            ok = ok & ~self._in_cone(hole, c, cand) & ~self._in_excluded(M, c, cand, excl)
+            newp = torch.where(ok[:, None], cand, newp)
+        for _ in range(self.relax_new):
+            allp = torch.cat([P_live, newp])
+            d = torch.cdist(newp, allp)
+            d[torch.arange(add, device=dev), P_live.shape[0] + torch.arange(add, device=dev)] = 1e9
+            kk = min(7, allp.shape[0] - 1)
+            if kk <= 0:
+                break
+            nd, ni = torch.topk(-d, kk, dim=1)
+            nd = -nd
+            diff = newp[:, None, :] - allp[ni]
+            w_ = (ls - nd).clamp_min(0.0) / ls
+            push = (diff / nd[..., None].clamp_min(1e-9) * w_[..., None]).sum(1)
+            cand, ok, _ = self._onto(M, c, newp + push * (0.3 * ls))
+            ok = ok & ~self._in_cone(hole, c, cand) & ~self._in_excluded(M, c, cand, excl)
+            newp = torch.where(ok[:, None], cand, newp)
+
+        pos[slots] = newp
+        if "vel" in lvl.state_schema:
+            lvl.get("vel")[slots] = 0.0
+        oc = getattr(lvl, "occ", None)
+        if oc is not None:
+            oc[slots] = 1.0
+        live = live.clone()
+        live[slots] = True
+        H.membrane_alive = live
+        self._spent[slots] = True
+        pn = getattr(H, "membrane_new", None)
+        H.membrane_new = slots if pn is None or pn.numel() == 0 else torch.cat([pn, slots])
+        SECRETE_LIVE_TRACE.append((f, n_live, add, want, A))
+        return {}
+
+
+# Per call of `bm_secrete[live]`: (frame, live nodes before, nodes added, n_want, basal area A_b).
+SECRETE_LIVE_TRACE: list = []
+
+
+@register_operator("bm_secrete", implementation="heal", family="population", set="particle",
+                   kind="structural",
+                   equation=r"""$$d_f=\max\big(0,\ \rho^\ast-\rho_f\big)\,a_f,\qquad \Delta n=\min\Big(\big\lceil \textstyle\sum_f d_f/\tau_h\big\rceil,\ \lceil r\,n_{\rm live}\rceil\Big)$$""")
+class BasementMembraneSecreteHeal(BasementMembraneSecreteLive):
+    """`bm_secrete[live]` with a LOCAL setpoint: the membrane re-covers the cells it left, within `heal_tau` frames.
+
+    basement_membrane_node -> basement_membrane_node: as `bm_secrete[live]` (reserve slots only, sparsest first,
+    never in a declared hole), but WHO secretes and HOW MUCH follow each cell's own deficit:
+
+        rho*   the median bound density `m["bm_ligand"]` (nodes within the contact band per unit basal area) at the
+               first call -- the density the sheet was laid at, counted the way `bm_contact[live]` counts it
+        d_f    = max(0, rho* - rho_f) a_f      cell f's missing nodes, a_f its basal area; a BARE cell (rho_f 0) too
+        add    = min(ceil(sum_f d_f / heal_tau), ceil(rate n_live))
+        w_f    = d_f                            the new nodes land on the cells that lack them
+
+    `bm_secrete[live]` holds the GLOBAL count n0 A / A0 and lays nodes only under cells that grew AND already hold
+    membrane, so a patch the membrane has left never gets it back while the count is met by nodes crowded elsewhere:
+    exp 11 run 460 (mc_W3_b1block) held 16.2-16.5 nodes per unit basal area over the whole run while the median
+    density near a cell fell 15 -> 8.9 and 45 cells had no node within 10 um by row 140 -- the branches ran bare. Here
+    the epithelium keeps depositing where its own basement membrane is thin (Harunaga 2014: continuous deposition,
+    thin but unbroken at the tips).
+
+    `heal_tau` (frames, default 6 = 1 h) is how fast a deficit closes; `max_over` and `global_floor` bound the
+    total (below). Everything else is `bm_secrete[live]`'s.
+    """
+    MECHANISM_TAGS = ["secretion", "material_addition", "local_density_setpoint", "basal_deposition", "repair"]
+    PARAM_ROLES = {**BasementMembraneSecreteLive.PARAM_ROLES, "heal_tau": "frames_to_close_a_local_deficit"}
+    PARAM_UNITS = {"heal_tau": "frames"}
+
+    # `max_over` (default none = unbounded): the live count never exceeds max_over x the global setpoint n0 A / A0.
+    # Unbounded, the local rule kept adding: R1 (exp 11, 2026-09-30) climbed to 19-25 nodes per unit area near a cell
+    # (seeded 15) and used all 120,000 slots by row 200, after which nothing healed (Finding 187).
+    # `global_floor` (default false): lay at least what `bm_secrete[live]` would (want - n_live) when the local
+    # deficits ask for less, so the sheet's density never falls below its setpoint as the tissue grows.
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.heal_tau = float(params.get("heal_tau", 6.0))
+        _mo = params.get("max_over", None)
+        self.max_over = None if _mo is None else float(_mo)
+        self.global_floor = bool(params.get("global_floor", False))
+        # `heal_frac` (default 1.0): a cell is in deficit only below heal_frac x rho*. At 1.0 the setpoint is the median,
+        # so half the cells are always "in deficit" and draw nodes for ever -- the overshoot of R1; at 0.5 only cells
+        # clearly thinner than the sheet are healed, up to half its density, and the rest is the global rule's.
+        self.heal_frac = float(params.get("heal_frac", 1.0))
+        self._rho_star = None
+
+    def _deficit(self, lig, farea):
+        if self._rho_star is None:
+            self._rho_star = float(torch.median(lig[farea > 0])) if bool((farea > 0).any()) else 0.0
+            print(f"[bm_secrete/heal] local setpoint {self._rho_star:.4g} bound nodes per unit basal area; "
+                  f"deficits close in {self.heal_tau:g} frames", flush=True)
+        return (self.heal_frac * self._rho_star - lig).clamp_min(0.0) * farea
+
+    def _count(self, want, n_live, lig, farea):
+        d = self._deficit(lig, farea)
+        add = int(math.ceil(float(d.sum()) / max(self.heal_tau, 1e-9)))
+        if self.global_floor:
+            add = max(add, want - n_live)
+        if self.max_over is not None:
+            add = min(add, int(math.ceil(self.max_over * want)) - n_live)
+        return min(add, int(math.ceil(self.rate * n_live)))
+
+    def _weights(self, gain, lig, farea):
+        d = self._deficit(lig, farea)
+        if float(d.sum()) <= 0 and self.global_floor:
+            return BasementMembraneSecreteLive._weights(self, gain, lig, farea)
+        return d
+
 
 
 SECRETE_TRACE = []

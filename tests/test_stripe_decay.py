@@ -34,6 +34,15 @@ def test_stripe_is_the_middle_band():
     assert torch.equal(m, shifted)                                          # centred on the tissue, wherever it is
 
 
+def test_fixed_width_does_not_scale_with_the_tissue():
+    x = torch.linspace(-10, 10, 21)
+    m = CellReactStripeDecay(dict(P, source={"axis": 0, "width": 3.0})).source_mask(_Lvl(x))
+    assert m.nonzero().flatten().tolist() == [9, 10, 11]                   # |x| < 1.5
+    big = CellReactStripeDecay(dict(P, source={"axis": 0, "width": 3.0})).source_mask(_Lvl(3 * x))
+    assert big.nonzero().flatten().tolist() == [10]                        # a 3x wider tissue: still |x| < 1.5
+    frac = CellReactStripeDecay(dict(P, source={"axis": 0, "frac": 0.15})).source_mask(_Lvl(3 * x))
+    assert frac.nonzero().flatten().tolist() == [9, 10, 11]                # the default scales with it
+
 def test_dead_cells_are_ignored():
     x = torch.linspace(-10, 10, 21)
     occ = torch.ones(21); occ[:10] = 0                                     # the live tissue is x in [0, 10]

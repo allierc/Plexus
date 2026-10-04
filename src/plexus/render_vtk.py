@@ -251,6 +251,16 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
             a_ = np.asarray(z[k])
             if a_.ndim == 3 and a_.shape[2] == 1:
                 cell_cols[b] = a_
+    # THE CELL SET'S TYPE COLUMN, for `plotting.mesh_color_by: node_type` (exp 9: LEP/MEP faces, and
+    # Part B's receivers retyped by contact). `node_type` is not a state block, so the loop above never
+    # sees it; `<cell>__node_type_t` is the per-row column the engine keeps when a type changed during
+    # the run, `<cell>__node_type` the final one otherwise. Only `mesh_color_by` reads it.
+    _cnt = None
+    if cell_set:
+        for _k in (f"{cell_set}__node_type_t", f"{cell_set}__node_type"):
+            if _k in z.files:
+                _cnt = np.asarray(z[_k])
+                break
     out = []
     for t in range(len(nF)):
         a, b = int(off[t]), int(off[t + 1])
@@ -261,6 +271,9 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
             mt[c] = arr[fa:fb]
         for c, arr in cell_cols.items():               # cut to the frame's live faces
             mt.setdefault(c, np.asarray(arr[t])[:int(nF[t]), 0])
+        if _cnt is not None:
+            mt.setdefault("node_type", np.asarray(_cnt[min(t, len(_cnt) - 1)] if _cnt.ndim == 2
+                                                  else _cnt)[:int(nF[t])])
         for c, (arr, eoff) in edge_cols.items():       # each column's OWN offsets -- see live_movie
             ea, eb = int(eoff[t]), int(eoff[t + 1])
             if eb > ea:
@@ -494,9 +507,87 @@ def _marks(mt, idx, nF, prev_nF=None):
             (None if kills is None else kills > 0), (None if sup is None else sup > 0))
 
 
+def mesh_color_values(mt, lab):
+    """The per-face values `plotting.mesh_color_by: <lab>` names, or None. A block of that name first;
+    `node_type` / `type` fall back to the cell set's type column (`_core_frames`, `live_movie`)."""
+    if not lab:
+        return None
+    v = mt.get(lab)
+    if v is None and str(lab).lower() in ("node_type", "type"):
+        v = mt.get("node_type")
+    return v
+
+
+def mesh_scale_continuous(v, st) -> bool:
+    """Whether `mesh_color_by` is drawn through a colormap rather than as categories.
+
+    `plotting.mesh_color_scale`: absent or `categorical` -> categories, the law every existing movie
+    was drawn with (a float block is rounded to its nearest integer); `continuous` -> the colormap;
+    `auto` -> the colormap when any finite value is not an integer, categories otherwise.
+    """
+    s = str((st or {}).get("mesh_color_scale", "") or "").lower()
+    if s == "continuous":
+        return True
+    if s == "auto":
+        a = np.asarray(v, float).ravel()
+        f = np.isfinite(a)
+        return bool(np.any(a[f] != np.rint(a[f])))
+    return False
+
+
+def mesh_block_continuous(v, st, rng=None):
+    """uint8 [n, 3]: per-face values `v` through `plotting.mesh_cmap` (default viridis).
+
+    THE RANGE IS FIXED, not the frame's: `plotting.mesh_color_range: [lo, hi]` when declared, else the
+    caller's `rng` (the run's, in `evolve`; widened-only over the frames seen so far, live), else this
+    frame's own min/max. A non-finite value is magenta, the renderer's "not a cell any more".
+    """
+    from matplotlib import colormaps
+    st = st or {}
+    a = np.asarray(v, float).ravel()
+    fin = np.isfinite(a)
+    r = st.get("mesh_color_range") or rng
+    if r is not None and len(r) == 2:
+        lo, hi = float(r[0]), float(r[1])
+    elif fin.any():
+        lo, hi = float(a[fin].min()), float(a[fin].max())
+    else:
+        lo, hi = 0.0, 1.0
+    x = np.clip((np.where(fin, a, lo) - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+    rgb = (np.asarray(colormaps[str(st.get("mesh_cmap", "viridis"))](x))[:, :3] * 255).astype(np.uint8)
+    rgb[~fin] = (255, 26, 217)
+    return rgb
+
+
+def mesh_color_rng(fr):
+    """(lo, hi) of the `mesh_color_by` block over EVERY frame of `fr`, when it is drawn continuous;
+    None otherwise -- and None keeps `mesh_of` on the categorical law. One range for the whole clip,
+    for the reason the activator has one: a per-frame range makes a strengthening pattern look static."""
+    st = _PLOT_OVERRIDE or {}
+    lab = str(st.get("mesh_color_by", "") or "")
+    scale = str(st.get("mesh_color_scale", "") or "").lower()
+    if not lab or lab.lower() in ("phase", "cycle_progress") or scale not in ("continuous", "auto"):
+        return None
+    vals = []
+    for f in fr or []:
+        v = mesh_color_values(f[1], lab)
+        if v is not None:
+            vals.append(np.asarray(v, float).ravel()[:int(f[1]["nF"])])
+    if not vals:
+        return None
+    a = np.concatenate(vals)
+    fin = np.isfinite(a)
+    if scale == "auto" and not bool(np.any(a[fin] != np.rint(a[fin]))):
+        return None
+    r = st.get("mesh_color_range")
+    if r is not None and len(r) == 2:
+        return float(r[0]), float(r[1])
+    return (float(a[fin].min()), float(a[fin].max())) if fin.any() else (0.0, 1.0)
+
+
 def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=None, lut=None,
             cutaway=None,
-            blend=None, vmax=None):
+            blend=None, vmax=None, color_rng=None):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
     from plexus.models.topology import rings_from_flat_3d
@@ -551,6 +642,17 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
     _a = None if act is None else np.asarray(act, float)[:nF][idx]
     _fin = None if _a is None else np.isfinite(_a)
     flat = _a is not None and bool(_fin.any()) and not bool(np.any(_a[_fin] != 0.0))
+    # WITH A DECLARED LUT, FLAT MEANS FLAT IN THE COLUMNS IT DRAWS. `act` is one column (chan 0 by
+    # default); a spec whose LUT draws other columns -- exp 7's gene circuit in columns 3-5 beside a
+    # morphogen in column 0 -- was painted BODY_GREY whenever column 0 was zero, i.e. on every
+    # no-source control, where Pax6 sits at 3 in every cell. No LUT: the test above stands unchanged.
+    if flat and chem is not None and lut:
+        _c = np.asarray(chem, float)[:nF][idx]
+        _drawn = [k for k, h in enumerate(lut) if h is not None and k < _c.shape[1]]
+        if _drawn:
+            _v = _c[:, _drawn]
+            _vf = np.isfinite(_v)
+            flat = bool(_vf.any()) and not bool(np.any(_v[_vf] != 0.0))
     # A DECLARED LUT WINS. `plotting.species` is a column-to-colour table and it is a property of
     # the MODEL: Gray-Scott draws its activator and hides its substrate, May-Leonard's three
     # species are a partition and want red/green/blue. The 2D path has honoured it since
@@ -598,9 +700,17 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
     # sphere puts indices a Fibonacci number apart side by side, and those step to near-equal hues),
     # so a clone keeps its colour in every frame. It replaces the body colour; the division and death marks still draw over it.
     _lab = str((_PLOT_OVERRIDE or {}).get("mesh_color_by", "") or "")
-    if _lab and _lab.lower() not in ("phase", "cycle_progress") and mt.get(_lab) is not None:
+    # `node_type` (alias `type`) IS THE CELL SET'S TYPE COLUMN, per frame -- see `_core_frames`. A float
+    # block drawn through a colormap instead of as categories is opt-in, `mesh_color_scale` -- see
+    # `mesh_block_continuous`; without that key the categorical law below is unchanged.
+    _lv = mesh_color_values(mt, _lab)
+    if _lab and _lab.lower() not in ("phase", "cycle_progress") and _lv is not None \
+            and (color_rng is not None
+                 or mesh_scale_continuous(np.asarray(_lv, float)[:nF][idx], _PLOT_OVERRIDE or {})):
+        rgb = mesh_block_continuous(np.asarray(_lv, float)[:nF][idx], _PLOT_OVERRIDE or {}, color_rng)
+    elif _lab and _lab.lower() not in ("phase", "cycle_progress") and _lv is not None:
         from plexus.measures import label_rgb
-        _q = np.rint(np.asarray(mt[_lab], float)[:nF][idx]).astype(np.int64)
+        _q = np.rint(np.asarray(_lv, float)[:nF][idx]).astype(np.int64)
         _pal = (_PLOT_OVERRIDE or {}).get("label_colors") or []
         _c = np.empty((len(idx), 3))
         for k in np.unique(_q):
@@ -778,7 +888,7 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     name = label or os.path.basename(run_dir.rstrip("/"))
     pos, mt, act, _chem = fr[-1]
     m = mesh_of(pos, mt, act, show_div=False, chem=_chem, lut=_lut, blend=_blend,
-                cutaway=_cut, vmax=_pl.get("chem_max"))
+                cutaway=_cut, vmax=_pl.get("chem_max"), color_rng=mesh_color_rng(fr))
     n = int(KB_SECONDS * FPS)
     p = _plotter(); add(p, m, style)
     p.add_text(f"{name}  {style}", position="upper_left", font_size=11, color="white")
@@ -836,10 +946,12 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
         if _vals:
             _erng = (float(min(np.nanmin(v) for v in _vals)),
                      float(max(np.nanmax(v) for v in _vals)))
+    _crng = mesh_color_rng(fr)                    # None unless `mesh_color_scale` asks for a colormap
     for t, (pos, mt, act, _chem) in enumerate(fr):
         back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
         m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh" and _div), prev_nF=back,
-                    chem=_chem, lut=_lut, blend=_blend, cutaway=_cut, vmax=_pl.get("chem_max"))
+                    chem=_chem, lut=_lut, blend=_blend, cutaway=_cut, vmax=_pl.get("chem_max"),
+                    color_rng=_crng)
         if m is None:
             continue
         if actor is not None:
@@ -881,7 +993,8 @@ def still(run_dir, style="flat", out=None, fill=1.0, frame=-1, label=True, traj=
     pos, mt, act, _chem = fr[frame][:4]
     m = mesh_of(pos, mt, act, show_div=(style == "mesh"), chem=_chem,
                 lut=style_of(run_dir)[0], blend=style_of(run_dir)[1],
-                cutaway=style_of(run_dir)[2], vmax=plot_style(run_dir).get("chem_max"))
+                cutaway=style_of(run_dir)[2], vmax=plot_style(run_dir).get("chem_max"),
+                color_rng=mesh_color_rng(fr))
     p = _plotter()
     add(p, m, style)
     if label:

@@ -1,0 +1,58 @@
+general:
+  name: ql_bit_64_stim0
+  seed: 0
+  n_frames: 480
+  dt: 0.0166666666666667
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+sets:
+  brain: {n: 1}
+  sensor:
+    parent: brain
+    per_parent: 8
+    state:
+      signal: {width: 1, integration: none, boundary: free}
+  neuron:
+    parent: brain
+    per_parent: 64
+    type_layout: ordered
+    types:
+      a1:
+        count: 32
+        sign: E
+        role: recurrent
+        p: &id001 [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      a2:
+        count: 32
+        sign: E
+        role: recurrent
+        p: *id001
+    state:
+      pos: {width: 3, role: geometry, integration: none, boundary: world}
+      voltage: {width: 1, role: coordinate, integration: first_order, boundary: free}
+      omega: {width: 1, role: modulation, integration: none, boundary: free, record: false}
+      tau: {width: 1, integration: none, boundary: free, record: false}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  output:
+    parent: brain
+    per_parent: 1
+    state:
+      value: {width: 1, integration: none, boundary: free}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  synapse: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: neuron, edges_file: neural/ql_bit_64_edges.npz}
+  afferent: {parent: brain, edge_set: true, entity: connection, pre: sensor, post: neuron, edges_file: neural/ql_bit_64_in_stim0.npz}
+  motor: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: output, edges_file: neural/ql_bit_64_out.npz}
+fields: {}
+seed:
+- {op: seed_state_random, at: sensor, block: signal, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: neuron, block: tau, lo: 0.1, hi: 0.1}
+- {op: seed_state_random, at: neuron, block: bias, lo: -0.1768, hi: 0.1768}
+- {op: seed_state_random, at: output, block: bias, lo: 0.0, hi: 0.0}
+operators:
+- {op: project, at: neuron, edge_set: afferent, block: signal, gain: 10.0, bias: bias}
+- {op: neuron_update, at: neuron, model: leaky_tanh, tau: tau, tau_min: 0.05, noise: 0.0}
+- {op: neuron_signal, at: neuron, edge_set: synapse, activation: tanh, dale: true, model: shared}
+- {op: readout, at: output, edge_set: motor, block: voltage, into: value, send: tanh, activation: identity, bias: bias}
+schedule: [project, neuron_update, neuron_signal, readout]
+plotting: {renderer: none, max_frames: 0}

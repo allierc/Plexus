@@ -188,3 +188,49 @@ def test_region_swelling_follows_the_fate_and_the_ramp():
     assert op._swell(_H(0, {"chem": fate}), nF, "cpu", torch.float64) is None
     g = op._swell(_H(20, {"chem": fate}), nF, "cpu", torch.float64)
     assert abs(float(g[20]) - 1.56) < 1e-12 and abs(float(g[0]) - 0.77) < 1e-12
+
+
+def test_growing_lumen_fraction_inflates_and_releases():
+    m = _mesh()
+    o = m["pos"].mean(0)
+    v_in = float(enclosed_ring_volume(m["pos"] - m["sep"], m["es"], m["et"], m["ef"], m["nF"], m["eocc"], o))
+    v_out = float(enclosed_ring_volume(m["pos"] + m["sep"], m["es"], m["et"], m["ef"], m["nF"], m["eocc"], o))
+    op = ApicoBasalRegionShapeEnergy3D(dict(lumen_frac=v_in / v_out + 0.1, k_lumen_frac=3.0, lumen_until=10), "cpu")
+    _, _, lum = op._region_terms(_H(5, {}), {}, m["nF"], m["pos"], m["sep"], m["es"], m["et"], m["ef"],
+                                 m["eocc"], "cpu", torch.float64)
+    assert lum["V0"] is None and abs(lum["V_out"] - v_out) < 1e-9 and lum["k_f"] == 3.0
+    x = m["pos"].clone().requires_grad_(True)
+    E = region_lumen_energy(x, m["sep"], m["es"], m["et"], m["ef"], m["nF"], m["alive"], m["eocc"], lumen=lum)
+    assert abs(float(E) - 0.5 * 3.0 * v_out * 0.1 ** 2) < 1e-9       # the declared shortfall, 0.1 of the organoid
+    g = torch.autograd.grad(E, x)[0]
+    n_hat = m["pos"] / m["pos"].norm(dim=1, keepdim=True)
+    assert float((g * n_hat).sum(1).mean()) < 0                       # a lumen short of its fraction inflates
+    _, _, off = op._region_terms(_H(10, {}), {}, m["nF"], m["pos"], m["sep"], m["es"], m["et"], m["ef"],
+                                 m["eocc"], "cpu", torch.float64)
+    assert off is None                                                # released at lumen_until
+
+
+def test_lumen_fraction_ramps_between_its_two_values():
+    m = _mesh()
+    op = ApicoBasalRegionShapeEnergy3D(dict(lumen_frac=[0.07, 0.26], lumen_ramp=[100, 300], k_lumen_frac=5.0), "cpu")
+    fr = {}
+    for f in (50, 200, 400):
+        _, _, lum = op._region_terms(_H(f, {}), {}, m["nF"], m["pos"], m["sep"], m["es"], m["et"], m["ef"],
+                                     m["eocc"], "cpu", torch.float64)
+        fr[f] = lum["frac"]
+    assert fr[50] == pytest.approx(0.07) and fr[200] == pytest.approx(0.165) and fr[400] == pytest.approx(0.26)
+
+
+def test_lumen_fraction_piecewise_inflate_then_deflate():
+    m = _mesh()
+    op = ApicoBasalRegionShapeEnergy3D(dict(lumen_frac=[0.07, 0.26, 0.12], lumen_ramp=[100, 300, 500],
+                                            k_lumen_frac=5.0), "cpu")
+    got = {}
+    for f in (0, 200, 300, 400, 900):
+        _, _, lum = op._region_terms(_H(f, {}), {}, m["nF"], m["pos"], m["sep"], m["es"], m["et"], m["ef"],
+                                     m["eocc"], "cpu", torch.float64)
+        got[f] = lum["frac"]
+    assert got[0] == pytest.approx(0.07) and got[200] == pytest.approx(0.165) and got[300] == pytest.approx(0.26)
+    assert got[400] == pytest.approx(0.19) and got[900] == pytest.approx(0.12)
+    with pytest.raises(ValueError):
+        ApicoBasalRegionShapeEnergy3D(dict(lumen_frac=[0.07, 0.26, 0.12], lumen_ramp=[100, 300]), "cpu")

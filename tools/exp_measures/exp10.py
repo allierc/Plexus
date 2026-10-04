@@ -61,7 +61,8 @@ image analysis"):
 
 THE PATCH is a declared per-cell block (`patch_block`, default `fate`; a cell with a value above
 `patch_min` is a patch cell). `on_patch` is the fraction of the bud's cells that are patch cells,
-`patch_in_bud` the fraction of the patch inside the bud. Without the block both are None and
+`patch_in_bud` the fraction of the patch inside the bud; `patch_col` picks the block's column (phase 2: the
+Wnt column of `cell_chem_react[notch_delta]`, 3). Without the block both are None and
 `one_crypt_at_patch` is 0: a crypt with no patch to be at cannot pass that gate.
 
 THE PATCH'S OWN GEOMETRY, bud or no bud, because a patch can fail two ways the bud count cannot tell
@@ -195,12 +196,12 @@ def bud_profile(V, c, R, n_bins=8):
 
 
 # ============================================================================ one row
-def crypt_row(T, t, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5, n_bins=8, h_base=0.05):
+def crypt_row(T, t, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5, n_bins=8, h_base=0.05, patch_col=0):
     c = cells(T, t)
     x = c.x
     ok = np.isfinite(x).all(1)
     pb = c.block(patch_block)
-    patch = None if pb is None else (pb[:, 0] > patch_min)
+    patch = None if pb is None or pb.shape[1] <= patch_col else (pb[:, patch_col] > patch_min)
     # THE REFERENCE IS THE REST OF THE SHELL, LITERALLY, when the fate is declared: the sphere of the
     # non-patch cells. A broad crypt pulls any sphere fitted through it -- a planted mesa (a fifth of the
     # cells 0.3 radii out) settled on a compromise sphere of radius 5.55 offset 0.95 toward it, and no
@@ -286,10 +287,11 @@ def _rows(T, every):
     return sorted(set(list(range(0, n, max(1, int(every)))) + [n - 1]))
 
 
-def crypt(T, every=5, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5, n_bins=8, h_base=0.05, **_):
+def crypt(T, every=5, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5, n_bins=8, h_base=0.05, patch_col=0,
+          **_):
     """The crypt ruler over the run: last-row values, maxima, lumen ratios and the per-row series."""
     ts = _rows(T, every)
-    rows = [crypt_row(T, t, patch_block, patch_min, h_bud, min_cells, n_bins, h_base) for t in ts]
+    rows = [crypt_row(T, t, patch_block, patch_min, h_bud, min_cells, n_bins, h_base, patch_col) for t in ts]
     first, last = rows[0], rows[-1]
     out = {"rows": ts}
     for k in ("n_buds", "n_in", "depth_rel", "depth", "width", "neck", "depth_over_width",
@@ -303,14 +305,14 @@ def crypt(T, every=5, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5,
     rr = [r["rest_rms"] for r in rows if r.get("rest_rms") is not None]
     out["rest_rms_max"] = finite(max(rr)) if rr else None
     out["one_crypt_last"] = float(last["n_buds"] == 1)
+    op = last.get("on_patch")
+    out["one_crypt_at_patch"] = float(last["n_buds"] == 1 and op is not None and op >= 0.5)
     # THE POPULATION READS THESE TWO, one run = one organoid: the seed mean of `budded` is the fraction
     # of organoids that bud (Serra 2019 Fig. 1g's complement of the enterocysts), and `one_crypt_if_budded`
     # is None on an organoid that did not bud, so its seed mean -- the scorer drops None -- is the
-    # fraction of BUDDING organoids that grew exactly one crypt.
+    # fraction of BUDDING organoids that grew exactly one crypt, on the patch (`one_crypt_at_patch`).
     out["budded"] = float(last["n_buds"] >= 1)
-    out["one_crypt_if_budded"] = float(last["n_buds"] == 1) if last["n_buds"] >= 1 else None
-    op = last.get("on_patch")
-    out["one_crypt_at_patch"] = float(last["n_buds"] == 1 and op is not None and op >= 0.5)
+    out["one_crypt_if_budded"] = out["one_crypt_at_patch"] if last["n_buds"] >= 1 else None
     lum = [r.get("lumen") for r in rows]
     out["lumen_side"] = last.get("lumen_side")
     if all(v is not None for v in lum) and lum[0]:
@@ -328,6 +330,12 @@ def crypt(T, every=5, patch_block="fate", patch_min=0.5, h_bud=0.2, min_cells=5,
     if all(v is not None for v in fr) and fr[0]:
         out["lumen_frac_first"] = finite(fr[0])
         out["lumen_frac_ratio"] = finite(fr[-1] / fr[0])
+        # A GROWING ORGANOID'S FIRST ROW IS NOT YANG'S "BEFORE BULGING": it is the 12-cell start, whose
+        # lumen may open only later. Last over the run's largest lumen fraction is the shrink from the
+        # inflated state (Yang Fig. 1f's before -> after); on a non-growing shell whose lumen only
+        # shrinks it equals `lumen_frac_ratio`.
+        out["lumen_frac_max"] = finite(max(fr))
+        out["lumen_frac_last_over_max"] = finite(fr[-1] / max(fr)) if max(fr) > 0 else None
     ec = [r.get("ecc") for r in rows]
     if all(v is not None for v in ec):
         out["ecc_first"] = finite(ec[0])

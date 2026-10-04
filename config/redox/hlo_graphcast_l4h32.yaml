@@ -1,0 +1,16 @@
+general:
+  name: hlo_graphcast_l4h32
+  seed: 0
+  n_frames: 6
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [0.109375, 1.0, 1.0]
+  save_data: false
+sets: {}
+fields:
+  ratio: {frame: grid, res: 128, components: 1, title: the redox ratio NADH/FAD of each voxel}
+operators:
+- {op: diffuse, model: graphcast, at: ratio, latent: 32, layers: 4, spacing: [5.0, 3.3146, 3.3146], seed: 0,
+   title: the voxels' own dynamics, learned by message passing between lattice neighbours}
+schedule: [diffuse]

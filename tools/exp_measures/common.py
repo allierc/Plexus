@@ -31,17 +31,47 @@ from plexus.measures import CoreTraj, ParticleTraj, open_traj, register  # noqa:
 
 # ============================================================================ opening a run
 def run_dir(spec: str) -> str:
-    """`group/name` under graphs_data, or a directory path as given."""
+    """`group/name` under graphs_data, `training/<model>/<name>` under log/ (a trainer's run, exp16),
+    or a directory path as given."""
     if os.path.isdir(spec):
         return spec
-    from plexus.paths import graphs_data_path
+    from plexus.paths import graphs_data_path, log_path
     group, name = spec.split("/", 1)
+    if group == "training":
+        return log_path("training", name)
     return graphs_data_path(group, name)
 
 
-def open_run(spec: str):
-    """A `Traj` over the run, with `.dir` and `.spec` (the spec as run, or {}) attached."""
+def landed_file(spec: str) -> str:
+    """The file whose existence says a run has landed, and whose age says when: a simulation's
+    `trajectory.npz`; a training run's held-out result, `results/<name>_test.json` (it has no trajectory)."""
     d = run_dir(spec)
+    if spec.startswith("training/") or os.path.exists(os.path.join(d, "models")):
+        return os.path.join(d, "results", f"{os.path.basename(d.rstrip('/'))}_test.json")
+    return os.path.join(d, "trajectory.npz")
+
+
+class TrainingRun:
+    """A trainer's run as a ruler reads it: `.dir`, `.name`, `.spec` (the training spec as run),
+    `.model` (the forward spec it trained) and `.results` (every `results/*.json`, by file stem)."""
+
+    def __init__(self, d):
+        import glob as _glob
+        import json as _json
+        import yaml
+        self.dir, self.name = d, os.path.basename(d.rstrip("/"))
+        self.spec = yaml.safe_load(open(os.path.join(d, "config.yaml"))) or {}
+        self.model = yaml.safe_load(open(os.path.join(d, "model.yaml"))) or {}
+        self.results = {os.path.splitext(os.path.basename(f))[0]: _json.load(open(f))
+                        for f in _glob.glob(os.path.join(d, "results", "*.json"))}
+
+
+def open_run(spec: str):
+    """A `Traj` over the run, with `.dir` and `.spec` (the spec as run, or {}) attached -- or, for a
+    trainer's run (no trajectory), a `TrainingRun`."""
+    d = run_dir(spec)
+    if not os.path.exists(os.path.join(d, "trajectory.npz")) and os.path.exists(os.path.join(d, "config.yaml")):
+        return TrainingRun(d)
     T = open_traj(d)
     T.dir = d
     try:
@@ -153,6 +183,15 @@ def neighbour_pairs(T, t, c: Cells | None = None, cut: float = 2.0) -> np.ndarra
 
 
 # ============================================================================ registry and scoring
+# A MEASURE WHOSE DEFINITION CHANGED, and when: the scorer's cache re-measures every value written before
+# that minute (tools/exp_gate_score.py, `measure_all`). Add a line when a ruler's answer changes for the
+# same run; a pure speed-up or a new output key needs none.
+CHANGED = {
+    "shared.growth_audit": "2026-09-27 15:01",   # jump per simulated frame, skipping slots re-wired in this row or the one before
+    "exp12.strands": "2026-09-27 15:02",   # + strands_wide_* (width across the strand's axis), cells_first/last, cell_gain
+}
+
+
 def register_run(name: str, fn, dim=None, doc=""):
     """A whole-run measure `fn(T, **kw) -> dict`, in the same registry as the gate rows."""
     return register(name, "run", fn, dim, doc)

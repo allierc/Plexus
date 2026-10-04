@@ -1,0 +1,236 @@
+general:
+  name: exp10_c3d_s6
+  seed: 0
+  n_frames: 1200
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 24.0
+  - 24.0
+  - 24.0
+sets:
+  cell:
+    n: 2048
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      chem:
+        width: 4
+        integration: first_order
+  vertex:
+    n: 5120
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 16384
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  model: apicobasal
+  at: vertex
+  n_cells: 12
+  radius: 0.6
+  jitter: 0.02
+  p0: 3.5
+  seed: 5
+  h0: 0.5
+  apical: in
+  lattice_rotation: true
+operators:
+- op: cell_geometry
+  at: cell
+- op: seed_cell_chem
+  at: cell
+  model: cones
+  n_spots: 1
+  seed_dir:
+  - 0.0
+  - 0.0
+  - 1.0
+  cone_deg: 53.13
+  seed: 5
+  chan: 2
+- op: cell_neighbours
+  at: cell
+- op: cell_grow
+  at: vertex
+  rate: 0.0012
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+  conserve_amount: false
+- op: cell_mechanics
+  implementation: apicobasal_region
+  at: vertex
+  k_v: 16.0
+  kappa_s: 0.05
+  gamma: 0.03
+  Lambda: 0.0
+  K_R: 0.0
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+  sigma_a:
+  - 0.15
+  - 0.85
+  sigma_ramp: 150
+  fate_block: chem
+  fate_col: 2
+  sigma_b:
+  - 0.27
+  - 0.15
+  v_swell:
+  - 1.56
+  - 1.0
+  lumen_frac:
+  - 0.07
+  - 0.26
+  - 0.12
+  k_lumen_frac: 200.0
+  lumen_ramp:
+  - 150
+  - 650
+  - 950
+- op: cell_divide
+  at: vertex
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- seed_cell_chem
+- cell_neighbours
+- cell_grow
+- cell_mechanics
+- cell_divide
+- edge_flip
+- topo_record
+plotting:
+  duration_s: 10
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 6.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: false
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+  species:
+  - null
+  - null
+  - '#ffb000'
+  - null
+  chem_max: 1.0
+  mesh_mark_division: false
+  zoom: 4.0
+descriptions:
+  movie:
+    description: A cluster of orange cells begins to grow and expand across the surface
+      of a white spherical structure. As the simulation progresses, the orange region
+      spreads outward, increasing in total area and complexity. The number of cells
+      grows exponentially, as shown in the top-right graph, while the average cell
+      area remains relatively stable. By the final frame, the orange cluster covers
+      a significant portion of the sphere's surface.
+    objects: The primary object is a large white sphere composed of a Voronoi-like
+      tessellation of smaller polygonal cells. A subset of these cells is colored
+      bright orange, representing the active or growing region of the simulation.
+      In the bottom-left corner, a circular diagram shows a radial distribution of
+      lines, which becomes increasingly dense and complex over time. The graphs on
+      the right track the total cell count and the average cell area as numerical
+      values over the 401 frames.

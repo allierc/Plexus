@@ -241,3 +241,868 @@ def persist(T, axis=None, every=5, **_):
 
 register_run("exp11.surface", surface, None, "surface layer growth over Wang Fig 1H's window")
 register_run("exp11.persist", persist, "fraction", "bud_excess last / peak on the hole axis")
+
+
+def membrane(T, set_name="bm_node", **_):
+    """Is the membrane still there? Over every row: `finite_min`, the smallest fraction of live membrane
+    nodes with finite positions (batch 2 of Phase 2 lost every node to an unstable spring step by row 60
+    and its tissues grew free -- Finding 38), and `r_ratio_last`, the membrane's median radius over the
+    tissue's at the last row, about the tissue's centroid (≥ ~1: the membrane outside the layer)."""
+    z = getattr(T, "z", None)
+    k = f"{set_name}__pos"
+    if z is None or k not in z.files:
+        return {"available": False, "why": f"no {k} in the trajectory"}
+    P = z[k]
+    ko = f"{set_name}__occ"
+    occ = z[ko] if ko in z.files else None
+    fmin, rr = 1.0, float("nan")
+    for t in range(T.n_rows()):
+        p = np.asarray(P[t], float)
+        if occ is not None:
+            p = p[np.asarray(occ[t]) > 0.5]
+        if len(p) == 0:
+            continue
+        fin = np.isfinite(p).all(1)
+        fmin = min(fmin, float(fin.mean()))
+        if t == T.n_rows() - 1:
+            x = np.asarray(T.pos(t), float)
+            x = x[np.isfinite(x).all(1)]
+            c = x.mean(0)
+            rt = float(np.median(np.linalg.norm(x - c, axis=1)))
+            rr = float(np.median(np.linalg.norm(p[fin] - c, axis=1)) / max(rt, 1e-12)) if fin.any() else float("nan")
+    return {"available": True, "finite_min": finite(fmin), "r_ratio_last": finite(rr)}
+
+
+register_run("exp11.membrane", membrane, "fraction", "membrane nodes finite (min over rows), radius vs tissue")
+
+
+def clefts(T, every=10, thresh=0.1, **_):
+    """Inward folds of the layer (Wang 2021 Fig 1J reads clefts as negative curvature of the outline). Per recorded row
+    (every `every`), the fraction of mesh vertices whose umbrella vector -- the mean of its ring neighbours minus the
+    vertex -- points OUTWARD (along the vertex's direction from the tissue centroid) by more than `thresh` median edge
+    lengths: a vertex sitting inward of its neighbours, i.e. at the bottom of a fold. 0 on a smooth convex shell.
+    `frac_last`, `frac_max`, and the series."""
+    rows = _rows(T, every)
+    out = []
+    for t in rows:
+        P = np.asarray(T.pos(t), float)
+        es, et, _ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        n = len(P)
+        cnt = np.bincount(np.r_[es, et], minlength=n).astype(float)
+        s = np.zeros((n, 3))
+        np.add.at(s, es, P[et]); np.add.at(s, et, P[es])
+        mean_nb = s / np.maximum(cnt, 1)[:, None]
+        c = P[np.isfinite(P).all(1)].mean(0)
+        u = P - c
+        u /= np.maximum(np.linalg.norm(u, axis=1, keepdims=True), 1e-12)
+        L = np.median(np.linalg.norm(P[et] - P[es], axis=1))
+        h = ((mean_nb - P) * u).sum(1) / max(L, 1e-12)
+        out.append(float(np.mean(h > thresh)))
+    return {"frac_last": finite(out[-1]), "frac_max": finite(max(out)), "series": [finite(v) for v in out],
+            "rows": rows}
+
+
+register_run("exp11.clefts", clefts, "fraction", "fraction of layer vertices at the bottom of an inward fold")
+
+
+def prw_fit(lag_h, msd):
+    """The persistent random walk fitted to a mean squared displacement curve, by least squares:
+
+        MSD(t) = 2 v^2 P (t - P (1 - exp(-t / P))) + c
+
+    (Furth 1920; the 3D form with <v(0).v(t)> = v^2 exp(-t / P)), over a grid of P with (v^2, c) in
+    closed form. `c` = 6 sigma^2 is the positional noise of a tracked spot (sigma per axis): it adds the
+    same offset at every lag, and without it the first lags read as a fast, unpersistent walk. ONE
+    ESTIMATOR FOR THE DATA AND THE MODEL: `tools/wang_smg_stats.py` fits Wang 2021's nucleus tracks with
+    this same function, so a model's (v, P) is compared with the gland's through identical arithmetic.
+    Returns v (length / h), P (h), r2, noise_sigma (length)."""
+    lag_h = np.asarray(lag_h, float); msd = np.asarray(msd, float)
+    best = (np.inf, np.nan, np.nan, 0.0)
+    for P in np.geomspace(0.02, 20.0, 400):
+        g = 2.0 * P * (lag_h - P * (1.0 - np.exp(-lag_h / P)))
+        A = np.stack([g, np.ones_like(g)], 1)
+        (v2, c), *_ = np.linalg.lstsq(A, msd, rcond=None)
+        if v2 < 0 or c < 0:
+            v2 = max(float((g * msd).sum() / max((g * g).sum(), 1e-30)), 0.0); c = 0.0
+        r = float(((msd - v2 * g - c) ** 2).sum())
+        if r < best[0]:
+            best = (r, float(np.sqrt(max(v2, 0.0))), float(P), float(c))
+    ss = float(((msd - msd.mean()) ** 2).sum())
+    return {"v": best[1], "P": best[2], "r2": 1.0 - best[0] / max(ss, 1e-30),
+            "noise_sigma": float(np.sqrt(max(best[3], 0.0) / 6.0))}
+
+
+def cell_motion(T, cell_set="icell", point_set="ipt", max_lag=24, um_per_unit=None, min_per_frame=None, **_):
+    """How the MPM cells move and deform, in the terms Wang 2021's nucleus tracks give (tools/wang_smg_stats.py,
+    experiments/exp11_bm_hole_budding/data/wang_smg_cell_stats.json), so the two sit in one table.
+
+    Tracks are the cells' centroids (`<cell_set>__pos`, kept by `aggregate_centroid`) at every recorded row,
+    with the population's drift removed (per row, the median step of every cell), exactly as the data's.
+      speed_um_h_median / _iqr    instantaneous speed, step length over the row interval
+      track_speed_cv              the spread of per-cell mean speeds across cells (Wang interior: 0.17)
+      turn_deg_median             angle between successive steps of one cell
+      prw_v_um_h, prw_P_h, prw_r2 `prw_fit` on the drift-corrected MSD over lags 1..`max_lag` rows
+      msd_um2                     the MSD curve itself (first 12 lags)
+      aspect_median, aspect_cv    each cell's shape: sqrt(largest / smallest eigenvalue) of its points'
+                                  gyration tensor, median over cells and rows, and its CV over rows within
+                                  a cell (a cell that changes shape as it moves reads > 0)
+      align_median                |cos| between a cell's long axis and its step (0.58 for no relation in 3D)
+      integrity_max               the largest point-to-centroid distance over the cell's row-0 rms radius,
+                                  max over cells and rows: ~1.3 for an intact ball, > 3 a smeared or torn cell
+      nn_um_median                centre-to-centre nearest-neighbour distance at row 0 (Wang interior: 9.4 um)
+      neighbour_kept              the fraction of row-0 neighbour pairs (within 1.25 x that distance) still
+                                  within 1.5 x at the last row: 1 for a welded mass, falling as cells rearrange;
+                                  None when the cells are too sparse to have neighbours
+    Units: `general.units` of the run (length_um, time_s) unless `um_per_unit` / `min_per_frame` are given."""
+    z = T.z
+    key = f"{cell_set}__pos"
+    n = T.n_rows()
+    C = np.array([np.asarray(z[key][t], float) for t in range(n)])
+    try:
+        P = np.array([np.asarray(z[f"{point_set}__pos"][t], float) for t in range(n)])
+    except Exception:                                                        # noqa: BLE001
+        P = None
+    u = (T.spec.get("general") or {}).get("units") or {}
+    um = float(um_per_unit if um_per_unit is not None else u.get("length_um", 1.0))
+    fr = _row_frames(T)
+    dt_frame = float((T.spec.get("general") or {}).get("dt", 1.0))
+    mpf = float(min_per_frame if min_per_frame is not None else u.get("time_s", 60.0) * dt_frame / 60.0)
+    dt_h = np.median(np.diff(fr)) * mpf / 60.0
+    ok = np.isfinite(C).all(axis=(0, 2))
+    C = C[:, ok]
+    steps = np.diff(C, axis=0)
+    drift = np.median(steps, axis=1, keepdims=True)
+    sc = (steps - drift) * um
+    spd = np.linalg.norm(sc, axis=2) / dt_h
+    a, b = sc[1:], sc[:-1]
+    na, nb = np.linalg.norm(a, axis=2), np.linalg.norm(b, axis=2)
+    cosang = (a * b).sum(2) / np.maximum(na * nb, 1e-12)
+    ang = np.degrees(np.arccos(np.clip(cosang, -1, 1)))
+    track_v = spd.mean(0)
+    Cc = C * um - np.vstack([np.zeros((1, 1, 3)), np.cumsum(drift, axis=0) * um])
+    L = min(max_lag, n - 1)
+    msd = np.array([((Cc[k:] - Cc[:-k]) ** 2).sum(2).mean() for k in range(1, L + 1)])
+    fit = prw_fit(np.arange(1, L + 1) * dt_h, msd)
+    out = {"available": True, "n_cells": int(C.shape[1]), "row_min": finite(dt_h * 60.0),
+           "speed_um_h_median": finite(np.median(spd)),
+           "speed_um_h_iqr": [finite(np.percentile(spd, 25)), finite(np.percentile(spd, 75))],
+           "track_speed_cv": finite(track_v.std() / max(track_v.mean(), 1e-12)),
+           "turn_deg_median": finite(np.median(ang)),
+           "prw_v_um_h": finite(fit["v"]), "prw_P_h": finite(fit["P"]), "prw_r2": finite(fit["r2"]),
+           "prw_noise_sigma_um": finite(fit["noise_sigma"]),
+           "msd_um2": [finite(v) for v in msd[:12]]}
+    from scipy.spatial import cKDTree
+    nn0 = cKDTree(C[0]).query(C[0], k=2)[0][:, 1]
+    d0 = float(np.median(nn0))
+    out["nn_um_median"] = finite(d0 * um)
+    pairs = cKDTree(C[0]).query_pairs(1.25 * d0, output_type="ndarray")
+    # IN CONTACT, OR THERE ARE NO NEIGHBOURS TO KEEP: the centres closer than 2.2 cell radii (a ball's
+    # radius is sqrt(5/3) x its points' rms distance), read off the points at row 0
+    touching = False
+    if P is not None and P.shape[1] % max(C.shape[1], 1) == 0 and ok.all():
+        _k = P.shape[1] // C.shape[1]
+        _par = np.repeat(np.arange(C.shape[1]), _k)
+        _rms = np.sqrt(np.bincount(_par, ((P[0] - C[0][_par]) ** 2).sum(1)) / _k)
+        touching = d0 < 2.2 * np.sqrt(5.0 / 3.0) * float(np.median(_rms))
+    if touching and len(pairs) >= 10:
+        dl = np.linalg.norm(C[-1][pairs[:, 0]] - C[-1][pairs[:, 1]], axis=1)
+        out["neighbour_kept"] = finite(np.mean(dl < 1.5 * d0))
+    else:
+        out["neighbour_kept"] = None
+    if P is not None and P.shape[1] % max(C.shape[1], 1) == 0 and ok.all():
+        k = P.shape[1] // C.shape[1]
+        par = np.repeat(np.arange(C.shape[1]), k)
+        asp, al, integ = [], [], 0.0
+        r0 = None
+        for t in range(0, n, max(1, n // 30)):
+            X = P[t]
+            cen = np.zeros((C.shape[1], 3)); np.add.at(cen, par, X); cen /= k
+            d = X - cen[par]
+            G = np.zeros((C.shape[1], 3, 3)); np.add.at(G, par, d[:, :, None] * d[:, None, :]); G /= k
+            w, V = np.linalg.eigh(G)
+            asp.append(np.sqrt(np.maximum(w[:, 2], 1e-12) / np.maximum(w[:, 0], 1e-12)))
+            rr = np.sqrt(np.maximum(w.sum(1), 1e-12))
+            if r0 is None:
+                r0 = rr
+            dist = np.zeros(C.shape[1]); np.maximum.at(dist, par, np.linalg.norm(d, axis=1))
+            integ = max(integ, float(np.max(dist / r0)))
+            if 0 < t < n - 1:
+                stp = C[min(t + 1, n - 1)] - C[t - 1]
+                sn = np.linalg.norm(stp, axis=1)
+                m = sn > 1e-9
+                al.append(np.abs((V[:, :, 2] * stp).sum(1))[m] / sn[m])
+        asp = np.array(asp)
+        out["aspect_median"] = finite(np.median(asp))
+        out["aspect_cv"] = finite(np.median(asp.std(0) / np.maximum(asp.mean(0), 1e-12)))
+        out["align_median"] = finite(np.median(np.concatenate(al))) if al else None
+        out["integrity_max"] = finite(integ)
+    return out
+
+
+register_run("exp11.cell_motion", cell_motion, None, "MPM cells: speed, persistence, turning, shape, neighbour exchange")
+
+
+def exchange(T, cell_set="icell", point_set="ipt", every=5, **_):
+    """The surface <-> interior exchange of Wang 2021's Type I division (Fig 2A-B), and whether the layer
+    survives it. Per recorded row every `every`: `surface` (the layer's cells), `interior` (live MPM cells),
+    `dived` / `returning` (live cells carrying the `dived` / `ret` mark), `vol_nonpos` (layer cells whose
+    apico-basal polyhedron volume is <= 0 -- a crushed or inverted cell), `vol_median` (of the layer's cells),
+    `leaked` (interior points farther from the tissue centroid than the apical surface's 99th-percentile
+    radius + 0.5, i.e. outside the lumen), `spike` (the farthest layer vertex over the median radius: ~1.1-1.3 for a
+    round gland, > 2 an arm or a thrown vertex) and `giant` (the largest layer cell's volume over the median).
+    Timings over every row, per cell slot: `dive_to_div_h` (a `dived` cell's time in the lumen before it
+    divides -- the mark clears), `ret_to_return_h` (a daughter's time before it re-enters the layer -- its slot
+    goes dormant), their medians and counts, and `cycle_h_median` their sum (Wang: dive -> return 1.96 h
+    median, 80 % under 4 h)."""
+    import torch
+    from plexus.operators.vertex_ops import apicobasal_geometry_3d
+    z = T.z
+    n = T.n_rows()
+    u = (T.spec.get("general") or {}).get("units") or {}
+    fr = _row_frames(T)
+    dt_frame = float((T.spec.get("general") or {}).get("dt", 1.0))
+    h_row = float(np.median(np.diff(fr))) * float(u.get("time_s", 600.0)) * dt_frame / 3600.0
+    def _blk(name, t):
+        k = f"{cell_set}__{name}"
+        return np.asarray(z[k][t], float).reshape(-1) if k in z.files else None
+    rows = _rows(T, every)
+    ser = {k: [] for k in ("surface", "interior", "dived", "returning", "vol_nonpos", "vol_median", "leaked",
+                           "spike", "giant")}
+    for t in rows:
+        P = T.pos(t); nF = T.nF(t)
+        es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        S = T.vertex_block("sep", t)
+        oc = _blk("occ", t) if f"{cell_set}__occ" in z.files else None
+        oc = np.asarray(z[f"{cell_set}__occ"][t], float).reshape(-1) > 0.5
+        dv, rt = _blk("dived", t), _blk("ret", t)
+        ser["surface"].append(nF); ser["interior"].append(int(oc.sum()))
+        ser["dived"].append(int((oc & (dv > 0.5)).sum()) if dv is not None else None)
+        ser["returning"].append(int((oc & (rt > 0.5)).sum()) if rt is not None else None)
+        if S is not None:
+            vp, _a1, _a2, _ = apicobasal_geometry_3d(torch.tensor(P, dtype=torch.float32), torch.tensor(S, dtype=torch.float32),
+                                                     torch.tensor(es), torch.tensor(et), torch.tensor(ef), nF)
+            vp = vp.numpy()
+            ser["vol_nonpos"].append(int((vp <= 0).sum())); ser["vol_median"].append(finite(np.median(vp)))
+            ser["giant"].append(finite(np.max(vp) / max(float(np.median(vp[vp > 0])) if (vp > 0).any() else 1.0, 1e-9)))
+            c = P.mean(0)
+            _r = np.linalg.norm(P - c, axis=1)
+            ser["spike"].append(finite(_r.max() / max(float(np.median(_r)), 1e-9)))
+            ra = np.linalg.norm(P + S / 2.0 - c, axis=1)
+            Q = np.asarray(z[f"{point_set}__pos"][t], float)
+            qo = np.asarray(z[f"{point_set}__occ"][t], float).reshape(-1) > 0.5
+            rq = np.linalg.norm(Q[qo] - c, axis=1)
+            ser["leaked"].append(int((rq > np.percentile(ra, 99) + 0.5).sum()))
+        else:
+            ser["vol_nonpos"].append(None); ser["vol_median"].append(None); ser["leaked"].append(None)
+            ser["spike"].append(None); ser["giant"].append(None)
+    # timings: consecutive recorded rows a slot is live with the mark
+    occ = np.array([np.asarray(z[f"{cell_set}__occ"][t], float).reshape(-1) > 0.5 for t in range(n)])
+    def _runs(mark):
+        k = f"{cell_set}__{mark}"
+        if k not in z.files:
+            return []
+        M = np.array([np.asarray(z[k][t], float).reshape(-1) > 0.5 for t in range(n)]) & occ
+        out = []
+        for s in range(M.shape[1]):
+            col = M[:, s]
+            if not col.any():
+                continue
+            d = np.diff(np.r_[0, col.astype(int), 0])
+            st, en = np.flatnonzero(d == 1), np.flatnonzero(d == -1)
+            for a, b in zip(st, en):
+                if b < n:                                   # ended inside the run (divided / returned)
+                    out.append((b - a) * h_row)
+        return out
+    d2d, r2r = _runs("dived"), _runs("ret")
+    md = finite(np.median(d2d)) if d2d else None
+    mr = finite(np.median(r2r)) if r2r else None
+    return {"available": True, "rows": rows, **ser,
+            "dive_to_div_h_median": md, "n_divided": len(d2d),
+            "ret_to_return_h_median": mr, "n_returned": len(r2r),
+            "ret_to_return_under_4h": finite(np.mean(np.asarray(r2r) < 4.0)) if r2r else None,
+            "cycle_h_median": finite((md or 0.0) + (mr or 0.0)) if (md is not None and mr is not None) else None}
+
+
+register_run("exp11.exchange", exchange, None, "surface <-> interior exchange: counts, timings, the layer's health")
+
+
+def size_health(T, every=10, **_):
+    """Is the surface layer's GROWTH-CYCLE healthy? (exp 11, 2026-09-28, the growth-cycle grid.) Per sampled row:
+    `vol_cv` (spread over mean of the cells' measured polyhedron volumes; exp 13's working point reads ~0.2),
+    `big` (the fraction of cells over 3x the median volume), `target_cv` and `target_max` (the targets `V0f`, the
+    largest over the seed's median), `nonpos` (cells whose volume is <= 0), `R_layer` / `R_membrane` (median radii
+    about the layer's centre) and `cells`. Over the run: `burst` -- the largest share of all the run's divisions
+    that fall in any one sampled interval (1/n_intervals for a perfectly steady rate; ~0.5 for one big wave)."""
+    import torch
+    from plexus.operators.vertex_ops import apicobasal_geometry_3d
+    z = T.z
+    rows = _rows(T, every)
+    out = {k: [] for k in ("row", "cells", "vol_cv", "big", "target_cv", "target_max", "nonpos", "R_layer", "R_membrane")}
+    v0_seed = float(np.median(np.asarray(z["cell__V0f"][0], float).reshape(-1)[:T.nF(0)]))
+    for t in rows:
+        P = T.pos(t); nF = T.nF(t)
+        es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        S = T.vertex_block("sep", t)
+        vp = apicobasal_geometry_3d(torch.tensor(P, dtype=torch.float32), torch.tensor(S, dtype=torch.float32),
+                                    torch.tensor(es), torch.tensor(et), torch.tensor(ef), nF)[0].numpy()
+        V0 = np.asarray(z["cell__V0f"][t], float).reshape(-1)[:nF]
+        med = float(np.median(vp[vp > 0])) if (vp > 0).any() else 1.0
+        c = P.mean(0)
+        B = np.asarray(z["bm_node__pos"][t], float); ob = np.asarray(z["bm_node__occ"][t]).reshape(-1) > 0.5
+        out["row"].append(int(t)); out["cells"].append(int(nF))
+        out["vol_cv"].append(finite(float(np.std(vp) / max(np.mean(vp), 1e-12))))
+        out["big"].append(finite(float((vp > 3 * med).mean())))
+        out["target_cv"].append(finite(float(np.std(V0) / max(np.mean(V0), 1e-12))))
+        out["target_max"].append(finite(float(V0.max() / max(v0_seed, 1e-12))))
+        out["nonpos"].append(int((vp <= 0).sum()))
+        out["R_layer"].append(finite(float(np.median(np.linalg.norm(P - c, axis=1)))))
+        out["R_membrane"].append(finite(float(np.median(np.linalg.norm(B[ob] - c, axis=1)))) if ob.any() else None)
+    d = np.diff(np.asarray(out["cells"], float)); d = np.clip(d, 0, None)
+    out["burst"] = finite(float(d.max() / d.sum())) if d.sum() > 0 else None
+    out["n_intervals"] = int(len(d))
+    return out
+
+
+register_run("exp11.size_health", size_health, None, "surface growth-cycle health: volume CV, big cells, targets, bursts")
+
+
+def _basal_samples(P, S, es, et, ef, nF, sub, sign):
+    """Points sampling the layer's BASAL surface: each cell's basal cap as a fan of triangles about its
+    centroid (the triangles `bm_contact[live]` meets), each split `sub` times into 4. Returns the sample
+    points [n, 3], the area each one stands for [n], its fan-triangle normal [n, 3] and its cell [n]."""
+    X = P + sign * S
+    ok = (ef >= 0) & (ef < nF)
+    es, et, ef = es[ok], et[ok], ef[ok]
+    cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(cen, ef, X[es]); np.add.at(cnt, ef, 1.0)
+    cen /= np.maximum(cnt, 1.0)[:, None]
+    A, B, C = cen[ef], X[es], X[et]
+    n = np.cross(B - A, C - A)
+    area = 0.5 * np.linalg.norm(n, axis=1)
+    n = n / np.maximum(2.0 * area, 1e-12)[:, None]
+    tri = np.stack([A, B, C], 1)                         # [m, 3 corners, 3]
+    own = ef.copy(); nor = n
+    for _ in range(int(sub)):                            # midpoint split: one triangle -> four
+        a, b, c = tri[:, 0], tri[:, 1], tri[:, 2]
+        ab, bc, ca = (a + b) / 2, (b + c) / 2, (c + a) / 2
+        tri = np.concatenate([np.stack(q, 1) for q in ((a, ab, ca), (ab, b, bc), (ca, bc, c), (ab, bc, ca))])
+        own = np.tile(own, 4); nor = np.tile(nor, (4, 1))
+    pts = tri.mean(1)
+    w = 0.5 * np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1)
+    return pts, w, nor, own
+
+
+def holes(T, every=5, set_name="bm_node", sub=2, cover=1.5, band=0.3, lift=1.5, min_samples=2, link=1.6,
+          min_patches=1.0, um_per_unit=None, track=True, **_):
+    """HOLES IN THE MEMBRANE, COUNTED AND SIZED OVER TIME (exp 11, 2026-09-29).
+
+    A point of the layer's basal surface is COVERED when a live membrane node lies within `cover` x the
+    membrane's own spacing of it IN THE SURFACE'S PLANE (1.5 by default: at 1.0 the healthy L3 membrane,
+    mc_L3d_hl012 s2, read 184-331 "holes" of 2-60 um^2 -- the lattice's own irregular gaps; at 1.5 it reads
+    0-2 of <= 4 um^2 while Phase 1's declared hole, w2h_hole100 s1, keeps 700 -> 7,555 um^2), and within `band` (world units, the
+    `bm_contact[live]` band) of it along the surface normal. The spacing is re-read every row as the median
+    nearest-neighbour distance between live nodes, so a membrane that thins as it stretches is judged against
+    its own lattice, not the seed's. Uncovered points are joined into holes by `link` x the sample spacing,
+    and a hole must hold at least `min_samples` points. A basal point with a node near it in the plane but
+    farther than `band` (up to `lift`) along the normal is counted separately as DETACHED: the membrane lifting
+    off is not a hole in it.
+
+    The surface is sampled as each cell's basal fan split `sub` times into 4 (sub 2 -> 16 points per fan
+    triangle). Which side of the layer is basal (pos + sep or pos - sep) is decided at the first row by
+    which one lies nearer the membrane.
+
+    A gap smaller than `min_patches` node patches (one patch = spacing^2 sqrt(3)/2, about 4 um^2 at exp11's
+    2.0-2.4 um spacing) is below what the lattice resolves -- Harunaga 2014's tip perforations, 1.6 um^2, are
+    that size and live in the model as porosity, not geometry -- so it is counted in `n_small`, not `n_holes`.
+
+    Per sampled row: `n_holes`, `n_small`; `area_total`, `area_median`, `area_max` (um^2 when a length scale is
+    known, else world units^2); `frac_open`, the uncovered fraction of the basal area; `frac_detached`;
+    `spacing`, the node spacing; and `areas`, every hole's area (the size distribution). With `track`,
+    holes are matched from row to row by their centroids, which gives `tracks`: per hole, its first and
+    last row and its area over time. Scale: `um_per_unit`, else the spec's `general.units.length_um`."""
+    from scipy.spatial import cKDTree
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    z = T.z
+    kp, ko = f"{set_name}__pos", f"{set_name}__occ"
+    if kp not in z.files:
+        return {"available": False, "why": f"no {kp} in the trajectory"}
+    s_um = um_per_unit or (((getattr(T, "spec", {}) or {}).get("general") or {}).get("units") or {}).get("length_um")
+    a_scale = float(s_um) ** 2 if s_um else 1.0
+    rows = _rows(T, every)
+    out = {"available": True, "unit": "um^2" if s_um else "world^2",
+           **{k: [] for k in ("row", "n_holes", "n_small", "area_total", "area_median", "area_max",
+                              "frac_open", "frac_detached", "spacing", "areas", "centroids")}}
+    sign = None
+    for t in rows:
+        P = T.pos(t); nF = T.nF(t)
+        es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        S = T.vertex_block("sep", t)
+        S = np.zeros_like(P) if S is None else np.asarray(S, float)[: len(P)]
+        B = np.asarray(z[kp][t], float)
+        if ko in z.files:
+            B = B[np.asarray(z[ko][t]).reshape(-1) > 0.5]
+        B = B[np.isfinite(B).all(1)]
+        if len(B) < 4 or nF == 0:
+            continue
+        tb = cKDTree(B)
+        if sign is None:                                  # which cap faces the membrane
+            sign = min((+1.0, -1.0), key=lambda sg: float(np.median(tb.query(P + sg * S)[0])))
+        pts, w, nor, _own = _basal_samples(P, S, es, et, ef, nF, sub, sign)
+        spacing = float(np.median(tb.query(B, k=2)[0][:, 1]))
+        r_in = cover * spacing
+        # the nearest nodes of each sample, split into their in-plane and normal parts
+        k = min(12, len(B))
+        _, j = tb.query(pts, k=k)
+        j = j.reshape(len(pts), -1)
+        v = B[j] - pts[:, None, :]
+        vn = (v * nor[:, None, :]).sum(-1)
+        gn = np.abs(vn)
+        gp = np.linalg.norm(v - vn[..., None] * nor[:, None, :], axis=-1)
+        covered = ((gp <= r_in) & (gn <= band)).any(1)
+        detached = ~covered & ((gp <= r_in) & (gn <= lift)).any(1)
+        opn = ~covered & ~detached
+        tot = float(w.sum())
+        areas, cents = [], []
+        if opn.any():
+            q = pts[opn]; wq = w[opn]
+            h = float(np.sqrt(np.median(wq) * 2.0))        # a sample's own spacing
+            pr = cKDTree(q).query_pairs(link * h, output_type="ndarray")
+            n = len(q)
+            g = coo_matrix((np.ones(len(pr)), (pr[:, 0], pr[:, 1])), shape=(n, n)) if len(pr) else coo_matrix((n, n))
+            nc, lab = connected_components(g, directed=False)
+            cnt = np.bincount(lab, minlength=nc)
+            aw = np.bincount(lab, weights=wq, minlength=nc)
+            cx = np.stack([np.bincount(lab, weights=wq * q[:, c], minlength=nc) for c in range(3)], 1) / np.maximum(aw, 1e-12)[:, None]
+            keep = cnt >= int(min_samples)
+            big = keep & (aw >= min_patches * spacing ** 2 * np.sqrt(3) / 2)
+            n_small = int((keep & ~big).sum())
+            areas = (aw[big] * a_scale).tolist(); cents = cx[big].tolist()
+        else:
+            n_small = 0
+        out["row"].append(int(t)); out["n_holes"].append(len(areas)); out["n_small"].append(n_small)
+        out["area_total"].append(finite(float(np.sum(areas))) if areas else 0.0)
+        out["area_median"].append(finite(float(np.median(areas))) if areas else 0.0)
+        out["area_max"].append(finite(float(np.max(areas))) if areas else 0.0)
+        out["frac_open"].append(finite(float(w[opn].sum() / max(tot, 1e-12))))
+        out["frac_detached"].append(finite(float(w[detached].sum() / max(tot, 1e-12))))
+        out["spacing"].append(finite(spacing * (float(s_um) if s_um else 1.0)))
+        out["areas"].append([finite(a) for a in areas]); out["centroids"].append(cents)
+    if track:
+        out["tracks"] = _track_holes(out, a_scale)
+    out.pop("centroids")
+    return out
+
+
+def _track_holes(out, a_scale):
+    """Holes followed from one sampled row to the next: a hole continues the nearest hole of the
+    previous row whose centroid lies within the larger of the two radii (sqrt(area/pi)) + one row's
+    reach; each hole continues at most one. Returns [{first, last, rows, areas}] per track."""
+    tracks, prev = [], []                                 # prev: [(track index, centroid, radius)]
+    for r, A, C in zip(out["row"], out["areas"], out["centroids"]):
+        cur, used = [], set()
+        for a, c in zip(A, C):
+            c = np.asarray(c, float); rad = float(np.sqrt(max(a, 0.0) / a_scale / np.pi))
+            best, bd = None, np.inf
+            for ti, pc, pr in prev:
+                dd = float(np.linalg.norm(c - pc))
+                if ti not in used and dd <= max(rad, pr) + 0.5 and dd < bd:
+                    best, bd = ti, dd
+            if best is None:
+                tracks.append({"first": r, "last": r, "rows": [r], "areas": [a]}); best = len(tracks) - 1
+            else:
+                tk = tracks[best]; tk["last"] = r; tk["rows"].append(r); tk["areas"].append(a)
+            used.add(best); cur.append((best, c, rad))
+        prev = cur
+    return tracks
+
+
+def holes_summary(T, **kw):
+    o = holes(T, **kw)
+    if not o.get("available"):
+        return o
+    tr = o.get("tracks") or []
+    return {"available": True, "unit": o["unit"], "n_holes_last": o["n_holes"][-1] if o["n_holes"] else None,
+            "n_holes_max": max(o["n_holes"]) if o["n_holes"] else None,
+            "area_max": max(o["area_max"]) if o["area_max"] else None,
+            "frac_open_last": o["frac_open"][-1] if o["frac_open"] else None,
+            "frac_detached_last": o["frac_detached"][-1] if o["frac_detached"] else None,
+            "n_tracks": len(tr), "lifetime_rows_median": finite(float(np.median([t["last"] - t["first"] for t in tr]))) if tr else None}
+
+
+register_run("exp11.holes", holes_summary, None, "membrane holes: count, sizes, open and detached fractions over time")
+
+
+def wang_cycle(T, cell_set="icell", every=20, **_):
+    """Wang 2021's surface-cell cycle, read off a run (exp 11 Phase 3 B0, 2026-09-29; the L3 gate of 2026-09-28).
+
+    From the run's counters (`mesh_scalar_n_*`, last row): `dives` (T2 removals into the interior, `n_apop`),
+    `n_type2` (boundary divisions that sent one daughter in), `n_div` (in-place layer divisions), `typeI_frac`
+    = (dives - n_type2) / dives (Wang 0.924) and `inplace_not_typeII` = n_div - n_type2 (Wang: none).
+    From `exchange`: the dive -> return time (`cycle_h`, Wang median 1.96 h) and `under4h` (Wang 0.80).
+
+    `p_surface` -- WANG'S ON-SURFACE FRACTION (0.930 in control, 0.701 under collagenase; K = p / (1 - p) =
+    13.3): of the surface lineage, the share of cell-rows spent in the layer, summed over the recorded rows,
+    sum N_S / sum (N_S + N_B), with N_S the layer's cells and N_B the interior bodies carrying the `dived` or
+    `ret` mark (the surface lineage while it is inside). The unmarked interior core is not surface lineage and
+    is left out. Wang weighs tracked cells by frames; over a steady run the two agree."""
+    z = T.z
+    sc = {k.split("scalar_")[-1]: np.asarray(z[k]) for k in z.files if "mesh_scalar_n_" in k}
+    last = lambda k: float(sc[k][-1]) if k in sc else 0.0            # noqa: E731
+    dives, t2, div = last("n_apop"), last("n_type2"), last("n_div")
+    ns = nb = 0.0
+    ko = f"{cell_set}__occ"
+    for t in range(T.n_rows()):
+        ns += T.nF(t)
+        if ko in z.files:
+            oc = np.asarray(z[ko][t], float).reshape(-1) > 0.5
+            m = np.zeros_like(oc)
+            for mk in ("dived", "ret"):
+                k = f"{cell_set}__{mk}"
+                if k in z.files:
+                    m |= np.asarray(z[k][t], float).reshape(-1) > 0.5
+            nb += float((oc & m).sum())
+    o = exchange(T, cell_set=cell_set, every=every)
+    return {"available": True, "dives": int(dives), "n_type2": int(t2), "n_div": int(div),
+            "typeI_frac": finite((dives - t2) / dives) if dives else None,
+            "inplace_not_typeII": int(div - t2),
+            "p_surface": finite(ns / (ns + nb)) if (ns + nb) else None,
+            "cycle_h": o.get("cycle_h_median"), "under4h": o.get("ret_to_return_under_4h"),
+            "surface": (o["surface"][0], o["surface"][-1]), "interior": (o["interior"][0], o["interior"][-1])}
+
+
+register_run("exp11.wang_cycle", wang_cycle, None, "Wang's surface cycle: Type I share, in-place divisions, on-surface fraction, dive->return time")
+
+
+def ladder_health(T, **_):
+    """The Wang ladder's health gate, H1-H6 (exp 11 md, "The Wang cycle ladder"), at row 80 and the last row:
+    H1 no inverted cell (0 at row 80, <= 0.5 % at the end), H2 volume CV <= 0.55, H3 cells over 3x the median
+    <= 1 %, H4 layer radius within 0.6 of the membrane's, H5 three-sided cells <= 2 %, H6 division burst <= 0.40.
+    (H7, the landing audit, is not a trajectory measure.) Line W (2026-09-29) adds H8 -- every buffered set (`icell`,
+    `bm_node`) at most 90 % full at every row (a full interior deleted surface cells, Finding 165) -- and H9 -- at most
+    10 % of the layer's basal area DETACHED at the last row (membrane within `holes`' reach in plane but lifted
+    farther than its contact band, Finding 164's late detachment)."""
+    z = T.z
+    o = size_health(T, every=40)
+    n = T.n_rows() - 1
+    r80 = o["row"].index(80) if 80 in o["row"] else min(2, len(o["row"]) - 1)
+    rl = len(o["row"]) - 1
+
+    def tri(t):
+        nF = T.nF(t); es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        ns_ = np.bincount(ef[ef < nF], minlength=nF)[:nF]
+        return float((ns_ == 3).mean())
+    rm = [o["R_membrane"][i] for i in (r80, rl)]
+    H = {"H1_inverted": bool(o["nonpos"][r80] == 0 and o["nonpos"][rl] <= 0.005 * o["cells"][rl]),
+         "H2_cv": bool(max(o["vol_cv"][r80], o["vol_cv"][rl]) <= 0.55),
+         "H3_giants": bool(max(o["big"][r80], o["big"][rl]) <= 0.01),
+         "H4_membrane": bool(all(r is not None for r in rm) and
+                             max(abs(o["R_layer"][i] - o["R_membrane"][i]) for i in (r80, rl)) <= 0.6),
+         "H5_cones": bool(max(tri(80 if n >= 80 else n), tri(n)) <= 0.02),
+         "H6_waves": bool((o["burst"] or 0.0) <= 0.40)}
+    occ = {}
+    for sname in ("icell", "bm_node"):
+        if f"{sname}__occ" in z.files:
+            cap = np.asarray(z[f"{sname}__occ"][0]).reshape(-1).size
+            occ[sname] = max(float((np.asarray(z[f"{sname}__occ"][t]).reshape(-1) > 0.5).sum()) / cap for t in range(n + 1))
+    H["H8_buffers"] = bool(all(v <= 0.9 for v in occ.values()))
+    ho = holes(T, every=max(n, 1), track=False)
+    det = ho["frac_detached"][-1] if ho.get("available") and ho["frac_detached"] else None
+    H["H9_attached"] = bool(det is not None and det <= 0.10)
+    return {"available": True, "pass": all(H.values()), **H,
+            "cells": (o["cells"][r80], o["cells"][rl]), "vol_cv": (o["vol_cv"][r80], o["vol_cv"][rl]),
+            "nonpos": (o["nonpos"][r80], o["nonpos"][rl]), "burst": o["burst"],
+            "R_layer_membrane": (o["R_layer"][rl], o["R_membrane"][rl]), "tri": (tri(80 if n >= 80 else n), tri(n)),
+            "buffer_peak": {k: finite(v) for k, v in occ.items()}, "detached_last": det}
+
+
+register_run("exp11.ladder_health", ladder_health, None, "the Wang ladder's health gate H1-H6")
+
+
+def clutch(T, ref=None, delta_b=0.05, offset=0.0, every=20, **_):
+    """B1's card (exp 11 Phase 3, 2026-09-29): the integrin-laminin clutch of `bm_clutch`, read off a run.
+
+    `bound_frac` per sampled row (bound integrin over total, area-weighted, `vertex__mesh_scalar_itg_bound_frac`);
+    the ledger -- `fresh` (cells that started with no integrin, cumulative: only the first call's should
+    count) and `carry_err_max` (the largest change of a cell's total between two calls; every other operator
+    only copies it); `load_x` quantiles at the last row, the stretch past the standoff in units of `delta_b`
+    over the nodes in tension (`bm_gap` > 0), and `tension_frac`, their share of the contacting nodes; the
+    interior bodies' integrin (`icell__itg_*`, carried through the dive and back). With `ref`, a second run of
+    the same spec without the clutch: the largest vertex displacement between the two at their common rows
+    (0 when the clutch is read-only and the runs are reproducible)."""
+    z = T.z
+    g = lambda k: np.asarray(z[k]) if k in z.files else None       # noqa: E731
+    bf, fr, ce = g("vertex__mesh_scalar_itg_bound_frac"), g("vertex__mesh_scalar_itg_fresh"), g("vertex__mesh_scalar_itg_carry_err")
+    if bf is None:
+        return {"available": False, "why": "no bm_clutch scalars in the trajectory"}
+    rows = _rows(T, every)
+    out = {"available": True, "rows": rows, "bound_frac": [finite(float(bf[t])) for t in rows],
+           "fresh_first": finite(float(fr[0])), "fresh_after": finite(float(fr[-1] - fr[0])),
+           "carry_err_max": finite(float(np.max(ce)))}
+    t = T.n_rows() - 1
+    if "bm_node__bm_gap" in z.files:
+        gp = np.asarray(z["bm_node__bm_gap"][t], float).reshape(-1)
+        oc = np.asarray(z["bm_node__occ"][t]).reshape(-1) > 0.5 if "bm_node__occ" in z.files else np.ones_like(gp, bool)
+        con = oc & (gp != 0)
+        ten = gp[con] > 0
+        x = gp[con][ten] / delta_b
+        out["tension_frac"] = finite(float(ten.mean())) if con.any() else None
+        out["load_x_q50_90_99"] = [finite(float(v)) for v in np.quantile(x, [0.5, 0.9, 0.99])] if x.size else None
+    if "icell__itg_B" in z.files:
+        oc = np.asarray(z["icell__occ"][t]).reshape(-1) > 0.5
+        tot = sum(np.asarray(z[f"icell__{k}"][t], float).reshape(-1) for k in ("itg_I", "itg_A", "itg_N", "itg_B"))
+        out["interior_itg_total_median"] = finite(float(np.median(tot[oc]))) if oc.any() else None
+        out["interior_with_itg_frac"] = finite(float((tot[oc] > 0).mean())) if oc.any() else None
+    if ref is not None:
+        R = ref
+        dmax = 0.0
+        for tt in range(min(T.n_rows(), R.n_rows())):
+            a, b = T.pos(tt), R.pos(tt)
+            if a.shape != b.shape:
+                out["ref_diverged_row"] = tt
+                break
+            dmax = max(dmax, float(np.abs(a - b).max()))
+        out["ref_max_displacement"] = finite(dmax)
+    return out
+
+
+def membrane_mass(T, every=20, **_):
+    """B3's card (exp 11 Phase 3, 2026-09-29): the membrane's mass (`bm_M`, 1 = a seeded node), per sampled row --
+    `mean` over the live nodes, `old_mean` over the nodes live at row 0 and still live (Harunaga's 3x in 12 h
+    under BB-94 is a thickening of the SAME membrane, which new nodes laid at m0 would dilute), `thin_frac` (live
+    nodes below 0.5), the cumulative `dead` (nodes whose mass fell below m_death), and -- for a protease that follows the
+    tissue (exp 11 B4e) -- `cv`, the spread of the mass over the live nodes, and `r_corr`, the correlation of each
+    node's mass with its distance from the membrane's centroid (negative: the membrane is thin where the layer bulges
+    out, the signature of a thinning -> bulging feedback)."""
+    z = T.z
+    if "bm_node__bm_M" not in z.files:
+        return {"available": False, "why": "no bm_node__bm_M in the trajectory"}
+    occ = lambda t: np.asarray(z["bm_node__occ"][t]).reshape(-1) > 0.5              # noqa: E731
+    o0 = occ(0)
+    out = {"available": True, **{k: [] for k in ("row", "mean", "old_mean", "thin_frac", "dead", "live", "cv", "r_corr")}}
+    dd = np.asarray(z["vertex__mesh_scalar_bm_dead"]) if "vertex__mesh_scalar_bm_dead" in z.files else None
+    for t in _rows(T, every):
+        M = np.asarray(z["bm_node__bm_M"][t], float).reshape(-1); o = occ(t) & (M > 0)
+        old = o & o0
+        out["row"].append(int(t)); out["live"].append(int(o.sum()))
+        out["mean"].append(finite(float(M[o].mean())) if o.any() else None)
+        out["old_mean"].append(finite(float(M[old].mean())) if old.any() else None)
+        out["thin_frac"].append(finite(float((M[o] < 0.5).mean())) if o.any() else None)
+        out["dead"].append(int(dd[t]) if dd is not None else None)
+        if o.sum() > 10:
+            P = np.asarray(z["bm_node__pos"][t], float)[o]
+            fin = np.isfinite(P).all(1)
+            Mo, P = M[o][fin], P[fin]
+            r = np.linalg.norm(P - P.mean(0), axis=1)
+            out["cv"].append(finite(float(Mo.std() / max(Mo.mean(), 1e-12))))
+            out["r_corr"].append(finite(float(np.corrcoef(Mo, r)[0, 1])) if Mo.std() > 0 and r.std() > 0 else None)
+        else:
+            out["cv"].append(None); out["r_corr"].append(None)
+    return out
+
+
+def shape_modes(T, every=40, lmax=6, **_):
+    """How far the layer is from a sphere, and at what scale (exp 11 Phase 3 B6, 2026-09-29): per sampled row, the
+    layer's vertex radius about its centroid, r(theta, phi), least-squares fit to real spherical harmonics up to
+    `lmax`, and the RMS amplitude of each degree l over the mean radius (`power[l]`, l = 1..lmax; l = 1 is an offset
+    of the centroid, l = 2 an ellipsoid, l >= 3 bulges and buds). `bump` is the l >= 3 total. A spontaneous bud
+    has no declared axis, so this is the ruler that can see one: its power at l >= 3 grows over time."""
+    from scipy.special import sph_harm_y
+    out = {"available": True, "row": [], "r_mean": [], "power": [], "bump": []}
+    for t in _rows(T, every):
+        P = np.asarray(T.pos(t), float)
+        P = P[np.isfinite(P).all(1)]
+        if len(P) < 50:
+            continue
+        c = P.mean(0); d = P - c
+        r = np.linalg.norm(d, axis=1)
+        th = np.arccos(np.clip(d[:, 2] / np.maximum(r, 1e-12), -1, 1)); ph = np.arctan2(d[:, 1], d[:, 0])
+        cols, deg = [], []
+        for l in range(lmax + 1):
+            for m in range(-l, l + 1):
+                Y = sph_harm_y(l, abs(m), th, ph)
+                cols.append(np.sqrt(2) * (Y.imag if m < 0 else Y.real) if m != 0 else Y.real)
+                deg.append(l)
+        A = np.stack(cols, 1); deg = np.asarray(deg)
+        coef, *_r = np.linalg.lstsq(A, r, rcond=None)
+        r0 = coef[0] * np.sqrt(1 / (4 * np.pi)) if abs(coef[0]) > 0 else float(r.mean())
+        pw = [finite(float(np.sqrt(np.sum(coef[deg == l] ** 2) / (4 * np.pi)) / max(r0, 1e-12))) for l in range(1, lmax + 1)]
+        out["row"].append(int(t)); out["r_mean"].append(finite(float(r0))); out["power"].append(pw)
+        out["bump"].append(finite(float(np.sqrt(np.sum(np.square(pw[2:]))))))
+    return out
+
+
+register_run("exp11.shape_modes", lambda T, **kw: {"available": True, "bump_last": (shape_modes(T, **kw)["bump"] or [None])[-1]},
+             "fraction", "the layer's departure from a sphere at degrees >= 3 (bulges, buds), last row")
+
+
+def _cap_volume(X, es, et, ef, nF):
+    """Volume enclosed by one cap of the layer (X = pos + sep apical, pos - sep basal), by the divergence theorem over
+    each cell's cap fanned from its own cap centroid, about the cap's global centroid (float64). Absolute value: the
+    winding decides only the sign."""
+    m = ef < nF
+    es, et, ef = es[m], et[m], ef[m]
+    o = X[np.unique(es)].mean(0)
+    Y = X - o
+    cnt = np.bincount(ef, minlength=nF).clip(min=1)
+    c = np.stack([np.bincount(ef, weights=Y[es, k], minlength=nF) for k in range(3)], 1) / cnt[:, None]
+    return float(abs(np.einsum("ij,ij->i", c[ef], np.cross(Y[es], Y[et])).sum() / 6.0))
+
+
+def _body_volume(z, t, point_set="ipt"):
+    """The interior's MATERIAL volume at row t: per body (points grouped by `pid`), a ball whose radius of gyration
+    is its points' -- V = 4/3 pi (sqrt(5/3) r_g)^3 (a uniform ball of radius R has r_g^2 = 3/5 R^2). Division can
+    change a body's volume (`cell_divide[mpm]` `daughter_frac`; the default halves it), and the trajectory does
+    not record the points' volumes, so the size is read from the points themselves."""
+    kp, ko, ki = f"{point_set}__pos", f"{point_set}__occ", f"{point_set}__pid"
+    if kp not in z.files or ki not in z.files:
+        return 0.0
+    Q = np.asarray(z[kp][t], float); qo = np.asarray(z[ko][t]).reshape(-1) > 0.5
+    pid = np.asarray(z[ki][t]).reshape(-1)[qo].astype(np.int64); Q = Q[qo]
+    if pid.size == 0:
+        return 0.0
+    u, inv, cnt = np.unique(pid, return_inverse=True, return_counts=True)
+    m = np.stack([np.bincount(inv, weights=Q[:, k]) for k in range(3)], 1) / cnt[:, None]
+    rg2 = np.bincount(inv, weights=((Q - m[inv]) ** 2).sum(1)) / cnt
+    R = np.sqrt(5.0 / 3.0 * rg2)
+    return float((4.0 / 3.0 * np.pi * R ** 3)[cnt > 5].sum())
+
+
+def wang_alpha(T, every=20, row0=30, **_):
+    """WANG 2021'S BUDDING CRITERION, read off a run (exp 11 line W, 2026-09-29; STAR Methods eq 24-28, Fig S2G, S2L).
+
+    Two compartments: an interior of radius r under a surface layer of thickness h. If every cell keeps its size and
+    the layer stays a smooth sphere, the interior must gain alpha_crit = beta^2 / (2 beta + 1) cells for every cell the
+    layer gains (beta = r / h: dV_interior / dV_layer = r^2 / (2 r h + h^2)). An interior that gains fewer, alpha <
+    alpha_crit, leaves the layer more area than a sphere offers, and it buds. Wang's 12 buds: alpha / alpha_crit 0.52
+    (median, IQR 0.46-0.57).
+
+    Per sampled row: `N_S` (layer cells), `N_I` (live interior bodies), `V_S` (the layer's summed polyhedron volumes),
+    `V_I` (the volume the APICAL cap encloses -- the interior compartment, filled or not), `h` (the layer's median
+    thickness, 2 |sep|), `beta` = (3 V_I / 4 pi)^(1/3) / h, `fill` = the interior bodies' material volume
+    (`_body_volume`, read from each body's points) / V_I -- the share of the interior compartment its cells occupy
+    (Wang's is packed solid, ~1). Until 2026-09-30 it counted every body at the dive's 1.4, which overstated a
+    dividing interior whose bodies halve (Finding 180). Over the window from `row0` (the warm-up's end, frame 60) to
+    the last row: `alpha_N` = Delta N_I / Delta N_S (Wang's count definition), `alpha_V` = Delta V_I / Delta V_S (the
+    geometric one), `alpha_crit` at the window's mean beta, and `ratio_N`, `ratio_V` their quotients. Also per window
+    of `every` rows (`win_ratio_N`), to see whether the interior falls behind early or late."""
+    import torch
+    from plexus.operators.vertex_ops import apicobasal_geometry_3d
+    z = T.z
+    rows = [r for r in _rows(T, every) if r >= min(row0, T.n_rows() - 1)]
+    if rows and rows[0] != min(row0, T.n_rows() - 1):
+        rows = [min(row0, T.n_rows() - 1)] + rows
+    v_body = float(next((o.get("child_volume") for o in T.spec.get("operators", []) if o.get("op") == "cell_die"
+                         and o.get("child_volume")), 1.4))
+    out = {"available": True, **{k: [] for k in ("row", "N_S", "N_I", "V_S", "V_I", "h", "beta", "fill")}}
+    for t in rows:
+        P = np.asarray(T.pos(t), float); nF = T.nF(t)
+        es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        S = np.asarray(T.vertex_block("sep", t), float)[: len(P)]
+        vp = apicobasal_geometry_3d(torch.tensor(P, dtype=torch.float32), torch.tensor(S, dtype=torch.float32),
+                                    torch.tensor(es), torch.tensor(et), torch.tensor(ef), nF)[0].numpy()
+        oc = np.asarray(z["icell__occ"][t], float).reshape(-1) > 0.5 if "icell__occ" in z.files else np.zeros(0, bool)
+        used = np.unique(es[ef < nF])
+        h = 2.0 * float(np.median(np.linalg.norm(S[used], axis=1)))
+        VI = _cap_volume(P + S, es, et, ef, nF)
+        out["row"].append(int(t)); out["N_S"].append(int(nF)); out["N_I"].append(int(oc.sum()))
+        out["V_S"].append(finite(float(vp[vp > 0].sum()))); out["V_I"].append(finite(VI)); out["h"].append(finite(h))
+        out["beta"].append(finite((3 * VI / (4 * np.pi)) ** (1 / 3) / max(h, 1e-9)))
+        out["fill"].append(finite(_body_volume(z, t) / max(VI, 1e-9)))
+
+    def _ratio(i, j, key_i, key_s):
+        dS = out[key_s][j] - out[key_s][i]
+        if not dS:
+            return None, None, None
+        a = (out[key_i][j] - out[key_i][i]) / dS
+        b = 0.5 * (out["beta"][i] + out["beta"][j])
+        crit = b * b / (2 * b + 1)
+        return finite(a), finite(crit), finite(a / crit)
+    if len(out["row"]) >= 2:
+        n = len(out["row"]) - 1
+        out["alpha_N"], out["alpha_crit"], out["ratio_N"] = _ratio(0, n, "N_I", "N_S")
+        out["alpha_V"], _c, out["ratio_V"] = _ratio(0, n, "V_I", "V_S")
+        out["win_ratio_N"] = [_ratio(i, i + 1, "N_I", "N_S")[2] for i in range(n)]
+        out["win_ratio_V"] = [_ratio(i, i + 1, "V_I", "V_S")[2] for i in range(n)]
+    return out
+
+
+register_run("exp11.wang_alpha", lambda T, **kw: {k: v for k, v in wang_alpha(T, **kw).items() if not isinstance(v, list)},
+             None, "Wang's budding criterion: interior over layer growth, against beta^2/(2 beta + 1)")
+
+
+def lobes(T, every=20, lmax=8, thresh=0.05, sep_deg=25.0, n_dir=4000, **_):
+    """BUDS WITHOUT A DECLARED AXIS: the lobes of the layer and its excess area (exp 11 line W, 2026-09-29).
+
+    `excess` -- the layer's basal area over the area of the sphere enclosing the same basal volume, minus 1 (0 for a
+    sphere; Wang's alpha < alpha_crit leaves the layer this surplus, which it must fold or bud to hold). `n_lobes` --
+    the layer's vertex radius about its centroid is fit to real spherical harmonics up to `lmax` (8: features down to
+    about 180/8 ~ 22 degrees of arc, a few cells wide), evaluated on `n_dir` directions, and a lobe is a direction
+    whose radius, from the degrees l >= 3 alone (an offset or an ellipsoid is not a lobe), is the largest within
+    `sep_deg` degrees and stands at least `thresh` (a fraction of the mean radius) above the mean. `lobe_amp` -- the tallest lobe's height over the mean radius."""
+    import torch
+    from scipy.special import sph_harm_y
+    from scipy.spatial import cKDTree
+    from plexus.operators.vertex_ops import apicobasal_geometry_3d
+    k_i = np.arange(n_dir) + 0.5
+    th_d = np.arccos(1 - 2 * k_i / n_dir); ph_d = np.pi * (1 + 5 ** 0.5) * k_i
+    U = np.stack([np.sin(th_d) * np.cos(ph_d), np.sin(th_d) * np.sin(ph_d), np.cos(th_d)], 1)
+    nb = cKDTree(U).query_ball_point(U, 2 * np.sin(np.radians(sep_deg) / 2))
+
+    def basis(th, ph):
+        cols = []
+        for l in range(lmax + 1):
+            for m in range(-l, l + 1):
+                Y = sph_harm_y(l, abs(m), th, ph)
+                cols.append(np.sqrt(2) * (Y.imag if m < 0 else Y.real) if m != 0 else Y.real)
+        return np.stack(cols, 1)
+    Bd = basis(th_d, ph_d)
+    out = {"available": True, **{k: [] for k in ("row", "excess", "n_lobes", "lobe_amp")}}
+    for t in _rows(T, every):
+        P = np.asarray(T.pos(t), float); nF = T.nF(t)
+        es, et, ef = (np.asarray(a, np.int64) for a in T.half_edges(t))
+        S = np.asarray(T.vertex_block("sep", t), float)[: len(P)]
+        g = apicobasal_geometry_3d(torch.tensor(P, dtype=torch.float32), torch.tensor(S, dtype=torch.float32),
+                                   torch.tensor(es), torch.tensor(et), torch.tensor(ef), nF)
+        Ab = float(g[3].numpy().sum())
+        Vb = _cap_volume(P - S, es, et, ef, nF)
+        Req = (3 * Vb / (4 * np.pi)) ** (1 / 3)
+        used = np.unique(es[ef < nF]); X = P[used]; X = X[np.isfinite(X).all(1)]
+        d = X - X.mean(0); r = np.linalg.norm(d, axis=1)
+        th = np.arccos(np.clip(d[:, 2] / np.maximum(r, 1e-12), -1, 1)); ph = np.arctan2(d[:, 1], d[:, 0])
+        coef, *_r = np.linalg.lstsq(basis(th, ph), r, rcond=None)
+        r0 = float((Bd[:, :1] @ coef[:1]).mean())
+        rd = r0 + Bd[:, 9:] @ coef[9:]                     # degrees l >= 3 only: an ellipsoid (l <= 2) is not a lobe
+        peak = np.array([rd[i] >= rd[j].max() for i, j in enumerate(nb)]) & (rd >= r0 * (1 + thresh))
+        out["row"].append(int(t)); out["excess"].append(finite(Ab / (4 * np.pi * Req ** 2) - 1))
+        out["n_lobes"].append(int(peak.sum())); out["lobe_amp"].append(finite(float(rd.max() / r0 - 1)))
+    return out
+
+
+register_run("exp11.lobes", lambda T, **kw: {"available": True, **{k + "_last": (v[-1] if v else None) for k, v in lobes(T, **kw).items()
+                                                                    if isinstance(v, list) and k != "row"}},
+             None, "the layer's lobes (no declared axis) and its excess area over a sphere of the same volume, last row")
+
+
+def hollow(T, every=40, far=2.5, **_):
+    """HOLLOW BUDS (exp 11 line W, 2026-09-30, Finding 177): per sampled row, the share of layer cells whose centroid
+    lies farther than `far` (world units; 2.5 = 25 um, about two interior-body diameters) from every interior
+    point (`ipt`). Wang's buds are solid and stratified, so this stays near 0; a bud that is a sac of layer alone
+    raises it (W2b: 0.21 by the end)."""
+    from scipy.spatial import cKDTree
+    z = T.z
+    out = {"available": True, "row": [], "hollow_frac": []}
+    for t in _rows(T, every):
+        nF = T.nF(t)
+        cen = np.asarray(z["cell__centroid"][t], float)[:nF]
+        Q = np.asarray(z["ipt__pos"][t], float)
+        qo = np.asarray(z["ipt__occ"][t]).reshape(-1) > 0.5
+        if not qo.any() or nF == 0:
+            continue
+        d = cKDTree(Q[qo]).query(cen)[0]
+        out["row"].append(int(t)); out["hollow_frac"].append(finite(float((d > far).mean())))
+    return out
+
+
+register_run("exp11.hollow", lambda T, **kw: {"available": True, "hollow_last": (hollow(T, **kw)["hollow_frac"] or [None])[-1]},
+             "fraction", "share of layer cells farther than 25 um from any interior cell (hollow buds), last row")

@@ -416,3 +416,123 @@ def test_lattice_reads_the_digitized_fig2b(tmp_path):
     r = exp_measures.run_measure("exp15.lattice", T, strains=["A", "B", "C"])
     assert abs(r["M"] - 1e-4) < 1e-12 and abs(r["p_ext_paper"] - 0.602) < 0.002
     assert abs(r["p_ext_agree"] - (1 - 0.602)) < 0.002 and r["frac_all_alive"] == 1.0
+
+
+# ------------------------------------------------------------------ rig 4: the host (exp15.host)
+def host_run(tmp_path, K=4, q=2, side=4, day=10.0, dt=0.25, n_days=12, levels=(1.0, 1.0, 2.0, 2.0),
+             amps=(0.6, 0.6, 0.4, 0.4), peak=0.5, lost=(False, False, True, True)):
+    """K tiles of q x q host cells; tile r's A(t) = level_r (1 + amp_r cos(2 pi (t / day - peak))), the
+    same in each of its cells; the community lattice (side^2 sites per tile) holds strain 0 except where
+    `lost`. Clock omega = 2 pi / day; `clock_turnover` germ-free params k_in 1, k_out 0.5, floor 1 ->
+    level_gf = 2."""
+    n_frames = int(n_days * day / dt)
+    t = np.arange(n_frames + 1) * dt
+    A = np.stack([np.repeat([lv * (1 + a * np.cos(2 * np.pi * (tt / day - peak))) for lv, a in zip(levels, amps)], q * q)
+                  for tt in t])[..., None].astype(np.float32)
+    lab = np.concatenate([np.full(side * side, 1 if lo else 0) for lo in lost])
+    chem = np.zeros((len(t), K * side * side, 3), np.float32)
+    chem[:, np.arange(K * side * side), lab] = 1.0
+    x = np.zeros((K * side * side, 2), np.float32)
+    np.savez(tmp_path / "trajectory.npz", cell__pos=np.repeat(x[None], len(t), 0), cell__chem=chem,
+             host__pos=np.zeros((len(t), K * q * q, 2), np.float32), host__chem=A)
+    spec = {"general": {"name": "h", "n_frames": n_frames, "record_cap": n_frames + 1, "dt": dt},
+            "seed": [{"op": "seed_positions", "at": "cell", "model": "tiled_lattice", "side": side, "tiles": K},
+                     {"op": "seed_positions", "at": "host", "model": "tiled_lattice", "side": q, "tiles": K}],
+            "operators": [{"op": "phase_clock", "at": "host", "omega": 2 * np.pi / day},
+                          {"op": "cell_chem_react", "at": "host", "model": "clock_turnover", "k_in": 1.0,
+                           "k_out": 0.5, "weights": [1, 0, 0], "gate": {"block": "phase", "floor": 1.0}}]}
+    yaml.safe_dump(spec, open(tmp_path / "spec.yaml", "w"))
+    return open_run(str(tmp_path))
+
+
+def test_host_level_amplitude_peak_and_germ_free_tiles(tmp_path):
+    """Planted cosines: medians of level (1, 1, 2, 2) -> 1.5, of amp (0.6, 0.6, 0.4, 0.4) -> 0.5 (up to
+    the 12-bin folding, cos(pi / 12) = 0.966); peak at ZT 12; tiles 2, 3 sit at the germ-free level 2
+    and have lost strain 0 -> frac_gf_like = frac_signal_lost = 0.5, agreement 1."""
+    from exp_measures.exp15 import host
+    v = host(host_run(tmp_path))
+    assert v["host_valid"] == 1.0
+    assert abs(v["level"] - 1.5) < 0.02
+    assert 0.47 < v["amp"] < 0.51
+    assert abs(v["zt_peak"] - 12.0) <= 1.0
+    assert abs(v["level_gf"] - 2.0) < 1e-3 and abs(v["amp_gf"]) < 1e-6
+    assert v["frac_gf_like"] == 0.5 and v["frac_signal_lost"] == 0.5 and v["gf_like_agree"] == 1.0
+
+
+def test_host_flags_a_negative_level(tmp_path):
+    from exp_measures.exp15 import host
+    v = host(host_run(tmp_path, levels=(1.0, 1.0, 2.0, -0.5)))
+    assert v["host_valid"] == 0.0
+
+
+# ------------------------------------------------------------------ direction 4: exp15.traits
+def test_traits_gain_per_strain(tmp_path):
+    """Strain 0's trait doubles from 1 to 2 over the run, strain 1's stays 1, strain 2 absent late:
+    trait_A 2 (late mean), trait_B 1, trait_gain = mean(2, 1, C's) ..."""
+    from exp_measures.exp15 import traits
+    n, N = 50, 30
+    lab = np.arange(N) % 3
+    chem = np.zeros((n, N, 3), np.float32); chem[:, np.arange(N), lab] = 1.0
+    tr = np.ones((n, N, 1), np.float32)
+    for t in range(n):
+        tr[t, lab == 0, 0] = 1.0 + t / (n - 1)
+        tr[t, lab == 2, 0] = 0.5
+    np.savez(tmp_path / "trajectory.npz", cell__pos=np.zeros((n, N, 2), np.float32), cell__chem=chem, cell__trait=tr)
+    yaml.safe_dump({"general": {"name": "t", "n_frames": n - 1, "record_cap": n, "dt": 1.0}}, open(tmp_path / "spec.yaml", "w"))
+    v = traits(open_run(str(tmp_path)))
+    assert abs(v["trait0_A"] - 1.0) < 1e-6 and 1.85 < v["trait_A"] < 2.0
+    assert abs(v["trait_B"] - 1.0) < 1e-6 and abs(v["trait_C"] - 0.5) < 1e-6
+    assert abs(v["trait_gain"] - (v["trait_A"] + 1.0 + 1.0) / 3) < 1e-6
+    assert v["n_late_A"] == 10
+
+
+def test_traits_escalation_rate_only_while_contested(tmp_path):
+    """Two 4 x 4 lattices, t = 0..100 (dt 1): lattice 0 keeps three strains and its trait rises at 0.01 per
+    time unit (10 per 1,000); lattice 1 is down to one strain from t = 50 and its trait then JUMPS by +5 --
+    the jump is after the contest and must not enter the rate, which reads 10 per 1,000 on both."""
+    from exp_measures.exp15 import traits
+    side, K, n = 4, 2, 101
+    N = side * side
+    chem = np.zeros((n, K * N, 3), np.float32)
+    tr = np.zeros((n, K * N, 1), np.float32)
+    for t in range(n):
+        lab = np.concatenate([np.arange(N) % 3, (np.arange(N) % 3) if t < 50 else np.zeros(N, int)])
+        chem[t, np.arange(K * N), lab] = 1.0
+        tr[t, :, 0] = 1.0 + 0.01 * t
+        if t >= 50:
+            tr[t, N:, 0] += 5.0
+    np.savez(tmp_path / "trajectory.npz", cell__pos=np.zeros((n, K * N, 2), np.float32), cell__chem=chem, cell__trait=tr)
+    spec = {"general": {"name": "t", "n_frames": n - 1, "record_cap": n, "dt": 1.0},
+            "seed": [{"op": "seed_positions", "at": "cell", "model": "tiled_lattice", "side": side, "tiles": K}]}
+    yaml.safe_dump(spec, open(tmp_path / "spec.yaml", "w"))
+    v = traits(open_run(str(tmp_path)))
+    assert v["n_lattices_rate"] == 2
+    assert abs(v["trait_rate_contested"] - 10.0) < 0.2, v["trait_rate_contested"]
+
+
+# ------------------------------------------------------------------ directions 3 x 4: exp15.prefs
+def test_prefs_prey_vs_predator_per_strain(tmp_path):
+    """Budget 4. Strain A (0) moves from an even split (2 on prey's metabolite 2, 2 on predator's 1) to
+    all 4 on its predator's by the last row; B (1) holds 3 on its prey's (0) and 1 on its predator's (2);
+    C (2) holds 1 on its prey's (1), 3 on its predator's (0). Empty sites carry 0 and must not count."""
+    from exp_measures.exp15 import prefs
+    n, N = 50, 30
+    lab = np.arange(N) % 3
+    occ = np.arange(N) < 27                                              # the last 3 sites empty
+    chem = np.zeros((n, N, 3), np.float32); chem[:, np.arange(N)[occ], lab[occ]] = 1.0
+    pr = np.zeros((n, N, 3), np.float32)
+    for t in range(n):
+        a = t / (n - 1)
+        pr[t, (lab == 0) & occ] = [0.0, 2.0 + 2.0 * a, 2.0 - 2.0 * a]
+        pr[t, (lab == 1) & occ] = [3.0, 0.0, 1.0]
+        pr[t, (lab == 2) & occ] = [3.0, 1.0, 0.0]
+    np.savez(tmp_path / "trajectory.npz", cell__pos=np.zeros((n, N, 2), np.float32), cell__chem=chem, cell__pref=pr)
+    yaml.safe_dump({"general": {"name": "t", "n_frames": n - 1, "record_cap": n, "dt": 1.0}}, open(tmp_path / "spec.yaml", "w"))
+    v = prefs(open_run(str(tmp_path)))
+    late = np.mean([2.0 + 2.0 * t / (n - 1) for t in range(40, 50)])     # A's late mean on its predator's
+    assert abs(v["pref_pred_A"] - late) < 1e-5 and abs(v["pref_prey_A"] - (4.0 - late)) < 1e-5
+    assert abs(v["pref_prey_B"] - 3.0) < 1e-6 and abs(v["pref_pred_B"] - 1.0) < 1e-6
+    assert abs(v["pref_prey_C"] - 1.0) < 1e-6 and abs(v["pref_pred_C"] - 3.0) < 1e-6
+    assert abs(v["pref_pred_frac"] - (late / 4.0 + 0.25 + 0.75) / 3) < 1e-6
+    from plexus.measures import MEASURES
+    assert "exp15.prefs" in MEASURES

@@ -11,6 +11,8 @@
                        neighbour coherence), the same check the recordings' fitted delays went through
     exp06.apd          APD90 of every activation of every cell: the free pulse's against the vortex's
                        (Aliev & Panfilov Fig 5: the vortex's falls to 0.53 of the free pulse's)
+    exp06.rotor        a sustained vortex: its cycle, and the winding number of the activation phase
+                       round a scar or a loop -- 1 when it turns round what the loop encloses
 
 A FIRING IS AN UPWARD CROSSING OF `thr` BY THE EXCITATION VARIABLE, WITH HYSTERESIS. A cell fires at the
 first row where u >= thr while it is armed; it re-arms only once u has fallen below `rearm` (default
@@ -332,6 +334,38 @@ def real(T, set="cell", fit=None, chan=0, thr=0.5, rearm=None, dt=None, frame_ms
     return out
 
 
+def follow(T, set="cell", block="gam_prev", chan=0, thr=0.5, cut=None, cut_margin=1.0, **_):
+    """Does the contraction follow the excitation? Read on the combined rig (active_strain[excitation]).
+
+    peak_ratio_beyond   mean peak activation (`gam_prev`, the active strain's clock value) of the cells
+                        more than `cut_margin` cell diameters past the cut, over that of the cells
+                        before it (0 when nothing past a closed line contracts)
+    frac_excited        fraction of cells whose excitation reached `thr`
+    frac_contracting    fraction whose activation rose above 1 % of the sheet's largest
+    """
+    U = _on_set(T, set)
+    n = U.n_rows()
+    c0 = cells(U, 0)
+    G = np.stack([np.asarray(U.state(block, t), float)[c0.slot, 0] for t in range(n)])
+    X = np.stack([np.asarray(U.state("chem", t), float)[c0.slot, chan] for t in range(n)])
+    peak = np.nanmax(G, 0)
+    out = {"frac_excited": finite((np.nanmax(X, 0) >= thr).mean()),
+           "frac_contracting": finite((peak > 0.01 * np.nanmax(peak)).mean()) if np.nanmax(peak) > 0 else 0.0,
+           "peak_mean": finite(np.nanmean(peak))}
+    if cut:
+        cd = _cell_diameter(U, c0)
+        p = np.asarray(cut["point"], float)[: c0.x.shape[1]]
+        nrm = np.asarray(cut["normal"], float)[: c0.x.shape[1]]
+        side = ((c0.x - p) @ (nrm / np.linalg.norm(nrm))) / cd
+        before, beyond = side < -cut_margin, side > cut_margin
+        pb = np.nanmean(peak[before]) if before.any() else np.nan
+        out["peak_before"] = finite(pb)
+        out["peak_beyond"] = finite(np.nanmean(peak[beyond])) if beyond.any() else None
+        if np.isfinite(pb) and pb > 0 and beyond.any():
+            out["peak_ratio_beyond"] = finite(np.nanmean(peak[beyond]) / pb)
+    return out
+
+
 def apd(T, set=None, chan=0, thr=0.5, end=0.1, rearm=None, late=4, dt=None, **_):
     """APD90 of every activation: from the upstroke through `thr` to the fall below `end` (u is 0 at
     rest and ~1 at the plateau, so `end` = 0.1 is 90 % repolarised).
@@ -369,6 +403,85 @@ def apd(T, set=None, chan=0, thr=0.5, end=0.1, rearm=None, late=4, dt=None, **_)
     return out
 
 
+
+def _winding(F, tt, x, ring, centre, t0):
+    """Winding number, at time t0, of the activation phase round the closed loop of cells `ring` taken
+    in angular order about `centre`. A cell's phase is its own fraction of the way from its last upstroke
+    before t0 to its next one after (2 pi per cycle, each cell by its OWN interval), so cells beating at
+    slightly different rates do not alias. Sum of the wrapped phase steps round the loop / 2 pi: 1 or -1
+    when an activation circulates round something inside the loop, 0 when none does. None when a loop
+    cell has no upstroke on either side of t0."""
+    o = ring[np.argsort(np.arctan2(x[ring, 1] - centre[1], x[ring, 0] - centre[0]))]
+    ph = []
+    for k in o:
+        f = np.asarray(F[k], int)
+        before, after = f[tt[f] <= t0], f[tt[f] > t0]
+        if len(before) == 0 or len(after) == 0:
+            return None
+        a, b = tt[before[-1]], tt[after[0]]
+        ph.append(2 * np.pi * (t0 - a) / (b - a))
+    ph = np.asarray(ph)
+    return round(float(np.angle(np.exp(1j * np.diff(np.r_[ph, ph[0]]))).sum() / (2 * np.pi)), 6) + 0.0   # an integer up to round-off
+
+
+def rotor(T, set="cell", chan=0, thr=0.5, rearm=None, dt=None, scar=None, loop=None, band=(0.04, 0.12),
+          n_probe=5, **_):
+    """Is there a sustained vortex, how fast does it turn, and what does it turn round?
+
+    cycle          median interval between a cell's upstrokes, from its second upstroke on (the S1 -> S2
+                   interval excluded), in model time; `cycle_frames` in recording frames when the spec
+                   declares `active_strain.frames_per_clock_frame` (the contraction rig), with IQR
+    n_up_median, n_up_min, n_up_max    upstrokes per cell over the run
+    alive          1 when some cell still fires in the last tenth of the run
+    winding        median winding number (`_winding`) at `n_probe` times over the second half of the
+                   run, round `scar` = {point, normal, half_length} (the cells `band` away from that
+                   segment) or round `loop` = {centre, r0, r1} (an annulus); `winding_n` = probes that read
+                   (a probe is unreadable when a loop cell has no upstroke on one side of it -- a silent
+                   core cell inside the loop does that), `winding_cells` = cells in the loop
+    winding_loop   with BOTH `scar` and `loop`: the loop's reading, the scar's stays `winding`
+    """
+    U = _on_set(T, set)
+    rearm = thr / 2.0 if rearm is None else rearm
+    tt = _row_times(U, dt)
+    X, c0, _ = _series(U, chan)
+    F = _firings(np.nan_to_num(X, nan=-np.inf), thr, rearm)
+    nu = np.array([len(f) for f in F])
+    iv = np.concatenate([np.diff(tt[np.asarray(f, int)])[1:] for f in F if len(f) >= 3] or [np.array([])])
+    out = {"n_up_median": finite(np.median(nu)), "n_up_min": int(nu.min()), "n_up_max": int(nu.max()),
+           "alive": int(any(len(f) and tt[f[-1]] >= tt[0] + 0.9 * (tt[-1] - tt[0]) for f in F))}
+    if len(iv):
+        out["cycle"] = finite(np.median(iv))
+        op = next((o for o in (getattr(U, "spec", None) or {}).get("operators", [])
+                   if o.get("op") == "active_strain" and o.get("frames_per_clock_frame")), None)
+        if op is not None:
+            fr = float(U.spec["general"]["dt"]) * float(op["frames_per_clock_frame"])
+            out["cycle_frames"] = finite(np.median(iv) / fr)
+            out["cycle_frames_iqr"] = [finite(np.percentile(iv, 25) / fr), finite(np.percentile(iv, 75) / fr)]
+    x = np.asarray(c0.x, float)[:, :2]
+    probes = np.linspace(tt[0] + 0.5 * (tt[-1] - tt[0]), tt[-1], n_probe + 2)[1:-1]
+
+    def wind(ring, centre, key):
+        if len(ring) < 3:
+            return
+        w = [v for v in (_winding(F, tt, x, ring, centre, t0) for t0 in probes) if v is not None]
+        out[f"{key}_n"], out[f"{key}_cells"] = len(w), int(len(ring))
+        if w:
+            out[key] = finite(np.median(w))
+    if scar is not None:
+        p, nrm = np.asarray(scar["point"][:2], float), np.asarray(scar["normal"][:2], float)
+        tan = np.array([-nrm[1], nrm[0]]) / np.linalg.norm(nrm)
+        h = float(scar.get("half_length", np.inf))
+        s_ = np.clip((x - p) @ tan, -h, h)
+        d = np.linalg.norm(x - (p + s_[:, None] * tan), axis=1)
+        wind(np.flatnonzero((d > band[0]) & (d < band[1])), p, "winding")
+    if loop is not None:
+        centre = np.asarray(loop["centre"][:2], float)
+        d = np.linalg.norm(x - centre, axis=1)
+        wind(np.flatnonzero((d > float(loop["r0"])) & (d < float(loop["r1"]))), centre,
+             "winding" if scar is None else "winding_loop")
+    return out
+
+
 # ============================================================================ the results table's source
 def write_results(root=None):
     """`experiments/specs/exp06/wave.jsonl`: one line per run, the `exp06.wave` numbers the md's derived
@@ -384,7 +497,7 @@ def write_results(root=None):
     last = {}
     for line in open(os.path.join(d, "measures.jsonl")):
         r = json.loads(line)
-        if r["measure"] in ("exp06.wave", "exp06.cell_trace"):
+        if r["measure"] in ("exp06.wave", "exp06.cell_trace", "exp06.real", "exp06.apd", "exp06.follow"):
             last.setdefault(r["run"], {}).update({k: v for k, v in (r["value"] or {}).items()
                                                   if isinstance(v, (int, float)) or v is None})
     with open(os.path.join(d, "wave.jsonl"), "w") as fh:
@@ -395,3 +508,5 @@ def write_results(root=None):
 
 register_run("exp06.real", real, None, "the wave on the real Utrecht sheet: arrival spread, delay-map check, cut")
 register_run("exp06.apd", apd, None, "APD90 per activation: free pulse vs vortex")
+register_run("exp06.follow", follow, None, "contraction follows excitation: activation past a cut over before")
+register_run("exp06.rotor", rotor, None, "a sustained vortex: cycle, upstrokes per cell, winding round a scar or a loop")

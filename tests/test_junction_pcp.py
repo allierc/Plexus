@@ -248,3 +248,71 @@ def test_affine_drive_transient_returns_to_the_seed(tmp_path):
         assert np.allclose(P_[-1], P_[0], atol=1e-4), tag
         mid = P_[11]                                      # frame 11: u = 0.5, stretched along y
         assert np.ptp(mid[:, 1]) / np.ptp(P_[0][:, 1]) > 1.1, tag
+
+
+def test_isotropic_seed_has_no_shared_elongation():
+    """seed_mesh[isotropic]: the default disc's cells share an elongation along y (2/sqrt(3) pitch);
+    the isotropic builder's tissue-mean elongation is several times smaller, and its lattice angle
+    changes with the seed (the planted difference); both are valid discs of about n cells."""
+    from plexus.operators.vertex_ops import build_disc_mesh, build_disc_mesh_isotropic
+    def mean_e(builder, seed):
+        v, es, et, ef, nF = builder(400, 5.0, 0.15, seed)
+        e1, e2 = pcp_elongation(torch.as_tensor(v[:, :2]), torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF)
+        return complex(float(e1.mean()), float(e2.mean())), nF
+    d, nd = mean_e(build_disc_mesh, 1)
+    i1, ni = mean_e(build_disc_mesh_isotropic, 1)
+    i2, _ = mean_e(build_disc_mesh_isotropic, 2)
+    assert abs(d) > 3 * abs(i1) and 0.7 < ni / nd < 1.4
+    assert abs(np.angle(i1) - np.angle(i2)) > 1e-3 or abs(i1) < 1e-3
+    import plexus.operators  # noqa: F401
+    from plexus.models import registry as R
+    assert R.get_operator("seed_mesh", "isotropic").__name__ == "SeedMeshIsotropic"
+    assert R.get_operator("seed_mesh").__name__ == "SeedMesh3D"
+
+
+def test_primed_blend_is_linear_at_p0_and_cooperative_at_p1():
+    """`junction_pcp[primed]`'s recruitment (1 - p) x + p T(x): an unstretched side (p 0) must be the
+    linear model exactly, a fully primed one (p 1) the cooperative model exactly, and p 0.5 halfway,
+    at partner density 0.5 where the two differ (T(0.5) = 0.4 against 0.5)."""
+    half = torch.full((8,), 0.5, dtype=P.dtype)
+    twin = pcp_twins(ES, ET, 10)
+    L = geometry()[0]
+    tot = torch.full((2,), 4.0, dtype=P.dtype)
+    one = torch.ones(8, dtype=P.dtype)
+    lin = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, **KW)
+    coop = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0), **KW)
+    p0 = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0, torch.zeros(8, dtype=P.dtype)), **KW)
+    p1 = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0, torch.ones(8, dtype=P.dtype)), **KW)
+    ph = pcp_rates(half, half, twin, EF, L, 2, tot, tot, one, g=3.0, hill=(2.0, 1.0, torch.full((8,), 0.5, dtype=P.dtype)), **KW)
+    for i in range(2):
+        assert torch.allclose(p0[i], lin[i]) and torch.allclose(p1[i], coop[i])
+        assert torch.allclose(ph[i], 0.5 * (lin[i] + coop[i]))
+
+
+def test_primed_model_is_registered_and_needs_the_seed_strain():
+    from plexus.models import registry as R
+    cls = R.get_operator("junction_pcp", model="primed")
+    assert cls.__name__ == "JunctionPCPPrimed"
+    with pytest.raises(ValueError):
+        cls({"elong": 0.0})
+    o = cls({"elong": -0.5, "elong_ref": "seed", "prime_strain": 0.2})
+    ef = torch.tensor([0, 0, 1, 1])
+    o._eps = (torch.tensor([0.1, 0.0]), torch.tensor([0.0, 0.0]), ef)       # cell 0 stretched 0.1, cell 1 not
+    assert torch.allclose(o._hill()[2], torch.tensor([0.5, 0.5, 0.0, 0.0]))
+    o._eps = (torch.tensor([0.0, 0.3]), torch.tensor([0.0, 0.0]), ef)       # cell 0 relaxed: it keeps its 0.5
+    assert torch.allclose(o._hill()[2], torch.tensor([0.5, 0.5, 1.0, 1.0]))
+
+
+def test_celsr_colour_q_matches_the_ruler_on_a_planted_square():
+    """`pcp_celsr_q` on the unit square with the complex on its +-x sides only: q = (the two 90 deg arcs'
+    integral of exp(2 i phi)) / (their angle) = (2 x 1) / pi -> Re 2/pi, Im 0 (the axis at 0 deg, the
+    +-x borders); a uniform intensity reads 0."""
+    import math
+    from plexus.operators.junction_ops import pcp_celsr_q
+    Pq = torch.tensor([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=torch.float64) - 0.5
+    vi, vj, ef = torch.tensor([0, 1, 2, 3]), torch.tensor([1, 2, 3, 0]), torch.zeros(4, dtype=torch.long)
+    cen = torch.zeros(1, 2, dtype=torch.float64)
+    re, im = pcp_celsr_q(Pq, vi, vj, ef, cen, torch.tensor([0.0, 1.0, 0.0, 1.0], dtype=torch.float64), 1)
+    assert abs(float(re[0]) - 2 / math.pi) < 1e-9 and abs(float(im[0])) < 1e-9
+    re, im = pcp_celsr_q(Pq, vi, vj, ef, cen, torch.ones(4, dtype=torch.float64), 1)
+    assert abs(float(re[0])) < 1e-9 and abs(float(im[0])) < 1e-9

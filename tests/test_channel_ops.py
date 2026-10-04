@@ -454,3 +454,108 @@ def test_a_smooth_permittivity_region_is_conservative_and_charges_the_ion_its_bo
     work = float(torch.trapz(Fz, zs))
     assert abs(work + (U(0.50) - U(0.30))) < 1e-3 * abs(U(0.50) - U(0.30))
     assert U(0.50) - U(0.30) != 0.0
+
+
+def test_morph_gate_waypoints_is_the_default_on_two_points_and_follows_a_bend(tmp_path, monkeypatch):
+    """`morph_gate[waypoints]`: with 2 conformations (the seed and the open state) it moves exactly as the default;
+    with 3, whose middle one is off the straight line, the beads at lambda 0.5 sit on that middle conformation."""
+    import numpy as np
+    from plexus import shapes
+    from plexus.operators.channel_ops import MorphGate, MorphGateWaypoints
+    d = tmp_path / "shp"; d.mkdir()
+    Xc = np.array([[0.4, 0.5, 0.5], [0.6, 0.5, 0.5]]); Xo = np.array([[0.3, 0.5, 0.5], [0.7, 0.5, 0.5]])
+    Xm = np.array([[0.35, 0.55, 0.5], [0.65, 0.45, 0.5]])                   # a bent midpoint
+    np.savez(d / "points.npz", o=Xo, w01_o=Xo, w01b_o=Xm)
+    np.savez(tmp_path / "bent.npz")
+    (tmp_path / "bent").mkdir(); np.savez(tmp_path / "bent" / "points.npz", w01_o=Xm, w02_o=Xo)
+    monkeypatch.setattr(shapes, "roots", lambda: [str(tmp_path)])
+
+    def run(op, pushes=3):
+        A = _Level(torch.tensor(Xc, dtype=torch.float64)); cell = _Level(torch.tensor([[0.5, 0.5, 0.5]], dtype=torch.float64), [("w", 1)])
+        H = _H({"a": A, "cell": cell}); H.dt = 1e-3
+        for _ in range(pushes):
+            v = op.forward(H)["a"]
+            A.state[:, :3] += v * H.dt
+            A.state[0, 0] -= 0.01; A.state[1, 0] += 0.01
+        return op.lam, A
+    P = {"_at": "a", "sets": ["a"], "open_reference": "shp", "open_parts": ["o"], "basin_offset": 1.0,
+         "gate_block": ["cell", "w"], "mobility": 1.0}
+    lam_d, _ = run(MorphGate(dict(P)))
+    lam_w, _ = run(MorphGateWaypoints({**P, "waypoints": 2}))
+    assert abs(lam_d - lam_w) < 1e-12
+    op = MorphGateWaypoints({**P, "open_reference": "bent", "waypoints": 3})
+    A = _Level(torch.tensor(Xc, dtype=torch.float64)); cell = _Level(torch.tensor([[0.5, 0.5, 0.5]], dtype=torch.float64), [("w", 1)])
+    H = _H({"a": A, "cell": cell}); H.dt = 1e-3
+    op.forward(H)                                                        # loads the path from the seed
+    mid, _ = op._at(0.5)                                                 # halfway along its LENGTH
+    assert float((mid - torch.tensor(Xm)).abs().max()) < 1e-12           # the bent midpoint, not the chord
+    chord = 0.5 * (torch.tensor(Xc) + torch.tensor(Xo))
+    assert float((mid - chord).abs().max()) > 0.04
+
+
+def test_morph_gate_clamp_holds_lambda_and_reads_the_planted_force_along_the_path(tmp_path, monkeypatch):
+    """`morph_gate[clamp]`: lambda stays at lambda0, the beads are put back on the path there, and the force written
+    is sum_i f_i . d_i for a force f_i planted on every bead (one frame's displacement mu dt f_i)."""
+    import numpy as np
+    from plexus import shapes
+    from plexus.operators.channel_ops import MorphGateClamp, _block
+    Xc = np.array([[0.4, 0.5, 0.5], [0.6, 0.5, 0.5]]); Xo = np.array([[0.3, 0.5, 0.5], [0.7, 0.5, 0.5]])
+    (tmp_path / "shp").mkdir(); np.savez(tmp_path / "shp" / "points.npz", w01_o=Xo)
+    monkeypatch.setattr(shapes, "roots", lambda: [str(tmp_path)])
+    op = MorphGateClamp({"_at": "a", "sets": ["a"], "open_reference": "shp", "open_parts": ["o"], "waypoints": 2,
+                         "lambda0": 0.25, "mobility": 2.0, "gate_block": ["cell", "w"], "force_block": ["cell", "f"]})
+    A = _Level(torch.tensor(Xc, dtype=torch.float64))
+    cell = _Level(torch.tensor([[0.5, 0.5, 0.5]], dtype=torch.float64), [("w", 1), ("f", 1)])
+    H = _H({"a": A, "cell": cell}); H.dt = 1e-3
+    f = torch.tensor([[-3.0, 1.0, 0.0], [5.0, 0.0, 2.0]], dtype=torch.float64)
+    for _ in range(4):
+        A.state[:, :3] += op.forward(H)["a"] * H.dt                        # back on the path at lambda0
+        A.state[:, :3] += 2.0 * H.dt * f                                   # the planted push, mobility 2
+    op.forward(H)
+    _, D = op._at(0.25)
+    assert op.lam == 0.25
+    assert abs(float(_block(cell, "f")[0, 0]) - float((f * D).sum())) < 1e-9 * float((f * D).abs().sum())
+    assert abs(float(_block(cell, "w")[0, 0]) - 0.25) < 1e-12
+
+
+def test_pair_table_gives_each_type_pair_its_own_law_and_matches_the_plain_law():
+    """`pair_potential[table]`: a head-tail pair feels WCA at the head's sigma only (no attraction beyond its
+    minimum), a tail-tail pair the cooke law at its own sigma and depth -- each equal to the plain operator's force
+    for that law alone; and across two sets the reaction and the B side's `force` readout match the plain operator."""
+    from plexus.operators.channel_ops import PairPotentialTable
+    tab = {"h": {"h": {"law": "wca", "sigma": 0.095}, "t": {"law": "wca", "sigma": 0.095}},
+           "t": {"t": {"law": "cooke", "sigma": 0.1, "epsilon": 0.9, "tail": 0.16}}}
+
+    def lvl(X, types):
+        L_ = _Level(torch.tensor(X, dtype=torch.float64))
+        L_.type_names = ["h", "t"]; L_.node_type = torch.tensor(types)
+        return L_
+    for r0, pair, law in ((0.13, [0, 1], "wca"), (0.105, [0, 1], "wca"), (0.13, [1, 1], "cooke"), (0.2, [1, 1], "cooke")):
+        A = lvl([[0.5, 0.5, 0.5], [0.5 + r0, 0.5, 0.5]], pair)
+        op = PairPotentialTable({"_at": "l", "pair_table": tab, "mobility": 1.0})
+        v = op.forward(_H({"l": A}))["l"]
+        e = tab["h"]["t"] if law == "wca" else tab["t"]["t"]
+        ref = PairPotential({"_at": "l", "law": law, "sigma": e["sigma"], "epsilon": e.get("epsilon", 1.0),
+                             **({"tail": e["tail"]} if law == "cooke" else {}), "mobility": 1.0})
+        B = _Level(torch.tensor([[0.5, 0.5, 0.5], [0.5 + r0, 0.5, 0.5]], dtype=torch.float64))
+        vr = ref.forward(_H({"l": B}))["l"]
+        assert torch.allclose(v, vr, atol=1e-9), (r0, pair, v, vr)
+    assert float(PairPotentialTable({"_at": "l", "pair_table": tab}).forward(
+        _H({"l": lvl([[0.5, 0.5, 0.5], [0.62, 0.5, 0.5]], [0, 1])}))["l"].abs().max()) == 0.0   # no head attraction
+
+
+def test_pair_table_across_two_sets_writes_the_rim_force_like_the_plain_law():
+    from plexus.operators.channel_ops import _block
+    """Across two sets (`with:`) the force on side A and the B side's `force` readout equal the plain law's."""
+    from plexus.operators.channel_ops import PairPotentialTable
+    tab = {"h": {"h": {"law": "wca", "sigma": 0.095}, "t": {"law": "wca", "sigma": 0.095}},
+           "t": {"h": {"law": "wca", "sigma": 0.095}, "t": {"law": "cooke", "sigma": 0.1, "epsilon": 0.9, "tail": 0.16}}}
+    A = _Level(torch.tensor([[0.5, 0.5, 0.5]], dtype=torch.float64)); A.type_names = ["h", "t"]; A.node_type = torch.tensor([1])
+    B = _Level(torch.tensor([[0.63, 0.5, 0.5]], dtype=torch.float64), [("force", 3)]); B.type_names = ["h", "t"]; B.node_type = torch.tensor([1])
+    v = PairPotentialTable({"_at": "l", "with": "f", "pair_table": tab, "react": False}).forward(_H({"l": A, "f": B}))["l"]
+    A2 = _Level(torch.tensor([[0.5, 0.5, 0.5]], dtype=torch.float64))
+    B2 = _Level(torch.tensor([[0.63, 0.5, 0.5]], dtype=torch.float64), [("force", 3)])
+    vr = PairPotential({"_at": "l", "with": "f", "law": "cooke", "sigma": 0.1, "epsilon": 0.9, "tail": 0.16,
+                        "react": False}).forward(_H({"l": A2, "f": B2}))["l"]
+    assert torch.allclose(v, vr, atol=1e-12) and float(v.abs().max()) > 0
+    assert torch.allclose(_block(B, "force"), _block(B2, "force"), atol=1e-12)

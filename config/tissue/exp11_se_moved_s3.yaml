@@ -70,6 +70,7 @@ seed:
     axis: [1, 0, 0]
     half_angle_deg: 30
 plotting:
+  zoom: 3.0
   renderer: vtk_points
   background: black
   up_axis: 2

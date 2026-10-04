@@ -75,6 +75,29 @@ def config_path(*parts: str) -> str:
     return os.path.join(get_repo_root(), "config", *parts)
 
 
+def training_specs(pattern: str = "*") -> list[str]:
+    """Every training spec whose name matches `pattern`, across `config/training/<model>/`.
+
+    The folder says WHAT IS TRAINED -- `neural` (a circuit alone), `neural_eye` (a circuit driving
+    the eye) -- and the file name says which run, so a caller names the run, not the folder."""
+    import glob
+    return sorted(glob.glob(config_path("training", "*", f"{pattern}.yaml")))
+
+
+def training_spec(name: str) -> str:
+    """A training spec by name: `m1_integrate_zf285` -> `config/training/neural/m1_integrate_zf285.yaml`.
+    A path (anything ending in `.yaml`) is returned as given. A name found in two model folders
+    is refused rather than resolved to whichever the glob listed first."""
+    if name.endswith(".yaml"):
+        return name
+    hits = training_specs(name)
+    if len(hits) != 1:
+        raise FileNotFoundError(
+            f"training spec {name!r}: {len(hits)} match(es) under {config_path('training')}"
+            + (f": {hits}" if hits else "") + ". A name must be unique across the model folders.")
+    return hits[0]
+
+
 # --------------------------------------------------------------------------- #
 #  pre-folder (simulation type) inference
 # --------------------------------------------------------------------------- #

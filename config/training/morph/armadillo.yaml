@@ -1,0 +1,19 @@
+name: armadillo
+model: config/si_material/morph_ball.yaml
+learnable:
+- {block: rate, of: mpm_particle, with: lattice, over: material, K: 12, extent: [0.175, 0.175, 0.175, 0.055]}
+task:
+  reference: {shape: armadillo, size: 0.143, centre: [0.175, 0.175, 0.175]}
+  observe: {set: mpm_particle, block: pos, measure: grid_mass, grid: mpm_grid}
+  loss: log_mse
+training:
+  optimizer: adam
+  lr: 3.0
+  lr_min: 0.15
+  schedule: cosine
+  seed: 0
+  stages:
+  - {resolution: {mpm_particle: 5000, mpm_grid: 24}, iters: 80}
+  - {resolution: {mpm_particle: 12500, mpm_grid: 32}, iters: 80}
+  - {resolution: {mpm_particle: 50000, mpm_grid: 40}, iters: 80}
+  render: {frames: 200, px: 1100}

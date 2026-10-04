@@ -1,0 +1,9 @@
+name: hlo_fit_mesh
+model: config/redox/hlo_graphcast_in4_mesh3.yaml
+learnable:
+- {param: theta, op: diffuse, title: GraphCast model to learn redox dynamics}
+task:
+  reference: {field_recording: hlo_washout, coarsen: 4, split: all, n_val: 6}
+  observe: {field: ratio}
+  loss: masked_mse
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 1800, horizon: [1, 2, 4, 8, 16, 32], batch: 4, seed: 0, save_every: 100}

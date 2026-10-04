@@ -1354,6 +1354,1333 @@ class StateDiffuse(Lateral):
         return {(lvl.name, self.block): self.D * d}
 
 
+# THE MESH OF A POINT CLOUD, cached by content: `engine.run` builds its operators fresh on every call (one call per
+# training rollout), and the neurons never move, so the graph is built once per (positions, spacing, levels).
+_GC_MESH_CACHE: dict = {}
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="graphcast",
+                   title="Learned dynamics of a set's scalar (GraphCast message passing on a point cloud)",
+                   equation=r"""$$g_i=\phi_g(v_i),\; m_k\!\leftarrow\! m_k+\chi\big(m_k,\textstyle\sum_{i}\psi(e_{ik},g_i,m_k)\big),\;
+m_l\!\leftarrow\! m_l+\chi^{l}\big(m_l,\textstyle\sum_{k}e_{kl}\big),\; x_i\!\leftarrow\! x_i+\delta(g_i)$$""")
+class StateDiffuseGraphCast(Lateral):
+    """A set's scalar block, its dynamics LEARNED: GraphCast's encoder-processor-decoder with the ELEMENTS as the
+    grid (exp17, ZAPBench: the 71,721 neurons of a larval zebrafish brain, one dF/F each).
+
+    set -> set: reads `block` (the value and its history), the element positions (`xyz`), an optional per-element
+    `embedding` block, and an optional FORCING block of another set (`forcing: <set>.<block>`, the known stimulus
+    the task drives, plexus2.tex "the drive"); emits d(block)/dt. It is a MODEL of `state_diffuse` for the reason
+    exp16's `diffuse[model: graphcast]` is a model of `diffuse`: the contract is the same -- a set's value updated
+    from the others, written as its derivative -- and the graph Laplacian is one law it can represent. What
+    differs is that the law is whatever the data say.
+
+    ONE STEP, GraphCast (Lam et al. 2023, Science 382:1416, supplement sections 3.1-3.7), with the elements as its
+    grid nodes and a multi-level MESH over their bounding box as its mesh:
+
+        v_i   = [ (x_i - mu)/sd  (history, newest first),  p_i,  a_i,  u ]      grid-node features
+        encoder    g_i = phi_g(v_i),  m_k = phi_m(q_k),  e_ik = phi_e(d_ik)       grid2mesh edges
+                   e_ik <- e_ik + psi(e_ik, g_i, m_k);  m_k <- m_k + chi(m_k, sum_i e_ik);  g_i <- g_i + xi(g_i)
+        processor  L unshared layers on the merged multi-mesh:
+                   e_kl <- e_kl + psi_l(e_kl, m_k, m_l);  m_l <- m_l + chi_l(m_l, sum_k e_kl)
+        decoder    e_ki <- e_ki + psi'(e_ki, m_k, g_i);  g_i <- g_i + chi'(g_i, sum_k e_ki)
+        step       x_i(t+1) = x_i(t) + dsd * delta(g_i)
+
+    x_i is element i's value (the block's column 0) and its `inputs - 1` past values (columns 1..), mu / sd /
+    dsd the recording's mean, standard deviation and standard deviation of the ONE-STEP difference (GraphCast's
+    input and output normalisation, supplement 3.7) set by the trainer from its reference (`norm`, default
+    0 / 1 / 1); p_i the position divided by the half-extent of the cloud; a_i the embedding; u the forcing block,
+    flattened, THE SAME for every element (GraphCast appends its forcings to every grid node); q_k a mesh node's
+    scaled position; d the vector sender -> receiver in units of the finest mesh spacing, with its length.
+    Every MLP is Linear -> SiLU -> Linear then LayerNorm (none on delta), residual added after it; delta's last
+    layer STARTS AT ZERO, so the untrained law is exactly persistence.
+
+    THE MESH ON A POINT CLOUD: GraphCast's multi-mesh on a cubic lattice centred on the cloud -- mesh nodes at the
+    lattice VERTICES, level k made of the occupied cells of side 2^k L0 (L0 = `mesh_spacing`), its nodes their corners
+    and its edges their edges, every coarse vertex a vertex of every finer level (nested, as M0 c ... c M6), all levels'
+    edges ONE graph; each element sends to the corners of its level-0 cell within sqrt(3)/2 L0 (GraphCast's radius
+    query) and receives from all 8 (its containing cell, as GraphCast's containing triangle) (`mesh`).
+
+    THE HISTORY IS STATE, NOT A HIDDEN MEMORY. The block holds the element's last `inputs` values, newest first
+    (`inputs: 6` = t-5 .. t); the derivative emitted moves column 0 by the learned increment and every older column
+    to its newer neighbour's value, so after one tick of dt = 1 the block is the next window. Nothing is carried
+    that the recording does not contain (Cedric: "I do not want RNN").
+
+    THE WEIGHTS ARE ONE FLAT TENSOR, `theta` (`{param: theta, op: state_diffuse}`), as exp16's; `checkpoint: true`
+    recomputes the step during backward instead of storing it.
+
+    Reference: Lam, R. et al. (2023). Learning skillful medium-range global weather forecasting. Science
+    382:1416-1421; Battaglia, P. W. et al. (2018). arXiv:1806.01261.
+    """
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["block", "positions", "mesh_spacing"]
+    INPUTS = ["set"]; OUTPUTS = ["set"]; READS = ["block"]; WRITES = ["block"]
+    MECHANISM_TAGS = ["message_passing", "learned_law", "graphcast"]
+    NORM_FROM_REFERENCE = True                    # the trainer hands it (mu, sd, one-step sd) at `on_ready`
+    PARAM_ROLES = {"theta": "GraphCast model to learn the set's dynamics", "block": "state_block",
+                   "positions": "the elements' positions block, um", "mesh_spacing": "finest mesh spacing, um",
+                   "mesh_levels": "multi-mesh levels", "latent": "latent width", "layers": "processor layers, unshared",
+                   "inputs": "values read per element (the block's width): now and the past",
+                   "embedding": "the per-element embedding block", "embedding_dim": "its width",
+                   "forcing": "<set>.<block> of the known forcing (the task's drive)", "seed": "the initial weights' seed",
+                   "mesh_mirror_axis": "make the mesh mirror-symmetric across the plane through the cloud's centre normal to this axis",
+                   "checkpoint": "recompute each tick during backward instead of storing it"}
+    REFERENCE = ("Lam, R. et al. (2023). Learning skillful medium-range global weather forecasting. "
+                 "Science 382:1416-1421; Battaglia, P. W. et al. (2018). arXiv:1806.01261.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "compartment")
+        self.block = str(params["block"])
+        self.positions = str(params["positions"])
+        self.L0 = float(params["mesh_spacing"])
+        self.levels = int(params.get("mesh_levels", 1))
+        m = params.get("mesh_mirror_axis")
+        self.mirror = None if m is None else int(m)
+        self.latent = int(params.get("latent", 32))
+        self.layers = int(params.get("layers", 4))
+        self.inputs = int(params.get("inputs", 1))
+        self.embedding = params.get("embedding")
+        self.embedding_dim = int(params.get("embedding_dim", 0)) if self.embedding else 0
+        if self.embedding and not self.embedding_dim:
+            raise ValueError("state_diffuse[graphcast] `embedding:` needs `embedding_dim:`")
+        f = params.get("forcing")
+        self.forcing = tuple(str(f).split(".")) if f else None
+        if self.forcing is not None and len(self.forcing) != 2:
+            raise ValueError(f"state_diffuse[graphcast] `forcing:` is <set>.<block>, got {f!r}")
+        self.forcing_dim = int(params.get("forcing_dim", 0)) if self.forcing else 0
+        if self.forcing and not self.forcing_dim:
+            raise ValueError("state_diffuse[graphcast] `forcing:` needs `forcing_dim:`, the forcing block's size "
+                             "(elements x width) -- the encoder's width depends on it")
+        if self.levels < 1:
+            raise ValueError("state_diffuse[graphcast] needs `mesh_levels:` >= 1 (level 0 is the finest mesh)")
+        self.seed = int(params.get("seed", 0))
+        self.checkpoint = bool(params.get("checkpoint", False))
+        self.norm = (0.0, 1.0, 1.0)                 # mu, sd, dsd: set by the trainer from its reference
+        self.device_ = device
+        self.theta = self.init_theta()
+
+    # ------------------------------------------------------------------ the weights, flat
+    def layout(self):
+        """[(name, shape)] of every tensor in `theta`, in order; Linear weights are [out, in]."""
+        H, F = self.latent, 4                                   # edge features: the step (3) and its length
+        nin = self.inputs + 3 + self.embedding_dim + self.forcing_dim
+        out = []
+
+        def mlp(name, n_in, n_out, norm=True):
+            out.extend([(f"{name}.w1", (H, n_in)), (f"{name}.b1", (H,)),
+                        (f"{name}.w2", (n_out, H)), (f"{name}.b2", (n_out,))])
+            if norm:
+                out.extend([(f"{name}.g", (n_out,)), (f"{name}.beta", (n_out,))])
+        for name, n_in in (("enc_g", nin), ("enc_m", 3), ("enc_e_g2m", F), ("enc_e_mm", F), ("enc_e_m2g", F)):
+            mlp(name, n_in, H)
+        mlp("g2m_edge", 3 * H, H)
+        mlp("g2m_node", 2 * H, H)
+        mlp("g2m_grid", H, H)
+        for layer in range(self.layers):
+            mlp(f"mm_edge{layer}", 3 * H, H)
+            mlp(f"mm_node{layer}", 2 * H, H)
+        mlp("m2g_edge", 3 * H, H)
+        mlp("m2g_node", 2 * H, H)
+        mlp("dec", H, 1, norm=False)
+        return out
+
+    def init_theta(self):
+        """PyTorch's Linear initialisation, LayerNorm gain 1 / bias 0, the decoder's last layer 0 (persistence)."""
+        g = torch.Generator().manual_seed(self.seed)
+        lay = self.layout()
+        shapes = dict(lay)
+        parts = []
+        for name, shape in lay:
+            if name.startswith("dec.") and name.endswith(("w2", "b2")):
+                t = torch.zeros(shape)
+            elif name.endswith(".g"):
+                t = torch.ones(shape)
+            elif name.endswith(".beta"):
+                t = torch.zeros(shape)
+            else:
+                t = (torch.rand(shape, generator=g) * 2 - 1) / math.sqrt(shapes[name.replace(".b", ".w")][1])
+            parts.append(t.reshape(-1))
+        return torch.cat(parts).to(self.device_)
+
+    def _views(self):
+        views, k = {}, 0
+        for name, shape in self.layout():
+            n = math.prod(shape)
+            views[name] = self.theta[k:k + n].view(shape)
+            k += n
+        if k != self.theta.numel():
+            raise ValueError(f"state_diffuse[graphcast]: theta has {self.theta.numel()} values, the layout {k}")
+        return views
+
+    @staticmethod
+    def _mlp(W, name, x, norm=True):
+        """GraphCast's MLP: Linear -> SiLU -> Linear, then LayerNorm (none on the decoder), read from views of theta."""
+        import torch.nn.functional as Fnn
+        y = Fnn.linear(Fnn.silu(Fnn.linear(x, W[f"{name}.w1"], W[f"{name}.b1"])), W[f"{name}.w2"], W[f"{name}.b2"])
+        return Fnn.layer_norm(y, y.shape[-1:], W[f"{name}.g"], W[f"{name}.beta"]) if norm else y
+
+    # ------------------------------------------------------------------ the graph
+    def mesh(self, xyz):
+        """The multi-mesh and its two bipartite graphs for positions `xyz` [N, 3] (um), cached by content:
+        {n_mesh, q (mesh positions, scaled), pscale, g2m / mm / m2g: (senders, receivers, features), centre_um,
+        level_nodes, lattice, stats}.
+
+        THE MESH IS GRAPHCAST'S, ON A CUBIC LATTICE (2026-09-30, Cedric: the multi-mesh design is essential).
+        GraphCast refines an icosahedron M0 -> M6 and every vertex of a coarse mesh is a vertex of every finer one.
+        Here the mesh nodes are the VERTICES of a cubic lattice of spacing L0 = `mesh_spacing`:
+          level k   the cells of side 2^k L0 that hold at least one element; its nodes are their corners, its
+                    edges their edges (corner to corner, 2^k L0 long) -- so level k's nodes lie on the stride-2^k
+                    sub-lattice and are EXACTLY vertices of every finer level (a coarse corner is added to the finer
+                    levels' node sets where no occupied finer cell touches it: nested by construction, as M0 c M6);
+          the multi-mesh  the edges of every level in ONE graph on the level-0 nodes;
+          grid2mesh  each element to the corners of its own level-0 cell within sqrt(3)/2 L0 of it (GraphCast: the
+                    mesh nodes within 0.6 x its finest edge -- the radius that reaches at least one node);
+          mesh2grid  each element from the 8 corners of its cell (GraphCast: the 3 vertices of its triangle).
+        The lattice is CENTRED on the cloud: its centre (the midpoint of the 0.5-99.5 % extent) is a vertex of the
+        coarsest level, so a brain's midline runs through a column of vertices at every level, the mesh is
+        mirror-symmetric about it and the head's coarse node sits on it. (First written with nodes at the centres of
+        occupied cells: a coarse node then had to be one of the finer cell centres, drifted up to 56 um off the
+        midline, and level 4's nodes had no level-3 edges -- measured 2026-09-30.)"""
+        import numpy as np
+        P = xyz.detach().double().cpu().numpy()
+        import hashlib
+        # keyed on the positions' own bytes: a count + sum + sum-of-squares key let a shuffled or axis-swapped cloud
+        # fetch another cloud's mesh (review, 2026-09-30)
+        key = ("vertex", P.shape, hashlib.sha1(np.ascontiguousarray(P).tobytes()).hexdigest(), self.L0, self.levels,
+               self.mirror, str(xyz.device))
+        if key in _GC_MESH_CACHE:
+            return _GC_MESH_CACHE[key]
+        L0, K = self.L0, self.levels
+        Lc = L0 * 2 ** (K - 1)
+        cmid = (np.percentile(P, 0.5, 0) + np.percentile(P, 99.5, 0)) / 2
+        Q = P
+        if self.mirror is not None:                                   # the cloud and its mirror image
+            Pm = P.copy()
+            Pm[:, self.mirror] = 2 * cmid[self.mirror] - P[:, self.mirror]
+            Q = np.concatenate([P, Pm])
+        lo = cmid - np.ceil((cmid - Q.min(0)) / Lc) * Lc              # cmid is a coarsest-level vertex; lo <= Q.min
+        cell = np.floor((P - lo) / L0).astype(np.int64)               # each element's level-0 cell
+        occ_cells = cell
+        if self.mirror is not None:
+            # A BILATERAL MESH (`mesh_mirror_axis:`): the occupied cells and their mirror images across the plane
+            # through the centre -- a vertex plane -- so the mesh is exactly symmetric even where the cloud is not
+            # (a few somata beyond the other side's extent added a whole column of coarse cells on one side).
+            a = self.mirror
+            mm_ = int(round((cmid[a] - lo[a]) / L0))
+            mc = cell.copy()
+            mc[:, a] = 2 * mm_ - cell[:, a] - 1
+            occ_cells = np.concatenate([cell, mc])
+        corners = np.array(np.meshgrid([0, 1], [0, 1], [0, 1], indexing="ij")).reshape(3, -1).T
+        dims = occ_cells.max(0) + 2 ** K + 2
+
+        def code(v):                                                  # a vertex (in level-0 units) -> one integer
+            return (v[:, 0] * dims[1] + v[:, 1]) * dims[2] + v[:, 2]
+        # each level: its occupied cells, their corner vertices and their edges, in level-0 vertex units
+        lv_vert, lv_edge = [], []
+        for k in range(K):
+            s = 2 ** k
+            cc = np.unique(occ_cells // s, axis=0)                    # occupied level-k cells
+            vert = np.unique((cc[:, None, :] + corners[None]).reshape(-1, 3), axis=0) * s
+            ed = []
+            for ax in range(3):                                       # the 4 edges of each cell along each axis
+                others = [a for a in range(3) if a != ax]
+                for c1 in (0, 1):
+                    for c2 in (0, 1):
+                        off = np.zeros(3, np.int64)
+                        off[others[0]], off[others[1]] = c1, c2
+                        a = (cc + off) * s
+                        b = a.copy()
+                        b[:, ax] += s
+                        ed.append(np.stack([code(a), code(b)], 1))
+            ed = np.unique(np.concatenate(ed), axis=0)
+            lv_vert.append(vert)
+            lv_edge.append(ed)
+        # NESTED: every coarse vertex is a node of every finer level
+        for k in range(K - 2, -1, -1):
+            lv_vert[k] = np.unique(np.concatenate([lv_vert[k], lv_vert[k + 1]]), axis=0)
+        nodes = lv_vert[0]
+        ncode = code(nodes)
+        order = np.argsort(ncode)
+        sc = ncode[order]
+
+        def index(cd):
+            at = np.searchsorted(sc, cd)
+            if not (sc[np.minimum(at, len(sc) - 1)] == cd).all():
+                raise RuntimeError("state_diffuse[graphcast]: a mesh vertex is missing from the node set")
+            return order[at]
+        centre = lo + nodes * L0                                      # mesh node positions, um
+        level_nodes = [index(code(v)) for v in lv_vert]
+        mm = np.concatenate([np.concatenate([index(e[:, 0])[:, None], index(e[:, 1])[:, None]], 1) for e in lv_edge])
+        mm = np.unique(np.concatenate([mm, mm[:, ::-1]]), axis=0)     # both directions, a pair joined once
+        mm_s, mm_r = mm[:, 0], mm[:, 1]
+        own = (cell[:, None, :] + corners[None]).reshape(-1, 3)       # the 8 corners of each element's cell
+        m_nodes = index(code(own))
+        elem = np.repeat(np.arange(len(P)), 8)
+        # GRID2MESH AS GRAPHCAST'S, A RADIUS QUERY: each element sends to the mesh nodes within r of it. GraphCast
+        # takes r = 0.6 x the finest edge, which on its sphere reaches at least one node; on a cube lattice the
+        # smallest radius that does is sqrt(3)/2 L0 (an element at a cell's centre is that far from all 8 corners),
+        # so r = sqrt(3)/2 L0 -- 1 to 8 nodes per element, the corners of its own cell nearest to it.
+        # MESH2GRID keeps the 8 corners of the containing cell (GraphCast: the 3 vertices of the containing triangle).
+        r = math.sqrt(3) / 2 * L0 * (1 + 1e-6)
+        dist = np.linalg.norm(P[elem] - (lo + nodes[m_nodes] * L0), axis=1)
+        near = dist <= r
+        g_s, g_r = elem[near], m_nodes[near]
+        m_s, m_r = m_nodes, elem
+        half = np.maximum(np.ptp(P, 0) / 2, 1e-9)
+        mid = (P.max(0) + P.min(0)) / 2
+        dev = xyz.device
+        t = lambda a, dt=torch.float32: torch.as_tensor(a, dtype=dt, device=dev)   # noqa: E731
+
+        def feat(ps, pr):
+            d = (ps - pr) / L0
+            return t(np.concatenate([d, np.linalg.norm(d, axis=1, keepdims=True)], 1))
+        G = {"n_mesh": len(nodes), "q": t((centre - mid) / half), "pscale": (t(mid), t(half)),
+             "g2m": (t(g_s, torch.long), t(g_r, torch.long), feat(P[g_s], centre[g_r])),
+             "mm": (t(mm_s, torch.long), t(mm_r, torch.long), feat(centre[mm_s], centre[mm_r])),
+             "m2g": (t(m_s, torch.long), t(m_r, torch.long), feat(centre[m_s], P[m_r])),
+             "centre_um": centre, "level_nodes": level_nodes,
+             "lattice": {"origin_um": lo, "coarsest_um": Lc, "mid_um": cmid},
+             "stats": {"mesh_nodes": int(len(nodes)), "mm_edges": int(len(mm_s)), "g2m_edges": int(len(g_s)),
+                       "m2g_edges": int(len(m_s)), "nodes_per_level": [int(len(x)) for x in level_nodes],
+                       "edges_per_level": [int(2 * len(e)) for e in lv_edge]}}
+        _GC_MESH_CACHE[key] = G
+        return G
+
+    # ------------------------------------------------------------------ one tick
+    def step(self, x, xyz, a=None, u=None):
+        """x [N, inputs] (newest first) -> the derivative of the block over one tick of dt = 1: column 0 the
+        learned increment, column j >= 1 the move of the older value to its newer neighbour's."""
+        if x.shape[1] != self.inputs:
+            raise ValueError(f"state_diffuse[graphcast] reads {self.inputs} value(s) per element; the block is "
+                             f"{x.shape[1]} wide (`inputs:` must equal the block's width)")
+        G = self.mesh(xyz)
+        W = self._views()
+        mu, sd, dsd = self.norm
+        mid, half = G["pscale"]
+        feats = [(x - mu) / sd, (xyz.to(x.dtype) - mid) / half]
+        if self.embedding_dim:
+            feats.append(a)
+        if self.forcing_dim:
+            uf = u.reshape(1, -1)
+            if uf.shape[1] != self.forcing_dim:
+                raise ValueError(f"state_diffuse[graphcast]: forcing has {uf.shape[1]} values, "
+                                 f"`forcing_dim:` says {self.forcing_dim}")
+            feats.append(uf.expand(x.shape[0], -1))
+        v = torch.cat(feats, 1)
+        H, Nm, Ng = self.latent, G["n_mesh"], x.shape[0]
+
+        def agg(rc, e, n):
+            return torch.zeros(n, H, device=e.device, dtype=e.dtype).index_add(0, rc, e)
+        g = self._mlp(W, "enc_g", v)
+        m = self._mlp(W, "enc_m", G["q"])
+        sn, rc, f = G["g2m"]
+        e = self._mlp(W, "enc_e_g2m", f)
+        e = e + self._mlp(W, "g2m_edge", torch.cat([e, g[sn], m[rc]], -1))
+        m = m + self._mlp(W, "g2m_node", torch.cat([m, agg(rc, e, Nm)], -1))
+        g = g + self._mlp(W, "g2m_grid", g)
+        sn, rc, f = G["mm"]
+        e = self._mlp(W, "enc_e_mm", f)
+        for layer in range(self.layers):
+            e = e + self._mlp(W, f"mm_edge{layer}", torch.cat([e, m[sn], m[rc]], -1))
+            m = m + self._mlp(W, f"mm_node{layer}", torch.cat([m, agg(rc, e, Nm)], -1))
+        sn, rc, f = G["m2g"]
+        e = self._mlp(W, "enc_e_m2g", f)
+        e = e + self._mlp(W, "m2g_edge", torch.cat([e, m[sn], g[rc]], -1))
+        g = g + self._mlp(W, "m2g_node", torch.cat([g, agg(rc, e, Ng)], -1))
+        d0 = dsd * self._mlp(W, "dec", g, norm=False)                   # [N, 1]
+        if self.inputs == 1:
+            return d0
+        return torch.cat([d0, x[:, :-1] - x[:, 1:]], 1)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        b0, b1 = lvl.state_schema[self.block]
+        x = lvl.state[:, b0:b1]
+        p0, p1 = lvl.state_schema[self.positions]
+        xyz = lvl.state[:, p0:p1]
+        a = None
+        if self.embedding_dim:
+            e0, e1 = lvl.state_schema[self.embedding]
+            a = lvl.state[:, e0:e1]
+        u = None
+        if self.forcing:
+            fl = H.level(self.forcing[0])
+            f0, f1 = fl.state_schema[self.forcing[1]]
+            u = fl.state[:, f0:f1]
+        run = self.step
+        if self.checkpoint and torch.is_grad_enabled():
+            from torch.utils.checkpoint import checkpoint
+            run = lambda *q: checkpoint(self.step, *q, use_reentrant=False)   # noqa: E731
+        return {(lvl.name, self.block): run(x, xyz, a, u)}
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="connectome",
+                   title="Learned dynamics of a set's scalar through a mesoscale connectome on a multi-level mesh",
+                   equation=r"""$$v_k\!\leftarrow\!v_k+\tfrac{1}{M}f_\theta\big(v_k,a_k,\textstyle\sum_l W_{lk}\,g_\phi(v_l,a_l)^2\big)
+\;(\times M),\quad x_i\!\leftarrow\!x_i+f_n(x_i,a_i,m_i,u)$$""")
+class StateDiffuseConnectome(StateDiffuseGraphCast):
+    """A set's scalar, its dynamics learned as connectome-gnn learns a circuit -- but on GraphCast's multi-level mesh
+    over the elements instead of a measured connectome (exp17, Cedric 2026-09-30: "attach a Wij to all edges, run
+    multiple passes to let the voltages flow over the different levels").
+
+    ONE STATE PER MESH NODE, ONE WEIGHT PER MESH EDGE. One tick (dt = 1 recorded frame):
+
+        1 neurons -> mesh    v_k = the mean of (x_i - mu)/sd over the elements within sqrt(3)/2 L0 of node k (0 if none)
+        2 M substeps         v_k <- v_k + (1/M) f_theta(v_k, a_k, sum_l W_lk g_phi(v_l, a_l)^2)     on the multi-mesh
+        3 mesh -> neurons    m_i = the mean of v over the 8 corners of element i's cube
+                             x_i <- x_i + dsd f_n(x_i (history), e_i, m_i, u)
+
+    v_k is mesh node k's state (normalised dF/F), a_k its learned embedding (`mesh_embedding_dim` numbers, one per
+    node, the activity's parameter `mesh_embedding`), W_lk the learned weight of the mesh edge l -> k (the activity's
+    parameter `W`, one scalar per directed edge of every level: a mesoscale connectome), g_phi the message and f_theta
+    the mesh update (connectome-gnn's g_phi and f_theta, squared message as its `g_phi_positive`), f_n the elements'
+    update reading their own history, their embedding e_i (the set's `embedding` block), what the mesh brought back
+    (m_i) and the forcing u; M = `substeps`, so a signal crosses M edges of any level per tick. f_n's last layer
+    starts at 0: untrained = persistence. The mesh values are REBUILT from the elements every tick and dropped after
+    it -- no state is carried between frames, so this is not a recurrent hidden state (Cedric: "I do not want RNN").
+
+    The mesh is GraphCast's (`StateDiffuseGraphCast.mesh`: nested lattice vertices, mirror-symmetric if asked). W and
+    a_k are sized by it, so it is built at construction from `positions_file` (the same positions the set is seeded
+    with; the tick checks they are those). MLPs are Linear-SiLU-Linear-SiLU-Linear of width `hidden`, no norm
+    (connectome-gnn's form).
+
+    Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying the activity of
+    neural assemblies (connectome-gnn); Lam, R. et al. (2023) Science 382:1416 (the multi-mesh).
+    """
+    REQUIRES_PARAMS = ["block", "positions", "mesh_spacing", "positions_file"]
+    MECHANISM_TAGS = ["message_passing", "learned_law", "connectome", "multi_mesh"]
+    NORM_FROM_REFERENCE = True
+    PARAM_ROLES = {**StateDiffuseGraphCast.PARAM_ROLES,
+                   "theta_g": "the message MLP g_phi", "theta_f": "the mesh update MLP f_theta",
+                   "theta_n": "the element update MLP f_n",
+                   "W": "one weight per directed mesh edge, every level: a mesoscale connectome",
+                   "mesh_embedding": "each mesh node's learned embedding",
+                   "substeps": "message-passing substeps per tick on the mesh",
+                   "message": "current: g_phi(v_l, a_l); conductance: g_phi(v_k, v_l, a_k, a_l) (connectome-gnn's two forms)",
+                   "hidden": "MLP width", "mesh_embedding_dim": "width of a mesh node's embedding",
+                   "positions_file": "the npz the set's positions are seeded from (sizes W and the mesh embedding)",
+                   "positions_array": "the array of it", "w_init": "the starting W (default: small random)"}
+
+    def __init__(self, params, device="cpu"):
+        self.hidden = int(params.get("hidden", 64))
+        self.substeps = int(params.get("substeps", 8))
+        self.mesh_embedding_dim = int(params.get("mesh_embedding_dim", 2))
+        self.message = str(params.get("message", "current"))
+        if self.message not in ("current", "conductance"):
+            raise ValueError(f"state_diffuse[connectome] `message:` is current or conductance, got {self.message!r}")
+        super().__init__(params, device)
+        import numpy as np
+        from plexus.paths import graphs_data_path
+        f = str(params["positions_file"])
+        f = f if os.path.isabs(f) else graphs_data_path(f)
+        pos = np.load(f)[str(params.get("positions_array", "pos_um"))]
+        G = self.mesh(torch.as_tensor(pos, dtype=torch.float32, device=device))
+        n_e, n_m = int(G["mm"][0].numel()), int(G["n_mesh"])
+        g = torch.Generator().manual_seed(self.seed + 1)
+        w0 = params.get("w_init")
+        if w0 is None:                                # connectome-gnn's randn, scaled by the mean in-degree
+            self.W = (torch.randn(n_e, generator=g) / math.sqrt(max(n_e / n_m, 1.0))).to(device)
+        else:
+            self.W = torch.full((n_e,), float(w0), device=device)
+        self.mesh_embedding = torch.ones(n_m, self.mesh_embedding_dim, device=device)   # connectome-gnn's a_i = 1
+
+    # THREE WEIGHT TENSORS, not one: connectome-gnn regularises its message and update MLPs apart (coeff_g_phi_* and
+    # coeff_f_theta_*), so each is its own learnable and carries its own prior.
+    def _shapes(self):
+        H, E = self.hidden, self.mesh_embedding_dim
+        n_g = (2 + 2 * E) if self.message == "conductance" else (1 + E)
+        n_n = self.inputs + self.embedding_dim + 1 + self.forcing_dim
+        return {"theta_g": n_g, "theta_f": 2 + E, "theta_n": n_n}
+
+    def _layout3(self, n_in):
+        H = self.hidden
+        return [("w1", (H, n_in)), ("b1", (H,)), ("w2", (H, H)), ("b2", (H,)), ("w3", (1, H)), ("b3", (1,))]
+
+    def init_theta(self):
+        g = torch.Generator().manual_seed(self.seed)
+        for name, n_in in self._shapes().items():
+            parts = []
+            for k, shape in self._layout3(n_in):
+                if name == "theta_n" and k in ("w3", "b3"):
+                    t = torch.zeros(shape)                                 # persistence at the start
+                else:
+                    fan = n_in if k in ("w1", "b1") else self.hidden
+                    t = (torch.rand(shape, generator=g) * 2 - 1) / math.sqrt(fan)
+                parts.append(t.reshape(-1))
+            setattr(self, name, torch.cat(parts).to(self.device_))
+        return torch.zeros(0, device=self.device_)                         # the parent's `theta`: unused here
+
+    def _mlp3(self, name, x):
+        import torch.nn.functional as Fnn
+        flat, W, k = getattr(self, name), {}, 0
+        for key, shape in self._layout3(self._shapes()[name]):
+            n = math.prod(shape)
+            W[key] = flat[k:k + n].view(shape)
+            k += n
+        h = Fnn.silu(Fnn.linear(x, W["w1"], W["b1"]))
+        h = Fnn.silu(Fnn.linear(h, W["w2"], W["b2"]))
+        return Fnn.linear(h, W["w3"], W["b3"])
+
+    def _message(self, vk, vl, ak, al):
+        if self.message == "conductance":
+            return self._mlp3("theta_g", torch.cat([vl, al, vk, ak], 1)) ** 2
+        return self._mlp3("theta_g", torch.cat([vl, al], 1)) ** 2
+
+    def prior_term(self, param, kind):
+        """connectome-gnn's model-specific regularisers, evaluated by the model that knows its own message
+        (declared with the learnable, `prior: {monotone: l, pin: l, input_group_l1: l}`, on `theta_g`):
+          monotone        relu(g(v) - g(v + dv)) over sampled inputs: the message does not fall as the sender's value
+                          rises (coeff_g_phi_diff)
+          pin             g(v_ref) - 1 at v_ref = 2 (two standard deviations) for every embedding: fixes the scale that
+                          W and g share (coeff_g_phi_norm, the gauge)
+          input_group_l1  sum over g's input columns of ||first-layer column||_2: whole inputs to zero, the
+                          conductance lasso (coeff_g_phi_input_group_L1)."""
+        if param != "theta_g":
+            raise ValueError(f"state_diffuse[connectome]: `{kind}` is a prior of `theta_g`, not of `{param}`")
+        dev = self.theta_g.device
+        ak = self.mesh_embedding.detach()
+        idx = torch.randint(0, ak.shape[0], (512,), device=dev)
+        a = ak[idx]
+        if kind == "monotone":
+            v = torch.rand(512, 1, device=dev) * 6 - 3
+            return torch.relu(self._message(v, v, a, a) - self._message(v, v + 0.1, a, a)).norm(2)
+        if kind == "pin":
+            v = torch.full((512, 1), 2.0, device=dev)
+            return (self._message(v, v, a, a) - 1.0).norm(2)
+        if kind == "input_group_l1":
+            w1 = self.theta_g[: self.hidden * self._shapes()["theta_g"]].view(self.hidden, -1)
+            return w1.norm(dim=0).sum()
+        raise ValueError(f"state_diffuse[connectome]: no prior `{kind}`")
+
+    def step(self, x, xyz, a=None, u=None):
+        if x.shape[1] != self.inputs:
+            raise ValueError(f"state_diffuse[connectome] reads {self.inputs} value(s) per element; the block is "
+                             f"{x.shape[1]} wide")
+        G = self.mesh(xyz)
+        if int(G["mm"][0].numel()) != self.W.numel():
+            raise ValueError("state_diffuse[connectome]: the elements' positions are not those of `positions_file`")
+        mu, sd, dsd = self.norm
+        z = (x[:, :1] - mu) / sd                                           # [N, 1], now
+        Nm = G["n_mesh"]
+        # 1 neurons -> mesh: the mean over the elements in reach
+        gs, gr, _ = G["g2m"]
+        cnt = torch.zeros(Nm, 1, device=x.device, dtype=x.dtype).index_add(0, gr, torch.ones_like(z[gs]))
+        v = torch.zeros(Nm, 1, device=x.device, dtype=x.dtype).index_add(0, gr, z[gs]) / cnt.clamp(min=1.0)
+        # 2 M substeps on the multi-mesh, one weight per edge
+        ms, mr, _ = G["mm"]
+        ak = self.mesh_embedding
+        w = self.W[:, None]
+        for _ in range(self.substeps):
+            msg = w * self._message(v[mr], v[ms], ak[mr], ak[ms])
+            agg = torch.zeros(Nm, 1, device=x.device, dtype=x.dtype).index_add(0, mr, msg)
+            v = v + self._mlp3("theta_f", torch.cat([v, ak, agg], 1)) / self.substeps
+        # 3 mesh -> neurons: the mean over the cube's 8 corners, then the element's own update
+        m_s, m_r, _ = G["m2g"]
+        mi = torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype).index_add(0, m_r, v[m_s]) / 8.0
+        feats = [(x - mu) / sd]
+        if self.embedding_dim:
+            feats.append(a)
+        feats.append(mi)
+        if self.forcing_dim:
+            feats.append(u.reshape(1, -1).expand(x.shape[0], -1))
+        d0 = dsd * self._mlp3("theta_n", torch.cat(feats, 1))
+        if self.inputs == 1:
+            return d0
+        return torch.cat([d0, x[:, :-1] - x[:, 1:]], 1)
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="known_ode",
+                   title="A set's scalar through a known ODE on a multi-level mesh (connectome-gnn's known-ODE baseline)",
+                   equation=r"""$$v_k\!\leftarrow\!v_k+\tfrac{1}{M\tau_k}\big(-v_k+V_k+\textstyle\sum_l W_{lk}\phi(v_l)\big),
+\quad z_i\!\leftarrow\!z_i+\tfrac{1}{\tau_i}\big(-z_i+V_i+g_i m_i+B_i\!\cdot\!u\big)$$""")
+class StateDiffuseKnownODE(StateDiffuseConnectome):
+    """A set's scalar through a KNOWN ODE -- no MLP anywhere -- on GraphCast's multi-level mesh: connectome-gnn's
+    known-ODE baseline (`known_ode.py`, flyvis: dv/dt = (-v + msg + I + V_rest)/tau, msg = W relu(v_j)) with the mesh
+    in place of the connectome (exp17, Cedric 2026-09-30).
+
+    One tick (dt = 1 recorded frame), in the reference's normalised units z = (x - mu)/sd:
+        1 neurons -> mesh    v_k = the mean of z over the elements within sqrt(3)/2 L0 of node k (0 if none)
+        2 M substeps         v_k <- v_k + (1/M) (-v_k + V_k + msg_k) / tau_k
+                               current      msg_k = sum_l W_lk phi(v_l)                 phi = `activation` (tanh default:
+                                            the normalised activity is signed; relu drops every below-mean value)
+                               conductance  msg_k = sum_l W_lk^2 relu(v_l) (E_l - v_k)   W squared, so the sign comes
+                                            from the driving force alone (connectome-gnn's flyvis conductance ODE);
+                                            E_l a learned reversal value per SENDING node (Dale: a property of the sender)
+        3 mesh -> neurons    m_i = the mean of v over the 8 corners of element i's cube
+                             z_i <- z_i + (-z_i + V_i + g_i m_i + B_i . u) / tau_i
+    tau_k, V_k (and E_k) are the mesh nodes' own constants, parameters of this activity (`mesh_rate`, `mesh_rest`,
+    `mesh_reversal`); tau_i, V_i, g_i, B_i are the elements' own, STATE BLOCKS of the set (`tau`, `rest`, `gain`,
+    `input` blocks, learned as `{block:, of:}` as `neuron_update`'s `tau:` is); u is the forcing at the current frame
+    (the drive's window must be [0, 0]). 1/tau = softplus(raw). One state per element (`inputs: 1`), no history, and the
+    mesh values are rebuilt every tick: nothing carried, no hidden state. It does NOT start at exact persistence: an ODE
+    has no zero decoder; its seed (slow rates, zero gain and input) starts it near.
+
+    Reference: Allier, C. et al., connectome-gnn (`src/connectome_gnn/models/known_ode.py`, FlyvisKnownODE and
+    FlyvisConductanceKnownODE); Lam, R. et al. (2023) Science 382:1416 (the multi-mesh).
+    """
+    MECHANISM_TAGS = ["known_ode", "multi_mesh", "leaky_integrator"]
+    PARAM_ROLES = {**StateDiffuseConnectome.PARAM_ROLES,
+                   "synapse": "current (W phi(v_l)) or conductance (W^2 relu(v_l)(E_l - v_k))",
+                   "activation": "phi of the current synapse: tanh (default) or relu",
+                   "mesh_rate": "raw 1/tau of each mesh node (softplus)", "mesh_rest": "each mesh node's rest value",
+                   "mesh_reversal": "each mesh node's reversal value, as a sender (conductance)",
+                   "tau": "the elements' raw 1/tau block", "rest": "the elements' rest block",
+                   "gain": "the elements' gain on the mesh block", "input": "the elements' forcing weights block",
+                   "adaptation": "the slow adaptation state block (width 1); absent = no adaptation",
+                   "adapt_gain": "the elements' raw adaptation strength block (softplus)",
+                   "adapt_rate": "the elements' raw adaptation rate block (softplus, per tick)",
+                   "input_mask": "an npz (graphs_data) whose array keeps the elements the forcing enters; absent = every element",
+                   "input_mask_array": "the array of it (default mask)",}
+
+    def __init__(self, params, device="cpu"):
+        self.synapse = str(params.get("synapse", "current"))
+        self.activation = str(params.get("activation", "tanh" if self.synapse == "current" else "relu"))
+        if self.synapse not in ("current", "conductance") or self.activation not in ("tanh", "relu", "linear"):
+            raise ValueError("state_diffuse[known_ode]: `synapse:` current|conductance, `activation:` tanh|relu|linear")
+        self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "gain", "input")}
+        self._adapt_params(params)
+        super().__init__(params, device)
+        if self.inputs != 1:
+            raise ValueError("state_diffuse[known_ode] is a first-order ODE of the state: `inputs: 1`")
+        n_m = self.mesh_embedding.shape[0]
+        self.mesh_rate = torch.full((n_m,), math.log(math.e ** 0.5 - 1), device=device)   # 1/tau = 0.5 per frame
+        self.mesh_rest = torch.zeros(n_m, device=device)
+        self.mesh_reversal = torch.ones(n_m, device=device)
+
+    def init_theta(self):
+        return torch.zeros(0, device=self.device_)                         # no MLP
+
+    # ADAPTATION (exp17 batch 8, Cedric 2026-10-01): a second, SLOW state per element that follows the activity and is
+    # subtracted from its drive -- the overshoot-and-decay a single leaky variable cannot make (a big response to a
+    # stimulus step, then a decay while the stimulus stays). In the normalised units of z:
+    #     dz = softplus(tau_i) (-z + ... - softplus(g_i) a)              da = softplus(k_i) (z - a)
+    # `adaptation: <block>` names the state block (width 1); `adapt_gain` / `adapt_rate` the elements' raw g and k blocks
+    # (learned as `{block:, of:}`). At a rollout's start a = z (adapted to the present level: `init_latent`).
+    def _adapt_params(self, params):
+        # THE INPUT MASK (exp17 batch 10, Cedric 2026-10-01): the stimulus enters only the elements the mask keeps
+        # (`input_mask`: an npz under graphs_data, `input_mask_array` its array, one value per element); every other
+        # element gets it only through the coupling. Its B rows then receive no gradient and stay at their start.
+        self.input_mask = None
+        if params.get("input_mask"):
+            import numpy as np
+            from plexus.paths import graphs_data_path
+            f = str(params["input_mask"])
+            f = f if os.path.isabs(f) else graphs_data_path(f)
+            self.input_mask = torch.as_tensor(np.load(f)[str(params.get("input_mask_array", "mask"))],
+                                              dtype=torch.float32, device=self.device_ if hasattr(self, "device_") else "cpu")[:, None]
+        self.adapt = params.get("adaptation")
+        self.adapt_blocks = {"adapt_gain": str(params.get("adapt_gain", "adapt_gain")),
+                             "adapt_rate": str(params.get("adapt_rate", "adapt_rate"))} if self.adapt else {}
+
+    def _act(self, v):
+        return torch.tanh(v) if self.activation == "tanh" else (torch.relu(v) if self.activation == "relu" else v)
+
+    def init_latent(self, H):
+        """a = z at the rollout's start (the trainer calls this at `on_ready`, once `norm` is set)."""
+        if not self.adapt:
+            return
+        lvl = H.level(self.at)
+        b0, _ = lvl.state_schema[self.block]
+        a0, _ = lvl.state_schema[self.adapt]
+        mu, sd, _ = self.norm
+        z = (lvl.state[..., b0:b0 + 1] - mu) / sd
+        st = lvl.state.clone()
+        st[..., a0:a0 + 1] = z
+        lvl.state = st
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        import torch.nn.functional as Fnn
+        G = self.mesh(xyz)
+        if int(G["mm"][0].numel()) != self.W.numel():
+            raise ValueError("state_diffuse[known_ode]: the elements' positions are not those of `positions_file`")
+        if x.shape[1] != 1:                           # a wider block would get this [N, 1] increment broadcast
+            raise ValueError(f"state_diffuse[known_ode] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
+        mu, sd, _ = self.norm
+        z = (x[:, :1] - mu) / sd
+        Nm = G["n_mesh"]
+        gs, gr, _ = G["g2m"]
+        cnt = torch.zeros(Nm, 1, device=x.device, dtype=x.dtype).index_add(0, gr, torch.ones_like(z[gs]))
+        v = torch.zeros(Nm, 1, device=x.device, dtype=x.dtype).index_add(0, gr, z[gs]) / cnt.clamp(min=1.0)
+        ms, mr, _ = G["mm"]
+        rate = Fnn.softplus(self.mesh_rate)[:, None]
+        rest = self.mesh_rest[:, None]
+        for _ in range(self.substeps):
+            if self.synapse == "current":
+                act = self._act(v[ms])
+                msg = self.W[:, None] * act
+            else:
+                msg = self.W[:, None] ** 2 * torch.relu(v[ms]) * (self.mesh_reversal[ms][:, None] - v[mr])
+            agg = torch.zeros(Nm, 1, device=x.device, dtype=x.dtype).index_add(0, mr, msg)
+            v = v + rate * (-v + rest + agg) / self.substeps
+        m_s, m_r, _ = G["m2g"]
+        mi = torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype).index_add(0, m_r, v[m_s]) / 8.0
+        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
+        if self.input_mask is not None and self.forcing_dim:
+            drive = drive * self.input_mask.to(drive.device)
+        if not self.adapt:
+            dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive)
+            return sd * dz
+        ad = nb["adapt"]
+        dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive - Fnn.softplus(nb["adapt_gain"]) * ad)
+        return sd * dz, Fnn.softplus(nb["adapt_rate"]) * (z - ad)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        b0, b1 = lvl.state_schema[self.block]
+        p0, p1 = lvl.state_schema[self.positions]
+        nb = {}
+        for k, name in self.blocks.items():
+            if k == "input" and not self.forcing_dim:
+                continue
+            c0, c1 = lvl.state_schema[name]
+            nb[k] = lvl.state[:, c0:c1]
+        if getattr(self, "adapt", None):
+            for k, name in {"adapt": self.adapt, **self.adapt_blocks}.items():
+                c0, c1 = lvl.state_schema[name]
+                nb[k] = lvl.state[:, c0:c1]
+        u = None
+        if self.forcing:
+            fl = H.level(self.forcing[0])
+            f0, f1 = fl.state_schema[self.forcing[1]]
+            u = fl.state[:, f0:f1]
+        if getattr(self, "modulation", "none") == "hash":
+            # the neuron graph's modulation: its spatial features once per rollout (one instance), handed to each tick
+            if getattr(self, "_fs_cache", None) is None or self._fs_cache[0] is not self.omega_table:
+                self._fs_cache = (self.omega_table, self._space_features())
+            nb["_omega_fs"] = self._fs_cache[1]
+        run = self.step
+        if self.checkpoint and torch.is_grad_enabled():
+            from torch.utils.checkpoint import checkpoint
+            run = lambda *q, **k: checkpoint(self.step, *q, use_reentrant=False, **k)   # noqa: E731
+        d = run(lvl.state[:, b0:b1], lvl.state[:, p0:p1], None, u, nb=nb)
+        if getattr(self, "adapt", None):
+            return {(lvl.name, self.block): d[0], (lvl.name, self.adapt): d[1]}
+        return {(lvl.name, self.block): d}
+
+
+_NG_GRAPH_CACHE: dict = {}
+_NG_MOD_CACHE: dict = {}
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph",
+                   title="A set's scalar through a known ODE on a multi-scale graph between the elements themselves",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j\in\mathcal N_s(i)}
+W^{s}_{ji}\tanh z_j+B_i\cdot u\big)/\tau_i$$""")
+class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
+    """The known ODE with NO MESH: the elements pass messages to each other directly, over three typed edge sets
+    built from their positions (exp17, Cedric 2026-09-30: "project the multi-mesh corners to the closest neuron and
+    discard the multimesh, just using Wij over long, middle and short edges"). One state per element, one weight per
+    directed edge: connectome-gnn's known ODE on a proxy connectome.
+
+    The graph, built once from `positions_file` (the positions the set is seeded with):
+        short   j -> i for the `short_k` nearest elements j of i                      (the local pooling the mesh
+                                                                                     did by averaging, now weighted)
+        mid     j -> i for each of the 6 points p_i +- `mid_um` along x, y, z: the element nearest to that point,
+                kept if it lies within half the reach of it (a point outside the brain gives no edge)
+        long    the same at `long_um`
+    A reach of 0 drops that edge set. The three sets are three learnables (`W_short`, `W_mid`, `W_long`), so each
+    carries its own prior and step size.
+
+    One tick (dt = 1 recorded frame), in the reference's normalised units z = (x - mu)/sd, M = `substeps`:
+        z_i <- z_i + (1/M) softplus(tau_i) (-z_i + V_i + sum_s sum_j W^s_ji tanh(z_j) + B_i . u)
+    tanh because the normalised activity is signed. tau_i, V_i, B_i are the elements' STATE BLOCKS (`tau`, `rest`,
+    `input`), learned as `{block:, of:}`; no gain block (each edge's W carries its own). W starts at `w_init` (0: the
+    untrained law is each element's own leaky filter of the stimulus, the ablation's per-neuron floor). u is the forcing
+    at the current frame (drive window [0, 0]). Nothing is carried between ticks but the state: no hidden state.
+
+    Reference: Allier, C. et al., connectome-gnn (`known_ode.py`, FlyvisKnownODE).
+    """
+    REQUIRES_PARAMS = ["block", "positions", "positions_file"]
+    MECHANISM_TAGS = ["known_ode", "proxy_connectome", "leaky_integrator"]
+    NORM_FROM_REFERENCE = True
+    PARAM_ROLES = {"block": "state_block", "positions": "the elements' positions block, um",
+                   "positions_file": "the npz the set's positions are seeded from (sizes the edge sets)",
+                   "positions_array": "the array of it",
+                   "short_k": "nearest elements sending to each element (the short edges)",
+                   "mid_um": "reach of the middle edges, um (0: none)", "long_um": "reach of the long edges, um (0: none)",
+                   "W_short": "one weight per short edge", "W_mid": "one weight per middle edge",
+                   "omega_table": "the modulation's spatial hash table (modulation: hash)", "omega_ttable": "its time table",
+                   "omega_mlp": "its decoder or SIREN weights, flat",
+                   "W_long": "one weight per long edge", "w_init": "the starting weights (default 0)",
+                   "substeps": "Euler substeps per tick", "inputs": "values read per element: 1 (now)",
+                   "forcing": "<set>.<block> of the known forcing (the task's drive)", "forcing_dim": "its size",
+                   "seed": "unused (no random start); kept for the spec's uniformity",
+                   "checkpoint": "recompute each tick during backward instead of storing it",
+                   "tau": "the elements' raw 1/tau block", "rest": "the elements' rest block",
+                   "input": "the elements' forcing weights block",
+                   "activation": "phi of the messages: tanh (default), relu or linear (no cap)",
+                   "adaptation": "the slow adaptation state block (width 1); absent = no adaptation",
+                   "adapt_gain": "the elements' raw adaptation strength block (softplus)",
+                   "adapt_rate": "the elements' raw adaptation rate block (softplus, per tick)",
+                   "input_mask": "an npz (graphs_data) whose array keeps the elements the forcing enters; absent = every element",
+                   "input_mask_array": "the array of it (default mask)",
+                   "integrator": "euler (default: z += rate (target - z) / M, stable for rate < 2M) or exponential "
+                                 "(z += (1 - exp(-rate / M)) (target - z), stable at any rate)",
+                   "rate_max": "a smooth cap on every learned rate, rate_max tanh(rate / rate_max); absent = none",
+                   "synapse": "current (W phi(z_j), default) or conductance (W^2 relu(z_j) (E_j - z_i), E per sender)",
+                   "reversal": "the elements' reversal block E_j (conductance), in the normalised units of z",
+                   "w_init": "every edge weight's start (0; a conductance needs > 0: W^2 has no gradient at 0)",
+                   "modulation": "none (default), hash or siren: Omega_i(t) = 1 + f(x_i, y_i, z_i, t) scales each "
+                                 "element's message sum (Allier et al. 2026, arXiv 2602.13325, eq. 3)",
+                   "mod_levels": "hash: levels (12)", "mod_features": "hash: features per level (2)",
+                   "mod_log2_table": "hash: log2 table rows per level (19)",
+                   "mod_res_space": "hash: [coarsest, finest] cells across the brain ([4, 128])",
+                   "mod_res_time": "hash: [coarsest, finest] cells across the recording ([8, 2048]); space and time are two tables",
+                   "mod_hidden": "the decoder's (hash) or the SIREN's width (32 / 128)",
+                   "mod_layers": "siren: layers, input to output (5, the paper's)",
+                   "siren_omega": "siren: omega_0 of its sines (30, Sitzmann et al.; coordinates in [-1, 1])",
+                   "reach_dirs": "mid / long partners along the axes (default), the axes rotated, or 6 random directions per element",
+                   "reach_rotation_deg": "with reach_dirs: rotated, the turn of the axes about z, degrees",
+                   "graph": "spatial (default) or random: the same degrees, senders drawn uniformly (the null)",
+                   "graph_seed": "the seed of the random directions or the random graph"}
+    EDGE_SETS = ("short", "mid", "long")
+
+    def __init__(self, params, device="cpu"):
+        super(StateDiffuseGraphCast, self).__init__(params, device)            # Lateral: no mesh, no MLP
+        self.at = params.get("_at", "compartment")
+        self.block = str(params["block"])
+        self.positions = str(params["positions"])
+        self.inputs = int(params.get("inputs", 1))
+        if self.inputs != 1:
+            raise ValueError("state_diffuse[neuron_graph] is a first-order ODE of the state: `inputs: 1`")
+        f = params.get("forcing")
+        self.forcing = tuple(str(f).split(".")) if f else None
+        self.forcing_dim = int(params.get("forcing_dim", 0)) if self.forcing else 0
+        if self.forcing and not self.forcing_dim:
+            raise ValueError("state_diffuse[neuron_graph] `forcing:` needs `forcing_dim:`")
+        self.seed = int(params.get("seed", 0))
+        self.checkpoint = bool(params.get("checkpoint", False))
+        self.substeps = int(params.get("substeps", 4))
+        self.short_k = int(params.get("short_k", 6))
+        self.reach = {"mid": float(params.get("mid_um", 32.0)), "long": float(params.get("long_um", 128.0))}
+        # THE GRAPH'S TOPOLOGY (exp17 batch 17, Cedric 2026-10-03: "the visualisation shows the graph that supports
+        # the dynamics; train over different graphs"). `reach_dirs`: the mid / long partners are the elements nearest
+        # p_i +- L along the frame's axes (`axes`, every earlier run), along those axes turned `reach_rotation_deg`
+        # about z (`rotated`), or along 6 random unit directions drawn per element (`random`, seed `graph_seed`).
+        # `graph: random` is the null: every set keeps its degree (short_k, 6, 6 senders per element) but the
+        # senders are drawn uniformly over all the elements -- no space in it.
+        self.reach_dirs = str(params.get("reach_dirs", "axes"))
+        if self.reach_dirs not in ("axes", "rotated", "random"):
+            raise ValueError("state_diffuse[neuron_graph] `reach_dirs:` axes (default), rotated or random")
+        self.reach_rot = float(params.get("reach_rotation_deg", 0.0))
+        if (self.reach_rot != 0.0) != (self.reach_dirs == "rotated"):
+            raise ValueError("state_diffuse[neuron_graph] `reach_rotation_deg:` goes with `reach_dirs: rotated` only")
+        self.graph_kind = str(params.get("graph", "spatial"))
+        if self.graph_kind not in ("spatial", "random"):
+            raise ValueError("state_diffuse[neuron_graph] `graph:` spatial (default) or random")
+        self.graph_seed = int(params.get("graph_seed", 0))
+        self.norm = (0.0, 1.0, 1.0)
+        self.device_ = device
+        self.theta = torch.zeros(0, device=device)
+        self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "input")}
+        self.activation = str(params.get("activation", "tanh"))
+        if self.activation not in ("tanh", "relu", "linear"):
+            raise ValueError("state_diffuse[neuron_graph] `activation:` tanh (default), relu or linear")
+        self._adapt_params(params)
+        # THE INTEGRATOR (exp17 batch 12, Cedric 2026-10-02; finding 21): explicit Euler substeps are stable only for a
+        # learned rate below 2M per frame, and flat neurons drift past it and run away. `exponential` takes the exact
+        # relaxation of the leak over a substep, stable at any rate (equal to Euler for slow neurons); `rate_max`
+        # bounds the rates smoothly. Defaults keep every earlier run's law bit-for-bit.
+        self.integrator = str(params.get("integrator", "euler"))
+        if self.integrator not in ("euler", "exponential"):
+            raise ValueError("state_diffuse[neuron_graph] `integrator:` euler (default) or exponential")
+        self.rate_max = float(params["rate_max"]) if params.get("rate_max") is not None else None
+        if self.rate_max is not None and self.rate_max <= 0:
+            raise ValueError("state_diffuse[neuron_graph] `rate_max:` must be positive")
+        # THE CONDUCTANCE SYNAPSE (exp17 batch 14, Cedric 2026-10-02; connectome-gnn's flyvis_ode): the message from j to
+        # i is W^2 relu(z_j) (E_j - z_i) -- a non-negative conductance times a driving force toward the SENDER's reversal
+        # E_j (zebrafish has no cell types to give the sign: E_j is learned per neuron, its sign the synapse's)
+        self.synapse = str(params.get("synapse", "current"))
+        if self.synapse not in ("current", "conductance"):
+            raise ValueError("state_diffuse[neuron_graph] `synapse:` current (default) or conductance")
+        if self.synapse == "conductance":
+            self.blocks["reversal"] = str(params.get("reversal", "reversal"))
+            if float(params.get("w_init", 0.0)) == 0.0:
+                raise ValueError("state_diffuse[neuron_graph] conductance: `w_init:` > 0 (W^2 has no gradient at W = 0)")
+        # THE MODULATION (exp17 batch 14; Allier et al. 2026, eq. 3): Omega_i(t) = 1 + f(x_i, y_i, z_i, t) multiplies the
+        # element's message sum, f a hash grid + decoder or a SIREN of the position and the ABSOLUTE frame time (the
+        # trainer sets `frame` each tick and `n_frames_ref` once: FRAME_CLOCK). f's last layer starts at 0: Omega = 1.
+        self.modulation = str(params.get("modulation", "none"))
+        if self.modulation not in ("none", "hash", "siren"):
+            raise ValueError("state_diffuse[neuron_graph] `modulation:` none (default), hash or siren")
+        self.FRAME_CLOCK = self.modulation != "none"
+        self.frame, self.n_frames_ref = 0, 1
+        self._mod_params = {k: params[k] for k in ("mod_levels", "mod_features", "mod_log2_table", "mod_res_space",
+                                                   "mod_res_time", "mod_hidden", "mod_layers", "siren_omega")
+                            if k in params}
+        import numpy as np
+        from plexus.paths import graphs_data_path
+        pf = str(params["positions_file"])
+        pf = pf if os.path.isabs(pf) else graphs_data_path(pf)
+        self._pos_file = (pf, str(params.get("positions_array", "pos_um")))
+        pos = np.load(pf)[self._pos_file[1]]
+        E = self.graph(pos)
+        self._E = {k: E[k] for k in self.EDGE_SETS}
+        self.graph_stats = E["stats"]
+        self.n_elements = len(pos)
+        w0 = float(params.get("w_init", 0.0))
+        for s in self.EDGE_SETS:
+            setattr(self, f"W_{s}", torch.full((E[s][0].numel(),), w0, device=device))
+        if self.modulation != "none":
+            P = torch.as_tensor(np.asarray(pos, np.float32), device=device)
+            lo, hi = P.min(0).values, P.max(0).values
+            self._xyz01 = (P - lo) / (hi - lo).clamp(min=1e-6)                   # [N, 3] in [0, 1]
+            self._build_modulation(self._mod_params, device)
+
+    def _rate(self, raw):
+        """A learned rate per frame: softplus of its raw value, smoothly capped at `rate_max` when one is set."""
+        import torch.nn.functional as Fnn
+        r = Fnn.softplus(raw)
+        return r if self.rate_max is None else self.rate_max * torch.tanh(r / self.rate_max)
+
+    def _frac(self, rate):
+        """The fraction of the way to the target in one substep: rate / M (Euler, as before) or 1 - exp(-rate / M)."""
+        if self.integrator == "exponential":
+            return -torch.expm1(-rate / self.substeps)
+        return rate / self.substeps
+
+    def _build_modulation(self, mp, device):
+        """Built once per (positions, parameters, device) and shared by every later instance (_NG_MOD_CACHE): a
+        rollout makes a new operator, and recomputing the spatial corners and drawing a 6.3 M-row table each time
+        cost ~0.6 s per rollout (exp17, profiled 2026-10-02). The learnables replace the tables after the first."""
+        key = (self._pos_file, self.modulation, tuple(sorted((k, str(v)) for k, v in mp.items())), self.seed,
+               str(device), self._xyz01.shape[0])
+        if key not in _NG_MOD_CACHE:
+            self._build_modulation_once(mp, device)
+            _NG_MOD_CACHE[key] = {k: getattr(self, k) for k in ("_mlp_shapes", "omega_mlp", "_omega0", "_s_idx", "_s_w",
+                                                               "_t_res", "_t_off", "_L", "_F", "_rows", "omega_table",
+                                                               "omega_ttable", "_t_lv") if hasattr(self, k)}
+        for k, v in _NG_MOD_CACHE[key].items():
+            setattr(self, k, v)
+
+    def _build_modulation_once(self, mp, device):
+        """The learnable tensors of f: `omega_table` (hash: the space and time tables, flat) and `omega_mlp` (the
+        decoder or SIREN weights, flat), declared as `{param: omega_table / omega_mlp, op: state_diffuse}`.
+
+        THE HASH ENCODING IS SPACE x TIME (Instant NGP's multiresolution tables, one 3-D for x, y, z and one 1-D for
+        t, their features concatenated into the decoder): a joint 4-D grid re-hashes every neuron's 16 corners at
+        every level on every tick, ~6.5x the whole law's time on 100,759 neurons (exp17, measured 2026-10-02). The
+        neurons do not move, so their spatial corners and weights are computed ONCE here; a tick reads table rows."""
+        import math
+        import numpy as np
+        g = torch.Generator().manual_seed(self.seed)
+        H = int(mp.get("mod_hidden", 32 if self.modulation == "hash" else 128))
+        if self.modulation == "hash":
+            L, F = int(mp.get("mod_levels", 12)), int(mp.get("mod_features", 2))
+            rows = 2 ** int(mp.get("mod_log2_table", 19))
+            rs, rt = list(mp.get("mod_res_space", [4, 128])), list(mp.get("mod_res_time", [8, 2048]))
+            X = self._xyz01.detach().cpu().numpy().astype(np.float64)
+            idx, wts = [], []
+            for l in range(L):
+                res = rs[0] * (rs[1] / rs[0]) ** (l / max(L - 1, 1))
+                q = X * res
+                c0 = np.floor(q).astype(np.int64)
+                fr = q - c0
+                dense = (int(math.ceil(res)) + 2) ** 3 <= rows
+                il, wl = [], []
+                for corner in range(8):
+                    off = np.array([(corner >> d) & 1 for d in range(3)])
+                    c = c0 + off
+                    if dense:
+                        n_ = int(math.ceil(res)) + 2
+                        h = (c[:, 0] * n_ + c[:, 1]) * n_ + c[:, 2]
+                    else:
+                        h = (c[:, 0] * 1) ^ (c[:, 1] * 2654435761) ^ (c[:, 2] * 805459861)
+                    il.append(h % rows)
+                    wl.append(np.prod(np.where(off == 1, fr, 1 - fr), axis=1))
+                idx.append(np.stack(il, 1) + l * rows)                       # one flat table, a slice per level
+                wts.append(np.stack(wl, 1))
+            self._s_idx = torch.as_tensor(np.stack(idx, 1), device=device)    # [N, L, 8]
+            self._s_w = torch.as_tensor(np.stack(wts, 1), dtype=torch.float32, device=device)
+            self._t_res = [int(round(rt[0] * (rt[1] / rt[0]) ** (l / max(L - 1, 1)))) for l in range(L)]
+            self._t_off = np.cumsum([0] + [r + 1 for r in self._t_res]).tolist()
+            self._L, self._F, self._rows = L, F, rows
+            n_t = self._t_off[-1]
+            # TWO TABLES, two learnables: a small time table read every tick (`omega_ttable`), the large space table
+            # read once per rollout (`omega_table`) -- one table for both made every tick's few time rows backward
+            # into a dense gradient of all 6.3 M rows (exp17, profiled 2026-10-02: ~5x the law's time)
+            self.omega_table = ((torch.rand(L * rows, F, generator=g) * 2 - 1) * 1e-4).to(device)
+            self.omega_ttable = ((torch.rand(n_t, F, generator=g) * 2 - 1) * 1e-4).to(device)
+            t_lv = []
+            for l, r in enumerate(self._t_res):
+                t_lv.append((self._t_off[l], r))
+            self._t_lv = t_lv
+            shapes = [(2 * L * F, H), (H,), (H, 1), (1,)]
+        else:
+            n = int(mp.get("mod_layers", 5))
+            self._omega0 = float(mp.get("siren_omega", 30.0))
+            dims = [4] + [H] * (n - 1) + [1]
+            shapes = [s_ for i in range(n) for s_ in ((dims[i], dims[i + 1]), (dims[i + 1],))]
+        self._mlp_shapes = shapes
+        parts = []
+        for i, sh in enumerate(shapes):
+            if i >= len(shapes) - 2:
+                parts.append(torch.zeros(sh))                                   # f = 0 at the start: Omega = 1
+            elif len(sh) == 2:
+                fan = sh[0]
+                if self.modulation == "siren":                                  # Sitzmann et al.'s init
+                    bnd = 1.0 / fan if i == 0 else math.sqrt(6.0 / fan) / self._omega0
+                else:
+                    bnd = math.sqrt(6.0 / fan)
+                parts.append((torch.rand(sh, generator=g) * 2 - 1) * bnd)
+            else:
+                parts.append(torch.zeros(sh))
+        self.omega_mlp = torch.cat([q.reshape(-1) for q in parts]).to(device)
+
+    def _space_features(self):
+        """[N, L F] the hash's spatial features: the same on every tick of a rollout (the neurons do not move), so
+        the law computes them once per rollout (an operator instance is one rollout) and hands them to each tick."""
+        tab = self.omega_table
+        return (tab[self._s_idx] * self._s_w[..., None]).sum(2).reshape(self._xyz01.shape[0], -1)
+
+    def _omega(self, fs=None):
+        """[N, 1] Omega_i at the current frame: 1 + f(x_i, y_i, z_i, t)."""
+        N = self._xyz01.shape[0]
+        t = float(self.frame) / max(self.n_frames_ref - 1, 1)
+        ws, o = [], 0
+        for sh in self._mlp_shapes:
+            n = 1
+            for d in sh:
+                n *= d
+            ws.append(self.omega_mlp[o:o + n].reshape(sh))
+            o += n
+        if self.modulation == "hash":
+            tab = self.omega_table
+            fs = self._space_features() if fs is None else fs                        # [N, L F], space
+            i0, wt = [], []                                                         # [L F], time, the same for all
+            for base, r in self._t_lv:
+                q = t * r
+                c0 = min(int(q), r - 1)
+                i0.append(base + c0)
+                wt.append(q - c0)
+            dev = self.omega_ttable.device
+            i0 = torch.tensor(i0, device=dev)
+            wt = torch.tensor(wt, device=dev, dtype=self.omega_ttable.dtype)[:, None]
+            tt = self.omega_ttable
+            ft = (1 - wt) * tt[i0] + wt * tt[i0 + 1]                              # ONE gather of the small table
+            h = torch.cat([fs, ft.reshape(1, -1).expand(N, -1)], 1)
+            h = torch.relu(h @ ws[0] + ws[1])
+            return 1.0 + h @ ws[2] + ws[3]
+        c = torch.cat([self._xyz01, torch.full((N, 1), t, device=self._xyz01.device)], 1)
+        h = c * 2 - 1
+        for i in range(0, len(ws) - 2, 2):
+            h = torch.sin(self._omega0 * (h @ ws[i] + ws[i + 1]))
+        return 1.0 + h @ ws[-2] + ws[-1]
+
+    def graph(self, pos) -> dict:
+        """{set: (senders, receivers)} as long tensors on this device, and `stats` (edges and mean length, um)."""
+        import numpy as np
+        key = (self._pos_file, self.short_k, self.reach["mid"], self.reach["long"], len(pos), self.reach_dirs,
+               self.reach_rot, self.graph_kind, self.graph_seed)
+        if key not in _NG_GRAPH_CACHE:
+            from scipy.spatial import cKDTree
+            P = np.asarray(pos, dtype=np.float64)
+            tree = cKDTree(P)
+            N = len(P)
+            out, stats = {}, {}
+            rng = np.random.default_rng(self.graph_seed)
+            if self.graph_kind == "random":                              # the null: the degrees, no space
+                for name, k in (("short", self.short_k), ("mid", 6 if self.reach["mid"] > 0 else 0),
+                                ("long", 6 if self.reach["long"] > 0 else 0)):
+                    s = rng.integers(0, N - 1, N * k)
+                    r = np.repeat(np.arange(N), k)
+                    s = s + (s >= r)                                       # never the element itself
+                    out[name] = (s, r)
+            elif self.short_k > 0:
+                _, j = tree.query(P, k=self.short_k + 1)                  # the first is the element itself
+                s, r = j[:, 1:].reshape(-1), np.repeat(np.arange(N), self.short_k)
+            else:
+                s = r = np.zeros(0, dtype=np.int64)
+            if self.graph_kind == "spatial":
+                out["short"] = (s, r)
+            dirs = np.concatenate([np.eye(3), -np.eye(3)])
+            if self.reach_dirs == "rotated":
+                c_, s_ = np.cos(np.radians(self.reach_rot)), np.sin(np.radians(self.reach_rot))
+                dirs = dirs @ np.array([[c_, -s_, 0.0], [s_, c_, 0.0], [0.0, 0.0, 1.0]]).T
+            for name in (("mid", "long") if self.graph_kind == "spatial" else ()):
+                L = self.reach[name]
+                ss, rr = [], []
+                if L > 0:
+                    for i_ in range(6):
+                        if self.reach_dirs == "random":                    # 6 random unit directions per element
+                            d = rng.normal(size=(N, 3))
+                            d /= np.linalg.norm(d, axis=1, keepdims=True)
+                        else:
+                            d = dirs[i_]
+                        dist, j = tree.query(P + L * d)
+                        ok = (dist < 0.5 * L) & (j != np.arange(N))
+                        ss.append(j[ok])
+                        rr.append(np.arange(N)[ok])
+                out[name] = (np.concatenate(ss) if ss else np.zeros(0, np.int64),
+                             np.concatenate(rr) if rr else np.zeros(0, np.int64))
+            for name, (s, r) in out.items():
+                ln = np.linalg.norm(P[s] - P[r], axis=1) if len(s) else np.zeros(0)
+                stats[name] = {"edges": int(len(s)), "mean_um": float(ln.mean()) if len(ln) else 0.0,
+                               "per_element": float(len(s) / N)}
+            _NG_GRAPH_CACHE[key] = ({k: (torch.as_tensor(s, dtype=torch.long), torch.as_tensor(r, dtype=torch.long))
+                                     for k, (s, r) in out.items()}, stats)
+        E, stats = _NG_GRAPH_CACHE[key]
+        return {**{k: (s.to(self.device_), r.to(self.device_)) for k, (s, r) in E.items()}, "stats": stats}
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        import torch.nn.functional as Fnn
+        E = self._E                                   # built once, from `positions_file`
+        if x.shape[0] != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph]: {x.shape[0]} elements, the graph was built on "
+                             f"{self.n_elements} (`positions_file`)")
+        if x.shape[1] != 1:                           # a wider block would get this [N, 1] increment broadcast
+            raise ValueError(f"state_diffuse[neuron_graph] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        rate = self._rate(nb["tau"])
+        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
+        if self.input_mask is not None and self.forcing_dim:
+            drive = drive * self.input_mask.to(drive.device)
+        ad0 = nb["adapt"] if self.adapt else None
+        ad = ad0
+        if self.adapt:
+            ga, ka = Fnn.softplus(nb["adapt_gain"]), self._rate(nb["adapt_rate"])
+        fz = self._frac(rate)                  # the fraction of the way to the target per substep
+        fa = self._frac(ka) if self.adapt else None
+        om = self._omega(nb.get("_omega_fs")) if self.modulation != "none" else None   # once per tick: f is of the frame
+        cond = self.synapse == "conductance"
+        for _ in range(self.substeps):
+            if cond:
+                # sum_j W^2 relu(z_j) (E_j - z_i) = sum_j W^2 relu(z_j) E_j - z_i sum_j W^2 relu(z_j): ONE gather and
+                # ONE sum of a 2-wide sender quantity, not three gathers per edge
+                r = torch.relu(z)
+                q = torch.cat([r * nb["reversal"], r], 1)
+                acc = torch.zeros_like(q)
+                for s in self.EDGE_SETS:
+                    snd, rcv = E[s]
+                    if snd.numel():
+                        w = getattr(self, f"W_{s}")[:, None]
+                        acc = acc.index_add(0, rcv, (w * w) * q[snd])
+                agg = acc[:, :1] - z * acc[:, 1:]
+            else:
+                act = self._act(z)
+                agg = torch.zeros_like(z)
+                for s in self.EDGE_SETS:
+                    snd, rcv = E[s]
+                    if snd.numel():
+                        agg = agg.index_add(0, rcv, getattr(self, f"W_{s}")[:, None] * act[snd])
+            if om is not None:
+                agg = om * agg
+            if self.adapt:
+                z, ad = (z + fz * (-z + nb["rest"] + agg + drive - ga * ad),
+                         ad + fa * (z - ad))
+            else:
+                z = z + fz * (-z + nb["rest"] + agg + drive)
+        if self.adapt:
+            return sd * (z - z0), ad - ad0
+        return sd * (z - z0)
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_mlp",
+                   title="A set's scalar through a learned GNN (MLP message and update, per-element embedding) on the "
+                         "multi-scale graph between the elements",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}f_\theta\big(z_i,a_i,\textstyle\sum_{s}\sum_{j\in\mathcal N_s(i)}
+W^{s}_{ji}\,g_\phi(\cdot)^2,B_i\cdot u\big)$$""")
+class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
+    """THE GNN-MLP ON THE NEURON GRAPH (exp17 batch 12, Cedric 2026-10-02: "twin of 13 but with GNN-MLP + 2D embedding
+    instead of known-ode, sweep over g_phi MLP(a_j, v_j) and MLP(a_i, a_j, v_i, v_j)"): connectome-gnn's signal model
+    on the neuron graph's three typed edge sets. One tick, M substeps, in the normalised units z = (x - mu)/sd:
+
+        m_i = sum_s sum_{j->i} W^s_e g_phi(.)^2          `message: sender`  g_phi(z_j, a_j)        (per sender: N MLPs)
+                                                         `message: pair`    g_phi(z_i, z_j, a_i, a_j) (per edge)
+        z_i <- z_i + (1/M) f_theta(z_i, a_i, m_i, B_i . u)
+
+    a_i the element's learned embedding (the `embedding` block, `{block: embedding, of: <set>}`, width E), W^s one
+    weight per edge (`W_short` / `W_mid` / `W_long`), g_phi squared (connectome-gnn's g_phi_positive: the message's
+    sign is W's), f_theta's last layer at zero (the untrained law is persistence). B_i . u the known stimulus as in the
+    known ODE, `input_mask` applying. Both MLPs: 2 hidden layers of `hidden`, SiLU (the connectome law's `_mlp3`).
+    Priors on theta_g as the connectome law: `monotone` (g does not fall as the sender's value rises), `pin`
+    (g(z = 2) = 1, the scale W and g share), `input_group_l1`. No leak, rest or rate: f_theta is the whole update.
+    """
+    REQUIRES_PARAMS = ["block", "positions", "positions_file"]
+    MECHANISM_TAGS = ["learned_update", "proxy_connectome", "gnn"]
+    NORM_FROM_REFERENCE = True
+    PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraph.PARAM_ROLES.items()
+                      if k not in ("tau", "rest", "integrator", "rate_max", "synapse", "reversal", "activation",
+                                   "adaptation", "adapt_gain", "adapt_rate", "modulation", "mod_levels",
+                                   "mod_features", "mod_log2_table", "mod_res_space", "mod_res_time", "mod_hidden",
+                                   "mod_layers", "siren_omega", "omega_table", "omega_mlp")},
+                   "message": "sender (g_phi(z_j, a_j), default) or pair (g_phi(z_i, z_j, a_i, a_j))",
+                   "embedding": "the elements' learned embedding block a_i (its width is E)",
+                   "embedding_dim": "E, the embedding block's width (2)",
+                   "hidden": "both MLPs' width (64)",
+                   "theta_g": "the message MLP g_phi, flat", "theta_f": "the update MLP f_theta, flat"}
+
+    def __init__(self, params, device="cpu"):
+        bad = [k for k in ("integrator", "rate_max", "synapse", "adaptation", "modulation", "activation") if k in params]
+        if bad:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: {bad} belong to the known ODE (neuron_graph)")
+        super().__init__(params, device)
+        self.message = str(params.get("message", "sender"))
+        if self.message not in ("sender", "pair"):
+            raise ValueError("state_diffuse[neuron_graph_mlp] `message:` sender (default) or pair")
+        self.hidden = int(params.get("hidden", 64))
+        self.embedding_dim = int(params.get("embedding_dim", 2))
+        self.blocks = {"input": str(params.get("input", "input")), "embedding": str(params.get("embedding", "embedding"))}
+        self._a_last = None
+        self.init_theta()
+
+    def _shapes(self):
+        E = self.embedding_dim
+        n_g = (2 + 2 * E) if self.message == "pair" else (1 + E)
+        return {"theta_g": n_g, "theta_f": 2 + E + (1 if self.forcing_dim else 0)}
+
+    def init_theta(self):
+        g = torch.Generator().manual_seed(self.seed)
+        for name, n_in in self._shapes().items():
+            parts = []
+            for k, shape in self._layout3(n_in):
+                if name == "theta_f" and k in ("w3", "b3"):
+                    t = torch.zeros(shape)                                 # persistence at the start
+                else:
+                    fan = n_in if k in ("w1", "b1") else self.hidden
+                    t = (torch.rand(shape, generator=g) * 2 - 1) / math.sqrt(fan)
+                parts.append(t.reshape(-1))
+            setattr(self, name, torch.cat(parts).to(self.device_))
+        return torch.zeros(0, device=self.device_)
+
+    def _g(self, zi, zj, ai, aj):
+        x = torch.cat([zj, aj], 1) if self.message == "sender" else torch.cat([zi, zj, ai, aj], 1)
+        return self._mlp3("theta_g", x) ** 2
+
+    def prior_term(self, param, kind):
+        """The connectome law's priors on theta_g, the embeddings sampled from the last rollout's (ones before any)."""
+        if param != "theta_g":
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: `{kind}` is a prior of `theta_g`, not of `{param}`")
+        dev = self.theta_g.device
+        A = self._a_last if self._a_last is not None else torch.ones(1, self.embedding_dim, device=dev)
+        a = A[torch.randint(0, A.shape[0], (512,), device=dev)]
+        if kind == "monotone":
+            v = torch.rand(512, 1, device=dev) * 6 - 3
+            return torch.relu(self._g(v, v, a, a) - self._g(v, v + 0.1, a, a)).norm(2)
+        if kind == "pin":
+            v = torch.full((512, 1), 2.0, device=dev)
+            return (self._g(v, v, a, a) - 1.0).norm(2)
+        if kind == "input_group_l1":
+            w1 = self.theta_g[: self.hidden * self._shapes()["theta_g"]].view(self.hidden, -1)
+            return w1.norm(dim=0).sum()
+        raise ValueError(f"state_diffuse[neuron_graph_mlp]: no prior `{kind}`")
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        E = self._E
+        if x.shape[0] != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: {x.shape[0]} elements, the graph was built on "
+                             f"{self.n_elements} (`positions_file`)")
+        if x.shape[1] != 1:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
+        ae = nb["embedding"]
+        if ae.shape[1] != self.embedding_dim:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp]: the embedding block is {ae.shape[1]} wide, "
+                             f"`embedding_dim` {self.embedding_dim}")
+        self._a_last = ae.detach()
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        feats_d = []
+        if self.forcing_dim:
+            drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True)
+            if self.input_mask is not None:
+                drive = drive * self.input_mask.to(drive.device)
+            feats_d = [drive]
+        for _ in range(self.substeps):
+            agg = torch.zeros_like(z)
+            gn = self._g(z, z, ae, ae) if self.message == "sender" else None     # per sender: one MLP per element
+            for s in self.EDGE_SETS:
+                snd, rcv = E[s]
+                if snd.numel():
+                    w = getattr(self, f"W_{s}")[:, None]
+                    ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
+                    agg = agg.index_add(0, rcv, w * ge)
+            z = z + self._mlp3("theta_f", torch.cat([z, ae, agg] + feats_d, 1)) / self.substeps
+        return sd * (z - z0)
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_mlp_leak",
+                   title="A set's scalar through the known ODE's leak with a learned MLP message (per-element embedding) "
+                         "on the multi-scale graph between the elements",
+                   equation=r"""$$z_i\leftarrow z_i+\big(1-e^{-r_i/M}\big)\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j\in\mathcal N_s(i)}
+W^{s}_{ji}\,g_\phi(\cdot)^2+B_i\cdot u\big)$$""")
+class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
+    """THE LEAKY GNN-MLP (exp17 batch 12, arms 9-12; Cedric 2026-10-03: "a new model GNN class with known-ODE leak and MLP
+    message passing, two variants function of (a_j, v_j) and (a_i, a_j, v_i, v_j)"). The known ODE on the neuron graph
+    with its message W tanh(z_j) replaced by the GNN-MLP's learned message, and NO update MLP:
+
+        m_i = sum_s sum_{j->i} W^s_e g_phi(.)^2           `message: sender`  g_phi(z_j, a_j)
+                                                          `message: pair`    g_phi(z_i, z_j, a_i, a_j)
+        z_i <- z_i + frac(r_i) (-z_i + V_i + m_i + B_i . u),   r_i = softplus(tau_i), per substep
+
+    frac(r) = 1 - exp(-r / M) (`integrator: exponential`, this law's default; `euler` gives r / M). WHY: batch 12's
+    update z += f_theta(...) / M has nothing pulling a neuron back, and every free rollout drifted off the recording
+    past the trained horizon (50 frames) while its windows matched the known ODE's; the -z_i leak toward the learned
+    rest V_i is what kept batch 13's rollouts on the recording for 2 h. The leak is exactly the known ODE's, so with
+    every W = 0 this law IS the known ODE with W = 0 (each element's own leaky filter of the stimulus).
+    tau, rest, input, embedding are state blocks learned as `{block:, of:}`; theta_g and W^s as in neuron_graph_mlp,
+    with its priors on theta_g (`monotone`, `pin`, `input_group_l1`).
+    """
+    MECHANISM_TAGS = ["known_ode", "leaky_integrator", "proxy_connectome", "gnn"]
+    PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraphMLP.PARAM_ROLES.items() if k != "theta_f"},
+                   **{k: StateDiffuseNeuronGraph.PARAM_ROLES[k] for k in ("tau", "rest", "integrator", "rate_max")}}
+
+    def __init__(self, params, device="cpu"):
+        bad = [k for k in ("synapse", "adaptation", "modulation", "activation") if k in params]
+        if bad:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: {bad} are options of the known ODE (neuron_graph)")
+        params = {"integrator": "exponential", **params}
+        StateDiffuseNeuronGraph.__init__(self, params, device)
+        self.message = str(params.get("message", "sender"))
+        if self.message not in ("sender", "pair"):
+            raise ValueError("state_diffuse[neuron_graph_mlp_leak] `message:` sender (default) or pair")
+        self.hidden = int(params.get("hidden", 64))
+        self.embedding_dim = int(params.get("embedding_dim", 2))
+        self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "input", "embedding")}
+        self._a_last = None
+        self.init_theta()
+
+    def _shapes(self):
+        E = self.embedding_dim
+        return {"theta_g": (2 + 2 * E) if self.message == "pair" else (1 + E)}
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        E = self._E
+        if x.shape[0] != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: {x.shape[0]} elements, the graph was built on "
+                             f"{self.n_elements} (`positions_file`)")
+        if x.shape[1] != 1:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak] writes a 1-wide block, `{self.block}` is "
+                             f"{x.shape[1]} wide")
+        ae = nb["embedding"]
+        if ae.shape[1] != self.embedding_dim:
+            raise ValueError(f"state_diffuse[neuron_graph_mlp_leak]: the embedding block is {ae.shape[1]} wide, "
+                             f"`embedding_dim` {self.embedding_dim}")
+        self._a_last = ae.detach()
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
+        if self.input_mask is not None and self.forcing_dim:
+            drive = drive * self.input_mask.to(drive.device)
+        fz = self._frac(self._rate(nb["tau"]))
+        for _ in range(self.substeps):
+            agg = torch.zeros_like(z)
+            gn = self._g(z, z, ae, ae) if self.message == "sender" else None     # per sender: one MLP per element
+            for s in self.EDGE_SETS:
+                snd, rcv = E[s]
+                if snd.numel():
+                    w = getattr(self, f"W_{s}")[:, None]
+                    ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
+                    agg = agg.index_add(0, rcv, w * ge)
+            z = z + fz * (-z + nb["rest"] + agg + drive)
+        return sd * (z - z0)
+
+
 # --------------------------------------------------------------------------- motility
 #
 # HOW AN ADHERENT CELL MOVES: by gripping the substrate and pulling, not by being pushed.
@@ -1569,6 +2896,170 @@ class Protrusion(Lateral):
         if mask is not None:
             a = a * mask.float()[:, None]
         return {p.name: a}
+
+
+LEADER_TRACE: list = []
+
+
+def leader_traction(pos, es, ef, nF, leader, f, zero_net=True, et=None, stall=None, follow=0.0, stall_reach=0):
+    """The traction load on a vertex tissue's vertices: f along each leader cell's outward direction,
+    on every vertex of that cell; with `zero_net` the total is taken back evenly from every used
+    vertex, so the tissue as a whole is not pushed. With `stall` (needs `et`), a leader whose
+    perimeter P_c has reached `stall` times the tissue's median perimeter pulls no more:
+    f_c = f clamp((stall - P_c/P_med) / (stall - 1), 0, 1). With `follow` > 0, a non-leader cell sharing a
+    vertex with a leader pulls too, at `follow` x f along its own outward direction (the stall applies to it
+    as well). With `stall_reach` 1, a pulled cell's stall factor is the SMALLEST among it and every cell
+    sharing a vertex with it, so a leader stops pulling when a neighbour it drags is over the line. float64
+    [nv, 3]."""
+    dev = pos.device
+    P = pos.to(torch.float64)
+    live = ef < nF
+    e_s, e_f = es[live].long(), ef[live].long()
+    cnt = torch.zeros(nF, device=dev, dtype=torch.float64).index_add_(
+        0, e_f, torch.ones_like(e_f, dtype=torch.float64))
+    cen = torch.zeros(nF, 3, device=dev, dtype=torch.float64).index_add_(0, e_f, P[e_s])
+    ok = cnt > 0
+    cen[ok] /= cnt[ok, None]
+    origin = cen[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=torch.float64)
+    u = cen - origin
+    u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+    lead = leader[:nF].to(dev) & ok
+    on = lead.to(torch.float64)
+    if follow > 0.0:
+        vl = torch.zeros(P.shape[0], dtype=torch.bool, device=dev)
+        vl[e_s[lead[e_f]]] = True                          # the vertices of every leader
+        touch = torch.zeros(nF, dtype=torch.bool, device=dev)
+        touch[e_f[vl[e_s]]] = True                         # cells with one of those vertices
+        on = on + float(follow) * (touch & ~lead & ok).to(torch.float64)
+    if stall is not None and et is not None and float(stall) > 1.0:
+        e_t = et[live].long()
+        per = torch.zeros(nF, device=dev, dtype=torch.float64).index_add_(
+            0, e_f, (P[e_t] - P[e_s]).norm(dim=1))
+        pm = per[ok].median().clamp_min(1e-12) if ok.any() else per.new_tensor(1.0)
+        sf = ((float(stall) - per / pm) / (float(stall) - 1.0)).clamp(0.0, 1.0)
+        if int(stall_reach) > 0:
+            for _ in range(int(stall_reach)):
+                vmin = torch.ones(P.shape[0], device=dev, dtype=torch.float64).scatter_reduce(
+                    0, e_s, sf[e_f], reduce="amin", include_self=True)   # per vertex: its most stretched cell
+                sf = torch.ones_like(sf).scatter_reduce(0, e_f, vmin[e_s], reduce="amin", include_self=True)
+        on = on * sf
+    F = torch.zeros_like(P)
+    # A VERTEX ONCE PER CELL IT BELONGS TO: each half-edge's source is one (vertex, cell) incidence.
+    F.index_add_(0, e_s, float(f) * on[e_f, None] * u[e_f])
+    if zero_net:
+        used = torch.zeros(P.shape[0], dtype=torch.bool, device=dev)
+        used[e_s] = True
+        if used.any():
+            F[used] -= F[used].sum(0) / used.sum()
+    return F
+
+
+@register_operator("protrusion", model="leader_traction", family="motility", set="vertex",
+                   kind="lateral",
+                   equation=r"""$$\mathbf u_c=\frac{\mathbf c_c-\bar{\mathbf c}}{\lVert\mathbf c_c-\bar{\mathbf c}\rVert},\qquad \mathbf f_v=f\sum_{c\ni v,\ c\ \mathrm{leader}}\mathbf u_c\;-\;\frac{1}{N_v}\sum_{w}f\sum_{c\ni w}\mathbf u_c$$""")
+class ProtrusionLeaderTraction(Lateral):
+    """Leader cells of a vertex tissue pull themselves outward into the matrix -- invasion as
+    MIGRATION, the leaders' own traction, not growth.
+
+    vertex -> vertex: reads the mesh and the cell set's leader block (`mutant`, set by
+    `seed_mesh[implementation: lineage]`), adds a load to the frame's basal load buffer
+    (`contact_ops.basal_load`), which `cell_mechanics[implementation: apicobasal_contact]` relaxes
+    the tissue against, on the cells' basal points.
+
+        u_c  = (c_c - c_bar) / |c_c - c_bar|       leader cell c's outward direction from the tissue's centre
+        f_v  = f sum_{leader c on v} u_c            on every vertex of every leader cell
+        f_v -= (1/N_v) sum_w f_w                    with `zero_net`: the total taken back evenly
+
+    THE STALL, `stall` (default None = off): traction is limited by the load it pulls against, and
+    a leader held by its neighbours stretches instead of moving. Without a limit the pull never
+    relents and the leader is drawn into a needle (exp12 batch 3: `p2_lt_hi`, f 0.3, spikes to the
+    box edge; `p2_lt`, an edge 31.7x the median). With it, a leader whose perimeter reaches `stall`
+    times the tissue's median pulls no more, and pulls again as the followers catch up:
+
+        f_c = f clamp((stall - P_c / P_med) / (stall - 1), 0, 1)
+
+    FOLLOWERS, `follow` (default 0 = leaders only): Cheung's leaders lead TRAILING cells (Fig 4J); a
+    cell that shares a vertex with a leader pulls outward too, at `follow` x f along its own direction.
+
+    THE GROUP STALL, `stall_reach` (default 0 = each cell's own shape): a follower caught between the
+    pulled tip and the body is stretched by its NEIGHBOURS' pull, its own long stalled (exp12 batch 13: the
+    worst edge, 15.9x the median, on a follower at 4-7x the median perimeter). With `stall_reach` 1 a
+    pulled cell's factor is the smallest over the cells sharing a vertex with it: the strand stops pulling
+    when any cell it drags is over the line -- the tension a strand can carry, read at its weakest cell.
+
+    f is the traction per vertex of a leader, in the tissue's force units. One frame's relaxation
+    (relax_iters x eta x mu = 30 x 0.08 x 1 on exp11's working point) moves a free vertex by up to
+    2.4 f, so f 0.1 is up to 0.24 world units a frame -- 2.4 um per 10 min, ~14 um/h, the order of
+    collective invasion. The membrane resists it through `bm_contact[live]` until the leader has
+    released the nodes it presses on (`bm_unbond[model: release]`): pushing is what opens the hole.
+
+    WHY THE PARTICLE `protrusion` IS NOT ENOUGH. It is odd about the cell's centroid (extend the
+    front, retract the rear) and needs `substrate_traction` gripping out of phase to move anything,
+    on an MPM body. A vertex cell has no material points to grip with and there is no matrix body
+    here; the grip is folded into a net outward traction, whose reaction goes to the collagen the
+    run does not model. `zero_net` (default) gives that reaction back to the tissue evenly -- the
+    spheroid is held by its gel as a whole and does not drift -- so the only thing the load does is
+    move leaders out relative to the rest. The load is NOT booked in the tissue-membrane ledger: it
+    is not a force between those two bodies.
+
+    Reference: Cheung, K. J. et al. (2013). Collective invasion in breast cancer requires a
+    conserved basal epithelial program. Cell 155:1639-1651 ("the cells leading these invasive
+    strands were highly protrusive and migratory", and led migration of trailing cells, Fig 4J).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    REQUIRES_PARAMS = ["f"]
+    MECHANISM_TAGS = ["motility", "protrusion", "leader_cells", "collective_invasion"]
+    PARAM_ROLES = {"f": "traction_per_leader_vertex", "leader_block": "leader_flag_block",
+                   "cell_set": "leader_owner", "zero_net": "reaction_back_to_the_tissue",
+                   "stall": "perimeter_over_median_at_which_traction_stops",
+                   "follow": "follower_traction_fraction_of_f",
+                   "stall_reach": "vertex_rings_over_which_the_stall_is_shared"}
+    REFERENCE = ("Cheung, K. J., Gabrielson, E., Werb, Z. & Ewald, A. J. (2013). Collective "
+                 "invasion in breast cancer requires a conserved basal epithelial program. Cell "
+                 "155:1639-1651.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.f = float(params["f"])
+        self.cell_set = str(params.get("cell_set", "cell"))
+        self.leader_block = str(params.get("leader_block", "mutant"))
+        self.zero_net = bool(params.get("zero_net", True))
+        self.follow = float(params.get("follow", 0.0))
+        self.stall_reach = int(params.get("stall_reach", 0))
+        _st = params.get("stall")
+        self.stall = None if _st is None else float(_st)
+        if self.stall is not None and self.stall <= 1.0:
+            raise ValueError(f"protrusion[leader_traction]: stall {self.stall:g} must exceed 1 -- it is a "
+                             f"multiple of the median perimeter")
+        self._said = False
+
+    def forward(self, H, mask=None):
+        from plexus.operators.contact_ops import basal_load
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        clvl = H.level(self.cell_set)
+        fr = getattr(H, "frame", None)
+        if (m is None or not int(m.get("Nv", 0)) or fr is None or clvl is None
+                or self.leader_block not in getattr(clvl, "state_schema", {})):
+            return {}
+        nv, nF = int(m["Nv"]), int(m["nF"])
+        pos = lvl.get("pos")[:nv]
+        b0, _ = clvl.state_schema[self.leader_block]
+        leader = clvl.state[:nF, b0] > 0.5
+        F = leader_traction(pos, m["E_srce"], m["E_face"], nF, leader, self.f, self.zero_net,
+                            et=m["E_trgt"], stall=self.stall, follow=self.follow,
+                            stall_reach=self.stall_reach)
+        buf = basal_load(m, int(fr), nv, pos.device)
+        buf += F
+        LEADER_TRACE.append((int(fr), int(leader.sum()), float(F.norm(dim=1).max()) if nv else 0.0))
+        if not self._said:
+            self._said = True
+            print(f"[protrusion/leader_traction] {int(leader.sum())} leader cells of {nF} pull "
+                  f"outward, f={self.f:g} per vertex, zero_net={self.zero_net}, stall={self.stall}", flush=True)
+        return {}
 
 
 # --------------------------------------------------------------------------- the crawl cycle
@@ -2939,6 +4430,53 @@ class DeformControl(Lateral):
                       f"CONTROL CUBE. `extent:` almost certainly does not match where this body "
                       f"actually is -- check its bounding box against the cube.", flush=True)
         F = torch.bmm(self._W, p.F)
+        if torch.is_grad_enabled():
+            p.F = F
+        else:
+            p.F.copy_(F)
+        return {}
+
+
+@register_operator("deform_control", implementation="block", family="motility", set="particle",
+                   kind="lateral",
+                   equation=r"""$$\mathbf F_p\leftarrow\big(\mathbf I-\mathbf A_p\Delta t+\tfrac12(\mathbf A_p\Delta t)^2\big)\,\mathbf F_p,\quad \mathbf A_p=\mathrm{sym}(\mathbf a_p)$$""")
+class DeformControlBlock(DeformControl):
+    """The same rest-shape rate, read PER PARTICLE from a state block of the set.
+
+        a_p = state[p, rate]  (six numbers: a_xx, a_yy, a_zz, a_xy, a_xz, a_yz)
+        F_p <- G_p F_p,   G_p = I + (-A_p dt) + (1/2)(-A_p dt)^2      once a frame
+
+    `field:` reads an optimised cube from a file and caches G after the first call. This variant
+    reads the block EVERY call and caches nothing, because the block is where a trainer writes a
+    learnable rate field: whatever wrote the block at set-up, the tape runs from it to every F.
+    G is the second-order expansion `plexus.morph` optimised with and `field:` applies, so the
+    three paths compute one law. Place it OUTSIDE the substep block, so `H.dt` is the frame step,
+    and gate it with `after_frame: 1` to act on the same frames `plexus.morph` did.
+    """
+    REQUIRES_PARAMS = []
+
+    def __init__(self, params, device="cpu"):
+        params = {**params, "rate": params.get("rate", [0.0] * 6)}   # the parent needs one of rate/field
+        super().__init__(params, device)
+        self.block = str(params.get("block", "rate"))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        if self.over and int(getattr(H, "frame", 0) or 0) >= self.over:
+            return {}
+        a = p.get(self.block)
+        if a.shape[-1] != 6:
+            raise ValueError(f"deform_control[block]: block {self.block!r} of {self.at!r} has width "
+                             f"{a.shape[-1]}; a symmetric rate is six numbers")
+        dt = float(getattr(H, "dt", 0.002))
+        A = torch.diag_embed(a[..., :3])
+        off = torch.zeros_like(A)
+        off[..., 0, 1] = off[..., 1, 0] = a[..., 3]
+        off[..., 0, 2] = off[..., 2, 0] = a[..., 4]
+        off[..., 1, 2] = off[..., 2, 1] = a[..., 5]
+        Adt = -(A + off) * dt
+        G = torch.eye(3, device=a.device, dtype=a.dtype) + Adt + 0.5 * (Adt @ Adt)
+        F = G @ p.F
         if torch.is_grad_enabled():
             p.F = F
         else:

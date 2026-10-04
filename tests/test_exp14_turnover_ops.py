@@ -534,3 +534,19 @@ def test_lineage_geometry_apicobasal_seeds_a_thick_labelled_tissue():
     sep = np.asarray(v["state"]["sep"][0])[np.asarray(v["occ"][0], bool)]
     assert np.median(np.linalg.norm(sep, axis=1)) > 0.2            # thickness seeded
     assert len(np.unique(rows(tr, "clone")[0])) >= 55 and (rows(tr, "fate")[0] < 0.5).sum() > 5
+
+
+def test_progenitor_fallback_orders_committed_first_then_progenitors():
+    from plexus.models.registry import get_operator
+    import plexus.operators.vertex_ops as V
+    T2 = get_operator("cell_die", variant="t2")
+    op = T2(dict(rule="fate", capacity=10, seed=0, order="crowded", progenitor_fallback=True))
+    deg = np.array([9, 3, 8, 4]); fate = np.array([0, 1, 0, 1.0])       # cells 0, 2 progenitors
+    op._nb = lambda m, nF, q: (None, deg); op.cat = "cell"
+    orig = V.cell_block
+    V.cell_block = lambda H, cat, name, nF: fate if name == "fate" else orig(H, cat, name, nF)
+    try:
+        order = list(np.argsort(op._severity({}, object(), 4, np.arange(4)), kind="stable"))
+    finally:
+        V.cell_block = orig
+    assert order == [3, 1, 0, 2]              # committed (most crowded first), then progenitors (most crowded first)

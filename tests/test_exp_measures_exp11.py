@@ -206,3 +206,75 @@ def test_persist_is_one_for_a_bud_still_growing_and_for_no_bud():
     assert exp_measures.run_measure("exp11.persist", T, axis=[0, 0, 1], every=1)["ratio"] == 1.0
     r = exp_measures.run_measure("exp11.persist", FakeTraj([sphere(), sphere(seed=1)]), axis=[0, 0, 1], every=1)
     assert r["grown"] is False and r["ratio"] == 1.0
+
+
+class NpzLike:
+    def __init__(self, d):
+        self.d, self.files = d, list(d)
+
+    def __getitem__(self, k):
+        return self.d[k]
+
+
+def test_membrane_flags_a_lost_membrane():
+    x = sphere()
+    bm_ok = [1.1 * sphere(500, seed=1)] * 3
+    bm_bad = [1.1 * sphere(500, seed=1), np.full((500, 3), np.nan), np.full((500, 3), np.nan)]
+    for bm, want in ((bm_ok, 1.0), (bm_bad, 0.0)):
+        T = FakeTraj([x] * 3)
+        T.z = NpzLike({"bm_node__pos": np.asarray(bm)})
+        r = exp_measures.run_measure("exp11.membrane", T)
+        assert r["finite_min"] == want
+    T = FakeTraj([x] * 3)
+    T.z = NpzLike({"bm_node__pos": np.asarray(bm_ok)})
+    assert abs(exp_measures.run_measure("exp11.membrane", T)["r_ratio_last"] - 1.1) < 0.02
+
+
+def test_scorer_flags_unknown_key_as_invalid():
+    """A gate reading a key the ruler never returns is INVALID (not 'no value'), and the card cannot pass."""
+    import exp_gate_score as S
+    G = {"pass_above": 8, "measures": [{"measure": "exp13.stress"}], "runs": {"fb": "x_s{seed}"},
+         "gates": [{"id": "typo", "max": 10.0, "value": {"arm": "fb", "key": "exp13.stress.tension_ratio_rim"},
+                    "full": 1.0, "zero": 2.0}]}
+    M = {("fb", 1): {"exp13.stress.s_tt_over_rr_rim": 1.7, "exp13.stress.area_ratio": 1.0}}
+    r = S.score(G, M)
+    row = r["rows"][0]
+    assert row["status"] == "INVALID" and "s_tt_over_rr_rim" in row["note"]
+    assert r["invalid"] == ["typo"] and not r["passed"]
+
+
+def test_scorer_not_on_arm_and_unknown_arm():
+    import exp_gate_score as S
+    G = {"measures": [{"measure": "m"}], "runs": {"a": "a_s{seed}", "b": "b_s{seed}"},
+         "gates": [{"id": "g1", "max": 1, "value": {"arm": "b", "key": "m.k"}, "full": 1, "zero": 0},
+                   {"id": "g2", "max": 1, "value": {"arm": "zz", "key": "m.k"}, "full": 1, "zero": 0}]}
+    M = {("a", 1): {"m.k": 1.0}, ("b", 1): {"m.other": 2.0}}
+    probs, errs = S.lint(G, M)
+    assert any(p.startswith("NOT ON ARM") for p in probs["g1"])
+    assert any(p.startswith("UNKNOWN ARM") for p in probs["g2"])
+
+
+def test_cache_key_survives_the_jsonl_round_trip():
+    """A kw dict with int keys must give the same cache key live and after the JSONL cache (exp12's bug)."""
+    import json
+    import exp_gate_score as S
+    kw = {"R_ref_um": {2: 1.0, 11: 2.0, 13: 3.0}, "axis": [0, 0, 1]}
+    assert S._kw_key(kw) == S._kw_key(json.loads(json.dumps(kw)))
+
+
+def test_min_over_arms_can_be_restricted():
+    import exp_gate_score as S
+    M = {("main", 1): {"a": 5.0}, ("explore", 1): {"a": 0.5}}
+    assert S.value({"min_over_arms": {"key": "a"}}, M)[0] == 0.5
+    assert S.value({"min_over_arms": {"key": "a", "arms": ["main"]}}, M)[0] == 5.0
+
+
+def test_clefts_zero_on_a_sphere_and_seen_on_a_dent():
+    x, tri = sphere_mesh(2000)
+    T = MeshTraj([x], tri)
+    assert exp_measures.run_measure("exp11.clefts", T, every=1)["frac_last"] < 0.01
+    y = x.copy()
+    d = y[:, 2] > 0.9                                  # a pit at the +z pole, pressed inward
+    y[d] *= 0.8
+    T = MeshTraj([y], tri)
+    assert exp_measures.run_measure("exp11.clefts", T, every=1)["frac_last"] > 0.005

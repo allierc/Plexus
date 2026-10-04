@@ -75,6 +75,7 @@ seed:
   vseed_cv: 0.02, h0: 0.88, ref_frame: 60, apical: in}
 - {op: bm_seed, implementation: live, at: bm_node, tissue: vertex, offset: 0.05, seed: 3}
 plotting:
+  zoom: 3.0
   renderer: vtk_points
   background: black
   up_axis: 2

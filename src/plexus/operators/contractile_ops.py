@@ -279,6 +279,89 @@ class ActiveStrain(Lateral):
         return {}
 
 
+@register_operator("active_strain", family="mechanics", set="particle", kind="lateral", model="excitation",
+                   equation=r"""$$\gamma_j(t)=\mathbb 1[\,j\text{ excited}\,]\;\gamma^{\mathrm{fit}}_j\big(t-(t^{\mathrm{exc}}_j-t_{\mathrm{ref}})\big)$$""")
+class ActiveStrainExcitation(ActiveStrain):
+    """`excitation` MODEL of active_strain -- the contraction is TRIGGERED by the cell's own excitation
+    instead of by the shared clock alone: the fitted time course is kept, its onset is the moment the
+    cell was excited, and a cell that is never excited never contracts.
+
+        gamma_j(t) = 1[j excited] * gamma_fit_j( t - (t_exc_j - t_ref) )
+
+    gamma_fit_j is the default's activation -- the fitted shared clock, cell j's fitted delay and time
+    course, the temporal modes -- unchanged; t_exc_j is the first frame at which the cell's excitation
+    variable (`chem` column `chan` of the parent set) reached `thr`; t_ref is the frame of the stimulus,
+    so a sheet excited everywhere at t_ref reproduces the default EXACTLY (the identity case), and a
+    wave that reaches cell j later shifts j's contraction by exactly that conduction delay. The fitted
+    per-cell delay stays where it was: it is each cell's own excitation-to-contraction delay (exp 6,
+    Stage 0 finding), which the conduction does not replace.
+
+    Why a model and not a new operator: the contract is active_strain's own (cell -> mpm_particle,
+    the rest-length change); what differs is the hypothesis about what starts a cell's contraction --
+    a clock shared by the sheet, or the cell's own excitation. The default is untouched.
+
+    `t_exc` is kept by the operator (it is the history of a threshold crossing, not a state the
+    engine integrates): the cell's LATEST upstroke, re-armed once its excitation falls below thr / 2,
+    so a paced sheet (`segments:`, one per beat) is triggered again at every beat; t_ref is then
+    counted from the beat's own segment start.
+
+    `frames_per_clock_frame: N` (default 1): the fitted clock counts RECORDING frames; a spec that
+    resolves the excitation finely runs N engine frames per recording frame (the chemistry needs
+    ~0.01 of a model time unit a step, a recording frame is 3.2), and this maps engine frame f to
+    clock frame f / N. The engine integrates a block once per tick at the frame's dt, so an excitable
+    chemistry cannot be sub-stepped inside a substep block -- only its last substep would count --
+    which is why the rig refines the frame instead. The active-strain increment telescopes exactly,
+    so N steps accumulate the same contraction as one.
+
+    Reference: excitation-contraction coupling as a trigger: Bers, D. M. (2002). Cardiac
+    excitation-contraction coupling. Nature 415:198-205; the fitted time course: prototype/cardio_mpm/
+    strain (Plexus, this work).
+    """
+    READS = ["phi", "g", "g2", "chem"]
+    PARAM_ROLES = {**ActiveStrain.PARAM_ROLES, "t_ref": "stimulus_frame", "thr": "excitation_threshold",
+                   "chan": "excitation_column", "frames_per_clock_frame": "engine_frames_per_recording_frame"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.t_ref = float(params.get("t_ref", 0.0))
+        self.thr = float(params.get("thr", 0.5))
+        self.chan = int(params.get("chan", 0))
+        self.fpf = float(params.get("frames_per_clock_frame", 1))
+        self._t_exc = None
+        self._shift = None
+
+    def _block(self, lvl, name, n, dev, dt):
+        b = super()._block(lvl, name, n, dev, dt)
+        if name == "delay" and self._shift is not None:
+            return b + self._shift
+        return b
+
+    def gamma(self, cell, frame, dev, dt):
+        frame = frame / self.fpf if self.fpf != 1 else frame
+        if "chem" not in cell.state_schema:
+            raise ValueError(f"active_strain[excitation]: {self.parent!r} has no `chem` block -- the "
+                             f"excitation this model reads. Put an excitable chemistry on the cell set.")
+        u = cell.get("chem")[:, self.chan].detach().to(dt)
+        if self._t_exc is None or self._t_exc.shape[0] != u.shape[0]:
+            self._t_exc = torch.full((u.shape[0],), float("nan"), device=dev, dtype=dt)
+            self._armed = torch.ones(u.shape[0], dtype=torch.bool, device=dev)
+        # ONE ONSET PER BEAT: a cell's onset is its latest upstroke through `thr`; it re-arms once its
+        # excitation has fallen below thr / 2, so a paced sheet is triggered again at every beat
+        new = self._armed & (u >= self.thr)
+        self._t_exc = torch.where(new, torch.full_like(self._t_exc, float(frame)), self._t_exc)
+        self._armed = (self._armed & ~new) | (u < 0.5 * self.thr)
+        # the beat this frame belongs to starts at the last segment offset (0 without segments), and
+        # only an onset inside it triggers this beat's contraction
+        seg = max([float(x) for x in self.segments if float(x) <= float(frame)], default=0.0)
+        excited = ~torch.isnan(self._t_exc) & (self._t_exc >= seg)
+        self._shift = torch.nan_to_num(self._t_exc - seg - self.t_ref, nan=0.0)[:, None]
+        try:
+            gam = super().gamma(cell, frame, dev, dt)
+        finally:
+            self._shift = None
+        return gam * excited.to(gam.dtype)[:, None]
+
+
 @register_operator("material_from_cell", family="mechanics", set="particle", kind="lateral",
                    equation=r"""$$E_j=e^{\,\log E_j}$$""")
 class MaterialFromCell(Lateral):
@@ -347,3 +430,124 @@ class MaterialFromCell(Lateral):
         lvl.mu = E / (2 * (1 + nu))
         lvl.la = E * nu / ((1 + nu) * (1 - 2 * nu))
         return {}
+
+
+from plexus.operators.mpm_ops import MPMAnchor                          # noqa: E402
+
+
+@register_operator("mpm_anchor", model="per_cell", family="mechanics", set="particle", kind="lateral",
+                   equation=r"""$$\mathbf a_p=k\,e^{\log\kappa_{j(p)}}\,(\mathbf x^{\mathrm{rest}}_p-\mathbf x_p)$$""")
+class MPMAnchorPerCell(MPMAnchor):
+    """The substrate spring with a stiffness PER CELL: how firmly each cell is held by its gel.
+
+    cell -> mpm_particle: reads the parent's `logkappa` block through the containment map.
+
+        a_p = k exp(logkappa_j) (x_p^rest - x_p),      j = the cell particle p belongs to
+
+    `mpm_anchor` states one k for the whole sheet; this is the different hypothesis that adhesion
+    differs cell to cell, and how firmly a cell is held sets how much of its own contraction it
+    realises and how much it hands to its neighbours. k is the sheet's stiffness in inverse time
+    squared and logkappa_j a dimensionless log-factor on it, 0 meaning "the shared spring", so a
+    sheet with no `logkappa` block is `mpm_anchor` exactly. The rest state and `applies_to` are
+    the parent's; `applies_to` defaults to `substrate` here, every particle anchored.
+
+    Reference: prototype/cardio_mpm/strain `anchor_percell` (Plexus, this work), the per-cell
+    adhesion of the cardiomyocyte reporting fits.
+    """
+    READS = ["logkappa"]
+    PARAM_ROLES = {**MPMAnchor.PARAM_ROLES, "parent": "the_set_carrying_logkappa",
+                   "block": "per_cell_log_stiffness_block"}
+
+    def __init__(self, params, device="cpu"):
+        params = {"applies_to": "substrate", **params}
+        super().__init__(params, device)
+        self.parent = str(params.get("parent", "cell"))
+        self.block = str(params.get("block", "logkappa"))
+        self._idx = None
+
+    def forward(self, H, mask=None):
+        lvl, cell = H.level(self.at), H.level(self.parent)
+        if self._rest is None:
+            self._init(lvl, H)
+        if self._idx is None:
+            self._idx = H.lift_index(lvl.name, self.parent)
+        k = self.k
+        if self.block in cell.state_schema:
+            k = self.k * cell.get(self.block)[..., 0].exp()[..., self._idx]
+            k = k[..., None]
+        acc = k * (self._rest - lvl.get("pos")) * (self._sel * lvl.occ)[:, None].float()
+        if mask is not None:
+            acc = acc * mask[:, None].float()
+        return {self.at: acc}
+
+
+@register_operator("active_strain", family="mechanics", set="particle", kind="lateral", model="coupled",
+                   equation=r"""$$a_j(t)=\mathrm{clip}\Big(\gamma_j(t)+\sum_{i\in N(j)}W_2\tanh\!\big(W_1[a_i(t-1),a_j(t-1)]\big),\,0,\,1.5\Big)$$""")
+class ActiveStrainCoupled(ActiveStrain):
+    """`coupled` MODEL of active_strain -- each cell's pulse is modulated by a learned MESSAGE from
+    the cells it touches, one message-passing step per frame: a graph neural network between cells.
+
+        a_j(t) = clip( gamma_j(t) + sum_{i in N(j)} m(a_i(t-1), a_j(t-1)), 0, 1.5 )
+        m(x_i, x_j) = W2 tanh( W1 [x_i, x_j] )
+
+    gamma_j(t) is the default's activation (the shared clock, cell j's delay and time course, the
+    temporal modes), a_j the activation the contraction actually follows, and N(j) the cells whose
+    segmented outlines touch j's -- the `edge_index` `cell_neighbours[model: label_image]` writes,
+    the junctional contact graph a gap junction needs. The message m is a small network with hidden
+    width `hidden`: W1 is [hidden, 2], W2 is [1, hidden]. It has NO BIAS, so two cells at rest
+    exchange nothing and a resting sheet stays at rest; and W2 STARTS AT ZERO, so the model starts
+    as the default exactly and whatever the fit does to W2 is the coupling the data asked for.
+    W1 starts at seeded random values so the hidden units are not all alike.
+
+    `embedding: <block>` names a learnable LATENT block of the parent set (width d, typically 2),
+    and the message then reads it too: m(x_i, x_j) = W2 tanh(W1 [a_i, a_j, e_i, e_j]), W1 being
+    [hidden, 2 + 2d]. One shared message, and each cell may differ in what it sends and how it
+    takes its neighbours' -- connectome-gnn's per-neuron a_i, which lets one g_phi be 65 cell
+    types. Without `embedding:` the input is [a_i, a_j] exactly as before.
+
+    W1 and W2 are PARAMETERS OF THE ACTIVITY, held as tensors on the instance, so a training spec
+    frees them as `{param: W1, op: active_strain}` and the trainer hands its own leaves to every
+    rollout through `on_ready`. The message reads last frame's activations, which the parent's
+    `gam_prev` block already carries.
+
+    Why a model and not a new operator: the contract is active_strain's own; what differs is the
+    hypothesis that a cell's excitation is shaped by its neighbours rather than by its own clock
+    alone. `excitation`, beside it, triggers the pulse by a threshold crossing, which is right for a
+    wave and has no gradient; this one is smooth so it can be fitted.
+
+    Reference: gap-junction coupling of cardiomyocyte excitation, e.g. Kléber, A. G. & Rudy, Y.
+    (2004). Basic mechanisms of cardiac impulse propagation and associated arrhythmias. Physiol.
+    Rev. 84:431-488; the message-passing form, Gilmer, J. et al. (2017). Neural message passing
+    for quantum chemistry. ICML.
+    """
+    PARAM_ROLES = {**ActiveStrain.PARAM_ROLES, "hidden": "message_network_width",
+                   "seed": "message_network_init_seed",
+                   "embedding": "latent_block_of_the_parent_read_by_the_message",
+                   "embedding_dim": "width_of_that_block"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        h = int(params.get("hidden", 8))
+        self.embedding = params.get("embedding")
+        d = int(params.get("embedding_dim", 2)) if self.embedding else 0
+        gen = torch.Generator().manual_seed(int(params.get("seed", 0)))
+        self.W1 = torch.randn(h, 2 + 2 * d, generator=gen) / np.sqrt(2.0 + 2 * d)
+        self.W2 = torch.zeros(1, h)
+
+    def gamma(self, cell, frame, dev, dt):
+        gam = super().gamma(cell, frame, dev, dt)                        # [C, 1]
+        ei = getattr(cell, "edge_index", None)
+        if frame == 0 or ei is None or ei.numel() == 0 or "gam_prev" not in cell.state_schema:
+            return gam
+        a = cell.get("gam_prev")                                         # a(t-1), [C, 1]
+        src, dst = ei[0].to(a.device), ei[1].to(a.device)
+        x = torch.cat([a[src], a[dst]], -1)                              # [E, 2]
+        if self.embedding:
+            e = cell.get(self.embedding)                                 # [C, d]
+            if e.shape[-1] * 2 + 2 != self.W1.shape[1]:
+                raise ValueError(f"active_strain[coupled]: embedding {self.embedding!r} has width "
+                                 f"{e.shape[-1]}, but `embedding_dim` said {(self.W1.shape[1] - 2) // 2}")
+            x = torch.cat([x, e[src], e[dst]], -1)                       # [E, 2 + 2d]
+        m = torch.tanh(x @ self.W1.to(device=dev, dtype=dt).T) @ self.W2.to(device=dev, dtype=dt).T
+        msg = torch.zeros_like(a).index_add(0, dst, m)                   # sum over each cell's contacts
+        return (gam + msg).clamp(min=0.0, max=1.5)

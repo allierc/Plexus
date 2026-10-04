@@ -330,10 +330,16 @@ class LiveMovie:
             # a header reading "4.1M cells" over a picture of six of them is a collision of two
             # meanings in the one place a reader looks first. The RESOLUTION is what the number was
             # for, and `grid 160^3` already says it.
-            self._grid_label = f"   grid {_ng}^{_d}"
+            _fc0 = next((fc for fc in _fl.values() if isinstance(fc, dict) and "n_grid" in fc), {})
+            # THE GRID'S OWN BOX when it declares one (`box`, or `cell_box` for a grid per body), not the
+            # world's: exp 11's 4.7-unit per-cell blocks read "dx 200 um" off the 200-unit world.
+            _gb = (float(_fc0["cell_box"]) if _fc0.get("cell_box") is not None else
+                   float(_fc0["box"][1]) if _fc0.get("box") is not None else
+                   float(world[1] if len(world) > 1 else world[0]))
+            self._grid_label = (f"   grid {_ng}^{_d} per {_fc0['per_parent']}" if _fc0.get("per_parent")
+                                else f"   grid {_ng}^{_d}")
             if length_um:                       # with units, the spacing has a SIZE worth quoting
-                _dx = float(world[1] if len(world) > 1 else world[0]) / _ng \
-                    * float(length_um) / 1.0e6
+                _dx = _gb / _ng * float(length_um) / 1.0e6
                 # IN THE SAME UNIT THE SCALE BAR PICKS, and at two significant figures. `dx
                 # 0.000625 mm` is the same length as `0.62 um` written to be unreadable, and it
                 # disagreed with a scale bar standing right below it saying `25 um`.
@@ -1259,6 +1265,8 @@ class LiveMovie:
             _rgbv = self._rgb_field(H, lvl)
             if _rgbv is None:
                 _rgbv = self._rgb_chem(H, lvl)
+            if _rgbv is None and str((self.style or {}).get("color_by", "") or "").lower() == "chem":
+                _rgbv = self._rgb_parent_chem(H, lvl)     # opt-in: see `_rgb_parent_chem`
             self.cloud["rgb"] = _rgbv if _rgbv is not None else self._rgb(H, lvl, pos)
             self._base_rgb = None
             if str((self.style or {}).get("dot_shading", "")).lower() == "body":
@@ -1362,6 +1370,7 @@ class LiveMovie:
             self._static_mesh(H)
             self._chain_build(H)
             self._spheres_build(H)
+            self._also_build(H)                           # `plotting.also_sets` -- opt-in
             self._field_slice_update(H, first=True)
             self._field_iso_update(H, first=True)
             self._add_meshes(H)
@@ -1386,6 +1395,8 @@ class LiveMovie:
         self.cloud.points = self._xyz(lvl)
         self._chain_update(H)
         self._spheres_update(H)
+        self._also_update(H)
+        self._protein_insets_update(H)
         self._field_slice_update(H)
         self._field_iso_update(H)
         self._glyph_update(lvl)
@@ -1405,7 +1416,8 @@ class LiveMovie:
             if _c is not None:
                 self.cloud["rgb"] = _c
         elif getattr(self, "_chem_live", False):
-            _c = self._rgb_chem(H, lvl)
+            _c = (self._rgb_parent_chem(H, lvl) if getattr(self, "_chem_parent", False)
+                  else self._rgb_chem(H, lvl))
             if _c is not None:
                 self.cloud["rgb"] = _c
         el = time.perf_counter() - self.t0
@@ -1430,6 +1442,9 @@ class LiveMovie:
             # `colour_by` ALREADY CARRIES THE RANGE AND THE MAP -- `_rgb_field` builds it as
             # "<label> <range> (<cmap>)" -- so appending them here printed each of them twice.
             _lut = f"\ncolour = {self.colour_by}"
+        # `mesh_chem_label`: what the layer's face colour means, as a line of this header (the human, 2026-09-29)
+        if (self.style or {}).get("mesh_chem_label") and bool((self.style or {}).get("mesh_chem", True)):
+            _lut += f"\n{self.style['mesh_chem_label']}"
         # `nodes`, NOT `particles`. What is drawn is the members of a SET -- vertices of a mesh,
         # cells, neurons -- and only one substrate in this tree calls them particles.
         # "4,440 of 25,584 nodes" while a set is growing into its reservoir, and plainly
@@ -1496,7 +1511,7 @@ class LiveMovie:
     def _curve_dim(q):
         """The dimension a curve quantity converts through; `count:<set>` is a count."""
         from plexus.measures import CURVE_DIMS
-        return "count" if str(q).startswith(("count:", "species:")) else (None if str(q).startswith(("block:", "jacobian:", "strain:", "rate:")) else CURVE_DIMS.get(q))
+        return "count" if str(q).startswith(("count:", "species:")) else (None if str(q).startswith(("block:", "total:", "jacobian:", "strain:", "rate:")) else CURVE_DIMS.get(q))
 
     # WHAT EACH CURVE IS, SO THE PANEL CAN CONVERT IT. Until this existed the volume panel appended
     # `µm³` to a raw simulation number and was wrong by `length_um ** 3` -- a factor of 1000 on every
@@ -1513,6 +1528,25 @@ class LiveMovie:
             return max(1, int(b) - int(a))
         except Exception:                                # noqa: BLE001
             return max(1, len((self.style or {}).get("species") or []))
+
+    def _curve_block_ok(self, H, lvl, q):
+        """Does `block:<set>:<block>` / `total:<set>:<block>` name something this run has? A set that is a
+        level answers through its schema; the mesh's cell set, which on a replay is not a level, through the
+        cell columns the mesh carries (width-1 blocks only)."""
+        if q.count(":") != 2:
+            return False
+        _, name, block = q.split(":", 2)
+        blocks = [b for b in block.split("@") if b]                  # `total:<set>:<block>@<weight>`
+        if name in getattr(H, "levels", {}):
+            sch = getattr(H.level(name), "state_schema", None)
+            try:
+                return sch is None or all(b in sch for b in blocks)
+            except TypeError:
+                return True
+        m = getattr(lvl, "mesh", None)
+        nF = int(m.get("nF", 0) or 0) if m is not None else 0
+        cc = self._cell_cols(H, lvl, nF) if nF else {}
+        return bool(nF) and all(b in cc for b in blocks)
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -1636,14 +1670,14 @@ class LiveMovie:
             # which no set has, and the panel drew nothing -- the ion-flow runs' "K+ inside" and "Cl- inside"
             # panels read "nan +- nan" through batch 10 while the trajectory held the counts.
             _q = str(cfg.get("quantity", "cells"))
-            q = _q if _q.lower().startswith(("block:", "count:", "jacobian:", "strain:", "rate:", "species:", "clones:")) else _q.lower()
+            q = _q if _q.lower().startswith(("block:", "total:", "count:", "jacobian:", "strain:", "rate:", "species:", "clones:")) else _q.lower()
             if ":" in q:
                 q = q.split(":", 1)[0].lower() + ":" + q.split(":", 1)[1]
-            if q not in self._CURVE_Q and not any(str(q).startswith(k) for k in ("count:", "block:", "jacobian:", "strain:", "rate:", "species:", "clones:")):
+            if q not in self._CURVE_Q and not any(str(q).startswith(k) for k in ("count:", "block:", "total:", "jacobian:", "strain:", "rate:", "species:", "clones:")):
                 raise ValueError(f"plotting.curve.quantity: {q!r} is not one of "
-                                 f"{', '.join(self._CURVE_Q)}, count:<set>, block:<set>:<block>, jacobian:<set>, strain:<set> or rate:<set>")
-            if str(q).startswith("block:") and (q.count(":") != 2 or q.split(":")[1] not in getattr(H, "levels", {})):
-                raise ValueError(f"plotting.curve.quantity: {q!r} must be block:<set>:<block> with a set this run has")
+                                 f"{', '.join(self._CURVE_Q)}, count:<set>, block:<set>:<block>, total:<set>:<block>, jacobian:<set>, strain:<set> or rate:<set>")
+            if str(q).startswith(("block:", "total:")) and not self._curve_block_ok(H, lvl, q):
+                raise ValueError(f"plotting.curve.quantity: {q!r} must be block:<set>:<block> or total:<set>:<block> with a set and block this run has")
             if str(q).startswith("count:") and q[len("count:"):].split(":", 1)[0] not in getattr(H, "levels", {}):
                 raise ValueError(f"plotting.curve.quantity: {q!r} names a set this run does not have")
             if str(q).startswith("species:") and q[len("species:"):] not in getattr(H, "levels", {}):
@@ -1665,6 +1699,33 @@ class LiveMovie:
                 S = np.full((T_live, nt0, 2), np.nan)
             else:
                 S = self._curve_series(H, lvl, q, ntype)
+                # `with: <quantity>` -- A SECOND QUANTITY ON THE SAME PANEL, its own line (exp 11, 2026-09-27: the
+                # surface and the interior cell counts on one curve). `colors: [a, b]` colours the two. Replay only:
+                # a live pass keeps one series per panel.
+                # `with: [q2, q3, ...]` -- AS MANY AS THE PANEL NEEDS (exp 11, 2026-09-29: the membrane's node count
+                # and every protein's total on one panel, `total:<set>:<block>`), one colour each from `colors:`,
+                # named by `labels:` in a legend. A named set or block the run does not have is an error here,
+                # not a flat line: a protein panel on a run without the proteins must say so.
+                _w = cfg.get("with")
+                if _w:
+                    _ws = [_w] if isinstance(_w, str) else list(_w)
+                    _parts = [S[:, :1, :]]
+                    for _q2 in _ws:
+                        _q2 = str(_q2)
+                        _q2 = _q2 if _q2.lower().startswith(("block:", "total:", "count:", "jacobian:", "strain:", "rate:",
+                                                             "species:", "clones:")) else _q2.lower()
+                        if _q2.startswith("count:") and _q2.split(":")[1] not in getattr(H, "levels", {}):
+                            raise ValueError(f"plotting.curve.with: {_q2!r} names a set this run does not have")
+                        if _q2.startswith(("block:", "total:")) and not self._curve_block_ok(H, lvl, _q2):
+                            raise ValueError(f"plotting.curve.with: {_q2!r} -- no such set and block in this run")
+                        _parts.append(self._curve_series(H, lvl, _q2, ntype)[:, :1, :])
+                    n = min(p_.shape[0] for p_ in _parts)
+                    S = np.concatenate([p_[:n] for p_ in _parts], axis=1)
+                # `log: true` -- A LOG Y AXIS, for series decades apart (a membrane of 27,000 nodes beside a
+                # protease total of a few). Nothing <= 0 has a place on it, so those points are left out.
+                if cfg.get("log"):
+                    S = S.copy(); _nz = ~(S[..., 0] > 0)
+                    S[..., 0][_nz] = np.nan; S[..., 1] = 0.0
                 if not np.isfinite(S[..., 0]).any():
                     continue
             # CONVERT ONCE, HERE, AND EVERY SURFACE FOLLOWS. The y-axis range, the +-SD band, the
@@ -1777,6 +1838,17 @@ class LiveMovie:
                 if np.isfinite(_dmin) and _dmin < y0 and y0 != 0.0:
                     y0 = _round1(_dmin - 0.4 * (y1 - _dmin), False)
                     y0, y1, cfg["ticks"] = _snap_range(y0, y1, _ticks_req)
+            if cfg.get("log") and not live:
+                _pv = S[..., 0][np.isfinite(S[..., 0]) & (S[..., 0] > 0)]
+                if _pv.size:
+                    y0 = float(10.0 ** np.floor(np.log10(_pv.min())))
+                    y1 = float(10.0 ** np.ceil(np.log10(_pv.max() * 1.0001)))
+                    if y1 <= y0:
+                        y1 = y0 * 10.0
+                    try:
+                        ch.y_axis.log_scale = True
+                    except Exception:                        # noqa: BLE001
+                        pass
             ch.y_axis.range = [y0, y1]
             ch.x_axis.label = str(cfg.get("xlabel", (f"time ({_ct.get('unit', 'ns')})" if _ct.get("per_frame_s") else "frame")))
             # UNITS ON THE Y AXIS, DERIVED FROM THE DECLARED SCALE AND NOT TYPED IN.
@@ -1874,6 +1946,10 @@ class LiveMovie:
                 import matplotlib.colors as _mc3
                 _sc = (self.style or {}).get("species") or []
                 cols = [tuple(_mc3.to_rgb(_sc[j])) if j < len(_sc) else _pal[j % len(_pal)] for j in range(nt)]
+            elif cfg.get("colors"):
+                import matplotlib.colors as _mc4
+                cols = [tuple(_mc4.to_rgb(c)) for c in cfg["colors"]][:nt]
+                cols += [_pal[j % len(_pal)] for j in range(len(cols), nt)]
             else:
                 cols = ([tuple(cfg["color"])] if "color" in cfg and nt == 1
                         else [(1.0, 1.0, 1.0)] if nt == 1
@@ -1885,7 +1961,25 @@ class LiveMovie:
                 bands.append(ch.area([0.0, 0.0], [0.0, 0.0], [0.0, 0.0],
                                      color=(*c, 1.0 if _clones is not None else 0.28)))
                 lines.append(ch.line([0.0, 0.0], [0.0, 0.0],
-                                     color=(*c, 0.0 if _clones is not None else 1.0), width=2.0))
+                                     color=(*c, 0.0 if _clones is not None else 1.0), width=2.0,
+                                     label=str((cfg.get("labels") or [])[j]) if j < len(cfg.get("labels") or []) else ""))
+            # `labels: [...]` -- A LEGEND inside the plot, white on clear, one entry per line, when the panel
+            # carries more series than its y label can name in words; `legend_loc: top_left` (default),
+            # `top_right`, `bottom_left` or `bottom_right` moves it off the curves.
+            if cfg.get("labels"):
+                ch.legend_visible = True
+                try:
+                    _lg = ch.GetLegend()
+                    _v, _h = str(cfg.get("legend_loc", "top_left")).split("_", 1)
+                    _lg.SetHorizontalAlignment({"left": _lg.LEFT, "right": _lg.RIGHT}[_h])
+                    _lg.SetVerticalAlignment({"top": _lg.TOP, "bottom": _lg.BOTTOM}[_v])
+                    _lg.SetLabelSize(int(cfg.get("legend_font_size", max(8, int(cfg.get("font_size", 18)) - 6))))
+                    _lg.GetLabelProperties().SetColor(1.0, 1.0, 1.0)
+                    _lg.GetBrush().SetColorF(0.0, 0.0, 0.0); _lg.GetBrush().SetOpacityF(0.0)
+                    _lg.GetPen().SetOpacityF(0.0)
+                    _lg.SetInline(True)
+                except Exception:                            # noqa: BLE001
+                    pass
             self.p.add_chart(ch)
             # WHERE THE VALUE READOUT GOES, from the same `loc` and `size` the chart got rather than
             # a second guess at them -- see `_curves_update` for what it prints.
@@ -1896,11 +1990,17 @@ class LiveMovie:
             # reports; `+ 0.055` centres it on the data. `fs` is the HEADER's size, because the two
             # are the same kind of statement -- a number the reader is meant to take away -- and
             # the tick size made this one look like an axis annotation.
-            self._curve_labels.append(dict(name=f"curveval{_i}", q=q, unit=_u,
+            _nw = (0 if not cfg.get("with") else 1 if isinstance(cfg.get("with"), str) else len(cfg.get("with")))
+            self._curve_labels.append(dict(name=f"curveval{_i}", q=q, unit=_u, **({"with": True} if _nw == 1 else {}),
+                                           **({"multi": True} if _nw > 1 else {}),
                                            x=float(_loc[0]) + 0.055,
                                            y=float(_loc[1]) + float(_sz[1]) + 0.004,
                                            fs=int(cfg.get("value_font_size", 11))))
             self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
+                                 # `legend_frac` (default 0.03): the legend shows over the first 3 % of the run's
+                                 # frames only -- it is readable while the panel is still empty, and the curves
+                                 # it names then run under it (the human, 2026-09-29). 1.0 keeps it throughout.
+                                 "legend": bool(cfg.get("labels")), "legend_frac": float(cfg.get("legend_frac", 0.03)),
                                  "sd": bool(cfg.get("sd", q not in ("cells", "phase") and not str(q).startswith("species:")))
                                        or _clones is not None,
                                  "nsurv": None if _clones is None else _clones[2],
@@ -1965,6 +2065,10 @@ class LiveMovie:
                     [S, np.full((_want - S.shape[0],) + S.shape[1:], np.nan)], 0)
                 cv["ch"].x_axis.range = [0.0, float(S.shape[0] - 1) * getattr(self, "_curve_xs", 1.0)]
             t = min(int(tick), S.shape[0] - 1)
+            if cv.get("legend"):
+                _on = int(tick) <= max(1.0, cv["legend_frac"] * float(S.shape[0] - 1))
+                if bool(cv["ch"].legend_visible) != _on:
+                    cv["ch"].legend_visible = _on
             if cv.get("live") and H is not None:
                 # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
                 # BY NAME, NOT BY OBJECT: `engine.run` builds and seeds its OWN hierarchy, so a panel
@@ -2007,8 +2111,12 @@ class LiveMovie:
                    else None)
             if lab is not None:
                 m0, s0 = S[t, :, 0], S[t, :, 1]
+                if lab.get("multi"):                          # many series: the number is the panel's own quantity
+                    m0, s0 = m0[:1], s0[:1]
                 if cv.get("nsurv") is not None:              # a Muller plot: how many labels survive
                     txt = f"{int(cv['nsurv'][t])} clones"
+                elif lab.get("with"):                         # `with:` -- two quantities, two numbers, never their sum
+                    txt = "  |  ".join(f"{v:,.0f}" for v in m0)
                 elif lab["q"] == "cells" or str(lab["q"]).startswith("count:"):   # a count prints as an integer
                     txt = f"{np.nansum(m0):,.0f}"
                 elif lab["q"] == "phase":
@@ -3361,7 +3469,7 @@ class LiveMovie:
                 # the marks are carrying; unlit, a cell's colour means only what it was set to.
                 _flat_m = (self._mesh_is_subject and style == "surface"
                            and bool(st.get("mesh_flat", True)))
-                _rgb = self._mesh_face_rgb(m, pd, H) if self._mesh_is_subject else None
+                _rgb = self._mesh_face_rgb(m, pd, H, lvl) if self._mesh_is_subject else None
                 # A CONCAVE CELL IS FILLED FROM A TRIANGULATION, NOT AS ONE POLYGON. VTK draws a
                 # polygon cell as a fan from its first vertex, which is right only when the cell is
                 # convex: a concave one paints over its neighbours. Measured on a C-shaped test
@@ -3416,6 +3524,11 @@ class LiveMovie:
         if H is None:
             return None
         st = self.style or {}
+        # `mesh_chem: false` (default true): the layer keeps `mesh_color` even though its cells carry `chem` -- exp 11,
+        # 2026-09-29: `bm_sense` writes a membrane deficit into chem channel 0, and it painted those cells orange on
+        # the main view, a colour nobody had asked for and no label named
+        if not bool(st.get("mesh_chem", True)):
+            return None
         v = None
         try:
             v = H.level(str(st.get("mesh_chem_set", "cell"))).get("chem")
@@ -3440,7 +3553,26 @@ class LiveMovie:
             return None
         return (np.clip(np.asarray(rgb, float), 0, 1) * 255).astype(np.uint8)
 
-    def _mesh_face_rgb(self, m, pd, H=None):
+    @staticmethod
+    def _face_node_type(H, lvl, nF):
+        """[nF] type of each face of the mesh `lvl`, THIS frame: the paired cell set's `node_type`.
+
+        Live, `Level.mesh_cell_set` names the set and its `node_type` is current (an operator that
+        retypes a cell writes it there). On replay the level serves the recorded column itself --
+        the per-row `<cell>__node_type_t` when the types changed, the final column otherwise
+        (`_ReplayLevel.cell_node_type`). None when neither exists.
+        """
+        if lvl is None:
+            return None
+        pre = getattr(lvl, "cell_node_type", None)       # replay
+        if pre is not None:
+            return pre(nF)
+        cs = getattr(lvl, "mesh_cell_set", None)
+        clvl = H.level(cs) if (H is not None and cs and cs in getattr(H, "levels", {})) else None
+        nt = getattr(clvl, "node_type", None)
+        return None if nt is None else nt[:nF]
+
+    def _mesh_face_rgb(self, m, pd, H=None, lvl=None):
         """One colour per cell: the base, with the division pair marked -- `render_vtk`'s own rule.
 
         REUSED, NOT REIMPLEMENTED. `render_vtk._marks` is where the mother/daughter split lives, and
@@ -3535,6 +3667,29 @@ class LiveMovie:
         _lab = str(st.get("mesh_color_by", "") or "")
         if _lab and _lab.lower() not in ("phase", "cycle_progress"):
             lv = m.get(_lab)
+            # `node_type` (alias `type`) IS THE CELL SET'S TYPE COLUMN, which is not a state block and
+            # so is not on the view: read per frame off the face set (live) or its recorded per-row
+            # column (replay), so a cell retyped mid-run is recoloured (exp 9 Part B).
+            if lv is None and _lab.lower() in ("node_type", "type"):
+                lv = self._face_node_type(H, lvl, nF)
+            # A COLORMAP INSTEAD OF CATEGORIES is opt-in, `mesh_color_scale: continuous | auto` --
+            # `render_vtk.mesh_scale_continuous`. The range widens over the frames drawn (never
+            # narrows) unless `mesh_color_range` fixes it. Absent, the categorical law below stands.
+            if lv is not None:
+                from plexus.render_vtk import mesh_block_continuous, mesh_scale_continuous
+                _v = np.resize(np.asarray(lv.detach().cpu().numpy() if hasattr(lv, "detach")
+                                          else lv, np.float64).ravel(), nF)
+                if getattr(self, "_mcb_cont", False) or mesh_scale_continuous(_v, st):
+                    self._mcb_cont = True
+                    _f = np.isfinite(_v)
+                    _r = getattr(self, "_mcb_rng", None)
+                    if _f.any():
+                        _lo, _hi = float(_v[_f].min()), float(_v[_f].max())
+                        _r = (_lo, _hi) if _r is None else (min(_r[0], _lo), max(_r[1], _hi))
+                        self._mcb_rng = _r
+                    base = mesh_block_continuous(_v, st, _r)
+                    pd.cell_data["rgb"] = base
+                    return base
             if lv is not None:
                 from plexus.measures import label_rgb
                 q = np.rint(np.resize(np.asarray(lv.detach().cpu().numpy() if hasattr(lv, "detach")
@@ -3761,7 +3916,7 @@ class LiveMovie:
                     pd.points = self._mesh_xyz(lvl, nv, sc, ct)
                 self._edge_actor(H, lvl, m, first=False)
                 if self._mesh_is_subject:
-                    self._mesh_face_rgb(m, pd, H)
+                    self._mesh_face_rgb(m, pd, H, lvl)
                 self._near_side_faces(pd)
                 # THE TRIANGULATED FILL READS `pd` THROUGH A PIPELINE, which re-executes only when
                 # `pd` says it changed; a colour array replaced in place does not say so.
@@ -3895,6 +4050,12 @@ class LiveMovie:
         """Scatter whatever is inside the slab, in the plane of the other two axes."""
         try:
             lvl = H.level(self.set_name) if getattr(self, "set_name", None) else None
+            # THE SET `self.idx` INDEXES, which is the one the 3D view draws (`_sname`), before the
+            # biggest one: they were the same set until a spec carried a point set larger than its
+            # drawn mesh (exp 11's 21,760 interior MPM points beside a 396-vertex layer), and then a
+            # vertex subset indexed the MPM set -- "index 24600 is out of bounds for size 21760".
+            if lvl is None and getattr(self, "_sname", None):
+                lvl = H.level(self._sname)
             if lvl is None:
                 from plexus.live_movie import _biggest_particle_set
                 lvl = H.level(_biggest_particle_set(H))
@@ -4023,6 +4184,89 @@ class LiveMovie:
             for _a in (self.cs.x_axis, self.cs.y_axis):
                 _a.behavior = "fixed"
             self._cs_series = []
+            # `cross_section.style: outlines` (exp 11, 2026-09-28; default = the scatter/walls drawing below): the section
+            # drawn as a histological one -- the outlines of the apico-basal cells where the plane cuts their prisms and
+            # of each interior cell (`cross_section.interior: <set with a pid block>`), from the density of ALL its
+            # particles, in white; the membrane's nodes in the slab (`cross_section.membrane: <set>`) as orange dots.
+            # `plexus.section_render` does the drawing; nothing else in the panel runs.
+            _csx = (self.style or {}).get("cross_section", {}) or {}
+            if str(_csx.get("style", "")).lower() == "outlines":
+                for _s in getattr(self, "_cs_mesh_series", []) or []:
+                    try:
+                        self.cs.remove_plot(_s)
+                    except Exception:                    # noqa: BLE001
+                        pass
+                self._cs_mesh_series = []
+                from plexus import section_render as _SR
+                from plexus.models.topology import rings_from_flat_3d as _rf
+                _vl = H.level(self.set_name) if getattr(self, "set_name", None) else lvl
+                _m = getattr(_vl, "_mesh", None)
+                if _m is None:
+                    _mm = getattr(_vl, "mesh", None)     # the replay level serves its frame's mesh (a property)
+                    _m = _mm() if callable(_mm) else _mm
+                try:
+                    _sep = _vl.get("sep")
+                except Exception:                        # noqa: BLE001
+                    _sep = None
+                if _m is not None and _sep is not None:
+                    _nF = int(_m["nF"]); _Nv = int(_m["Nv"])
+                    _tn = lambda v: (v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v))  # noqa: E731
+                    _Pv = _tn(_vl.get("pos"))[:_Nv].astype(np.float64)
+                    _Sv = _tn(_sep)[:_Nv].astype(np.float64)
+                    _rings = _rf(_tn(_m["E_srce"]), _tn(_m["E_trgt"]), _tn(_m["E_face"]), _nF)
+                    _pts, _lab = _SR.prism_cloud(_Pv, _Sv, _rings, _nF)
+                else:
+                    _pts, _lab = np.zeros((0, 3)), np.zeros(0, int)
+                _Q = np.zeros((0, 3)); _qc = np.zeros(0, int)
+                _inn = _csx.get("interior")
+                if _inn:
+                    try:
+                        _il = H.level(_inn); _n2 = lambda v: (v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v))  # noqa: E731
+                        _o = _n2(_il.occ).reshape(-1) > 0.5
+                        _Q = _n2(_il.get("pos"))[_o].astype(np.float64)
+                        _qc = np.rint(_n2(_il.get("pid")).reshape(-1)[_o]).astype(int)
+                    except Exception:                    # noqa: BLE001
+                        pass
+                _xr, _yr = self._cs_rng
+                if os.environ.get("PLEXUS_CS_DEBUG") and not getattr(self, "_cs_dbg", False):
+                    self._cs_dbg = True
+                    print(f"[cs-outlines] set_name {getattr(self, 'set_name', None)} _sname {getattr(self, '_sname', None)} "
+                          f"vl {type(_vl).__name__} m {None if _m is None else list(_m)[:6]} sep {None if _sep is None else getattr(_sep, 'shape', None)}",
+                          flush=True)
+                    print(f"[cs-outlines] y0 {y0:.3g} ax {ax} a {a} b {b} xr {_xr} yr {_yr} pts {len(_pts)} "
+                          f"P range {(_pts.min(0), _pts.max(0)) if len(_pts) else None} Q {len(_Q)} "
+                          f"Q range {(_Q.min(0), _Q.max(0)) if len(_Q) else None} qc {len(np.unique(_qc))} cells", flush=True)
+                _npx = int(_csx.get("resolution", 360))
+                _L = _SR.section_labels(_pts, _lab, _Q, _qc, ax, a, b, y0, _xr, _yr, _npx)
+                _bd = _SR.borders(_L)
+                _px = (_xr[1] - _xr[0]) / _npx
+                _iy, _ix = np.nonzero(_bd)
+                if os.environ.get("PLEXUS_CS_DEBUG"):
+                    print(f"[cs-outlines] labels {(int((_L >= 0).sum()))} border px {len(_ix)}", flush=True)
+                if len(_ix):
+                    try:
+                        self._cs_series.append(self.cs.scatter(_xr[0] + (_ix + 0.5) * _px, _yr[0] + (_iy + 0.5) * _px,
+                                                               size=float(_csx.get("line_px", 2.5)), style="o",
+                                                               color=(235, 235, 235, 255)))
+                    except Exception as _e:              # noqa: BLE001
+                        print(f"[cs-outlines] scatter failed: {type(_e).__name__}: {_e}", flush=True)
+                _mem = _csx.get("membrane")
+                if _mem:
+                    try:
+                        _ml = H.level(_mem); _n3 = lambda v: (v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v))  # noqa: E731
+                        _o = _n3(_ml.occ).reshape(-1) > 0.5
+                        _B = _n3(_ml.get("pos"))[_o]
+                        _sl = np.abs(_B[:, ax] - y0) < 0.30
+                        if _sl.any():
+                            self._cs_series.append(self.cs.scatter(_B[_sl, a], _B[_sl, b], size=3.0, style="o",
+                                                                   color=(255, 159, 28, 255)))
+                    except Exception:                    # noqa: BLE001
+                        pass
+                # the axes last, as the default path does (a series added after the range resets it)
+                for _a2, _r2 in ((self.cs.x_axis, self._cs_rng[0]), (self.cs.y_axis, self._cs_rng[1])):
+                    _a2.label_visible = _a2.ticks_visible = _a2.tick_labels_visible = False
+                    _a2.grid = False; _a2.range = _r2; _a2.behavior = "fixed"
+                return
             fld = str(self.style.get("color_field", "") or "")
             val = self._field(H, lvl)[0] if fld else None
             # `cross_section.points: false` -- DO NOT SCATTER THE DRAWN SET'S PARTICLES IN THE
@@ -4076,6 +4320,56 @@ class LiveMovie:
                             continue
                         pxs = max(1.0, 2.0 * (k + 0.5) / nb * float(r) * _px_per_unit)
                         self._cs_series.append(self.cs.scatter(xc[m_], yc[m_], size=pxs, style="o", color=col))
+            # `cross_section.also_sets: [set, ...]` -- OTHER POINT SETS IN THE SLICE (exp 11, 2026-09-27: the interior's
+            # cells inside a stratified bud). Each set's live points within the slab are scattered in its `also_colors`
+            # colour (`cross_section.also_size` px, default 4), drawn before the subject's own scatter. Opt-in.
+            for _nm in (_cs_sty.get("also_sets") or []):
+                try:
+                    from matplotlib.colors import to_rgb as _to_rgb
+                    _lv = H.level(str(_nm))
+                    _P = _lv.get("pos").detach()
+                    _oc = getattr(_lv, "occ", None)
+                    if _oc is not None:
+                        _P = _P[_t.as_tensor(_oc).to(_P.device).reshape(-1)[:_P.shape[0]] > 0.5]
+                    # `cross_section.also_halfwidth` -- THE SLAB'S HALF-WIDTH FOR THESE SETS, in world units (default
+                    # the subject's `thickness * dx`). At thickness 6 in a 200-unit world that is 12.5 units, the whole
+                    # interior ball: every point was projected, not a slice (the human, 2026-09-27, "too many for cells").
+                    _hw = float(_cs_sty.get("also_halfwidth", self.cs_cells * dx))
+                    _in = (_P[:, ax] - y0).abs() < _hw
+                    # `cross_section.also_color_by: {set: <block>}` -- A COLOUR PER VALUE OF THAT BLOCK (a cell
+                    # label, 0..19, `tab20`), one scatter series per value, so the interior's cells read as
+                    # cells in the section rather than as one colour of dots (exp 11, 2026-09-27). Opt-in.
+                    _lab = None
+                    _cb = (_cs_sty.get("also_color_by") or {}).get(str(_nm))
+                    if _cb:
+                        _Lr = _lv.get(str(_cb))
+                        _L = (_Lr.detach() if hasattr(_Lr, "detach") else _t.as_tensor(np.asarray(_Lr))).reshape(-1)
+                        _L = _L.to(_P.device)[: _lv.get("pos").shape[0]]
+                        if _oc is not None:
+                            _L = _L[_t.as_tensor(_oc).to(_L.device).reshape(-1)[:_L.shape[0]] > 0.5]
+                        _lab = _L[_in].round().long().cpu().numpy()
+                    _P = _P[_in]
+                    if _P.shape[0] and _lab is not None:
+                        import matplotlib as _mpl
+                        _cm = _mpl.colormaps["tab20"]
+                        _xa, _xb = _P[:, a].cpu().numpy(), _P[:, b].cpu().numpy()
+                        for _v in sorted(set(int(v) for v in _lab)):
+                            _sel = _lab == _v
+                            _c = _cm((_v % 20) / 19.0)
+                            self._cs_series.append(self.cs.scatter(_xa[_sel], _xb[_sel],
+                                                                   size=float(_cs_sty.get("also_size", 4)), style="o",
+                                                                   color=(int(_c[0] * 255), int(_c[1] * 255),
+                                                                          int(_c[2] * 255), 255)))
+                    elif _P.shape[0]:
+                        _c = ((self.style or {}).get("also_colors") or {}).get(str(_nm), "#ffffff")
+                        _c = _to_rgb(_c)
+                        self._cs_series.append(self.cs.scatter(_P[:, a].cpu().numpy(), _P[:, b].cpu().numpy(),
+                                                               size=float(_cs_sty.get("also_size", 4)), style="o",
+                                                               color=(int(_c[0] * 255), int(_c[1] * 255),
+                                                                      int(_c[2] * 255), 255)))
+                except Exception as _e:                              # noqa: BLE001 -- not the movie
+                    print(f"[live-movie] cross_section.also_sets: {_nm!r} not drawn ({type(_e).__name__}: {_e})",
+                          flush=True)
             if _cs_sty.get("points", True) is False:
                 pass                                  # neither branch: no scatter at all
             elif val is not None:
@@ -4553,6 +4847,55 @@ class LiveMovie:
         self.colour_by = f"chem, {b - a} column(s), via plexus.live.chem_rgb"
         return (np.clip(cols, 0, 1) * 255).astype(np.uint8)
 
+    def _rgb_parent_chem(self, H, lvl):
+        """`plotting.color_by: chem` -- each particle in its PARENT's `chem` colour, per frame.
+
+        WHY. A segmentation-seeded sheet (exp 6: `seed_from_segmentation` puts `mpm_particle`s in each
+        `cell`) has its chemistry on the cells and its positions on the material points, and the
+        points are the larger set, so they are the subject. They carry no `chem`, so `_rgb_chem`
+        returned None and `_rgb` painted them by parent BODY -- one hue per cell id, fixed at t = 0:
+        a static confetti square while the excitation wave crossed the tissue (14 exp 6 movies).
+        Opt-in because a parent-body hue is the right picture for every MPM run whose cells carry
+        a chemistry that is not the point (drops, balls). The law is `plexus.live.chem_rgb` over the
+        PARENT's rows -- `species`, `blend`, `chem_max` -- then gathered by `lvl.parent`, so a
+        particle is exactly its cell's colour. None when the subject has no chem-carrying parent.
+        """
+        pname = getattr(lvl, "parent_name", None)
+        par = getattr(lvl, "parent", None)
+        if not pname or par is None or pname not in getattr(H, "levels", {}):
+            return None
+        plv = H.level(pname)
+        try:
+            sch = getattr(plv, "state_schema", None)
+            if sch is not None and "chem" in sch:
+                a, b = sch["chem"]
+                v = plv.state[:, a:b]
+            else:
+                v = plv.get("chem")
+            if v is None:
+                return None
+            v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+            if v.ndim == 3:                                            # [T, n, w]: the replay's frame
+                v = v[int(getattr(plv, "t", 0))]
+            if v.ndim != 2 or v.shape[1] == 0:
+                return None
+            from plexus.live import chem_rgb
+            st = self.style or {}
+            cols, _ = chem_rgb(np.asarray(v, float), lut=st.get("species"), blend=st.get("blend"),
+                               background=st.get("background", "black"), vmax=st.get("chem_max"))
+        except Exception as e:                                       # noqa: BLE001
+            print(f"[live-movie] color_by: chem unavailable ({type(e).__name__}: {e})", flush=True)
+            return None
+        if cols is None:
+            return None
+        pi = par.detach().cpu().numpy() if hasattr(par, "detach") else np.asarray(par)
+        ix = self.idx.detach().cpu().numpy() if hasattr(self.idx, "detach") else np.asarray(self.idx)
+        pi = np.clip(np.asarray(pi, np.int64)[ix], 0, len(cols) - 1)
+        self._chem_live = True
+        self._chem_parent = True
+        self.colour_by = f"parent {pname!r} chem, {v.shape[1]} column(s), via plexus.live.chem_rgb"
+        return (np.clip(cols[pi], 0, 1) * 255).astype(np.uint8)
+
     def _rgb(self, H, lvl, pos):
         """Per-particle colour, FIXED AT t=0 and carried with the particle.
 
@@ -4566,6 +4909,13 @@ class LiveMovie:
 
         Falls back to height only when the spec declares no palette and the set has no parent.
         """
+        # `plotting.dot_color: <colour>` -- ONE FIXED COLOUR FOR EVERY DOT (exp 11, 2026-09-27: white basement-membrane
+        # nodes over a white mesh). Opt-in; absent, the palette / height logic below is unchanged.
+        _dc = (self.style or {}).get("dot_color")
+        if _dc:
+            from matplotlib.colors import to_rgb
+            self.colour_by = f"fixed {_dc}"
+            return (np.tile(np.asarray(to_rgb(_dc), float), (len(pos), 1)) * 255).astype(np.uint8)
         n = pos.shape[0]
         try:
             from plexus.plot import _typed_palette
@@ -4938,6 +5288,540 @@ class LiveMovie:
                 self._fi_meshes[k].Modified()
             except Exception:                                    # noqa: BLE001 -- keep the last surface
                 pass
+
+    # ---- `plotting.also_sets`: MORE POINT SETS OVER THE SUBJECT ---------------------------------
+    #
+    #     plotting:
+    #       subject: cell
+    #       also_sets: [host]                  # drawn over the subject, every frame
+    #       also_colors: {host: "#ffffff"}     # optional: a fixed colour per set
+    #       also_dot_size: 6                   # optional: px; default the subject's dot size
+    #
+    # The movie draws ONE subject set, and a model with two populations -- exp 15's community on
+    # its lattice and the host cells it feeds -- lost the second: the talk movie needed its own
+    # script. Each named set is its own point actor, moved each frame. Its colour, in order: the
+    # fixed `also_colors` entry, else its own `chem` through `plexus.live.chem_rgb` (the spec's
+    # `species`, `blend`, `chem_max`; recomputed every frame), else its type palette
+    # (`plotting.colors` by type name), else white. Dormant slots are parked on a live point.
+    # Absent, nothing is built and no pixel changes.
+    def _also_names(self, H):
+        names = (self.style or {}).get("also_sets") or []
+        names = [names] if isinstance(names, str) else list(names)
+        out = []
+        for nm in names:
+            nm = str(nm)
+            if nm not in getattr(H, "levels", {}):
+                print(f"[live-movie] also_sets: no set {nm!r}; not drawn", flush=True)
+            elif nm != getattr(self, "_sname", None):
+                out.append(nm)
+        return out
+
+    def _also_xyz(self, lv):
+        P = lv.get("pos")
+        if P is None:
+            return None, None
+        P = np.asarray(P.detach().cpu().numpy() if hasattr(P, "detach") else P, np.float32)
+        occ = getattr(lv, "occ", None)
+        live = (np.ones(P.shape[0], bool) if occ is None else
+                np.asarray(occ.detach().cpu().numpy() if hasattr(occ, "detach") else occ).astype(bool)
+                .reshape(-1)[:P.shape[0]])
+        if live.any() and not live.all():
+            P = np.where(live[:, None], P, P[live][:1])
+        if P.shape[1] == 2:
+            # ON TOP, NOT IN THE SAME PLANE: a 2D run is drawn at z = 0 and seen from +z, and two
+            # point sets at one depth z-fight. A lift far below a pixel settles which is in front.
+            P = np.concatenate([P, np.full((P.shape[0], 1), 1e-3 * float(np.max(self.world)),
+                                           np.float32)], 1)
+        return P, live
+
+    def _also_rgb(self, H, nm, lv, n, live):
+        from matplotlib.colors import to_rgb
+        st = self.style or {}
+        fixed = (st.get("also_colors") or {}).get(nm) if isinstance(st.get("also_colors"), dict) else None
+        cols = None
+        # `color_block.<set>` ON AN `also_sets` SET (exp 11, 2026-09-29: the membrane's mass or bonds, `bm_M`, `bond_P`):
+        # the set's dots -- and its `also_mesh` wireframe, which takes these colours per node -- through the block's
+        # colormap at its fixed range, instead of one flat `also_colors` hue. Absent, nothing changes.
+        _cb = self._block_cfg(nm)
+        if _cb is not None:
+            try:
+                from matplotlib import colormaps
+                _v, _lo, _hi, _cmap, _ = self._block_values(H, nm, _cb)
+                _v = np.asarray(_v, float)[:n]
+                _t = np.clip((_v - _lo) / max(_hi - _lo, 1e-12), 0.0, 1.0)
+                _t = np.where(np.isfinite(_t), _t, 0.0)
+                cols = colormaps[str(_cmap or "magma")](_t)[:, :3]
+            except Exception as e:                                   # noqa: BLE001 -- the flat hue, loudly
+                if not getattr(self, f"_cb_warn_{nm}", False):
+                    setattr(self, f"_cb_warn_{nm}", True)
+                    print(f"[live-movie] color_block.{nm} on also_sets not drawn ({type(e).__name__}: {e})", flush=True)
+                cols = None
+        if cols is not None:
+            pass
+        elif fixed is not None:
+            cols = np.tile(np.asarray(to_rgb(fixed), float), (n, 1))
+        else:
+            try:
+                sch = getattr(lv, "state_schema", None)
+                if sch is not None and "chem" in sch:
+                    a, b = sch["chem"]
+                    v = lv.state[:n, a:b]
+                else:
+                    v = lv.get("chem")
+                if v is not None:
+                    v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+                    if v.ndim == 2 and v.shape[1] > 0:
+                        from plexus.live import chem_rgb
+                        cols = chem_rgb(np.asarray(v, float)[:n], lut=st.get("species"),
+                                        blend=st.get("blend"), background=st.get("background", "black"),
+                                        vmax=st.get("chem_max"))[0]
+            except Exception:                                        # noqa: BLE001
+                cols = None
+            if cols is None:
+                own = getattr(lv, "node_type", None)
+                pal = None
+                if own is not None:
+                    from plexus.plot import _typed_palette
+                    pal, _ = _typed_palette(self.sim, nm, st)
+                if pal is not None:
+                    tid = np.asarray(own.detach().cpu().numpy() if hasattr(own, "detach") else own,
+                                     np.int64)[:n] % len(pal)
+                    cols = np.asarray(pal, float)[tid]
+                else:
+                    cols = np.ones((n, 3))
+        rgb = (np.clip(np.asarray(cols, float), 0, 1) * 255).astype(np.uint8)
+        if live is not None and live.any() and not live.all():
+            rgb[~live] = rgb[live][0]
+        return rgb
+
+    def _also_build(self, H):
+        self._also = []
+        if not (self.style or {}).get("also_sets"):
+            return
+        _ps = (self.style or {}).get("also_dot_size")
+        _ps = float(_ps) if _ps is not None else float(getattr(self, "px_used", None) or 3.0)
+        for nm in self._also_names(H):
+            try:
+                lv = H.level(nm)
+                P, live = self._also_xyz(lv)
+                if P is None or not len(P):
+                    continue
+                pd = self.pv.PolyData(P)
+                pd["rgb"] = self._also_rgb(H, nm, lv, P.shape[0], live)
+                self.p.add_mesh(pd, scalars="rgb", rgb=True, **FLAT, point_size=_ps)
+            except Exception as e:                                   # noqa: BLE001 -- not the movie
+                print(f"[live-movie] also_sets: {nm!r} not drawn ({type(e).__name__}: {e})", flush=True)
+                continue
+            self._also.append((nm, pd))
+            print(f"[live-movie] also_sets: {nm!r} drawn over the subject, {P.shape[0]:,} nodes, "
+                  f"{_ps:g} px", flush=True)
+        # `plotting.protein_bars` (exp 11, 2026-09-29): COLOUR BARS for what the picture is painted with -- the
+        # layer's `mesh_color_by` (when `mesh_color_scale: continuous` and `mesh_color_range` are given; its title
+        # `mesh_color_label`) and every `color_block` set among `also_sets` (its `label`) -- side by side at the
+        # bottom right of the scene, clear of the section inset at the bottom left. Opt-in: absent, no bar.
+        if (self.style or {}).get("protein_bars"):
+            try:
+                self._protein_bars(H)
+            except Exception as e:                                   # noqa: BLE001 -- not the movie
+                print(f"[live-movie] protein_bars not drawn ({type(e).__name__}: {e})", flush=True)
+        # `plotting.also_mesh: [set, ...]` -- THE SET DRAWN AS A SHEET, not only as dots (exp 11, 2026-09-27: the
+        # basement membrane). Each frame its LIVE nodes are triangulated by the convex hull of their directions from
+        # their own centroid -- a spherical Delaunay, right for a star-shaped sheet such as a membrane around a
+        # spheroid -- and drawn as a wireframe in the set's `also_colors` colour (`also_mesh_line_width`, default 1).
+        # A picture of how the nodes neighbour each other, NOT the model's spring bonds (the trajectory does not
+        # record them). Opt-in; absent, nothing is built.
+        self._also_mesh = []
+        am = (self.style or {}).get("also_mesh") or []
+        am = [am] if isinstance(am, str) else list(am)
+        for nm in am:
+            try:
+                lv = H.level(str(nm))
+                P, live = self._also_xyz(lv)
+                faces = self._hull_faces(P, live)
+                if faces is None:
+                    continue
+                mpd = self.pv.PolyData(P, faces)
+                from matplotlib.colors import to_rgb
+                col = ((self.style or {}).get("also_colors") or {}).get(str(nm), "#ffffff")
+                _lw = float((self.style or {}).get("also_mesh_line_width", 1.0))
+                _op = float((self.style or {}).get("also_mesh_opacity", 1.0))
+                if self._block_cfg(str(nm)) is not None:        # the wireframe in the block's colours, per node
+                    mpd.point_data["rgb"] = self._also_rgb(H, str(nm), lv, P.shape[0], live)
+                    self.p.add_mesh(mpd, style="wireframe", scalars="rgb", rgb=True, lighting=False,
+                                    line_width=_lw, opacity=_op, render_lines_as_tubes=False)
+                else:
+                    self.p.add_mesh(mpd, style="wireframe", color=to_rgb(col), lighting=False,
+                                    line_width=_lw, opacity=_op, render_lines_as_tubes=False)
+                self._also_mesh.append((str(nm), mpd))
+                print(f"[live-movie] also_mesh: {nm!r} drawn as a hull-triangulated wireframe", flush=True)
+            except Exception as e:                                   # noqa: BLE001 -- not the movie
+                print(f"[live-movie] also_mesh: {nm!r} not drawn ({type(e).__name__}: {e})", flush=True)
+        # `plotting.iso_cells: {set, label, color, spacing, blur, iso_frac, smooth}` -- EVERY CELL OF A SET OF
+        # MATERIAL POINTS DRAWN AS ITS OWN SURFACE (exp 11, 2026-09-27: the gland's interior MPM cells, the human's
+        # "use iso surface for the rendering"). The points of each value of `label` (a per-point cell id, e.g.
+        # `pid`) are splatted on a small grid of `spacing` (world units) around that cell, blurred by `blur`
+        # voxels, and contoured at `iso_frac` of the median occupied density -- the recipe `_isosurface` uses for
+        # a whole cloud, one cell at a time -- then coloured by `color` (a 0..19 block, `tab20`). With `near_side:
+        # far` the cells in front of the plane through the body's centre are left out whole, so a cut-open gland
+        # shows its interior cells behind the cut. Opt-in; absent, nothing is built.
+        self._iso = None
+        ic = (self.style or {}).get("iso_cells")
+        if ic:
+            try:
+                surf = self._iso_cells_poly(H, dict(ic))
+                if surf is not None:
+                    self.p.add_mesh(surf, scalars="c", cmap="tab20", clim=[0, 19], smooth_shading=True,
+                                    specular=0.25, show_scalar_bar=False)
+                    self._iso = (dict(ic), surf)
+                    print(f"[live-movie] iso_cells: {ic.get('set')!r} drawn as one isosurface per cell "
+                          f"({surf.n_points:,} vertices)", flush=True)
+            except Exception as e:                                   # noqa: BLE001 -- not the movie
+                print(f"[live-movie] iso_cells not drawn ({type(e).__name__}: {e})", flush=True)
+
+    def _iso_cells_poly(self, H, cfg):
+        """The merged per-cell isosurfaces of `cfg['set']` (see `plotting.iso_cells`), scalars `c` = colour label."""
+        from scipy.ndimage import gaussian_filter
+        lv = H.level(str(cfg["set"]))
+        P, live = self._also_xyz(lv)
+        if P is None or not len(P):
+            return None
+        def _blk(name):
+            v = lv.get(str(name))
+            v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+            return np.asarray(v, float).reshape(len(v), -1)[:, 0][: len(P)]
+        lab = _blk(cfg.get("label", "pid")).round().astype(np.int64)
+        col = _blk(cfg["color"]) if cfg.get("color") else (lab % 20).astype(float)
+        if live is not None:
+            P, lab, col = P[live], lab[live], col[live]
+        h = float(cfg.get("spacing", 0.1)); blur = float(cfg.get("blur", 1.0))
+        frac = float(cfg.get("iso_frac", 0.5)); n_sm = int(cfg.get("smooth", 10))
+        far = str((self.style or {}).get("near_side", "") or "").lower() == "far"
+        if far:
+            n = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+            n = n / max(float(np.linalg.norm(n)), 1e-12)
+            _nc = (self.style or {}).get("near_side_centre")
+            ctr = np.asarray(_nc, float) if _nc is not None else P.mean(0)
+        order = np.argsort(lab, kind="stable")
+        lab_s, P_s, col_s = lab[order], P[order], col[order]
+        cuts = np.flatnonzero(np.diff(lab_s)) + 1
+        parts = []
+        pad = (2.0 + 3.0 * blur) * h
+        for a, b in zip(np.r_[0, cuts], np.r_[cuts, len(lab_s)]):
+            X = P_s[a:b]
+            if len(X) < 4:
+                continue
+            if far and float((X.mean(0) - ctr) @ n) > 0.0:
+                continue
+            lo = X.min(0) - pad
+            dim = np.maximum(np.ceil((X.max(0) + pad - lo) / h).astype(int) + 1, 2)
+            if int(np.prod(dim)) > 200_000:                          # a torn cell: do not draw a room-sized grid
+                continue
+            ijk = np.clip(((X - lo) / h).astype(np.int64), 0, dim - 1)
+            D = np.zeros(tuple(dim), np.float32)
+            np.add.at(D, (ijk[:, 0], ijk[:, 1], ijk[:, 2]), 1.0)
+            held = D > 0
+            D = gaussian_filter(D, sigma=blur)
+            iso = frac * float(np.median(D[held]))
+            g = self.pv.ImageData(dimensions=tuple(int(v) for v in dim), spacing=(h, h, h),
+                                  origin=tuple(float(v) for v in lo))
+            g.point_data["d"] = D.ravel(order="F")
+            srf = g.contour([iso], scalars="d")
+            if srf.n_points == 0:
+                continue
+            if n_sm > 0:
+                srf = srf.smooth_taubin(n_iter=n_sm, pass_band=0.1)
+            # ONLY THE COLOUR ARRAY: the contour keeps its density `d`, constant on the surface, and after a
+            # `copy_from` it became the active scalar -- every cell one colour
+            for _k in list(srf.point_data.keys()):
+                if _k != "Normals":
+                    srf.point_data.remove(_k)
+            srf.point_data["c"] = np.full(srf.n_points, float(col_s[a]) % 20.0)
+            parts.append(srf)
+        if not parts:
+            return None
+        out = parts[0].merge(parts[1:]) if len(parts) > 1 else parts[0]
+        return out.extract_surface() if hasattr(out, "extract_surface") and not isinstance(out, self.pv.PolyData) else out
+
+    @staticmethod
+    def _hull_faces(P, live):
+        """VTK face array of the convex hull of the live points' unit directions about their centroid, or None."""
+        from scipy.spatial import ConvexHull
+        idx = np.flatnonzero(live) if live is not None else np.arange(len(P))
+        if idx.size < 4:
+            return None
+        Q = P[idx].astype(np.float64)
+        u = Q - Q.mean(0)
+        u /= np.maximum(np.linalg.norm(u, axis=1, keepdims=True), 1e-12)
+        tri = idx[ConvexHull(u).simplices]
+        # A HOLE STAYS A HOLE: the hull closes every gap, so triangles whose longest edge is above 3x the median edge
+        # (spanning a membrane hole rather than joining neighbours) are dropped.
+        e = np.stack([np.linalg.norm(P[tri[:, a]] - P[tri[:, b]], axis=1) for a, b in ((0, 1), (1, 2), (2, 0))], 1)
+        tri = tri[e.max(1) <= 3.0 * float(np.median(e))]
+        return np.hstack([np.full((len(tri), 1), 3), tri]).astype(np.int64).ravel()
+
+    # ---- `plotting.protein_insets`: SMALL 3D MAPS OF ONE BLOCK EACH, beside the section inset ------------------
+    #
+    #     protein_insets:
+    #       - {what: mesh, block: itg_B, cmap: viridis, label: bound integrin}     # the layer's cells
+    #       - {what: bm_node, block: bm_M, cmap: magma, label: BM mass}            # a set's elements, as points
+    #     protein_inset_size: 0.215     # each inset's height, a fraction of the window's
+    #
+    # exp 11, 2026-09-29, the human: the proteins painted on the main view saturated (a fixed range) and the
+    # membrane's mass could not be read on the spheroid, "two inlets ... to see separately bound integrin and BM
+    # mass 3D maps, no colorbar". Each inset is its own renderer on the MAIN CAMERA (it turns with the scene), a
+    # square viewport in a row just right of the section inset, a label inside its top edge and no bar. `range: auto`
+    # (the default) is the block's 2nd-98th percentile over EVERY recorded row on a replay (positive values; the
+    # set's live elements for a set), else the first frame's, then fixed: one colour, one number, all movie. A
+    # quantity with an absolute meaning declares `range: [lo, hi]` instead, so its colour compares ACROSS runs: the
+    # membrane's mass, 1 at rest, is [0, 2] in exp 11 (a per-run range had nothing to spread where it never moves).
+    def _protein_insets_update(self, H):
+        cfgs = (self.style or {}).get("protein_insets") or []
+        if not cfgs:
+            return
+        try:
+            if getattr(self, "_pins", None) is None:
+                self._pins = []
+                s = float((self.style or {}).get("protein_inset_size", 0.17))
+                csl = ((self.style or {}).get("cross_section") or {}).get("loc") or (0.015, 0.03)
+                csh = float((self.style or {}).get("cross_section_height", 0.26))
+                x_first = float(csl[0]) + csh / self.aspect + 0.008
+                for k, cfg in enumerate(cfgs):
+                    # IN A ROW along the section inset's bottom edge, not a column (the human, 2026-09-29): side
+                    # by side the two maps are read together, at the same height as the section
+                    x0 = x_first + k * (s / self.aspect + 0.008)
+                    y0 = float(csl[1])
+                    ren = self.pv.Renderer(self.p, border=True, border_color="#9a9a9a", border_width=1.0)
+                    ren.SetViewport(x0, y0, x0 + s / self.aspect, y0 + s)
+                    ren.set_background("black")
+                    # ITS OWN CAMERA (`_pin_camera`): the main view's direction, centred on the inset's object
+                    from vtkmodules.vtkRenderingCore import vtkCamera
+                    ren.SetActiveCamera(vtkCamera())
+                    self.p.ren_win.AddRenderer(ren)
+                    # THE TITLE ABOVE THE INSET, on the main scene: inside it, the inset's own renderer painted over it
+                    _t = str(cfg.get("label", cfg.get("block", "")))
+                    if len(_t) > 18 and " " in _t:            # two lines, split at the space nearest the middle
+                        _sp = [i for i, ch in enumerate(_t) if ch == " "]
+                        _i = min(_sp, key=lambda i: abs(i - len(_t) / 2))
+                        _t = _t[:_i] + "\n" + _t[_i + 1:]
+                    self.p.add_text(_t, position=(x0, y0 + s + 0.006),
+                                    viewport=True, font_size=int((self.style or {}).get("protein_inset_font_size", 11)),
+                                    color=self._fg, name=f"pin_label_{k}")
+                    self._pins.append({"cfg": dict(cfg), "ren": ren, "pd": None, "rng": None})
+            for pin in self._pins:
+                self._pin_frame(H, pin)
+                self._pin_camera(pin)
+        except Exception as e:                                       # noqa: BLE001 -- not the movie
+            if not getattr(self, "_pins_warned", False):
+                self._pins_warned = True
+                print(f"[live-movie] protein_insets not drawn ({type(e).__name__}: {e})", flush=True)
+
+    def _pin_camera(self, pin):
+        """THE MAIN VIEW'S DIRECTION, THE INSET'S OWN FRAMING (the human, 2026-09-29: "the spheroid is not well
+        centred in the small inlet"): looking along the main camera, centred on the inset's own object and fitted
+        to its bounds every frame, since it grows. A copy of the main camera kept the object where it sits in the
+        wide main view, off the side of a square inset. `protein_inset_zoom` (default 1.15) tightens the fit."""
+        pd = pin.get("pd")
+        if pd is None or pd.n_points == 0:
+            return
+        mc = self.p.renderer.GetActiveCamera()
+        cam = pin["ren"].GetActiveCamera()
+        b = pd.bounds
+        c = np.array([(b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2])
+        d = np.asarray(mc.GetPosition(), float) - np.asarray(mc.GetFocalPoint(), float)
+        cam.SetFocalPoint(*c)
+        cam.SetPosition(*(c + d))
+        cam.SetViewUp(*mc.GetViewUp())
+        cam.SetViewAngle(mc.GetViewAngle())
+        pin["ren"].ResetCamera(b)
+        cam.Zoom(float((self.style or {}).get("protein_inset_zoom", 1.15)))
+        pin["ren"].ResetCameraClippingRange()
+
+    @staticmethod
+    def _pin_actor(ren, pd, cells, point_size=3.0):
+        """A plain VTK actor on the inset renderer (pyvista's Renderer has no add_mesh): the `pin_rgb` array
+        drawn as colours directly, unlit, per cell or per point."""
+        from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper
+        mp = vtkPolyDataMapper()
+        mp.SetInputData(pd)
+        mp.SetColorModeToDirectScalars()
+        if cells:
+            mp.SetScalarModeToUseCellFieldData()
+        else:
+            mp.SetScalarModeToUsePointFieldData()
+        mp.SelectColorArray("pin_rgb")
+        mp.ScalarVisibilityOn()
+        a = vtkActor()
+        a.SetMapper(mp)
+        a.GetProperty().LightingOff()
+        a.GetProperty().SetPointSize(float(point_size))
+        ren.AddActor(a)
+        return a
+
+    def _pin_range(self, H, cfg, now):
+        r = cfg.get("range", "auto")
+        if isinstance(r, (list, tuple)) and len(r) == 2:
+            return float(r[0]), float(r[1])
+        allv = None
+        what, b = str(cfg.get("what", "mesh")), str(cfg["block"])
+        try:
+            if what == "mesh":
+                for name, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                    cb = getattr(H.level(name), "_cell_blocks", {}) or {}
+                    if b in cb:
+                        allv = np.asarray(cb[b], np.float64).reshape(-1)
+                        break
+            else:
+                lv = H.level(what)
+                ser = (getattr(lv, "_blocks", {}) or {}).get(b)
+                if ser is not None:
+                    v = np.asarray(ser, np.float64).reshape(ser.shape[0], ser.shape[1], -1)[:, :, 0]
+                    oc = getattr(lv, "_occ", None)
+                    if oc is not None:
+                        oc = oc.detach().cpu().numpy() if hasattr(oc, "detach") else np.asarray(oc)
+                        v = v[np.asarray(oc).reshape(v.shape) > 0.5]
+                    allv = v.reshape(-1)
+        except Exception:                                            # noqa: BLE001 -- the frame's own range
+            allv = None
+        pool = allv if allv is not None else np.asarray(now, np.float64)
+        pool = pool[np.isfinite(pool) & (pool > 0)]
+        if not pool.size:
+            return 0.0, 1.0
+        lo, hi = float(np.percentile(pool, 2)), float(np.percentile(pool, 98))
+        # A BLOCK THAT DOES NOT VARY (the membrane's mass at its rest point, 1 everywhere) sat at one end of the map
+        # -- black on black for magma. It is drawn mid-map instead, on a range from 0 to twice its value.
+        if hi - lo < 0.05 * max(abs(hi), 1e-12):
+            mid = 0.5 * (lo + hi)
+            lo, hi = 0.0, (2.0 * mid if mid > 0 else 1.0)
+        return lo, hi
+
+    def _pin_frame(self, H, pin):
+        from matplotlib import colormaps
+        cfg, ren = pin["cfg"], pin["ren"]
+        what, b = str(cfg.get("what", "mesh")), str(cfg["block"])
+        cmap = colormaps[str(cfg.get("cmap", "viridis"))]
+        if what == "mesh":
+            got = None
+            for name, _nv, mpd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                lvl = H.level(name)
+                m = getattr(lvl, "mesh", None)
+                if m is None:
+                    continue
+                cc = self._cell_cols(H, lvl, int(m["nF"]))
+                if b in cc:
+                    _v = cc[b]
+                    _v = _v.detach().cpu().numpy() if hasattr(_v, "detach") else _v   # live: a CUDA tensor
+                    got = (mpd, np.asarray(_v, np.float64))
+                    break
+            if got is None:
+                return
+            mpd, v = got
+            if pin["rng"] is None:
+                pin["rng"] = self._pin_range(H, cfg, v)
+                print(f"[live-movie] protein_insets: {cfg.get('label', b)} ({b}) coloured over [{pin['rng'][0]:.4g}, "
+                      f"{pin['rng'][1]:.4g}] ({'declared' if isinstance(cfg.get('range'), (list, tuple)) else 'the whole run, 2nd-98th percentile'})", flush=True)
+            lo, hi = pin["rng"]
+            if pin["pd"] is None:
+                pin["pd"] = self.pv.PolyData()
+            pd = pin["pd"]
+            pd.copy_from(mpd)
+            t = np.clip((v[: pd.n_cells] - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+            rgb = (cmap(np.where(np.isfinite(t), t, 0.0))[:, :3] * 255).astype(np.uint8)
+            if rgb.shape[0] < pd.n_cells:
+                rgb = np.vstack([rgb, np.zeros((pd.n_cells - rgb.shape[0], 3), np.uint8)])
+            pd.cell_data["pin_rgb"] = rgb
+            pd.Modified()
+            if not pin.get("actor"):
+                pin["actor"] = self._pin_actor(ren, pd, cells=True)
+        else:
+            lv = H.level(what)
+            P, live = self._also_xyz(lv)
+            if P is None:
+                return
+            vals = lv.get(b)
+            vals = np.asarray(vals.detach().cpu().numpy() if hasattr(vals, "detach") else vals, np.float64).reshape(P.shape[0], -1)[:, 0]
+            keep = live if live is not None else np.ones(P.shape[0], bool)
+            keep = keep & np.isfinite(P).all(1)
+            if cfg.get("skip_zero"):                  # e.g. a membrane node laid this frame, its mass not yet set (bm_mass
+                keep = keep & (vals != 0)             # runs first next frame): drawn as a black speck, it is not a value
+            if pin["rng"] is None:
+                pin["rng"] = self._pin_range(H, cfg, vals[keep])
+                print(f"[live-movie] protein_insets: {cfg.get('label', b)} ({b}) coloured over [{pin['rng'][0]:.4g}, "
+                      f"{pin['rng'][1]:.4g}] ({'declared' if isinstance(cfg.get('range'), (list, tuple)) else 'the whole run, 2nd-98th percentile'})", flush=True)
+            lo, hi = pin["rng"]
+            t = np.clip((vals[keep] - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+            rgb = (cmap(t)[:, :3] * 255).astype(np.uint8)
+            pts = self.pv.PolyData(P[keep].astype(np.float32))
+            pts.point_data["pin_rgb"] = rgb
+            if pin["pd"] is None:
+                pin["pd"] = self.pv.PolyData()
+                pin["pd"].copy_from(pts)
+                pin["actor"] = self._pin_actor(ren, pin["pd"], cells=False, point_size=float(cfg.get("point_size", 3.0)))
+            else:
+                pin["pd"].copy_from(pts)
+            pin["pd"].Modified()
+
+    def _protein_bars(self, H):
+        st = self.style or {}
+        bars = []
+        if str(st.get("mesh_color_scale", "")).lower() == "continuous" and st.get("mesh_color_range"):
+            lo, hi = (float(x) for x in st["mesh_color_range"])
+            bars.append((str(st.get("mesh_color_label", st.get("mesh_color_by", ""))), str(st.get("mesh_cmap", "viridis")), lo, hi))
+        for nm in self._also_names(H):
+            cb = self._block_cfg(nm)
+            if cb is not None and cb.get("range"):
+                lo, hi = (float(x) for x in cb["range"])
+                bars.append((str(cb.get("label", cb["block"])), str(cb.get("cmap", "magma")), lo, hi))
+        x0 = float(st.get("protein_bars_x", 0.60))
+        for k, (title, cmap, lo, hi) in enumerate(bars):
+            dummy = self.pv.PolyData(np.zeros((2, 3)))
+            dummy["v"] = np.array([lo, hi], np.float32)
+            args = {**self._legend_args(title), "position_x": x0 + 0.075 * k, "position_y": 0.06, "height": 0.25,
+                    "title_font_size": int(st.get("protein_bars_font_size", 16)), "label_font_size": int(st.get("protein_bars_font_size", 16)) - 2}
+            self.p.add_mesh(dummy, scalars="v", cmap=cmap, clim=[lo, hi], opacity=0.0, show_scalar_bar=True,
+                            scalar_bar_args=args)
+        if bars:
+            print(f"[live-movie] protein_bars: " + ", ".join(f"{t} [{lo:g}, {hi:g}] {c}" for t, c, lo, hi in bars), flush=True)
+
+    def _also_update(self, H):
+        for nm, mpd in getattr(self, "_also_mesh", []) or []:
+            try:
+                P, live = self._also_xyz(H.level(nm))
+                faces = self._hull_faces(P, live)
+                if faces is not None:
+                    # `near_side: far` CUTS THE SHEET TOO: the membrane's front half would hide a cut-open body
+                    if str((self.style or {}).get("near_side", "") or "").lower() == "far":
+                        tri = faces.reshape(-1, 4)[:, 1:]
+                        n = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+                        n = n / max(float(np.linalg.norm(n)), 1e-12)
+                        _nc = (self.style or {}).get("near_side_centre")
+                        ctr = np.asarray(_nc, float) if _nc is not None else P[live].mean(0) if live is not None else P.mean(0)
+                        keep = ((P[tri].mean(1) - ctr) @ n) <= 0.0
+                        faces = np.hstack([np.full((int(keep.sum()), 1), 3), tri[keep]]).astype(np.int64).ravel()
+                    mpd.copy_from(self.pv.PolyData(P, faces))
+                    if self._block_cfg(nm) is not None:
+                        mpd.point_data["rgb"] = self._also_rgb(H, nm, H.level(nm), P.shape[0], live)
+            except Exception as e:                                   # noqa: BLE001
+                print(f"[live-movie] also_mesh: {nm!r} not updated ({type(e).__name__}: {e})", flush=True)
+        if getattr(self, "_iso", None) is not None:
+            try:
+                cfg, surf = self._iso
+                new = self._iso_cells_poly(H, cfg)
+                if new is not None:
+                    surf.copy_from(new)
+                    surf.set_active_scalars("c")
+            except Exception as e:                                   # noqa: BLE001
+                print(f"[live-movie] iso_cells not updated ({type(e).__name__}: {e})", flush=True)
+        for nm, pd in getattr(self, "_also", []) or []:
+            try:
+                lv = H.level(nm)
+                P, live = self._also_xyz(lv)
+                if P is None or P.shape[0] != pd.n_points:
+                    continue
+                pd.points = P
+                pd["rgb"] = self._also_rgb(H, nm, lv, P.shape[0], live)
+            except Exception as e:                                   # noqa: BLE001
+                print(f"[live-movie] also_sets: {nm!r} not updated ({type(e).__name__}: {e})",
+                      flush=True)
 
     def _spheres_build(self, H):
         """Draw a set's elements as SPHERES OF A WORLD RADIUS, `plotting.spheres`.
@@ -5442,6 +6326,14 @@ class _ReplayLevel:
                 if b in skip:
                     continue
                 self._cell_blocks[b] = np.asarray(z[k])
+        # AND ITS TYPE COLUMN, which is not a block: per row when a type changed during the run
+        # (`__node_type_t`), the final column otherwise. Read only by `mesh_color_by: node_type`.
+        self._cell_nt = None
+        if cell_set:
+            for _k in (f"{cell_set}__node_type_t", f"{cell_set}__node_type"):
+                if _k in z.files:
+                    self._cell_nt = np.asarray(z[_k])
+                    break
         # THE HALF-EDGE TABLE IS IN THE TRAJECTORY AND WAS NOT BEING READ, so a replay of a
         # vertex-model run drew the mesh's VERTICES as dots while the same renderer, driven live
         # from the engine, drew the surface. One renderer that produces two different pictures of
@@ -5523,6 +6415,13 @@ class _ReplayLevel:
         """
         return {k: np.asarray(v[self.t])[:nF, 0] for k, v in self._cell_blocks.items()
                 if v.ndim == 3 and v.shape[2] == 1}
+
+    def cell_node_type(self, nF):
+        """[nF] type of each face at this frame, from the paired cell set -- see `_cell_nt`."""
+        a = getattr(self, "_cell_nt", None)
+        if a is None:
+            return None
+        return np.asarray(a[min(int(self.t), len(a) - 1)] if a.ndim == 2 else a)[:nF]
 
     @property
     def mesh(self):

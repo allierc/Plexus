@@ -204,12 +204,14 @@ def test_celsr_nematic_on_planted_sheets(tmp_path):
     r = exp_measures.run_measure("exp08.celsr", open_run(str(tmp_path / "c1")), deform_axis=[0, 1, 0])
     assert abs(r["MP_last"] - 6 / (5 * np.pi)) < 1e-4 and abs(r["P_axis_deg_last"]) < 1e-3   # (4x1x2 - 1x1x2) / (10 x pi/2)
     assert abs(r["ang_P_deform_deg_last"] - 90) < 1e-3
+    assert abs(r["Mcell_last"] - r["MP_last"]) < 1e-6                     # every cell agrees: Mcell = MP
     zr = dict(z); rng = np.random.default_rng(0)
     rnd = np.concatenate([np.roll(enr[4 * f:4 * f + 4], rng.integers(0, 2)) for f in range(144)])
     zr["vertex__mesh_e_fz"] = (rnd / 2).astype(np.float32); zr["vertex__mesh_e_vang"] = (rnd / 2).astype(np.float32)
     os.makedirs(tmp_path / "c2", exist_ok=True); np.savez(os.path.join(tmp_path / "c2", "trajectory.npz"), **zr)
     r = exp_measures.run_measure("exp08.celsr", open_run(str(tmp_path / "c2")), deform_axis=[0, 1, 0])
     assert r["MP_last"] < 0.15                                              # half the cells +-x, half +-y
+    assert abs(r["Mcell_last"] - 6 / (5 * np.pi)) < 1e-4                    # each cell as enriched as before
 
 
 def test_celsr_elongation_of_stretched_cells(tmp_path):

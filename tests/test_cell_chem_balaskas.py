@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from plexus.operators.diffusion_reaction import (CellDiffuse, CellRDSeedUniform,  # noqa: E402
                                                  CellReactBalaskas, CellReactBalaskasAdapt, CellReactBalaskasCommit,
-                                                 CellReactBalaskasSchedule,
+                                                 CellReactBalaskasSchedule, CellReactBalaskasCommitSchedule,
                                                  CellReactSourceDecay)
 
 
@@ -262,3 +262,19 @@ def test_schedule_halves_the_input_after_its_time():
     after = m.forward(_Clock(100, Lvl({"chem": chem})))["cell"]
     assert torch.allclose(before, base.forward(_Clock(80, Lvl({"chem": chem})))["cell"])
     assert torch.allclose(after[:, 3:], base.forward(_Clock(100, Lvl({"chem": half})))["cell"][:, 3:])
+
+
+def test_identity_commit_schedule_empty_is_commit():
+    chem = torch.rand(8, 6, dtype=torch.float64) * 3
+    a = CellReactBalaskasCommit(dict(g_col=0, chan=3, rate=0.1)).forward(_Clock(90, Lvl({"chem": chem})))["cell"]
+    b = CellReactBalaskasCommitSchedule(dict(g_col=0, chan=3, rate=0.1)).forward(_Clock(90, Lvl({"chem": chem})))["cell"]
+    assert torch.equal(a, b)
+
+
+def test_commit_schedule_halves_the_adapted_input():
+    """After t = 8.6 the input is f(t) x 0.5: equal to balaskas_commit fed half the morphogen."""
+    chem = torch.rand(8, 6, dtype=torch.float64) * 3
+    half = chem.clone(); half[:, 0] *= 0.5
+    a = CellReactBalaskasCommitSchedule(dict(g_col=0, chan=3, rate=0.1, schedule=[[8.6, 0.5]])).forward(_Clock(100, Lvl({"chem": chem})))["cell"]
+    b = CellReactBalaskasCommit(dict(g_col=0, chan=3, rate=0.1)).forward(_Clock(100, Lvl({"chem": half})))["cell"]
+    assert torch.allclose(a, b)

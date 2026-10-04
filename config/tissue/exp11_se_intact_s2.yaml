@@ -62,6 +62,7 @@ seed:
 - {op: seed_mesh, at: vertex, n_cells: 200, seed: 2, vseed_cv: 0.15, radius: 5.0, jitter: 0.15, p0: 3.5}
 - {op: bm_seed, implementation: live, at: bm_node, tissue: vertex, offset: 0.05, seed: 2}
 plotting:
+  zoom: 3.0
   renderer: vtk_points
   background: black
   up_axis: 2

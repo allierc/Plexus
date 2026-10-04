@@ -52,6 +52,7 @@ from __future__ import annotations
 import functools
 import itertools
 import math
+import numpy as np
 import torch
 from plexus.models.base import Field, Structural
 from plexus.models.registry import register_field
@@ -155,13 +156,51 @@ class MPMGrid(Field):
 
     RECORD = False                                   # transient scratch -- not recorded/rendered
 
-    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", world_size=None, **kw):
+    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", world_size=None,
+                 box=None, origin=None, per_parent=None, cell_box=None, **kw):
         super().__init__(name)
         self.dim = int(dim)
+        # `per_parent: <set>` + `cell_box: L` -- ONE SMALL GRID PER BODY, the cell's own (exp 11,
+        # 2026-09-27). On one shared grid every body that touches another shares its nodes, so the
+        # two move with one velocity there: MEASURED on 370 packed MPM cells (Finding 89), no cell
+        # lost a neighbour in 150 frames and the walk tore cells instead of moving them. Here each
+        # parent (a cell of `per_parent`) gets its own n_grid^3 block of side `cell_box` (world
+        # units), re-centred on the cell's centroid every substep by `mpm_scatter`: a cell's
+        # elasticity is solved on its own nodes only, and bodies meet through a contact force
+        # between their points (`pair_potential ... exclude: <the parent-id block>`) that can
+        # slide. The block must hold the cell with a 2-node margin; `mpm_gather` clamps a point
+        # that reaches its block's edge. Default-off; only the torch bodies read it.
+        self.per_parent = str(per_parent) if per_parent else None
+        if self.per_parent:
+            if cell_box is None:
+                raise ValueError("MPMGrid: `per_parent` needs `cell_box`, the side of each body's grid (world units)")
+            box = [float(cell_box)] * self.dim
+            origin = None
+        self.pp_origin = None
+        _box_decl = box
         # `width` is the legacy axis-0 scalar and stays the fallback: a caller that does not pass
         # the per-axis box gets exactly the old geometry, [width] x [1] x [1].
         box = [float(w) for w in world_size] if world_size else \
               [float(width)] + [1.0] * (self.dim - 1)
+        # `box` + `origin` -- A GRID THAT COVERS PART OF THE WORLD, in world units (exp 11, 2026-09-27).
+        # The grid spans [origin, origin + box] instead of [0, world]. A tissue built about the
+        # ORIGIN of a 200-unit free world (exp 11's gland, radius 5 -> 18) needs material points
+        # only inside a ~48-unit box around it: over the whole world, a dx small enough for a
+        # 50-point cell (~0.6) is ~350 nodes per axis, 43M nodes, and the torch gather clamps every
+        # point into [2 dx, world - 2 dx] -- a body at negative coordinates is crushed onto the
+        # first plane. Default-off: with neither key the grid is the world box and `origin` is None,
+        # which is the branch every existing spec takes, byte for byte. Only the torch bodies of
+        # `mpm_scatter` and `mpm_gather` read `origin`; every other body refuses it (`_no_origin`).
+        if _box_decl is not None:
+            box = [float(w) for w in _box_decl]
+        self.origin = None
+        if origin is not None:
+            o = [float(v) for v in origin]
+            if len(o) != self.dim:
+                raise ValueError(f"MPMGrid: origin has {len(o)} entries but dim={self.dim}")
+            self.origin = torch.tensor(o, dtype=torch.float32, device=device)
+        # THE GATHER CLAMPS TO THIS GRID'S BOX, not the world's, once the spec has declared either key.
+        self.box_own = (_box_decl is not None) or (origin is not None)
         if len(box) != self.dim:
             raise ValueError(f"MPMGrid: world_size has {len(box)} entries but dim={self.dim}")
         self.world_size = box
@@ -184,10 +223,54 @@ class MPMGrid(Field):
         self.register_buffer("mv", torch.zeros(n, self.dim, device=device))
         self.register_buffer("c", torch.zeros(n, device=device))
         self.register_buffer("v", torch.zeros(n, self.dim, device=device))
+        self.n_local = n                             # nodes of ONE block (the whole grid without `per_parent`)
+        self.n_blocks = 1
+
+    def ensure_blocks(self, n_blocks):
+        """`per_parent`: size the buffers to `n_blocks` blocks of `n_local` nodes (once, or when the
+        parent set's buffer grows)."""
+        if int(n_blocks) == self.n_blocks:
+            return
+        n, dev = int(n_blocks) * self.n_local, self.m.device
+        self.m = torch.zeros(n, device=dev); self.mv = torch.zeros(n, self.dim, device=dev)
+        self.c = torch.zeros(n, device=dev); self.v = torch.zeros(n, self.dim, device=dev)
+        self.n_blocks = int(n_blocks)
 
     @property
     def grid(self):                                  # [1,*shape] view for the recorder (mass density)
-        return self.m.view((1,) + self.shape)
+        return self.m[: self.n_local].view((1,) + self.shape)
+
+
+def _pp_frame(H, g, p, X, occ=None, recentre=False):
+    """`per_parent` grids: (the block index of every point, the block origins [n_blocks, D]).
+    `recentre` (the substep's first scatter) puts every block's centre on its cell's live centroid; the
+    gather reads the SAME origins, so a substep's scatter and gather agree on where each node is."""
+    pidx = H.lift_index(p.name, g.per_parent)
+    nb = int(H.level(g.per_parent).state.shape[0])
+    g.ensure_blocks(nb)
+    if recentre or g.pp_origin is None or g.pp_origin.shape[0] != nb:
+        w = torch.ones(X.shape[0], device=X.device, dtype=X.dtype) if occ is None else (occ > 0).to(X.dtype)
+        cnt = torch.zeros(nb, device=X.device, dtype=X.dtype).index_add_(0, pidx, w)
+        cen = torch.zeros(nb, X.shape[1], device=X.device, dtype=X.dtype).index_add_(0, pidx, X * w[:, None])
+        cen = cen / cnt.clamp_min(1.0)[:, None]
+        half = 0.5 * torch.as_tensor(g.world_size, device=X.device, dtype=X.dtype)
+        g.pp_origin = cen - half
+    return pidx, g.pp_origin
+
+
+def _pp_flat(flat, pidx, n_local, S):
+    """The local stencil index of every point, offset into its own block."""
+    return (flat.view(pidx.shape[0], S) + (pidx * n_local)[:, None]).reshape(-1)
+
+
+def _no_origin(op, g):
+    """Refuse a grid with an `origin` (see `MPMGrid`) in a body that does not implement it: that body
+    would read world positions as grid positions and put every point `origin` away from its node."""
+    if getattr(g, "origin", None) is not None:
+        raise NotImplementedError(
+            f"{type(op).__name__}: the grid {getattr(g, 'name', '?')!r} declares an `origin`, and only "
+            f"the torch bodies of mpm_scatter / mpm_gather / mpm_grid_update / mpm_strain honour it. "
+            f"Give these MPM operators `implementation: default`.")
 
 
 def bspline(X, inv_dx, offsets, shape, periodic):
@@ -677,7 +760,16 @@ class MPMScatter(MPMWrites, Exchange):
         stress = (-dt * 4 * inv_dx * inv_dx) * _pv[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 
-        fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
+        # `origin` -- the grid's lower corner (see `MPMGrid`); None on every spec that does not declare it.
+        # `per_parent` -- each body on its own block, re-centred here on the body (see `MPMGrid`).
+        if getattr(g, "per_parent", None):
+            _pi, _po = _pp_frame(H, g, p, X, getattr(p, "occ", None), recentre=getattr(self, "_zeroes_grid", True))
+            fx, weight, flat = bspline(X - _po[_pi], inv_dx, offsets, g.shape, periodic)
+            flat = _pp_flat(flat, _pi, g.n_local, offsets.shape[0])
+            gm, gmv, gc = g.m, g.mv, g.c
+        else:
+            fx, weight, flat = bspline(X if getattr(g, "origin", None) is None else X - g.origin,
+                                       inv_dx, offsets, g.shape, periodic)
         # DORMANT particles (occ==0, e.g. a agent_grow reserve) contribute NOTHING to the grid:
         # mask the scatter weights by occupancy. Byte-identical when all particles are live.
         occ = getattr(p, "occ", None)
@@ -1078,8 +1170,24 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
 
     def forward(self, H, mask=None):
         g = H.field(self.at); dev = g.m.device
+        # A GRID WITH AN `origin` (see `MPMGrid`) KEEPS ITS WALLS AT ITS OWN FACES, which this solve
+        # already does -- it works in node indices. Plates and obstacles are stated in WORLD units,
+        # and this body places them in the grid's frame, so with an origin they would be misplaced.
+        if getattr(g, "origin", None) is not None and (self.plate_axis is not None
+                                                       or getattr(H, "obstacles", None)):
+            raise NotImplementedError("mpm_grid_update: plates / obstacles on a grid with an `origin` "
+                                      "are not implemented (they are placed in the grid's frame)")
         dt = sub_dt(H, self.dt_sub)
         _mass_floor = self._const("mass_floor", g)
+        # `per_parent` BLOCKS ARE FREE: a body's block moves with it and holds it with a margin, so there
+        # is no wall to impose -- momentum over mass (plus the uniform body force) is the whole solve.
+        if getattr(g, "per_parent", None):
+            gv = g.mv / g.m.clamp(min=_mass_floor)[:, None]
+            _bf = getattr(H, "_mpm_body_accel", None)
+            if _bf is not None:
+                gv = gv + dt * _bf
+            g.v = torch.where((g.m > _mass_floor)[:, None], gv, torch.zeros_like(gv))
+            return {}
         _csf_floor = self._const("csf_mass_floor", g)
         _csf_eps = self._const("csf_eps", g)
         nx, ny, inv_dx, dx = g.nx, g.ny, g.inv_dx, g.dx
@@ -1566,12 +1674,24 @@ class MPMGather(MPMWrites, Exchange):
         # torch.compile it broke the graph in the middle of the gather on every single call.
         # Computed once, the branch is False on every later call and never enters the traced graph.
         if getattr(self, "_box", None) is None:
-            self._box = [float(b) for b in
-                         getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+            self._box = ([float(b) for b in g.world_size][:D] if getattr(g, "box_own", False) else
+                         [float(b) for b in
+                          getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D])
         box = self._box
         offsets = stencil_offsets(D, dev); S = offsets.shape[0]
         X, V = p.get("pos"), p.get("vel")
+        # `origin` -- the grid's lower corner (see `MPMGrid`). Every test below is in the GRID's frame
+        # (`_o` subtracted), and the new positions are handed back in the world's (`_o` added).
+        _o = getattr(g, "origin", None)
+        if getattr(g, "per_parent", None):
+            _pi, _po = _pp_frame(H, g, p, X, getattr(p, "occ", None))
+            _o = _po[_pi]
+            box = [float(b) for b in g.world_size][:D]
+        if _o is not None:
+            X = X - _o
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
+        if getattr(g, "per_parent", None):
+            flat = _pp_flat(flat, _pi, g.n_local, S)
         gvn = g.v[flat].view(p.n, S, D)
         new_V = (weight[..., None] * gvn).sum(1)
         dpos_grid = offsets[None] - fx[:, None, :]
@@ -1632,6 +1752,8 @@ class MPMGather(MPMWrites, Exchange):
         # IN PLACE. Every read of X / V above happens before this write, and this operator declares
         # MAY_MUTATE_INTEGRATED_STATE, so the engine's tick-0 integration-invariant guard does not
         # apply to it. The clone-and-rebind it replaces gave `p.state` a new address every substep.
+        if _o is not None:
+            Xn = Xn + _o
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
         self._write_particles(p, pa, pb, va, vb, Xn, new_V, new_C)
         return {}
@@ -2840,6 +2962,7 @@ class MPMScatterWarp(MPMScatter):
                 "`ecm_stress[measure: vonmises]`) will fall back to a different quantity.")
         from plexus.operators.mpm_ops import sub_dt
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
+        _no_origin(self, g)
         D = p.F.shape[-1]
         if D != 3 or str(dev) == "cpu":
             raise RuntimeError(f"mpm_scatter[warp] is 3D CUDA only (got dim={D}, dev={dev})")
@@ -3048,6 +3171,7 @@ class MPMGatherWarp(MPMGather):
             raise RuntimeError("mpm_gather[warp] needs warp-lang")
         from plexus.operators.mpm_ops import sub_dt
         p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
+        _no_origin(self, g)
         D = p.F.shape[-1]
         if D != 3 or str(dev) == "cpu" or bool(getattr(H, "periodic", False)):
             raise RuntimeError("mpm_gather[warp] is 3D, non-periodic, CUDA only")
@@ -3721,6 +3845,7 @@ class MPMScatterTriton(MPMScatter):
             raise RuntimeError("mpm_scatter[triton] needs triton; none importable")
         from plexus.operators.mpm_ops import sub_dt
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
+        _no_origin(self, g)
         D = p.F.shape[-1]
         if D != 3 or str(dev) == "cpu":
             raise RuntimeError(f"mpm_scatter[triton] is 3D CUDA only (got dim={D}, dev={dev})")
@@ -3899,6 +4024,7 @@ class MPMScatterTritonColour(MPMScatterTriton):
     def forward(self, H, mask=None):
         from plexus.operators.mpm_ops import sub_dt
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
+        _no_origin(self, g)
         D = p.F.shape[-1]
         if D != 3 or str(dev) == "cpu":
             raise RuntimeError("mpm_scatter[triton_colour] is 3D CUDA only")
@@ -3974,6 +4100,7 @@ class MPMGatherLoop27(MPMGather):
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
+        _no_origin(self, g)
         dt = sub_dt(H, self.dt_sub)
         inv_dx, dx = g.inv_dx, g.dx
         D = p.F.shape[-1]
@@ -4193,6 +4320,186 @@ class ActiveForceDirectional(ActiveForce):
         d = H.fields[self.direction_from].sample(pos)                     # [N, 2] direction: WHERE
         d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
         return self.amplitude * a[:, None] * d
+
+
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle",
+                   kind="exchange", model="persistent_walk",
+                   equation=r"""$$\mathbf a_i=f_c\,s_c(t)\,\big[1+b\tanh(\xi_i/w)\big]\,\mathbf p_c,\qquad \xi_i=\frac{(\mathbf x_i-\bar{\mathbf x}_c)\cdot\mathbf p_c}{R_c},\qquad d\mathbf p_c=\sqrt{2D_c}\,(\mathbf I-\mathbf p_c\mathbf p_c^{\!\top})\,d\mathbf W_c$$""")
+class ActiveForcePersistentWalk(ActiveForce):
+    """`persistent_walk` MODEL of active_force -- every material point of a cell pushed along ITS
+    CELL's polarity, the polarity wandering on the sphere: a crawling cell's persistent random walk,
+    in 3D, with the cell-to-cell and moment-to-moment variability real cells have.
+
+    particle -[containment]-> cell: reads which cell owns each material point (`cell_set`, the
+    containment map) and the points' positions; keeps one polarity, one drive and one speed factor
+    per cell as operator state; emits the acceleration the MPM substep consumes as a_ext, which
+    `mpm_scatter` deposits on the grid as momentum before the grid solve -- the placement it
+    documents as algebraically the grid solve's own (`_hand_body_force_to_grid`).
+
+        a_i   = f_c s_c(t) [1 + b tanh(xi_i / w)] p_c         every live point i of cell c
+        xi_i  = (x_i - xbar_c) . p_c / R_c                    where along its cell point i sits
+        p_c  <- p_c cos|v| + v/|v| sin|v|,   v = sqrt(2 D_c h_s) (I - p_c p_c^T) z_c,  z_c ~ N(0, I_3)
+        f_c   = f exp(sigma_f g_c - sigma_f^2 / 2)            g_c ~ N(0, 1), drawn once per cell
+        D_c   = Dr exp(-ucsp (f_c / f - 1))                   faster cells turn less
+        ds_c  = -(s_c - 1) dt / tau_s + sqrt(2 dt / tau_s) sigma_s z'_c,   s_c >= 0
+
+    f (`f`, world / time^2) is the median drive per unit mass: against the scatter's Stokes drag
+    gamma (`mpm_scatter.drag`, 1 / time) a free cell settles at v0 = f / gamma. Dr (`Dr`, 1 / time)
+    is the rotational diffusion: <p(t).p(0)> = exp(-2 Dr t) in 3D, a persistence time 1 / (2 Dr).
+    xbar_c is the cell's centroid and R_c the rms distance of its points from it, both measured
+    here every call from the points themselves.
+
+    THE FOUR KNOBS OF ORGANIC VARIABILITY, all default-off (0), each a measured property of
+    migrating cells:
+      `speed_cv` (sigma_f)   cells differ: a log-normal spread of drives across the population, the
+                             shape of single-cell speed distributions (Wu et al. 2014 PNAS 111:3949).
+      `ucsp`                 the universal coupling between speed and persistence: faster cells
+                             persist longer, tau_p ~ exp(lambda v) (Maiuri et al. 2015 Cell 161:374).
+      `speed_noise` (sigma_s) + `speed_tau` (tau_s)   a cell's speed wanders about its own mean, an
+                             Ornstein-Uhlenbeck factor clipped at zero: stop-and-go, not a motor.
+      `front_bias` (b) + `front_width` (w)   the push is stronger at the leading edge than at the
+                             rear, so a moving cell stretches along its motion and relaxes when it
+                             turns: the protrusion-led shape of a crawling cell (Mogilner 2009,
+                             J. Math. Biol. 58:105). With b > 0 part of the drive is a force dipole
+                             (tanh is odd), so the net push stays f_c s_c per unit mass.
+
+    A NET FORCE PER CELL, not a force-free dipole: `protrusion` alone moves nothing without a
+    substrate to grip, and a cell inside a gland has no floor -- it pushes against its drag and its
+    neighbours. f = 0 emits zeros: the operator is the identity.
+
+    Reference: Romanczuk, P. et al. (2012). Active Brownian particles. Eur. Phys. J. Spec. Top.
+    202:1-162; Wu, P.-H. et al. (2014). Three-dimensional cell migration does not follow a random
+    walk. PNAS 111:3949-3954; Maiuri, P. et al. (2015). Actin flows mediate a universal coupling
+    between cell speed and cell persistence. Cell 161:374-386.
+    """
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["cell_set", "f"]
+    MECHANISM_TAGS = ["motility", "self_propulsion", "persistent_random_walk", "active_brownian",
+                      "speed_persistence_coupling", "cell_variability"]
+    PARAM_ROLES = {"f": "median_drive_per_unit_mass", "Dr": "polarity_rotational_diffusion",
+                   "cell_set": "the_cells_owning_the_points", "seed": "rng_seed",
+                   "speed_cv": "log_normal_spread_of_drive_across_cells",
+                   "ucsp": "speed_persistence_coupling_exponent",
+                   "speed_noise": "ou_fluctuation_of_each_cells_speed", "speed_tau": "ou_correlation_time",
+                   "front_bias": "leading_edge_excess_of_the_push", "front_width": "front_rear_softness"}
+    PARAM_UNITS = {"f": "acceleration", "Dr": "rate", "speed_tau": "time"}
+    REFERENCE = ("Romanczuk, P. et al. (2012). Eur. Phys. J. Spec. Top. 202:1-162; Wu, P.-H. et al. "
+                 "(2014). PNAS 111:3949-3954; Maiuri, P. et al. (2015). Cell 161:374-386.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.cell_set = str(params["cell_set"])
+        self.f = float(params["f"])
+        self.Dr = float(params.get("Dr", 0.1))
+        self.seed = int(params.get("seed", 0))
+        self.speed_cv = float(params.get("speed_cv", 0.0))
+        self.ucsp = float(params.get("ucsp", 0.0))
+        self.speed_noise = float(params.get("speed_noise", 0.0))
+        self.speed_tau = float(params.get("speed_tau", 10.0))
+        self.front_bias = float(params.get("front_bias", 0.0))
+        self.front_width = float(params.get("front_width", 0.5))
+        # `cil_surface: <vertex set>` (default none = off): CONTACT INHIBITION OF LOCOMOTION at a tissue surface
+        # (Abercrombie 1979; Carmona-Fontaine et al. 2008). Each call, a cell with any point in this frame's
+        # `bm_contact[live]` list against that surface (its apical side, the lumen's wall) loses the part of its
+        # polarity that points INTO the wall -- it turns back into the lumen instead of pushing on. Without it the
+        # walking interior of exp 11 pushed the layer with the contact's full force while receiving a tenth of it
+        # back, and inflated the gland like a gas (Finding 105).
+        self.cil_surface = params.get("cil_surface")
+        self._p = None
+
+    def _init_cells(self, nc):
+        # ONE GENERATOR, ON THE CPU, SEEDED ONCE: the draws do not depend on the device or on how
+        # many other operators drew before this one (the reason `brownian[active_cell]` does it too).
+        self._gen = torch.Generator(device="cpu").manual_seed(self.seed)
+        p = torch.randn(nc, 3, generator=self._gen, dtype=torch.float64)
+        self._p = p / p.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        g = torch.randn(nc, generator=self._gen, dtype=torch.float64)
+        sf = self.speed_cv
+        # MEDIAN-PRESERVING, NOT MEAN-PRESERVING: exp(sigma g - sigma^2/2) has mean 1, so `f` stays
+        # the population's mean drive whatever the spread.
+        self._fc = self.f * torch.exp(sf * g - 0.5 * sf * sf)
+        self._Dc = self.Dr * torch.exp(-self.ucsp * (self._fc / max(abs(self.f), 1e-12) - 1.0))
+        self._s = torch.ones(nc, dtype=torch.float64)
+
+    def _inhibit(self, H, nc):
+        """`cil_surface`: remove, per cell touching the surface this frame, its polarity's component against the
+        contacts' mean normal (the normal INTO the lumen), and renormalise."""
+        m = getattr(H.level(str(self.cil_surface)), "_mesh", None)
+        bc = m.get("basal_contacts") if m is not None else None
+        C = bc.get(self.at) if isinstance(bc, dict) else None
+        fr = getattr(H, "frame", None)
+        if not C or C.get("frame") != (None if fr is None else int(fr)) or C["node"].numel() == 0:
+            return
+        par = H.lift_index(self.at, self.cell_set)[C["node"].long()].cpu()
+        n = C["n"].detach().to(torch.float64).cpu()
+        ns = torch.zeros(nc, 3, dtype=torch.float64).index_add_(0, par, n)
+        hit = ns.norm(dim=1) > 1e-12
+        if not bool(hit.any()):
+            return
+        nh = ns[hit] / ns[hit].norm(dim=1, keepdim=True)
+        p = self._p[hit]
+        into_wall = (p * nh).sum(1, keepdim=True).clamp(max=0.0)             # < 0: pointing out of the lumen
+        p = p - into_wall * nh
+        self._p[hit] = p / p.norm(dim=1, keepdim=True).clamp_min(1e-12)
+
+    def _step(self, h):
+        """Advance every cell's polarity and speed factor by one frame of length h.
+
+        ALONG THE SPHERE, IN SUB-STEPS: each sub-step draws a tangent Gaussian v (variance 2 D_c h_s
+        per tangent axis) and moves along the great circle it points to, p <- p cos|v| + v/|v| sin|v|
+        (the exponential map). A straight tangent step followed by a renormalisation is the obvious
+        alternative and it UNDER-TURNS: its mean cosine is 1 - s^2 + 3 s^4 per step (s^2 = 2 D_c h_s)
+        against the exact exp(-s^2) = 1 - s^2 + s^4 / 2, measured 0.632 against 0.619 per frame at
+        Dr 0.24 with 24 sub-steps -- a 4% slower walk. The arc's mean cosine is 1 - s^2 + s^4 / 3,
+        and with s^2 <= 0.02 per sub-step its error is ~0.3% of the decorrelation."""
+        n_sub = max(1, int(math.ceil(float(self._Dc.max()) * h / 0.01)))
+        hs = h / n_sub
+        for _ in range(n_sub):
+            z = torch.randn(self._p.shape[0], 3, generator=self._gen, dtype=torch.float64)
+            z = z - (z * self._p).sum(1, keepdim=True) * self._p           # tangent to the sphere
+            v = torch.sqrt(2.0 * self._Dc * hs)[:, None] * z
+            th = v.norm(dim=1, keepdim=True)
+            p = self._p * torch.cos(th) + v * (torch.sin(th) / th.clamp_min(1e-12))
+            self._p = p / p.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        if self.speed_noise > 0.0:
+            tau = max(self.speed_tau, 1e-9)
+            zs = torch.randn(self._s.shape[0], generator=self._gen, dtype=torch.float64)
+            self._s = (self._s - (self._s - 1.0) * (h / tau)
+                       + math.sqrt(2.0 * h / tau) * self.speed_noise * zs).clamp_min(0.0)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        X = lvl.get("pos")
+        cl = H.level(self.cell_set)
+        nc = int(cl.state.shape[0])
+        h = float(getattr(H, "dt", 1.0))
+        if self._p is None or self._p.shape[0] != nc:
+            self._init_cells(nc)
+        else:
+            self._step(h)
+        if self.cil_surface:
+            self._inhibit(H, nc)
+        if self.f == 0.0:
+            return {self.at: torch.zeros_like(X)}
+        idx = H.lift_index(self.at, self.cell_set)                          # [n] the cell of point i
+        dev, dt_ = X.device, X.dtype
+        pc = self._p.to(device=dev, dtype=dt_)[idx]
+        amp = (self._fc * self._s).to(device=dev, dtype=dt_)[idx]
+        if self.front_bias != 0.0:
+            live = lvl.occ.to(dt_)
+            w = torch.zeros(nc, device=dev, dtype=dt_).index_add_(0, idx, live)
+            xbar = torch.zeros(nc, 3, device=dev, dtype=dt_).index_add_(0, idx, X * live[:, None])
+            xbar = xbar / w.clamp_min(1.0)[:, None]
+            d = X - xbar[idx]
+            r2 = torch.zeros(nc, device=dev, dtype=dt_).index_add_(0, idx, (d * d).sum(1) * live)
+            R = (r2 / w.clamp_min(1.0)).clamp_min(1e-12).sqrt()
+            xi = (d * pc).sum(1) / R[idx]
+            amp = amp * (1.0 + self.front_bias * torch.tanh(xi / max(self.front_width, 1e-6)))
+        a = amp[:, None] * pc * lvl.occ[:, None].to(dt_)
+        if mask is not None:
+            a = a * mask[:, None].to(dt_)
+        return {self.at: a}
 
 
 @register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange",
@@ -4715,6 +5022,7 @@ class MPMDensityPressure(Lateral):
     def forward(self, H, mask=None):
         p = H.level(self.at)
         g = H.field(self.grid)
+        _no_origin(self, g)
         dev = p.state.device
         D = p.F.shape[-1]
         rho_g = self._density(H, g, D, dev)
@@ -5177,3 +5485,113 @@ class ECMSeed(Structural):
                       f"{self.dense_axis}")
               + f"; {n_in} left inside the cavity or a block", flush=True)
         return {}
+
+
+# ============================================================================================
+#  MPM BODIES AS CELLS: waking, sleeping and dividing a cell made of material points (exp 11)
+# ============================================================================================
+# A cell of `cell_set` owns a CONTIGUOUS block of `per` points of `point_set` (the containment map,
+# built in parent order; a dormant cell's block is dormant). These three routines are the topology of
+# such bodies: `wake_mpm_body` gives a free cell slot a fresh ball of material (a surface cell that
+# dives into the lumen, `cell_die[implementation: t2]`'s `to_children`), `sleep_mpm_body` returns a
+# cell's material to the pool (a daughter that re-enters the surface layer, `cell_divide[model:
+# reinsert]`'s `from_children`), and `cell_divide[model: mpm]` cuts one body into two.
+
+def mpm_blocks(H, cell_set, point_set):
+    """[n_cells, per] indices of every cell's point block, and `per`."""
+    nc = int(H.level(cell_set).state.shape[0])
+    npnt = int(H.level(point_set).state.shape[0])
+    if nc == 0 or npnt % nc:
+        raise ValueError(f"{point_set!r} ({npnt} points) is not made of equal blocks for the {nc} slots of {cell_set!r}")
+    per = npnt // nc
+    return torch.arange(nc * per, device=H.level(point_set).state.device).view(nc, per), per
+
+
+def _mpm_reset_points(P, idx, pos, vol):
+    """Fresh material at `pos` [k, D]: zero velocity, F = I, C = 0, Jp = 1, p_vol `vol` [k], mass density x vol."""
+    sch = P.state_schema
+    st = P.state.clone()
+    p0, p1 = sch["pos"]
+    st[idx, p0:p1] = pos.to(st.dtype)
+    if "vel" in sch:
+        v0, v1 = sch["vel"]
+        st[idx, v0:v1] = 0.0
+    P.state = st
+    D = p1 - p0
+    if getattr(P, "F", None) is not None:
+        P.F[idx] = torch.eye(D, device=P.F.device, dtype=P.F.dtype)
+    if getattr(P, "C", None) is not None:
+        P.C[idx] = 0.0
+    if getattr(P, "Jp", None) is not None:
+        P.Jp[idx] = 1.0
+    if getattr(P, "p_vol", None) is not None:
+        rho = (P.mass / P.p_vol.clamp_min(1e-30)) if getattr(P, "mass", None) is not None else None
+        r = rho[idx] if rho is not None else None
+        P.p_vol[idx] = vol.to(P.p_vol.dtype)
+        if r is not None:
+            P.mass[idx] = (r * vol.to(r.dtype)).to(P.mass.dtype)
+
+
+def _mpm_label_points(P, idx, slot, pid_block, label_block):
+    st = P.state.clone()
+    if pid_block and pid_block in P.state_schema:
+        st[idx, P.state_schema[pid_block][0]] = float(slot)
+    if label_block and label_block in P.state_schema:
+        st[idx, P.state_schema[label_block][0]] = float(int(slot) % 20)
+    P.state = st
+
+
+def wake_mpm_body(H, cell_set, point_set, slots, centres, volume, gen=None, pid_block="pid", label_block="cellc"):
+    """Wake dormant cells `slots` of `cell_set` at `centres` [k, D], each with its whole point block as a
+    uniform ball of `volume` (world units^3) about its centre. Returns the slots woken."""
+    C, P = H.level(cell_set), H.level(point_set)
+    blocks, per = mpm_blocks(H, cell_set, point_set)
+    dev, dt = P.state.device, P.state.dtype
+    D = P.state_schema["pos"][1] - P.state_schema["pos"][0]
+    slots = [int(s) for s in slots]
+    if not slots:
+        return []
+    cen = torch.as_tensor(np.asarray(centres, np.float64), device=dev, dtype=dt).reshape(len(slots), D)
+    vol = torch.as_tensor(np.broadcast_to(np.asarray(volume, np.float64), (len(slots),)).copy(), device=dev, dtype=dt)
+    R = (3.0 * vol / (4.0 * math.pi)) ** (1.0 / 3.0)
+    g = gen if gen is not None else torch.Generator(device="cpu").manual_seed(0)
+    for j, s in enumerate(slots):
+        u = torch.randn(per, D, generator=g, dtype=torch.float64)
+        u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        r = torch.rand(per, 1, generator=g, dtype=torch.float64) ** (1.0 / D)
+        pos = cen[j] + (u * r).to(device=dev, dtype=dt) * R[j]
+        idx = blocks[s]
+        _mpm_reset_points(P, idx, pos, vol[j].expand(per) / per)
+        _mpm_label_points(P, idx, s, pid_block, label_block)
+        oc = P.occ.clone(); oc[idx] = 1.0; P.occ = oc
+    sch = C.state_schema
+    st, oc = C.state.clone(), C.occ.clone()
+    c0, c1 = sch["pos"]
+    st[slots, c0:c1] = cen
+    if "vel" in sch:
+        v0, v1 = sch["vel"]
+        st[slots, v0:v1] = 0.0
+    oc[slots] = 1.0
+    C.state, C.occ = st, oc
+    return slots
+
+
+def sleep_mpm_body(H, cell_set, point_set, slots):
+    """Return cells `slots`' point blocks to the dormant pool (occ 0, parked at the cell's position,
+    velocity zero). The cell slots themselves are put to sleep by the caller (e.g. `Level.kill`)."""
+    slots = [int(s) for s in slots]
+    if not slots:
+        return
+    C, P = H.level(cell_set), H.level(point_set)
+    blocks, per = mpm_blocks(H, cell_set, point_set)
+    idx = blocks[slots].reshape(-1)
+    c0, c1 = C.state_schema["pos"]
+    park = C.state[slots, c0:c1].repeat_interleave(per, dim=0)
+    st, oc = P.state.clone(), P.occ.clone()
+    p0, p1 = P.state_schema["pos"]
+    st[idx, p0:p1] = park.to(st.dtype)
+    if "vel" in P.state_schema:
+        v0, v1 = P.state_schema["vel"]
+        st[idx, v0:v1] = 0.0
+    oc[idx] = 0.0
+    P.state, P.occ = st, oc

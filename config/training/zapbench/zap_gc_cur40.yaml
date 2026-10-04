@@ -1,0 +1,114 @@
+name: zap_gc_cur40
+model: config/zapbench/zap_gc_base.yaml
+learnable:
+- param: theta
+  op: state_diffuse
+  title: the GraphCast law's weights, one flat tensor
+- block: embedding
+  of: neuron
+  title: each neuron's embedding, 8 numbers
+task:
+  reference:
+    trace_recording: zapbench
+    split: all
+    test_stride: 8
+  drive:
+    set: stimulus
+    block: u
+    window:
+    - -5
+    - 1
+  observe:
+    set: neuron
+    block: dff
+  loss: trace_mse
+training:
+  optimizer: adam
+  lr: 0.001
+  schedule: none
+  clip: 1.0
+  batch: 4
+  seed: 0
+  save_every: 500
+  select: last
+  stages:
+  - horizon: 1
+    iters: 4000
+  - horizon: 2
+    iters: 2000
+  - horizon: 3
+    iters: 1333
+  - horizon: 4
+    iters: 1000
+  - horizon: 5
+    iters: 800
+  - horizon: 6
+    iters: 666
+  - horizon: 7
+    iters: 571
+  - horizon: 8
+    iters: 500
+  - horizon: 9
+    iters: 444
+  - horizon: 10
+    iters: 400
+  - horizon: 11
+    iters: 363
+  - horizon: 12
+    iters: 333
+  - horizon: 13
+    iters: 307
+  - horizon: 14
+    iters: 285
+  - horizon: 15
+    iters: 266
+  - horizon: 16
+    iters: 250
+  - horizon: 17
+    iters: 235
+  - horizon: 18
+    iters: 222
+  - horizon: 19
+    iters: 210
+  - horizon: 20
+    iters: 200
+  - horizon: 21
+    iters: 190
+  - horizon: 22
+    iters: 181
+  - horizon: 23
+    iters: 173
+  - horizon: 24
+    iters: 166
+  - horizon: 25
+    iters: 160
+  - horizon: 26
+    iters: 153
+  - horizon: 27
+    iters: 148
+  - horizon: 28
+    iters: 142
+  - horizon: 29
+    iters: 137
+  - horizon: 30
+    iters: 133
+  - horizon: 31
+    iters: 129
+  - horizon: 32
+    iters: 125
+  - horizon: 33
+    iters: 121
+  - horizon: 34
+    iters: 117
+  - horizon: 35
+    iters: 114
+  - horizon: 36
+    iters: 111
+  - horizon: 37
+    iters: 108
+  - horizon: 38
+    iters: 105
+  - horizon: 39
+    iters: 102
+  - horizon: 40
+    iters: 100

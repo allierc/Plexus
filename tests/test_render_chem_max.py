@@ -39,3 +39,24 @@ def test_without_chem_max_the_per_frame_law_is_unchanged():
 
 def test_with_chem_max_a_knocked_out_gene_draws_white():
     assert _rgb([1.0, 3.0]).min() >= 250                   # white, to the uint8 rounding
+
+
+def _drawn(chem, lut):
+    from plexus.render_vtk import mesh_of
+    pos, mt = _square()
+    chem = np.asarray(chem, float)
+    return mesh_of(pos, mt, chem[:, 0], chem=chem, lut=lut, blend="subtractive", vmax=[1.0, 3.0])
+
+
+def test_a_zero_morphogen_does_not_grey_out_the_declared_genes():
+    """exp 7's no-source controls: column 0 (the morphogen, `act`) is 0, the LUT draws column 1 (Pax6 = 3)."""
+    m = _drawn([[0.0, 3.0]], [None, "#3050ff"])
+    rgb = np.asarray(m.cell_data["rgb"])[0].astype(int)
+    assert rgb[2] > rgb[0] + 100                           # blue, not BODY_GREY
+
+
+def test_all_drawn_columns_zero_is_still_flat():
+    """Nothing to draw in the declared columns either: the flat branch stands (no rgb from the LUT)."""
+    m = _drawn([[0.0, 0.0]], [None, "#3050ff"])
+    rgb = m.cell_data["rgb"] if "rgb" in m.cell_data else None
+    assert rgb is None or np.ptp(np.asarray(rgb)[0].astype(int)) < 30   # grey or white, not blue

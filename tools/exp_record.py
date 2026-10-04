@@ -172,6 +172,35 @@ def _readout(r: dict) -> str:
     return (nl + nl).join(out)
 
 
+def undeclared_rows(number: int, rows: list[dict]) -> list[dict]:
+    """EVERY RUN OF THE EXPERIMENT REACHES THE WATCHER, declared or not (added 2026-09-27). The steps above
+    come from the markdown's arms and results rows only, so a phase whose arms were not yet declared --
+    exp11's whole Phase 2, nine runs on disk -- never appeared and the watcher stayed frozen at its last
+    declared step. Every folder graphs_data/<group>/exp{NN}* that holds a trajectory or a movie and is not
+    already a step is appended AFTER the declared ones, oldest first, marked UNDECLARED so the record says
+    it is not yet in the markdown. Declaring it later moves it into the declared steps."""
+    have = {(r["_group"], r["_run"]) for r in rows}
+    found = []
+    for d in glob.glob(os.path.join(GD, "*", f"exp{number:02d}*")):
+        if not os.path.isdir(d):
+            continue
+        group, run = os.path.basename(os.path.dirname(d)), os.path.basename(d)
+        if (group, run) in have:
+            continue
+        tj, mv = os.path.join(d, "trajectory.npz"), os.path.join(d, "movie.mp4")
+        if not (os.path.exists(tj) or os.path.exists(mv)):
+            continue
+        t = max(os.path.getmtime(x) for x in (tj, mv) if os.path.exists(x))
+        found.append((t, group, run))
+    out = []
+    for t, group, run in sorted(found):
+        out.append({"_v": f"UNDECLARED {run}", "_group": group, "_run": run, "_pred": {}, "_read": {},
+                    "arm": "(undeclared)", "label": "a run on disk not yet in the markdown's arms or results rows",
+                    "verdict": "undeclared -- not scored in the record",
+                    "what changed": "declare its arm (front matter) or add its results row"})
+    return out
+
+
 def build(number: int) -> str:
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     from exp import load                                         # the tool's own md reader
@@ -182,6 +211,7 @@ def build(number: int) -> str:
         os.makedirs(os.path.join(folder, k), exist_ok=True)
     grid = fm.get("branch") == "grid" or "arms" in fm
     rows = grid_rows(number, fm, body) if grid else table(body)
+    rows += undeclared_rows(number, rows)
     desc = descriptions()
     keep = set()
     journal = [f"# exp {number} {fm.get('name', '')} -- rebuilt from {os.path.basename(md)} "
@@ -191,14 +221,34 @@ def build(number: int) -> str:
         keep.add(n)
         run = os.path.join(GD, r["_group"], r["_run"])
         p = lambda k: os.path.join(folder, k, n + KINDS[k])      # noqa: E731
-        got = {"mp4": _link(os.path.join(run, "movie.mp4"), p("mp4")),
-               "png": _link(os.path.join(run, "3d.png"), p("png"))}
-        if not _link(os.path.join(run, "spec.yaml"), p("spec")):
-            _link(os.path.join(ROOT, "config", r["_group"], r["_run"] + ".yaml"), p("spec"))
+        if r["_group"] == "training":
+            # A TRAINING RUN (`training/<model>/<name>` in the spec cell) lands in
+            # log/training/<model>/<name>/, beside graphs_data. Its still is the analysis figure once
+            # `analyse` has written it, and until then `results/live.png`, which the trainer rewrites
+            # at every validation -- so the watcher shows a run while it trains.
+            run = os.path.join(os.path.dirname(os.path.realpath(GD)), "log", "training", r["_run"])
+            name = os.path.basename(r["_run"])
+            fig = os.path.join(run, "results", f"{name}_test.png")
+            got = {"mp4": _link(os.path.join(run, "results", "movie.mp4"), p("mp4")),
+                   "png": _link(fig if os.path.exists(fig) else os.path.join(run, "results", "live.png"), p("png"))}
+            if not _link(os.path.join(run, "config.yaml"), p("spec")):
+                _link(os.path.join(ROOT, "config", "training", r["_run"] + ".yaml"), p("spec"))
+        else:
+            got = {"mp4": _link(os.path.join(run, "movie.mp4"), p("mp4")),
+                   "png": _link(os.path.join(run, "3d.png"), p("png"))}
+            if not _link(os.path.join(run, "spec.yaml"), p("spec")):
+                _link(os.path.join(ROOT, "config", r["_group"], r["_run"] + ".yaml"), p("spec"))
         with open(p("why"), "w") as fh:
-            fh.write(f"step   {n}  =  {'run ' + r['_v'] if grid else 'iteration v' + r['_v']} of experiment {number}\n")
+            # a `batch` column (`3.4` = batch 3, arm 4) leads the line: the watcher shows this line beside its
+            # position, so a step can be matched to the deck's batch slides (Cedric, exp17, 2026-09-30)
+            bt = next((v for h, v in r.items() if h.lower() == "batch" and v), "")
+            bl = (f"batch {bt.split('.')[0]} · arm {bt.split('.')[1]} · " if re.fullmatch(r"\d+\.\d+", bt)
+                  else f"batch {bt} · " if bt else "")
+            fh.write(f"step   {n}  =  {bl}{os.path.basename(r['_run']) + ' (' if bl else ''}"
+                     f"{'run ' + r['_v'] if grid else 'iteration v' + r['_v']}{')' if bl else ''} of experiment {number}\n")
             fh.write(f"spec   {r['_group']}/{r['_run']}\n")
-            fh.write(f"run    graphs_data/{r['_group']}/{r['_run']}/\n\n")
+            fh.write(f"run    {run}/\n\n" if r["_group"] == "training"
+                     else f"run    graphs_data/{r['_group']}/{r['_run']}/\n\n")
             for h, v in r.items():
                 if not h.startswith("_") and h.lower() not in ("v", "spec"):
                     fh.write(f"{h}: {v}\n")
@@ -213,6 +263,9 @@ def build(number: int) -> str:
         verdict = next((v for h, v in r.items() if h.lower() == "verdict"), "")
         changed = next((v for h, v in r.items() if h.lower() == "what changed"), "")
         tag = r["_v"] if grid else f"v{r['_v']}"
+        bt = next((v for h, v in r.items() if h.lower() == "batch" and v), "")
+        if bt:
+            tag = f"{tag} [{bt}]"
         journal.append(f"{n}  {tag:<5} {r['_group']}/{r['_run']:<14} {verdict}  -- {changed}"
                        + ("" if got["mp4"] else "   [no movie yet]"))
     for k, ext in KINDS.items():                                 # steps no row backs any more

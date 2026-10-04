@@ -61,6 +61,19 @@ def test_clone_drive_multiplies():
     assert torch.allclose(r / d, drive)
 
 
+def test_hinge_ring_is_the_outer_annulus_and_off_by_default():
+    from plexus.operators.diffusion_reaction import hinge_ring
+    g = torch.linspace(-5, 5, 11, dtype=torch.float64)
+    X, Y = torch.meshgrid(g, g, indexing="ij")
+    cen = torch.stack([X.flatten(), Y.flatten(), torch.zeros(121, dtype=torch.float64)], 1) + 3.0
+    idx = hinge_ring(cen, 0.3)
+    r = (cen - cen.mean(0)).norm(dim=1)
+    assert len(idx) == 36 and float(r[idx].min()) >= float(r.max(0).values * 0 + torch.sort(r, descending=True).values[35]) - 1e-12
+    assert float(r[idx].min()) > float(torch.median(r))                         # all outside the median radius
+    assert len(hinge_ring(cen, 0.0)) == 0
+    g0 = Grow3DStretch(dict(BASE))
+    assert g0.hinge_frac == 0.0 and g0._hinge_drive(None) is None            # no hinge: the default path
+
 def test_clone_cap_is_the_polar_patch():
     th = torch.linspace(0, 3.14159, 101, dtype=torch.float64)
     cen = torch.stack([torch.sin(th), torch.zeros_like(th), torch.cos(th)], 1) + 7.0   # offset: centred first
@@ -162,6 +175,46 @@ def test_settle_reference_is_frozen():
     assert torch.allclose(_aw_law(rel, [0.9, 0.9, 0.9]), d)
 
 
+def test_settle_median_offsets_the_stress_once(monkeypatch):
+    """stretch_ref: settle_median with readout: stress -- the median stress at `ref_frame` (0.86, a
+    settled pouch's standing compression) is subtracted as a FIXED offset: the settled tissue reads 1,
+    a later 5 % global compression still reads as one (tissue would erase it), and nothing moves the
+    offset after it is set."""
+    import plexus.operators.diffusion_reaction as DR
+    import plexus.operators.vertex_ops as VO
+    planted = {"s": None}
+    monkeypatch.setattr(DR, "isotropic_stress", lambda *a, **k: planted["s"] - 1.0)
+    monkeypatch.setattr(VO, "cell_block_t", lambda H, cat, name, nF: torch.ones(nF, dtype=torch.float64))
+
+    class _Lvl:
+        def get(self, k):
+            return torch.zeros(4, 3, dtype=torch.float64)
+
+    class _H:
+        def level(self, at):
+            return _Lvl()
+    g = Grow3DStretch(dict(BASE, gain=2.0, readout="stress", stretch_ref="settle_median", ref_frame=60))
+    g.cat, g._H, g._drive = "cell", _H(), None
+    g._stretch_declared = lambda: False
+    z = torch.zeros(3, dtype=torch.float64)
+    m = {"mech": {}, "E_srce": z, "E_trgt": z, "E_face": z, "Nv": 4, "A0": torch.ones(3, dtype=torch.float64),
+         "P0": torch.ones(3, dtype=torch.float64), "V0f": torch.ones(3, dtype=torch.float64)}
+    s = torch.ones(3, dtype=torch.float64); h = torch.zeros(3, dtype=torch.float64)
+    d = Grow3D(dict(BASE))._rate(s, h, m, 1.0)
+    g._k = 10                                                                 # before ref_frame: no signal
+    planted["s"] = torch.tensor([0.3, 0.86, 1.8], dtype=torch.float64)
+    assert torch.allclose(g._rate(s, h, m, 1.0), d) and g._off is None
+    g._k = 60
+    planted["s"] = torch.tensor([0.84, 0.86, 0.88], dtype=torch.float64)
+    assert torch.allclose(g._rate(s, h, m, 1.0) / d, torch.tensor([0.96, 1.0, 1.04], dtype=torch.float64))
+    g._k = 300
+    planted["s"] = torch.tensor([0.81, 0.81, 0.81], dtype=torch.float64)       # the whole pouch 0.05 more compressed
+    assert torch.allclose(g._rate(s, h, m, 1.0) / d, torch.full((3,), 0.9, dtype=torch.float64))
+    rel = Grow3DStretch(dict(BASE, gain=2.0, readout="stress", stretch_ref="tissue"))
+    rel.cat, rel._H, rel._drive = "cell", _H(), None
+    rel._stretch_declared = lambda: False
+    assert torch.allclose(rel._rate(s, h, m, 1.0), d)                         # tissue reads no stress at all
+
 def test_stretch_growth_only_above_threshold():
     """k_s max(sigma - 1 - theta, 0): no growth factor anywhere (rho 0), only the stretched cell grows."""
     g = Grow3DStretch(dict(BASE, rho=0.0, gain=0.0, stretch_growth=4.0, stretch_threshold=0.05,
@@ -199,3 +252,77 @@ def test_a0_readout_is_area_over_target():
         assert torch.allclose(r / d, torch.tensor([1.0, 1.0, 0.6, 1.0], dtype=torch.float64))
     finally:
         mp.undo()
+
+
+def test_clone_disk_is_a_compact_interior_patch():
+    from plexus.operators.diffusion_reaction import clone_disk
+    g = torch.linspace(-5, 5, 11, dtype=torch.float64)
+    X, Y = torch.meshgrid(g, g, indexing="ij")
+    cen = torch.stack([X.flatten(), Y.flatten(), torch.zeros(121, dtype=torch.float64)], 1)
+    idx = clone_disk(cen, [0.0, 0.0, 0.0], 5 / 121)                   # the 5 cells nearest the centre
+    pts = cen[idx]
+    assert len(idx) == 5 and float(pts.norm(dim=1).max()) <= 1.0 + 1e-9
+    idx2 = clone_disk(cen, [0.4, 0.0, 0.0], 1 / 121)                  # 0.4 R along x, R = 5 sqrt 2
+    assert abs(float(cen[idx2[0], 0]) - 3.0) < 1e-9 and float(cen[idx2[0], 1]) == 0.0
+
+
+def test_isotropic_stress_matches_the_ruler_and_is_size_free():
+    """The operator's stress equals half the trace of the ruler's Batchelor stress (tools/exp_measures/exp13
+    cell_stress) over 2 K_A A0, on a two-square planted sheet; and it is 0 for a lone force-free cell at
+    any size (A = A0, no tension)."""
+    import numpy as np
+    from plexus.operators.diffusion_reaction import isotropic_stress
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from exp_measures.exp13 import cell_stress
+    pos = torch.tensor([[0, 0, 0], [1, 0, 0], [2, 0, 0], [0, 1, 0], [1, 1, 0], [2, 1.2, 0]], dtype=torch.float64)
+    es = torch.tensor([0, 1, 4, 3, 1, 2, 5, 4]); et = torch.tensor([1, 4, 3, 0, 2, 5, 4, 1]); ef = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1])
+    A = torch.tensor([1.0, 1.1], dtype=torch.float64); A0 = torch.tensor([0.9, 1.3], dtype=torch.float64); P0 = torch.tensor([3.5, 3.9], dtype=torch.float64)
+    mech = {"K_A": 1.0, "K_P": 0.3, "Gamma": 0.4, "Lambda": 0.5}
+    s = isotropic_stress(pos, es, et, ef, 2, A, A0, P0, mech)
+    cs = cell_stress(pos.numpy(), es.numpy(), et.numpy(), ef.numpy(), 2, A0.numpy(), P0.numpy(), **mech)
+    tr = np.trace(cs["sigma"], axis1=1, axis2=2) / 2
+    # the ruler measures the polygon's own area (1.0, 1.1 here, as planted)
+    assert np.allclose(s.numpy(), tr / (2 * mech["K_A"] * A0.numpy()), atol=1e-9)
+    for size in (1.0, 7.0):
+        sq = torch.tensor([[0, 0, 0], [size, 0, 0], [size, size, 0], [0, size, 0]], dtype=torch.float64)
+        z = isotropic_stress(sq, torch.tensor([0, 1, 2, 3]), torch.tensor([1, 2, 3, 0]), torch.zeros(4, dtype=torch.long), 1,
+                             torch.tensor([size ** 2], dtype=torch.float64), torch.tensor([size ** 2], dtype=torch.float64),
+                             torch.tensor([4 * size], dtype=torch.float64), {"K_A": 1.0, "K_P": 1.0, "Gamma": 0.0, "Lambda": 0.0})
+        assert abs(float(z[0])) < 1e-12
+
+
+def test_isotropic_stress_reads_junction_myosin_as_the_ruler_does():
+    """With a per-half-edge myosin multiplier on Lambda, the operator still equals the ruler's half trace;
+    all-ones myosin is the no-myosin answer, and a myosin array of the wrong length is ignored."""
+    import numpy as np
+    from plexus.operators.diffusion_reaction import isotropic_stress
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from exp_measures.exp13 import cell_stress
+    pos = torch.tensor([[0, 0, 0], [1, 0, 0], [2, 0, 0], [0, 1, 0], [1, 1, 0], [2, 1.2, 0]], dtype=torch.float64)
+    es = torch.tensor([0, 1, 4, 3, 1, 2, 5, 4]); et = torch.tensor([1, 4, 3, 0, 2, 5, 4, 1]); ef = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1])
+    A = torch.tensor([1.0, 1.1], dtype=torch.float64); A0 = torch.tensor([0.9, 1.3], dtype=torch.float64); P0 = torch.tensor([3.5, 3.9], dtype=torch.float64)
+    mech = {"K_A": 1.0, "K_P": 0.3, "Gamma": 0.4, "Lambda": 0.5}
+    myo = torch.tensor([0.5, 1.7, 1.0, 0.8, 1.2, 0.3, 2.0, 1.7], dtype=torch.float64)   # the shared edge 1-4 / 4-1: 1.7 both sides
+    s = isotropic_stress(pos, es, et, ef, 2, A, A0, P0, mech, myo=myo)
+    cs = cell_stress(pos.numpy(), es.numpy(), et.numpy(), ef.numpy(), 2, A0.numpy(), P0.numpy(), myo=myo.numpy(), **mech)
+    tr = np.trace(cs["sigma"], axis1=1, axis2=2) / 2
+    assert np.allclose(s.numpy(), tr / (2 * mech["K_A"] * A0.numpy()), atol=1e-9)
+    base = isotropic_stress(pos, es, et, ef, 2, A, A0, P0, mech)
+    assert torch.allclose(isotropic_stress(pos, es, et, ef, 2, A, A0, P0, mech, myo=torch.ones(8, dtype=torch.float64)), base)
+    assert torch.allclose(isotropic_stress(pos, es, et, ef, 2, A, A0, P0, mech, myo=torch.ones(5, dtype=torch.float64) * 3), base)
+    assert not torch.allclose(s, base)
+
+def test_and_gate_multiplies_the_hill_term_only():
+    """and_chan: drive = rho + Hill(a) * Hill_k(c_k). Identity: without it the default law; planted: a cell
+    with no second factor keeps only rho."""
+    g = Grow3DStretch(dict(BASE, rho=0.2, gain=0.0, and_chan=1))
+    g._drive, g._gf, g._H = None, None, None
+    g._and = torch.tensor([1.0, 0.0, 0.5], dtype=torch.float64)
+    s = torch.ones(3, dtype=torch.float64)
+    hill = torch.tensor([0.8, 0.8, 0.8], dtype=torch.float64)
+    r = g._rate(s, hill, {}, 1.0)
+    rate = BASE["rate"]
+    assert torch.allclose(r, rate * torch.tensor([0.2 + 0.8, 0.2, 0.2 + 0.4], dtype=torch.float64))
+    g0 = Grow3DStretch(dict(BASE, rho=0.2, gain=0.0))
+    g0._drive, g0._gf, g0._H, g0._and = None, None, None, None
+    assert torch.allclose(g0._rate(s, hill, {}, 1.0), rate * torch.full((3,), 1.0, dtype=torch.float64))

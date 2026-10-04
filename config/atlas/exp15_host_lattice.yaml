@@ -7,8 +7,8 @@ general:
   dim: 2
   boundary: free
   world:
-  - 360.0
-  - 360.0
+  - 400.0
+  - 400.0
 sets:
   cell:
     n: 102400
@@ -54,7 +54,7 @@ seed:
   model: tiled_lattice
   side: 40
   tiles: 64
-  gap: 5
+  gap: 10
 - op: seed_cell_chem
   at: cell
   model: lattice_sites
@@ -65,12 +65,8 @@ seed:
   model: tiled_lattice
   side: 8
   tiles: 64
-  gap: 1
+  gap: 2
   spacing: 5.0
-- op: seed_cell_chem
-  at: host
-  model: uniform
-  values: [1.0]
 operators:
 - op: radius_graph
   at: cell
@@ -102,11 +98,11 @@ operators:
   at: host
   model: clock_turnover
   k_in: 1.0
-  k_out: 0.864
-  g: 2.094
-  K: 0.05
+  k_out: 0.593
+  g: 12.88
+  K: 7.0e-05
   weights: [1.0, 0.0, 0.0]
-  gate: {block: phase, floor: 0.2076, offset: 0.0}
+  gate: {block: phase, floor: 0.0112, offset: 0.0}
 schedule:
 - radius_graph
 - cell_chem_react

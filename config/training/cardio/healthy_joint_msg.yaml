@@ -1,0 +1,62 @@
+name: healthy_joint_msg
+model: config/tissue/cardio_strain_healthy_coupled.yaml
+learnable:
+- block: g
+  of: cell
+  lr: 0.0004
+  bounds: [0.0, null]
+- block: g2
+  of: cell
+  lr: 0.0004
+  bounds: [-0.2, 0.2]
+- {block: phi, of: cell, lr: 0.006}
+- block: logE
+  of: cell
+  lr: 0.012
+  bounds: [2.0794415, 6.6846117]
+  prior: {shrink_to_mean: 0.3}
+- block: delay
+  of: cell
+  lr: 0.02
+  bounds: [-8.0, 8.0]
+- block: logtau
+  of: cell
+  lr: 0.01
+  bounds: [-1.5, 1.5]
+  prior: {shrink: 0.05}
+- block: logtr
+  of: cell
+  lr: 0.01
+  bounds: [-1.5, 1.5]
+  prior: {shrink: 0.05}
+- block: logdur
+  of: cell
+  lr: 0.01
+  bounds: [-1.0, 1.0]
+  prior: {shrink: 0.05}
+- block: amode
+  of: cell
+  lr: 0.004
+  prior: {shrink: 0.001}
+- block: logkappa
+  of: cell
+  lr: 0.01
+  bounds: [-2.0, 2.0]
+  prior: {shrink: 0.1}
+- {param: clock, op: active_strain, lr: 0.01}
+- param: psi
+  op: active_strain
+  lr: 0.002
+  prior: {smooth: 0.01}
+- {param: W1, op: active_strain, lr: 0.01}
+- {param: W2, op: active_strain, lr: 0.003}
+task:
+  reference:
+    recording: healthy
+    beats: [1, 2, 3]
+  drive: {set: mpm_particle, prescribe: edge_band, width: 0.03}
+  observe: {set: mpm_particle, block: pos, measure: cell_affine, of: cell}
+  loss: affine_mse
+  u_weight: 1.0
+  mask: interior
+training: {optimizer: adam, lr: 0.01, schedule: cosine, lr_min_frac: 0.05, iters: 60, seed: 0, save_every: 10}

@@ -75,19 +75,15 @@ def records():
             # folder by name (`experiments/expNN_*`, `builder/exp_*`), or any folder that already holds steps
             # ONLY PICTURES THAT EXIST: a record being rebuilt by another session holds, for a moment, a link whose
             # picture is gone (exp14's png/0013.png, 2026-09-26) -- its mtime raised and took the whole list down
-            steps = ([f for f in os.listdir(png) if len(f) == 8 and f.endswith(".png") and f[:4].isdigit()
-                      and os.path.exists(os.path.join(png, f))] if os.path.isdir(png) else [])
+            # NAMES ONLY: the pictures are links into /groups, and statting each of 600 of them made this list take 30 s
+            # (the drop-down looked empty meanwhile); a dangling link is skipped where a step is read, in `shots`
+            steps = ([f for f in os.listdir(png) if len(f) == 8 and f.endswith(".png") and f[:4].isdigit()]
+                     if os.path.isdir(png) else [])
             is_exp = os.path.isdir(d) and (name[:3] == "exp" and name[3:5].isdigit() if root == "experiments"
                                            else name.startswith("exp_"))
             if not steps and not is_exp:
                 continue
-            def _mt(f):
-                try:
-                    return os.path.getmtime(os.path.join(png, f))
-                except OSError:
-                    return 0.0
-            rows.append({"id": f"{root}/{name}", "root": root, "name": name, "n": len(steps),
-                         "mtime": max((_mt(f) for f in steps), default=0.0)})
+            rows.append({"id": f"{root}/{name}", "root": root, "name": name, "n": len(steps)})
         out += sorted(rows, key=lambda r: r["name"])
     return out
 
@@ -115,6 +111,9 @@ def journal_path(folder: str) -> str:
 JOURNAL = os.path.join(HISTORY, "journal.txt")
 
 
+_SHOTS_CACHE: dict = {}
+
+
 def shots(folder: str | None = None):
     """Every picture taken, oldest first -- the order they were made, which is the order to walk.
 
@@ -122,9 +121,15 @@ def shots(folder: str | None = None):
     order it builds, and that order is the thing to walk. Modification time would reorder the
     history if a file were ever touched or copied.
     """
-    # a link whose picture is gone (a record mid-rebuild) is not a step: every reader of a step stats its picture
-    return sorted(f for f in glob.glob(os.path.join(folder or HISTORY, "png", "[0-9][0-9][0-9][0-9].png"))
-                  if os.path.exists(f))
+    # a link whose picture is gone (a record mid-rebuild) is not a step: every reader of a step stats its picture.
+    # CACHED 10 s per folder: the page polls every 2 s, and statting 150 links into /groups took ~7 s a poll.
+    key = folder or HISTORY
+    hit = _SHOTS_CACHE.get(key)
+    if hit is not None and time.time() - hit[0] < 10.0:
+        return hit[1]
+    out = sorted(f for f in glob.glob(os.path.join(key, "png", "[0-9][0-9][0-9][0-9].png")) if os.path.exists(f))
+    _SHOTS_CACHE[key] = (time.time(), out)
+    return out
 
 
 def sidecar(png: str, kind: str) -> str:
@@ -301,6 +306,7 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8><title>Plexus — watch
   <button class=ic onclick="view3d('bottom')" title="bottom view: looking up the up axis"><svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="3"/><path d="M10 18V9M6.5 12.5 10 9l3.5 3.5"/></svg></button>
   <button class=ic onclick="view3d('nominal')" title="oblique: the movie's own camera"><svg viewBox="0 0 20 20"><path d="M4 14l7-3.5 6 2.5-7 3.5z"/><path d="M2 2l6 6M4.5 8.5H8V5"/></svg></button>
   <button class=ic onclick="view3d('side')" title="side view: level with the membrane"><svg viewBox="0 0 20 20"><rect x="9" y="8.5" width="9" height="3"/><path d="M1 10h6M4.5 6.5 8 10l-3.5 3.5"/></svg></button>
+  <button class=ic id=d3glass onclick="glass3d()" title="glass / solid: translucent skins with the atoms inside, or opaque skins alone"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="11" r="1"/><circle cx="10" cy="13" r="1"/></svg></button>
   <button class=ic id=d3cut onclick="cut3d()" title="slice: cut away the near half, through the centre, facing you"><svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14"/><path d="M10 1v18M11.5 7.5 15 4M11.5 12.5 17 7M11.5 17 17 11.5"/></svg></button>
  </span>
  <span id=pos class=t></span>
@@ -397,8 +403,9 @@ function open3d(){
  const mv = document.getElementById('mov');
  let f = 1.0;
  if(mv && mv.style.display !== 'none' && mv.duration > 0) f = Math.max(0, Math.min(1, mv.currentTime / mv.duration));
- d3 = {i: i, azim: 20, elev: 8, zoom: 1.3, roll: 180, drag: null, name: null, frame: null, nk: 0, tns: null, f: f, cut: false};
+ d3 = {i: i, azim: 20, elev: 8, zoom: 1.3, roll: 180, drag: null, name: null, frame: null, nk: 0, tns: null, f: f, cut: false, glass: false};
  document.getElementById('d3cut').className = 'ic';
+ document.getElementById('d3glass').className = 'ic';
  // A COUNTER WHILE VTK BUILDS, because a button that does nothing visible for six seconds is
  // indistinguishable from a broken one. The server prints the same thing to the journal panel.
  const t0 = Date.now();
@@ -441,6 +448,8 @@ function open3d(){
   // returns there. The fixed default above (roll 180) was chosen for the Platynereis larva and drew exp04 upside down.
   if(j.camera){ d3.cam = j.camera; d3.azim = j.camera.azim; d3.elev = j.camera.elev; d3.zoom = j.camera.zoom; d3.roll = j.camera.roll; }
   document.getElementById('d3cams').style.display = '';
+  d3.glass = !!j.glass;                       // the look the step's own spec draws; the button flips it
+  document.getElementById('d3glass').className = 'ic' + (d3.glass ? ' on' : '');
   if(d3.nk > 1){
    d3.frame = Math.round(d3.f * (d3.nk - 1));
    const sl = document.getElementById('d3frame');
@@ -498,6 +507,13 @@ function view3d(k){
  render3d();
 }
 // THE SLICE: a toggle, kept while the view turns and the frames change; the server cuts along the view each render
+// THE GLASS: a toggle like the slice, carried on every render
+function glass3d(){
+ if(!d3) return;
+ d3.glass = !d3.glass;
+ document.getElementById('d3glass').className = 'ic' + (d3.glass ? ' on' : '');
+ render3d();
+}
 function cut3d(){
  if(!d3) return;
  d3.cut = !d3.cut;
@@ -531,7 +547,7 @@ function render3d(){
  const url = '/api/watch/render?name=' + encodeURIComponent(d3.name || '')
    + '&azim=' + d3.azim.toFixed(1) + '&elev=' + d3.elev.toFixed(1)
    + '&zoom=' + d3.zoom.toFixed(3) + '&roll=' + d3.roll
-   + (d3.frame !== null ? '&frame=' + d3.frame : '') + '&cut=' + (d3.cut ? 1 : 0) + '&t=' + Date.now();
+   + (d3.frame !== null ? '&frame=' + d3.frame : '') + '&cut=' + (d3.cut ? 1 : 0) + '&glass=' + (d3.glass ? 1 : 0) + '&t=' + Date.now();
  const pre = new Image();
  pre.onload = () => {
   if(d3) document.getElementById('live3d').src = pre.src;
@@ -660,7 +676,11 @@ async function tick(){
                              : `${movies.length} movies`) : 'no movies yet';
  document.getElementById('livebtn').className = (idx < 0) ? 'on' : '';
  document.getElementById('pos').textContent =
-   total ? (idx < 0 ? `live — ${total} of ${total}` : `${j.index + 1} of ${total}`) : '';
+   (total ? (idx < 0 ? `live — ${total} of ${total}` : `${j.index + 1} of ${total}`) : '')
+   // the why's first line after "step NNNN =": which run this is (for exp17, "batch 3 · arm 4 · <run>"), so a step
+   // can be matched to the deck without opening the why pane
+   + ((j.why || '').split(String.fromCharCode(10))[0].replace(/^step\\s+\\d+\\s+=\\s+/, '').trim()
+      ? '   ' + (j.why || '').split(String.fromCharCode(10))[0].replace(/^step\\s+\\d+\\s+=\\s+/, '').trim() : '');
  document.getElementById('meta').innerHTML =
    j.shot ? `${j.shot_name} &nbsp;&middot;&nbsp; ${j.shot_age}s ago`
           + (j.mp4 ? ' &nbsp;&middot;&nbsp; showing the movie' : '') : 'no picture yet';

@@ -17,6 +17,7 @@ In the order they appear below:
 then the second model of `junction_myosin`, a different hypothesis in the same slot:
 
     junction_myosin[two_pool]  the belt fed by the medioapical pool, as a conserved amount
+    junction_myosin[rest_length]  each junction an elastic element whose rest length remodels (exp 13)
 
 The medioapical operators live in this file because the two-pool model is not a separate
 mechanism: it is the same junction bookkeeping with a second reservoir on the face, and it calls
@@ -24,6 +25,10 @@ the same helpers -- `_live_edges`, `_lookup`, `_scatter_full`, `edge_tension`. S
 files, the shared half of one model would be private to the other.
 """
 from __future__ import annotations
+
+import math
+
+import numpy as np
 import torch
 from plexus.models.base import Rewire, Structural
 from plexus.models.registry import register_operator
@@ -1147,7 +1152,10 @@ class JunctionMyosinTypePair(Structural):
     MAY_MUTATE_INTEGRATED_STATE = False             # writes m["myo"], not positions
     REQUIRES_PARAMS = ["tensions"]
     MECHANISM_TAGS = ["differential_adhesion", "cell_sorting", "type_pair_tension"]
-    PARAM_ROLES = {"tensions": "line_tension_multiplier_per_pair_of_types_and_medium"}
+    PARAM_ROLES = {"tensions": "line_tension_multiplier_per_pair_of_types_and_medium",
+                   "noise": "active_cortical_fluctuation_amplitude_in_W", "tau": "fluctuation_correlation_frames",
+                   "noise_end": "amplitude_at_the_end_of_the_ramp", "frames": "ramp_length_calls",
+                   "seed": "rng_seed"}
     PARAM_UNITS = {"tensions": "fraction"}
     REFERENCE = ("Graner, F. & Glazier, J.A. (1992). Phys. Rev. Lett. 69:2013-2016; Steinberg, M.S. "
                  "(1963). Science 141:401-408.")
@@ -1159,6 +1167,23 @@ class JunctionMyosinTypePair(Structural):
         self.spec = params["tensions"]
         self._tab = None
         self._medium = None
+        # ACTIVE CORTICAL FLUCTUATIONS (experiment 9, Phase 2, Finding 20). A deterministic vertex
+        # aggregate only descends to the nearest local minimum: two halves never engulf and a labyrinth
+        # never rounds. Cells in an aggregate fluctuate their cortex; here each CELL f carries an
+        # Ornstein-Uhlenbeck variable eta_f (unit variance, correlation time `tau` frames) and a junction
+        # between f and g adds `noise` x (eta_f + eta_g) / sqrt(2) to its multiplier (a rim junction,
+        # `noise` x eta_f). `noise` is in the table's own units (a W); 0, the default, is the table alone.
+        self.noise = float(params.get("noise", 0.0))
+        # `noise_end` and `frames`: the amplitude cooled linearly from `noise` to `noise_end` over
+        # `frames` calls, then held (an annealing schedule, Finding 23); absent, the amplitude is constant.
+        self.noise0 = self.noise
+        self.noise_end = float(params.get("noise_end", self.noise))
+        self.frames = max(1, int(params.get("frames", 1)))
+        self._calls = 0
+        self.tau = float(params.get("tau", 10.0))
+        self.seed = int(params.get("seed", 0))
+        self._eta = None
+        self._gen = None
 
     def _table(self, clvl, device, dtype):
         names = list(getattr(clvl, "type_names", None) or [])
@@ -1191,7 +1216,176 @@ class JunctionMyosinTypePair(Structural):
             self._tab, self._medium = self._table(clvl, pos.device, pos.dtype)
         nF = int(m["nF"])
         ft = clvl.node_type[:nF].to(pos.device).long()
-        m["myo"] = type_pair_multiplier(es, et, ef, ft, self._tab, self._medium)
+        myo = type_pair_multiplier(es, et, ef, ft, self._tab, self._medium)
+        self.noise = self.noise0 + (self.noise_end - self.noise0) * min(1.0, self._calls / self.frames)
+        self._calls += 1
+        if self.noise0 > 0.0 or self.noise_end > 0.0:
+            from plexus.operators.junction_ops import pcp_twins
+            n_buf = clvl.node_type.shape[0]
+            if self._eta is None:
+                self._gen = torch.Generator(device="cpu").manual_seed(self.seed)
+                self._eta = torch.randn(n_buf, generator=self._gen, dtype=torch.float64)
+            h = float(getattr(H, "dt", 1.0))
+            a = float(np.exp(-h / max(self.tau, 1e-9)))
+            self._eta = a * self._eta + float(np.sqrt(1.0 - a * a)) * torch.randn(n_buf, generator=self._gen, dtype=torch.float64)
+            eta = self._eta.to(device=pos.device, dtype=myo.dtype)
+            stride = int(max(int(es.max()), int(et.max()))) + 1 if es.numel() else 1
+            tw = pcp_twins(es, et, stride)
+            has = tw >= 0
+            other = torch.where(has, eta[ef[tw.clamp(min=0)]], torch.zeros_like(eta[ef]))
+            myo = myo + self.noise * torch.where(has, (eta[ef] + other) / float(np.sqrt(2.0)), eta[ef])
+        m["myo"] = myo
+        return {}
+
+
+def rest_length_step(L, L0, dt, tau, kappa, m_max):
+    """One step of a junction's viscoelastic rest length, and the line-tension multiplier it gives.
+
+        L0'  = L0 + (L - L0) dt / tau               the rest length remodels toward the length
+        m    = clip(1 + kappa (L - L0') / L0', 0, m_max)
+
+    A module function so the model and its test share one expression."""
+    L0n = L0 + (L - L0) * (dt / max(tau, 1e-9))
+    m = (1.0 + kappa * (L - L0n) / L0n.clamp_min(1e-12)).clamp(0.0, m_max)
+    return L0n, m
+
+
+@register_operator("junction_myosin", model="rest_length", family="mechanics", set="vertex", kind="structural",
+                   title="Junction tension from a slowly remodelling rest length",
+                   equation=r"""$$T_e=\Lambda\Big(1+\kappa\,\frac{\ell_e-\ell^0_e}{\ell^0_e}\Big),\qquad \frac{d\ell^0_e}{dt}=\frac{\ell_e-\ell^0_e}{\tau}$$""")
+class JunctionRestLength(Structural):
+    """Each junction an elastic element with a REST LENGTH that remodels toward its length over tau: a
+    junction stretched faster than it remodels pulls harder, one compressed faster pulls less.
+
+    vertex -> vertex: reads pos, keeps each junction's rest length in its own keyed store on the mesh
+    (`rl_keys` / `rl_vals`, keyed by vertex pair as the myosin store is), writes m["myo"], the multiplier
+    `cell_mechanics` puts on Lambda:
+
+        m_e   = clip(1 + kappa (l_e - l0_e) / l0_e, 0, m_max)       so  T_e = Lambda m_e + perimeter terms
+        dl0_e = (l_e - l0_e) dt / tau
+
+    l_e is the junction's length and l0_e its rest length, world units; kappa is the junction's
+    stiffness over Lambda (dimensionless); tau the remodelling time, frames. A junction with no history
+    (a new interface, a split half) starts at rest, l0 = l. Under steady stretching at strain rate r
+    the strain settles at r tau, so the tension records the RECENT DEFORMATION of each junction --
+    orientation-dependent wherever the tissue deforms anisotropically.
+
+    WHY, for exp 13 Phase 2 (P9): in the default energy a junction's tension is the sum of its two
+    cells' (Lambda + 2 K_P (P - P0) + Gamma P), so a cut junction's recoil cannot depend on its
+    orientation, and LeGoff et al. 2013's rim (tangential junctions recoil ~2.6x the radial ones)
+    cannot be expressed at all. Length-keyed myosin (the default model) is a zero-rest-length spring
+    that collapsed the pouch's junctions (P26, P30); this is a spring with a rest length that tracks
+    the junction, which is gentle at the start (every m = 1) and stiff only to recent strain.
+
+    `start` (frames, default 0): before it the rest length IS the length (every m = 1), so a seeded mesh
+    settling to its own equilibrium -- exp 13's disc halves its junction lengths in its first 60 frames --
+    is not read as compression (a first smoke without it: median m 0.16 at frame 60, cells ballooned,
+    wrecked). Set it to the spec's settle frame.
+
+    `tau_m` (frames, default 0 = off): the multiplier itself relaxes toward 1 + kappa (l - l0) / l0 over
+    tau_m instead of jumping to it. `cell_mechanics` holds m fixed through a frame's relaxation, so an
+    undamped m is a bang-bang loop -- a stretched junction pulls with its whole m, overshoots into
+    compression, reads m = 0 the next frame, springs back -- which wrecked every batch-14 run 20 frames
+    after `start`, gain 0 and kappa 1 included (a vertex jumping 4.5 edge lengths). The damped m is kept
+    in the same keyed store as l0 (`rl_mvals`).
+
+    WITH `cell_mechanics[model: junction_spring]` the law is a spring in the mechanics' ENERGY: that model
+    reads the store (`rl_keys`, `rl_vals`, `rl_kappa`, `rl_stride`) and adds (kappa Lambda / 2) (l - l0)^2 /
+    l0 per junction, evaluated at every relaxation iteration, and ignores m["myo"], which is then only a
+    readout of the junction's total tension (for the rulers and the growth law's stress). Use tau_m 0 there.
+    Without it, m multiplies Lambda and is held fixed through the relaxation -- which cascades into T1s
+    (exp 13 P45).
+
+    SCHEDULE IT BEFORE `cell_mechanics`, as the other junction_myosin models are, and -- for the record --
+    a second instance with `advance: false` after the topology operators. The advancing instance
+    relaxes l0 and writes m for the half-edges the mechanics is about to use. The read-only one
+    recomputes m from the stored l0 for the half-edges as they are after divisions and flips, so what
+    `topo_record` writes is aligned with the recorded mesh. It never moves l0 or the damped m. A single
+    instance after the topology operators (the first version) handed the next frame's mechanics a
+    multiplier indexed by the previous layout. At multipliers within 1 % of 1, vertices then jumped
+    0.2 -> 1.8 edge lengths over frames 65-80 (batch 15, `p2_rl_k1_tm20`).
+
+    Reference: Staddon, M.F. et al. (2019). Mechanosensitive junction remodeling promotes robust
+    epithelial morphogenesis. Biophys. J. 117:1739-1750 (junction rest-length remodelling);
+    Noll, N. et al. (2017). Active tension network model suggests an exotic mechanical state
+    realized in epithelial tissues. Nat. Phys. 13:1221-1226.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["junction_state", "viscoelastic", "rest_length_remodeling", "topology_persistent"]
+    PARAM_ROLES = {"kappa": "junction_stiffness_over_line_tension", "tau": "rest_length_remodeling_time",
+                   "m_max": "multiplier_ceiling", "start": "first_frame_of_remodelling",
+                   "tau_m": "multiplier_relaxation_time", "advance": "false = recompute m only, for the record"}
+    REFERENCE = ("Staddon, M.F. et al. (2019). Biophys. J. 117:1739-1750; Noll, N. et al. (2017). "
+                 "Nat. Phys. 13:1221-1226.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.kappa = float(params.get("kappa", 4.0))
+        self.tau = float(params.get("tau", 150.0))
+        self.m_max = float(params.get("m_max", 5.0))
+        self.dt = float(params.get("dt", 1.0))
+        self.start = int(params.get("start", 0))
+        self.tau_m = float(params.get("tau_m", 0.0))
+        self.advance = bool(params.get("advance", True))
+        self._k = 0
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, key, length = _live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        keys, vals = m.get("rl_keys"), m.get("rl_vals")
+        if not self.advance:
+            # READ-ONLY: m from the stored l0 (and the stored damped m) on the half-edges as they are now
+            mult = torch.ones_like(length)
+            if keys is not None and keys.numel():
+                order = torch.argsort(keys)
+                ks = keys[order]
+                idx = torch.searchsorted(ks, key).clamp(max=ks.numel() - 1)
+                hit = ks[idx] == key
+                mv = m.get("rl_mvals")
+                if mv is not None and mv.numel() == keys.numel():
+                    mult = torch.where(hit, mv[order].to(dt_)[idx], mult)
+            m["myo"] = _scatter_full(es, live, mult, dev, dt_)
+            return {}
+        self._k += 1
+        L0 = length.clone()
+        m_prev = torch.ones_like(length)
+        if keys is not None and keys.numel() and self._k > self.start:
+            order = torch.argsort(keys)
+            ks, vs = keys[order], vals[order].to(dt_)
+            idx = torch.searchsorted(ks, key).clamp(max=ks.numel() - 1)
+            hit = ks[idx] == key
+            L0 = torch.where(hit, vs[idx], length)
+            mv = m.get("rl_mvals")
+            if mv is not None and mv.numel() == keys.numel():
+                m_prev = torch.where(hit, mv[order].to(dt_)[idx], m_prev)
+        L0n, mult = rest_length_step(length, L0, self.dt, self.tau, self.kappa, self.m_max)
+        if self.tau_m > 0:
+            mult = m_prev + (mult - m_prev) * min(self.dt / self.tau_m, 1.0)
+        m["rl_keys"], m["rl_vals"], m["rl_mvals"] = key.detach().clone(), L0n.detach().clone(), mult.detach().clone()
+        # for cell_mechanics[junction_spring]: NO spring before `start`. The store is written from the first
+        # frame (l0 = l), and a spring at a rest length reset every frame to the current length is a drag on
+        # every junction's change within the relaxation; batch 18 ran with it (all four arms wrecked).
+        m["rl_kappa"], m["rl_stride"] = (self.kappa if self._k > self.start else 0.0), int(stride)
+        m["myo"] = _scatter_full(es, live, mult, dev, dt_)
+        MYOSIN_TRACE.append((int(live.sum()), float(mult.mean()), float(mult.min()), float(mult.max()), 0))
+        if not self._said:
+            print(f"[junction_myosin/rest_length] {int(live.sum())} live half-edges, kappa={self.kappa}, "
+                  f"tau={self.tau}, m_max={self.m_max}; rest lengths keyed by vertex pair", flush=True)
+            self._said = True
         return {}
 
 
@@ -1251,7 +1445,8 @@ def pcp_rates(F, V, twin, ef, L, nF, Ftot, Vtot, A, k_on, k_off, g, beta, Kb, Kp
     kern: (a, b, w) from `pcp_side_pairs`, or None for the side-local inhibition; AV: [E] a factor on
     V's unbinding (the elongation coupling), None for 1; hill: (n, K) makes the recruitment by the
     partner across the junction cooperative, x -> (1 + K^n) x^n / (K^n + x^n) (equal to x at x = 1),
-    None for linear (`junction_pcp[cooperative]`).
+    None for linear (`junction_pcp[cooperative]`); (n, K, p) with p [E] in [0, 1] blends the two per
+    side, (1 - p) x + p T(x) (`junction_pcp[primed]`).
     A module function so the two-cell test calls exactly what the operator integrates.
     """
     perim = torch.zeros(nF, dtype=F.dtype, device=F.device).index_add(0, ef, L).clamp_min(1e-12)
@@ -1272,12 +1467,34 @@ def pcp_rates(F, V, twin, ef, L, nF, Ftot, Vtot, A, k_on, k_off, g, beta, Kb, Kp
         Vs = num / den
     B = 1.0 + Kb * Vs.clamp_min(0.0) ** Kp                      # Vang on and near this side blocks Fz binding
     if hill is not None:                                        # cooperative recruitment across the junction
-        n_, K_ = hill
-        Vn = (1 + K_ ** n_) * Vn.clamp_min(0.0) ** n_ / (K_ ** n_ + Vn.clamp_min(0.0) ** n_)
-        Fn = (1 + K_ ** n_) * Fn.clamp_min(0.0) ** n_ / (K_ ** n_ + Fn.clamp_min(0.0) ** n_)
+        n_, K_ = hill[0], hill[1]
+        Tv = (1 + K_ ** n_) * Vn.clamp_min(0.0) ** n_ / (K_ ** n_ + Vn.clamp_min(0.0) ** n_)
+        Tf = (1 + K_ ** n_) * Fn.clamp_min(0.0) ** n_ / (K_ ** n_ + Fn.clamp_min(0.0) ** n_)
+        if len(hill) > 2:                                       # a per-side weight p: (1 - p) x + p T(x)
+            p_ = hill[2]
+            Tv, Tf = (1 - p_) * Vn + p_ * Tv, (1 - p_) * Fn + p_ * Tf
+        Vn, Fn = Tv, Tf
     dF = k_on * cF[ef] * (beta + g * Vn) - k_off * A * B * F
     dV = k_on * cV[ef] * (beta + g * Fn) - k_off * (V if AV is None else AV * V)
     return dF, dV
+
+
+def pcp_celsr_q(P, vi, vj, ef, cen, I, nF):
+    """Each cell's Celsr1-like nematic q_i (complex), Aigouy et al. 2010's angular integral of the border
+    intensity I round the cell: q_i = sum_h I_h int_{phi_a}^{phi_b} exp(2 i phi) dphi / sum_h I_h (phi_b - phi_a),
+    phi_a, phi_b the angles of side h's ends about the centroid -- the same readout as the exp08.celsr
+    ruler (a uniform I reads 0 on any cell shape). Returns (Re q, Im q), each [nF]; the axis of the
+    enriched borders' POSITIONS is half the angle of q.
+    """
+    ra, rb = P[vi] - cen[ef], P[vj] - cen[ef]
+    pa, pb = torch.atan2(ra[:, 1], ra[:, 0]), torch.atan2(rb[:, 1], rb[:, 0])
+    dphi = torch.remainder(pb - pa + math.pi, 2 * math.pi) - math.pi
+    pb = pa + dphi
+    re = torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(0, ef, I * (torch.sin(2 * pb) - torch.sin(2 * pa)) / 2)
+    im = torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(0, ef, I * (torch.cos(2 * pa) - torch.cos(2 * pb)) / 2)
+    den = torch.zeros(nF, dtype=P.dtype, device=P.device).index_add(0, ef, I * dphi)
+    den = torch.where(den.abs() > 1e-30, den, torch.full_like(den, 1e-30))
+    return re / den, im / den
 
 
 def pcp_elongation(P, vi, vj, ef, nF):
@@ -1306,7 +1523,13 @@ class JunctionPCP(Lateral):
     with `color_block: chem`, three colour channels for the movie: the arrow's share along +cue,
     along -cue and across it, each times min(1, 2 * asymmetry) -- the renderers colour a face from
     `chem` only, so a spec drawing them red / blue / green (`plotting.species`, additive) shows an
-    aligned sheet as one red field, a reversed row as blue, a swirl as green.
+    aligned sheet as one red field, a reversed row as blue, a swirl as green. `color_mode: celsr`
+    colours the AXIS instead of the arrow, as Aw et al. 2016 image Celsr1 (on both sides of a junction,
+    so it has no direction): each cell's nematic q_i of F + V round the cell (`pcp_celsr_q`, the
+    exp08.celsr ruler's angular integral) as a colour wheel of its axis theta_i, measured from the
+    cue axis: channel k = max(0, cos(2 theta_i - 2 pi k / 3)) times min(1, 2 |q_i|) -- enrichment on
+    the borders lying along the cue axis lights channel 0 alone, across it channels 1 and 2 equally,
+    the obliques mixtures; an A-P ordered sheet reads one colour whichever way its arrows point.
 
     THE MODEL is Amonlirdviman et al. 2005's feedback loop (SOM, reactions S1-S10 and PDEs S21-S30)
     reduced to the two complexes the minimal model keeps: F, the Fz(-Dsh) complex, and V, the
@@ -1449,6 +1672,9 @@ class JunctionPCP(Lateral):
         self._e0 = None
         self.clone = params.get("clone") or None
         self.color_block = params.get("color_block") or None
+        self.color_mode = str(params.get("color_mode", "arrow"))
+        if self.color_mode not in ("arrow", "celsr"):
+            raise ValueError(f"junction_pcp: color_mode must be 'arrow' or 'celsr', not {self.color_mode!r}")
         self._tot = None
         self._gen = None
         self._said = False
@@ -1544,6 +1770,7 @@ class JunctionPCP(Lateral):
                 if self._e0[0].shape[0] != nF:
                     raise RuntimeError("junction_pcp: elong_ref seed needs a fixed set of cells")
                 e1, e2 = e1 - self._e0[0], e2 - self._e0[1]
+            self._eps = (e1, e2, ef)                                         # read by `junction_pcp[primed]`
             phi = torch.atan2(n[:, 1], n[:, 0])
             AV = torch.exp(-self.elong * (e1[ef] * torch.cos(2 * phi) + e2[ef] * torch.sin(2 * phi)))
             A = A * AV
@@ -1572,7 +1799,13 @@ class JunctionPCP(Lateral):
                 vec[..., :nF, 0:2] = p.to(vec.dtype)
                 if vec.shape[-1] > 2:
                     vec[..., :nF, 2] = asym.to(vec.dtype)
-            if col is not None and col.shape[-1] >= 3:
+            if col is not None and col.shape[-1] >= 3 and self.color_mode == "celsr":
+                qr, qi = pcp_celsr_q(P, vi, vj, ef, cen, F + V, nF)
+                two = torch.atan2(qi, qr) - 2.0 * math.atan2(float(cue[1]), float(cue[0]))   # 2 x the axis, from the cue's
+                w = (2.0 * torch.sqrt(qr * qr + qi * qi)).clamp(max=1.0)
+                for k in range(3):                                     # a colour wheel of the axis
+                    col[..., :nF, k] = (torch.cos(two - 2.0 * math.pi * k / 3).clamp_min(0.0) * w).to(col.dtype)
+            elif col is not None and col.shape[-1] >= 3:
                 u = p / p.norm(dim=1, keepdim=True).clamp_min(1e-12)
                 along = u @ cue
                 w = (2.0 * asym).clamp(max=1.0)
@@ -1631,3 +1864,48 @@ class JunctionPCPCooperative(JunctionPCP):
 
     def _hill(self):
         return (self.hill_n, self.hill_k)
+
+
+@register_operator("junction_pcp", model="primed", family="polarity", set="vertex", kind="lateral",
+                   equation=r"""$$\frac{dF_h}{dt}=k_{\mathrm{on}}c^F_i\big(\beta+g\,[(1-p_i)V_{\bar h}+p_i T(V_{\bar h})]\big)-k_{\mathrm{off}}A_hB_hF_h,\quad p_i=\min\big(1,\max_{t'\le t}|\epsilon_i(t')-\epsilon_i(0)|/\epsilon_*\big)$$""")
+class JunctionPCPPrimed(JunctionPCPCooperative):
+    """`junction_pcp[cooperative]` whose cooperativity a cell ACQUIRES by being stretched: its exchange
+    is the default (linear) model's until its shape has changed, and the cooperative model's once it
+    has changed by `prime_strain`, for good.
+
+        recruitment by the partner x:  (1 - p_i) x + p_i T(x)       T the cooperative model's Hill function
+        p_i = min(1, s_i / prime_strain),   s_i = max over past frames of |eps_i(t) - eps_i(0)|
+
+    eps_i = (e1, e2) is cell i's elongation tensor (`pcp_elongation`, Aigouy et al. 2010), measured from
+    its seeded shape (so `elong_ref: seed` and a non-zero `elong` are required, the coupling that
+    computes it); |.| its magnitude, dimensionless (0 for a cell with its seed shape; ~0.35 for the
+    rig's 20 % stretch). p_i is a memory: it never decreases, so the relaxed tissue keeps the lock.
+
+    WHY (exp08 Phase 2 Findings P8-P13): the linear exchange makes domains on the undeformed sheet
+    (r_c 3-4 cell spacings) but forgets the stretch's axis once the cells relax; the cooperative
+    exchange keeps the axis but freezes an undeformed sheet in its first rows (r_c 0.28) -- the same
+    bistability doing both. Softening it everywhere (Hill n 1.5) lost the memory without making
+    domains. Priming by strain keeps the linear model where nothing has been stretched and the
+    cooperative one where the stretch has set an axis. It stands for a mechanically induced
+    stabilisation of the junctional complexes (Aw et al. 2016 propose the deformation reorganises the
+    junctions); the per-cell max-strain memory is this model's assumption, not a measured law.
+    """
+
+    PARAM_ROLES = dict(JunctionPCPCooperative.PARAM_ROLES,
+                       prime_strain="cell_shape_change_at_which_the_exchange_is_fully_cooperative")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.prime_strain = float(params.get("prime_strain", 0.1))
+        if self.elong == 0.0 or self.elong_ref != "seed":
+            raise ValueError("junction_pcp[primed] reads each cell's strain from the elongation "
+                             "coupling: set elong != 0 and elong_ref: seed")
+        self._eps = None
+        self._smax = None
+
+    def _hill(self):
+        e1, e2, ef = self._eps
+        s = torch.sqrt(e1 * e1 + e2 * e2)
+        self._smax = s if self._smax is None or self._smax.shape != s.shape else torch.maximum(self._smax, s)
+        p = (self._smax / self.prime_strain).clamp(max=1.0)
+        return (self.hill_n, self.hill_k, p[ef])

@@ -384,7 +384,8 @@ def _lattice_spec(T):
     (eps = d chi / 2); a run without the exchange has eps = 0."""
     L, K, eps = None, 1, 0.0
     for o in (T.spec.get("seed") or []):
-        if isinstance(o, dict) and o.get("op") == "seed_positions" and o.get("model") == "tiled_lattice":
+        if isinstance(o, dict) and o.get("op") == "seed_positions" and o.get("model") == "tiled_lattice" \
+                and o.get("at", "cell") == "cell":                     # rig 4 tiles its host set too
             L, K = int(o["side"]), int(o.get("tiles", 1))
         if isinstance(o, dict) and o.get("op") == "seed_colony" and o.get("lattice"):   # planted test runs
             L, K = int(o["lattice"]["side"]), int(o["lattice"].get("replicas", 1))
@@ -606,3 +607,223 @@ def lattice(T, strains=("A", "B", "C"), late=0.2, cg=3, n_wave_rows=6, min_turns
 
 register_run("exp15.lattice", lattice, None,
              "the papers' lattice quantities: validity, P_ext at t = N, extinction times, late abundances, wavelength, M")
+
+
+# ============================================================================ rig 4: the host
+def _host_spec(T, host="host"):
+    """(side q, tiles K) of the host tiling, the day length 2 pi / omega (`phase_clock`), the
+    `clock_turnover` entry (or {}), from the run's own spec."""
+    q, K, day, ct = None, 1, None, {}
+    for o in (T.spec.get("seed") or []):
+        if isinstance(o, dict) and o.get("op") == "seed_positions" and o.get("at") == host \
+                and o.get("model") == "tiled_lattice":
+            q, K = int(o["side"]), int(o.get("tiles", 1))
+    for o in (T.spec.get("operators") or []):
+        if isinstance(o, dict) and o.get("at") == host and o.get("op") == "phase_clock":
+            day = 2.0 * np.pi / float(o["omega"])
+        if isinstance(o, dict) and o.get("at") == host and o.get("model") == "clock_turnover":
+            ct = o
+    return q, K, day, ct
+
+
+def germ_free_level(ct, day, n_days=40, n=400):
+    """The mean and relative daily amplitude of A for a host cell that sees no signal (s = 0),
+    integrated from `clock_turnover`'s own equation at the spec's parameters -- the germ-free
+    reference a tile is compared with. Returns (mean, amplitude)."""
+    k_in, k_out = float(ct.get("k_in", 1.0)), float(ct.get("k_out", 1.0))
+    r = float(ct.get("rate", 1.0))
+    gate = ct.get("gate") or {"floor": 1.0}
+    f, off = float(gate.get("floor", 0.0)), float(gate.get("offset", 0.0))
+    dt = day / n
+    A, tr = k_in / k_out, []
+    for k in range(n_days * n):
+        gam = f + (1 - f) * 0.5 * (1 + np.cos(2 * np.pi * k / n + off))
+        A += dt * r * (k_in - k_out * gam * A)
+        if k >= (n_days - 1) * n:
+            tr.append(A)
+    tr = np.asarray(tr)
+    return float(tr.mean()), float((tr.max() - tr.min()) / (2 * tr.mean()))
+
+
+def _folded(a, t, day, n_bins):
+    """The mean daily profile of `a` [rows, ...] over times t, folded on the day in n_bins bins
+    (bin b covers ZT 24 b / n_bins to 24 (b + 1) / n_bins; phi = 0 is ZT 0)."""
+    b = np.floor((np.mod(t, day) / day) * n_bins).astype(int).clip(0, n_bins - 1)
+    prof = np.stack([a[b == k].mean(0) if np.any(b == k) else np.full(a.shape[1:], np.nan)
+                     for k in range(n_bins)])
+    return prof
+
+
+def host(T, host="host", days=10.0, n_bins=12, gf_frac=0.8, **_):
+    """What the host epithelium's clock-read acetylation does under a community (rig 4; Kuang 2019
+    Fig. 1C-D). The host set's `chem` column 0 is the acetylation A of `cell_chem_react[clock_turnover]`;
+    host cell (I, J) of tile r is slot r q^2 + I q + J (`seed_positions[tiled_lattice]` at the host).
+
+    A TISSUE READ-OUT, AS ChIP-seq IS: Kuang's reads pool the epithelium, so each tile's profile is the
+    MEAN of A over its q^2 host cells, a_r(t), folded on the day over the last `days` days into
+    `n_bins` bins (ZT 0 = clock phase 0).
+
+        host_valid     1 if A is finite and > 0 in every row
+        level          median over tiles of the tile's mean a_r (Kuang Fig. 1C's "average reads")
+        amp            median over tiles of (max - min) / (2 mean) of the folded a_r (Fig. 1D's
+                       "circadian amplitude", as a fraction of the mean)
+        amp_cell       the same per host cell, median over cells (no pooling)
+        zt_peak        ZT (hours) of the pooled profile's maximum, all tiles together (Fig. 1A-B: ZT8-16)
+        level_gf, amp_gf   the germ-free reference: `clock_turnover`'s equation at s = 0, integrated here
+        frac_gf_like   fraction of tiles whose mean a_r is at least `gf_frac` x level_gf -- tiles whose
+                       host has lost the microbial signal
+        frac_signal_lost   fraction of tiles whose signal-making strains (weights > 0) are all gone
+                       from the community lattice at the last row
+        gf_like_agree  fraction of tiles where the two above agree (host read-out vs community)"""
+    q, K, day, ct = _host_spec(T, host)
+    key = f"{host}__chem"
+    if not q or day is None or key not in getattr(T.z, "files", T.z):
+        return {"available": False, "why": "no host tiling / phase_clock / host chem in this run"}
+    A = np.asarray(T.z[key], float)[..., 0]                      # [rows, K q^2]
+    t = _ticks(T) * float((T.spec.get("general") or {}).get("dt", 1.0))
+    out = {"host_valid": float(np.all(np.isfinite(A)) and np.all(A > 0))}
+    sel = t >= t[-1] - days * day
+    if sel.sum() < 2 * n_bins:
+        return {**out, "available": False, "why": f"{int(sel.sum())} rows in the last {days} days"}
+    a_cell = A[sel]
+    a_tile = a_cell.reshape(a_cell.shape[0], K, q * q).mean(2)   # [rows, K]
+    pt = _folded(a_tile, t[sel], day, n_bins)                     # [bins, K]
+    pc = _folded(a_cell, t[sel], day, n_bins)
+    lev = np.nanmean(pt, 0)
+    amp_t = (np.nanmax(pt, 0) - np.nanmin(pt, 0)) / (2 * lev)
+    amp_c = (np.nanmax(pc, 0) - np.nanmin(pc, 0)) / (2 * np.nanmean(pc, 0))
+    pooled = np.nanmean(pt, 1)
+    out.update(level=finite(np.median(lev)), amp=finite(np.median(amp_t)), amp_cell=finite(np.median(amp_c)),
+               zt_peak=finite(24.0 * (np.nanargmax(pooled) + 0.5) / n_bins),
+               level_sd=finite(np.std(lev)), amp_sd=finite(np.std(amp_t)))
+    if ct:
+        lg, ag = germ_free_level(ct, day)
+        gf = lev >= gf_frac * lg
+        out.update(level_gf=finite(lg), amp_gf=finite(ag), frac_gf_like=finite(gf.mean()))
+        w = ct.get("weights")
+        ck = "cell__chem"
+        if w is not None and ck in getattr(T.z, "files", T.z):
+            c = np.asarray(T.z[ck][-1], float)
+            L, Kc = int(np.sqrt(c.shape[0] // K)), K
+            have = c[:, np.asarray(w, float) > 0].sum(1).reshape(Kc, L * L).sum(1) > 0.5
+            out["frac_signal_lost"] = finite((~have).mean())
+            out["gf_like_agree"] = finite((gf == ~have).mean())
+    return out
+
+
+register_run("exp15.host", host, None,
+             "rig 4: the host's pooled acetylation per tile -- level, relative daily amplitude, peak ZT, germ-free-like tiles")
+
+
+# ============================================================================ direction 4: the arms race
+def traits(T, block="trait", strains=("A", "B", "C"), late=0.2, **_):
+    """The heritable attack trait of `cell_chem_react[rps_lattice]` `trait:` (exp 15, direction 4), read
+    per strain from the community set's `trait` block (one value per site; 0 on empty sites).
+
+        trait0_<s>, trait_<s>   the mean trait of strain s's individuals over every lattice, at the first
+                                row and over the last `late` of the run
+        trait_gain              the mean over strains of trait_<s> / trait0_<s> (1 = no change; > 1 =
+                                attack escalated)
+        trait_sd_late           the spread of individual traits over the last `late`, all strains pooled
+        (keys are named after `block`: `block: defence` gives defence0_<s>, defence_<s>, defence_gain, ...)
+        n_late_<s>              the mean count of strain s over the last `late` (to read a trait gain
+                                against who is left)"""
+    key, ck = f"cell__{block}", "cell__chem"
+    files = getattr(T.z, "files", T.z)
+    if key not in files or ck not in files:
+        return {"available": False, "why": f"no cell {block!r} block in this run"}
+    tr = T.z[key]
+    ch = T.z[ck]
+    n = tr.shape[0]
+    rows = range(max(0, int(n * (1 - late))), n)
+    out, gains, pool = {}, [], []
+    for k, s in enumerate(strains):
+        c0 = np.asarray(ch[0][:, k]) > 0.5
+        t0 = float(np.asarray(tr[0])[c0, 0].mean()) if c0.any() else None
+        vals, cnt = [], []
+        for r in rows:
+            c = np.asarray(ch[r][:, k]) > 0.5
+            cnt.append(int(c.sum()))
+            if c.any():
+                v = np.asarray(tr[r])[c, 0]
+                vals.append(float(v.mean())); pool.append(v)
+        tl = float(np.mean(vals)) if vals else None
+        out[f"{block}0_{s}"], out[f"{block}_{s}"] = finite(t0), finite(tl)
+        out[f"n_late_{s}"] = finite(np.mean(cnt))
+        if t0 and tl is not None:
+            gains.append(tl / t0)
+    out[f"{block}_gain"] = finite(np.mean(gains)) if gains else None
+    out[f"{block}_sd_late"] = finite(np.std(np.concatenate(pool))) if pool else None
+    # ESCALATION WHILE CONTESTED. Once a lattice is down to one strain it has no prey, nothing selects the
+    # trait and it drifts, so a late mean mixes "escalated while fighting" with "stopped when won". The
+    # rate is read per lattice from the rows where it still holds >= 2 strains: the least-squares slope
+    # of its individuals' mean trait against time, in trait units per 1,000 time units (generations),
+    # averaged over lattices with >= 5 contested rows (every `stride`-th recorded row).
+    L, K, dt, _ = _lattice_spec(T)
+    if L:
+        t = _ticks(T) * dt
+        rates = []
+        rws = list(range(0, n, max(1, n // 120)))
+        per = {r: [] for r in range(K)}
+        for r in rws:
+            c = np.asarray(ch[r], float).reshape(K, L * L, 3)
+            v = np.asarray(tr[r], float)[:, 0].reshape(K, L * L)
+            occ = c.sum(2) > 0.5
+            nal = (c.sum(1) > 0.5).sum(1)
+            for k in range(K):
+                if nal[k] >= 2 and occ[k].any():
+                    per[k].append((t[r], float(v[k][occ[k]].mean())))
+        for k, pts in per.items():
+            if len(pts) >= 5:
+                x, y = np.asarray(pts).T
+                rates.append(np.polyfit(x, y, 1)[0] * 1000.0)
+        out[f"{block}_rate_contested"] = finite(np.mean(rates)) if rates else None
+        out["n_lattices_rate"] = len(rates)
+    return out
+
+
+register_run("exp15.traits", traits, None,
+             "direction 4: the heritable attack trait per strain -- first vs late mean, gain, spread")
+
+
+def prefs(T, block="pref", strains=("A", "B", "C"), late=0.2, **_):
+    """The heritable feeding preference of `cell_chem_react[rps_lattice]` `feed: {heritable: ...}` (exp 15,
+    directions 3 x 4: does selection favour feeding on the predator's metabolite?), read per strain from
+    the community set's width-3 `pref` block (column k = the benefit per unit concentration the
+    individual draws from metabolite k, the metabolite strain k secretes; each row sums to the budget
+    B on occupied sites, 0 on empty ones).
+
+        pref_prey_<s>    strain s's mean preference on its PREY's metabolite, column (s + 2) % 3 (v kills
+                         u, w kills v, u kills w), over its individuals and the last `late` of the run
+        pref_pred_<s>    the same on its PREDATOR's metabolite, column (s + 1) % 3
+        pref_pred_frac   the mean over strains of pref_pred_<s> / (pref_pred_<s> + pref_prey_<s>): 0.5 =
+                         the budget split evenly between the two, > 0.5 = selection moved it towards the
+                         predator's metabolite"""
+    key, ck = f"cell__{block}", "cell__chem"
+    files = getattr(T.z, "files", T.z)
+    if key not in files or ck not in files:
+        return {"available": False, "why": f"no cell {block!r} block in this run"}
+    pr = T.z[key]
+    ch = T.z[ck]
+    n = pr.shape[0]
+    rows = range(max(0, int(n * (1 - late))), n)
+    out, fracs = {}, []
+    for k, s in enumerate(strains):
+        prey, pred = (k + 2) % 3, (k + 1) % 3
+        vp, vd = [], []
+        for r in rows:
+            c = np.asarray(ch[r][:, k]) > 0.5
+            if c.any():
+                p = np.asarray(pr[r], float)[c]
+                vp.append(float(p[:, prey].mean())); vd.append(float(p[:, pred].mean()))
+        mp = float(np.mean(vp)) if vp else None
+        md = float(np.mean(vd)) if vd else None
+        out[f"pref_prey_{s}"], out[f"pref_pred_{s}"] = finite(mp), finite(md)
+        if mp is not None and md is not None and mp + md > 0:
+            fracs.append(md / (md + mp))
+    out["pref_pred_frac"] = finite(np.mean(fracs)) if fracs else None
+    return out
+
+
+register_run("exp15.prefs", prefs, None,
+             "directions 3 x 4: the heritable feeding preference per strain -- late mean on prey's vs predator's metabolite")

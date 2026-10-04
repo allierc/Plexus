@@ -258,3 +258,80 @@ def test_two_stimulus_sites_each_with_its_own_time():
         d = op.forward(h)["cell"][:, 0]
         assert bool((d[:2] == 5.0).all()) is s1 and bool((d[7:9] == 7.0).all()) is s2
         assert torch.all(d[2:7] == 0) and torch.all(d[9:] == 0)
+
+
+def test_contact_weighted_equals_default_for_equal_contacts_and_follows_lengths():
+    n = 6
+    pos = torch.tensor([[float(i), 0.0, 0.0] for i in range(n)])
+    chem = torch.zeros(n, 2); chem[:3, 0] = 1.0
+    lvl = LvlPos(chem, pos, chain(n))
+    lvl.edge_weight = torch.full((lvl.edge_index.shape[1],), 7.0)
+    h = H(lvl, 0.1)
+    old = diffuse(d=[1.0, 0.0]).forward(h)["cell"]
+    cw = get_operator("cell_chem_diffuse", model="contact_weighted")({"_at": "cell", "chi": 1.0, "d": [1.0, 0.0]})
+    assert torch.allclose(cw.forward(h)["cell"], old, atol=1e-12)          # equal contacts: the default
+    w = torch.ones(lvl.edge_index.shape[1]); ab = ((lvl.edge_index[0] == 2) & (lvl.edge_index[1] == 3)) | \
+        ((lvl.edge_index[0] == 3) & (lvl.edge_index[1] == 2))
+    w[ab] = 3.0                                                              # the 2-3 junction is 3x longer
+    lvl.edge_weight = w
+    new = cw.forward(h)["cell"]
+    assert new[3, 0] > old[3, 0] and new[2, 0] < old[2, 0]                  # more current across it
+    assert torch.allclose(new.sum(0), torch.zeros(2, dtype=new.dtype), atol=1e-12)   # conserved
+
+
+def test_label_adjacency_writes_contact_lengths():
+    from plexus.operators.diffusion_reaction import CellAdjacencyLabelImage as A
+    g = torch.zeros(6, 6, dtype=torch.long)
+    g[0:3, 0:6] = 1; g[3:6, 0:2] = 2; g[3:6, 2:6] = 3
+    p, c = A.pairs(g, counts=True)
+    got = {tuple(x): int(k) for x, k in zip(p.tolist(), c.tolist())}
+    assert got == {(1, 2): 2, (1, 3): 4, (2, 3): 3}
+
+
+class LvlPhi(LvlPos):
+    def __init__(self, chem, pos, phi, edge_index=None):
+        super().__init__(chem, pos, edge_index)
+        w = chem.shape[1]
+        self.state = torch.cat([self.state, torch.as_tensor(phi, dtype=torch.float64)[:, None]], 1)
+        self.state_schema["phi"] = (w + 3, w + 4)
+
+
+def grid_edges(nx, ny):
+    idx = lambda a, b: a * ny + b
+    e = [(idx(a, b), idx(a + 1, b)) for a in range(nx - 1) for b in range(ny)] + \
+        [(idx(a, b), idx(a, b + 1)) for a in range(nx) for b in range(ny - 1)]
+    e = torch.tensor(e).T
+    return torch.cat([e, e.flip(0)], 1)
+
+
+def test_fibre_anisotropic_identity_and_direction():
+    nx = ny = 5
+    pos = torch.tensor([[float(a), float(b), 0.0] for a in range(nx) for b in range(ny)])
+    chem = torch.zeros(nx * ny, 2); chem[12, 0] = 1.0                        # a pulse in the middle
+    lvl = LvlPhi(chem, pos, torch.zeros(nx * ny), grid_edges(nx, ny))       # every fibre along x
+    h = H(lvl, 0.1)
+    old = diffuse(d=[1.0, 0.0]).forward(h)["cell"]
+    op = lambda r: get_operator("cell_chem_diffuse", model="fibre_anisotropic")({"_at": "cell", "chi": 1.0, "d": [1.0, 0.0], "ratio": r})
+    assert torch.allclose(op(1.0).forward(h)["cell"], old, atol=1e-12)      # kappa 1: the default
+    new = op(4.41).forward(h)["cell"]
+    x_nb, y_nb = 17, 13                                                      # (3,2) along x, (2,3) along y
+    assert new[x_nb, 0] > new[y_nb, 0] > 0                                   # more current along the fibre
+    assert torch.allclose(new.sum(0), torch.zeros(2, dtype=new.dtype), atol=1e-12)
+
+
+def test_a_scar_segment_shuts_only_the_junctions_along_it():
+    """`half_length`: two parallel strands cross x = 0, at y = 0 and y = 5; a scar of half-length 1
+    centred on (0, 0) shuts the first strand's crossing, the second (5 away along the scar's tangent)
+    is open and carries graph_laplacian's current exactly."""
+    n = 20
+    xs = [float(i) - 9.5 for i in range(n)]
+    cen = torch.tensor([[x, 0.0, 0.0] for x in xs] + [[x, 5.0, 0.0] for x in xs])
+    chem = torch.zeros(2 * n, 2); chem[:10, 0] = 1.0; chem[n:n + 10, 0] = 1.0
+    lvl = Lvl(chem, cen, torch.cat([chain(n), chain(n) + n], 1))
+    h = H(lvl, 0.1)
+    old = diffuse(d=[1.0, 0.0]).forward(h)["cell"]
+    scar = diffuse("closed_junctions", d=[1.0, 0.0],
+                   closed={"point": [0.0, 0.0, 0.0], "normal": [1.0, 0.0, 0.0], "half_length": 1.0}).forward(h)["cell"]
+    assert scar[9, 0] == 0 and scar[10, 0] == 0                  # on the scar: shut
+    assert torch.allclose(scar[n:], old[n:], atol=1e-12)         # past its end: open, unchanged
+    assert old[n + 9, 0] < 0

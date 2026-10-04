@@ -106,9 +106,8 @@ class Spec:
     engine: str = "default"
     # WHAT IS FITTED. Empty on every forward spec, which is all of them until one declares
     # otherwise -- the forward description is unchanged by training, and that is the property
-    # `learnable:` exists to preserve. Two forms, validated in `_parse_learnable`:
+    # `learnable:` exists to preserve. One form, validated in `_parse_learnable`:
     #   {block: w, of: recurrent}        a state block becomes a tensor leaf
-    #   {replaces: neuron_signal, ...}   an operator is stood in for by a fitted approximator
     learnable: list = field(default_factory=list)
     record_cap: int = 10000                          # max recorded SET (position) frames; the trajectory is strided if n_frames exceeds it
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
@@ -119,6 +118,11 @@ class Spec:
     units: "Units" = field(default_factory=lambda: Units(declared=False))
     # SAVE THE TRAJECTORY, OR DO NOT. None = the legacy `record_cap` path.
     save_data: bool = None
+    # THE WARM-UP, NOT RECORDED (2026-09-28). None = the default: as many ticks as the seed's settle window
+    # (`ref_frame`, e.g. 60 on an apico-basal shell) run BEFORE the recorded frames, the size rules idle and
+    # `cell_grow` holding, so frame 0 of the data is the relaxed tissue and growth, the cell cycle and the
+    # record start together. 0 = no warm-up: the old behaviour, bit for bit (the settle window is recorded).
+    warmup: int = None
 
 
 _RESERVED = {"op", "at", "to", "from", "implementation", "model"}
@@ -131,56 +135,51 @@ _BUILTIN_STEPS: set = set()
 def _parse_learnable(block, raw):
     """Validate `learnable:` and return it as a list of dicts. Nothing is built here.
 
-    TWO FORMS, because there are two things a fit can be about:
+    ONE FORM, because it is the only one anything fits:
 
         {block: w, of: recurrent}
             a STATE BLOCK becomes a tensor leaf. This is parameter recovery -- fit the synaptic
             weights, the time constants, the conductances -- and it is the case connectome work
             actually needs: the mechanism is stated and its constants are not.
 
-        {replaces: neuron_signal, at: neuron, with: siren_edge, params: {...}}
-            an OPERATOR is stood in for by a fitted approximator. This is mechanism discovery --
-            the law itself is not stated. Checked against the operator's contract and its
-            MEASURED relations in `plexus.learnables.check_substitution`; the check cannot run
-            here because it needs a built Hierarchy to have watched the operator run.
+    THE LAW FORM IS REFUSED, NOT IGNORED. `{replaces: neuron_signal, with: siren_edge}` used to
+    pass this check and was then skipped by the engine, because nothing ever instantiated it: the
+    `plexus.learnables` package meant to was never wired in, and was deleted on 2026-09-29. A spec
+    naming it ran the original operator and reported nothing. A fitted law comes back as a variant
+    of the operator's own contract in the registry, beside `model:` and `implementation:`, so it
+    inherits that operator's signature rather than restating it.
 
-    Refusals are for the things that would otherwise fit something other than what was meant: a
-    block of a set that does not exist, an operator no schedule names, and the two forms mixed in
-    one entry.
+    AN UNKNOWN KEY IS REFUSED FOR THE SAME REASON: a representation named here (`with: siren`)
+    before anything reads it would be dropped, and the fit would be a tensor while the spec said
+    otherwise.
     """
     if not block:
         return []
     if not isinstance(block, list):
         raise ValueError("`learnable:` is a LIST of entries, one per thing fitted")
-    sets, ops = raw.get("sets", {}), {o.get("op") for o in (raw.get("operators") or [])}
+    sets = raw.get("sets", {})
     out = []
     for i, e in enumerate(block):
         if not isinstance(e, dict):
             raise ValueError(f"learnable[{i}] is not a mapping")
-        has_block, has_op = "block" in e, "replaces" in e
-        if has_block == has_op:
+        if "replaces" in e:
             raise ValueError(
-                f"learnable[{i}] must be EITHER {{block:, of:}} (fit a constant) OR "
-                f"{{replaces:, with:}} (fit a law), not both and not neither. They are different "
-                f"claims: one says the mechanism is right and its numbers are not, the other says "
-                f"the mechanism is unknown.")
-        if has_block:
-            for k in ("block", "of"):
-                if k not in e:
-                    raise ValueError(f"learnable[{i}] needs `{k}:`")
-            if e["of"] not in sets:
-                raise ValueError(
-                    f"learnable[{i}] fits block {e['block']!r} of {e['of']!r}, which is not a "
-                    f"declared set. Declared: {sorted(sets)}")
-        else:
-            for k in ("replaces", "with"):
-                if k not in e:
-                    raise ValueError(f"learnable[{i}] needs `{k}:`")
-            if e["replaces"] not in ops:
-                raise ValueError(
-                    f"learnable[{i}] replaces {e['replaces']!r}, which no operator line declares. "
-                    f"Declared: {sorted(ops)}. A substitution for an operator the spec does not "
-                    f"run would fit nothing and report no error.")
+                f"learnable[{i}] is a law substitution ({{replaces:, with:}}), which nothing runs: "
+                f"the engine never instantiated one, and the package meant to was deleted. Only "
+                f"{{block:, of:}} is fitted today. A fitted law will be a variant of the operator "
+                f"it replaces, registered beside its `model:` and `implementation:`.")
+        for k in ("block", "of"):
+            if k not in e:
+                raise ValueError(f"learnable[{i}] needs `{k}:`")
+        unread = sorted(set(e) - {"block", "of"})
+        if unread:
+            raise ValueError(
+                f"learnable[{i}] has key(s) {unread} that nothing reads. A block is fitted as one "
+                f"free value per element; a key that changes that would be silently dropped.")
+        if e["of"] not in sets:
+            raise ValueError(
+                f"learnable[{i}] fits block {e['block']!r} of {e['of']!r}, which is not a "
+                f"declared set. Declared: {sorted(sets)}")
         out.append(dict(e))
     return out
 
@@ -703,6 +702,7 @@ def load(path: str) -> Spec:
         field_record_cap=int(gv("field_record_cap", 256)),
         units=parse_units(gv("units", None)),
         save_data=gv("save_data", None),
+        warmup=(None if gv("warmup", None) is None else int(gv("warmup", None))),
     )
     # THE UNITS CHECK: ONE PASS, WARNING ONLY, AND IT CANNOT STOP THE LOAD. It runs here because
     # this is the first moment the whole declaration is visible at once -- the base scales, every

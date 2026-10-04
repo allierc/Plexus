@@ -1,0 +1,50 @@
+general:
+  name: zap_zs_ng_nol1_view
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 503.57855224609375
+  - 818.1832275390625
+  - 253.27536010742188
+  save_data: false
+sets:
+  group:
+    n: 1
+  neuron:
+    parent: group
+    per_parent: 71721
+    grow_reserve: 0
+    title: the 71,721 segmented neurons of the ZAPBench fish, at their soma centroids
+      -- the LEARNED frames of zap_zs_ng_nol1
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: none
+        boundary: free
+        title: position, um
+      dff:
+        width: 1
+        integration: none
+        boundary: free
+        title: the learned value (the law's free rollout)
+fields: {}
+seed:
+- op: seed_state_from_file
+  at: neuron
+  file: train_view/zap_zs_ng_nol1_view/positions.npz
+  blocks:
+    pos: pos
+operators: []
+schedule: []
+plotting:
+  renderer: vtk_points
+  background: black
+  color_field: dff
+  color_range:
+  - 0.054840087890625
+  - 0.26416015625
+  colormap: inferno

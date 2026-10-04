@@ -158,10 +158,21 @@ def reset_vbirth_at_reference(H, m, at, v, nF):
     apico-basal shell is 0.6 of the settled volume -- a first generation born 40% small."""
     if int(m.get("ref_frame", 0) or 0) <= 0 or m.get("vbirth_at_reference"):
         return
+    # WITH THE ENGINE'S WARM-UP (2026-09-28) the reset waits for its end -- frame 0 of the record, the relaxed tissue --
+    # and a cell's birth volume is the one its AGE implies: `seed_cycle` puts a cell at cycle position p at
+    # v_b (1 + p), so v_b = v / (1 + p). Without a warm-up (`general.warmup: 0`) the old reset, verbatim.
+    _wu = int(getattr(H, "warmup", 0) or 0)
+    if _wu > 0 and int(getattr(H, "frame", 0) or 0) < _wu:
+        return
     cat = resolve_cell_set(H, at)
     vb = cell_block(H, cat, "Vbirth", nF)
     if vb is not None and len(vb) == nF:
-        set_cell_block(H, cat, "Vbirth", np.asarray(v[:nF], np.float64), nF)
+        _v = np.asarray(v[:nF], np.float64)
+        if _wu > 0:
+            _p = cell_block(H, cat, "cycle_progress", nF)
+            if _p is not None and len(_p) == nF:
+                _v = _v / (1.0 + np.clip(np.asarray(_p, np.float64), 0.0, 1.0))
+        set_cell_block(H, cat, "Vbirth", _v, nF)
     m["vbirth_at_reference"] = True
 
 
@@ -220,8 +231,8 @@ def cell_size(lvl, m, nF, pos_np=None, H=None, at="vertex"):
             # different population from the same spec.
             if "v_ref_poly" not in m:
                 m["v_ref_poly"] = float(_np.median(v))
-                if H is not None:
-                    reset_vbirth_at_reference(H, m, at, v, nF)
+            if H is not None and not m.get("vbirth_at_reference"):
+                reset_vbirth_at_reference(H, m, at, v, nF)       # once; waits for the end of a warm-up
             m["size_convention"] = "polyhedron"
             return v, float(m["v_ref_poly"])
     area, _, _, vf = face_geometry_3d(P.cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
@@ -578,6 +589,59 @@ def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
         P = verts[rr, :2]
         c = P.mean(0)
         if np.cross(P[0] - c, P[1] - c) < 0:                 # CCW seen from +z
+            rr = rr[::-1]
+        k = len(rr)
+        for i in range(k):
+            es.append(int(rr[i])); et.append(int(rr[(i + 1) % k])); ef.append(f)
+    return (verts, np.array(es, np.int64), np.array(et, np.int64),
+            np.array(ef, np.int64), len(faces))
+
+
+def build_disc_mesh_isotropic(n, r=1.0, jitter=0.0, seed=0):
+    """`build_disc_mesh` without its two preferred axes -- for `seed_mesh[isotropic]`.
+
+    The default lattice lays EQUAL x- and y-pitch with alternate rows offset by half a step, so each
+    Voronoi cell is 2/sqrt(3) = 1.155 times longer along y than along x, and the rows run along x.
+    Measured on exp08's relaxed sheet: a tissue-mean cell elongation M_E 0.07 along y, and a polarity
+    that orders along x when the tissue is stretched along y but not when it is stretched along x
+    (exp08 Phase 2, Finding P3). Here the row pitch is sqrt(3)/2 of the column pitch -- a true
+    hexagonal lattice -- and the lattice is turned by an angle drawn from `seed` (uniform on [0, pi)),
+    so no axis is preferred across seeds. Otherwise identical: the same jitter, collar and Voronoi.
+    """
+    from scipy.spatial import Voronoi
+    g = np.random.default_rng(seed)
+    th = float(g.uniform(0.0, np.pi))
+    m = int(np.ceil(np.sqrt(n / 0.7854 * (np.sqrt(3) / 2))))       # the default's cell count: rows are denser
+    step = 2.0 * r / max(m, 1)
+    ny = int(np.ceil(2.0 * r / (step * np.sqrt(3) / 2)))
+    xs, ys = np.meshgrid(np.arange(m + 1) * step - r, np.arange(ny + 1) * step * np.sqrt(3) / 2 - r)
+    xs = xs + (np.arange(ny + 1)[:, None] % 2) * 0.5 * step
+    pts = np.stack([xs.ravel(), ys.ravel()], 1)
+    c, s_ = np.cos(th), np.sin(th)
+    pts = pts @ np.array([[c, s_], [-s_, c]])
+    if jitter > 0:
+        pts = pts + jitter * step * (g.random(pts.shape) - 0.5)
+    pts = pts[np.linalg.norm(pts, axis=1) <= r * 1.35]
+    vor = Voronoi(pts)
+    faces, V = [], vor.vertices
+    for ip, ir in enumerate(vor.point_region):
+        reg = vor.regions[ir]
+        if not reg or -1 in reg:
+            continue
+        if np.linalg.norm(V[reg], axis=1).max() > r:
+            continue
+        faces.append(np.asarray(reg, np.int64))
+    if not faces:
+        raise ValueError(f"build_disc_mesh_isotropic: no bounded cell inside r={r} for n={n}")
+    used = np.unique(np.concatenate(faces))
+    remap = -np.ones(len(V), np.int64); remap[used] = np.arange(len(used))
+    verts = np.zeros((len(used), 3), np.float64); verts[:, :2] = V[used]
+    es, et, ef = [], [], []
+    for f, reg in enumerate(faces):
+        rr = remap[reg]
+        P = verts[rr, :2]
+        cc = P.mean(0)
+        if np.cross(P[0] - cc, P[1] - cc) < 0:
             rr = rr[::-1]
         k = len(rr)
         for i in range(k):
@@ -1773,6 +1837,68 @@ class ShapeEnergyContact3D(ShapeEnergy3D):
         return _book_contacts(H, m, _fr, _bc, conts, Nv, pos.device, out)
 
 
+def junction_spring_grad(x, es, et, ef, nF, keys, l0, stride, k):
+    """dE/dx of E = sum over junctions of (k / 2) (l - l0)^2 / l0, one term per junction.
+
+    A junction is found by its vertex pair (key = min * stride + max, as `junction_ops` keys its store);
+    one with no stored rest length contributes nothing. Each undirected junction is two half-edges in
+    the interior and one on a free edge, so each half-edge carries 1 / (its key's count) of the term."""
+    live = ef < nF
+    vi, vj = es[live].long(), et[live].long()
+    key = torch.minimum(vi, vj) * stride + torch.maximum(vi, vj)
+    order = torch.argsort(keys)
+    ks, vs = keys[order], l0[order].to(x.dtype)
+    idx = torch.searchsorted(ks, key).clamp(max=max(ks.numel() - 1, 0))
+    hit = (ks.numel() > 0) & (ks[idx] == key)
+    L0 = torch.where(hit, vs[idx], torch.ones_like(vs[idx]) if vs.numel() else torch.ones(key.shape, dtype=x.dtype, device=x.device))
+    d = x[vj] - x[vi]
+    L = d.norm(dim=1).clamp_min(1e-12)
+    _, inv, cnt = torch.unique(key, return_inverse=True, return_counts=True)
+    T = torch.where(hit, k * (L - L0) / L0.clamp_min(1e-12), torch.zeros_like(L)) / cnt[inv].to(x.dtype)
+    f = (T / L)[:, None] * d
+    g = torch.zeros_like(x)
+    g.index_add_(0, vj, f)
+    g.index_add_(0, vi, -f)
+    return g
+
+
+@register_operator("cell_mechanics", model="junction_spring", set="vertex", kind="lateral",
+                   family="mechanics", title="Vertex-model shape energy with elastic junctions")
+class ShapeEnergyJunctionSpring3D(ShapeEnergy3D):
+    """`cell_mechanics` plus a SPRING on every junction whose rest length remodels:
+
+        E = E_shape + sum_j (k / 2) (l_j - l0_j)^2 / l0_j,        k = kappa Lambda
+
+    l0_j and kappa come from `junction_myosin[rest_length]` (its keyed store `rl_keys` / `rl_vals`, and
+    `rl_kappa`, `rl_stride`), which relaxes l0 toward l each frame. The shape energy is the parent's
+    with plain Lambda: m["myo"], which that operator also writes, is then a READOUT of
+    Lambda (1 + kappa (l - l0) / l0) -- the junction's total line tension, what the rulers and the
+    growth law's stress read -- and is not applied a second time here.
+
+    WHY A MODEL OF cell_mechanics (exp 13 Phase 2 P45): as a multiplier on Lambda, fixed through a
+    frame's relaxation, the same law collapsed junctions into a T1 cascade within two frames. A junction
+    at 1.13x shortened under a tension a spring would shed as it shortens (0 -> 314 flips a frame). In
+    the energy, the tension is re-evaluated at every relaxation iteration at the positions reached, as
+    `shape_contact` does for its contacts: the spring's tension falls as the junction shortens. With no
+    store (no junction_myosin[rest_length] scheduled) it IS the parent.
+
+    Reference: Staddon, M.F. et al. (2019). Biophys. J. 117:1739-1750; the shape energy as `cell_mechanics`.
+    """
+
+    def _grad_myo(self, m, *a, **kw):
+        keys = m.get("rl_keys") if isinstance(m, dict) else None
+        if keys is None:
+            return super()._grad_myo(m, *a, **kw)
+        m_shape = {k_: v for k_, v in m.items() if k_ != "myo"}
+        g = super()._grad_myo(m_shape, *a, **kw)
+        x, es, et, ef, nF = a[0], a[1], a[2], a[3], a[4]
+        k = float(m.get("rl_kappa", 0.0)) * float(self.Lambda)
+        if k == 0.0:
+            return g
+        return g + junction_spring_grad(x, es, et, ef, int(nF), keys.to(x.device), m["rl_vals"].to(x.device),
+                                        int(m["rl_stride"]), k).to(g.dtype)
+
+
 # There is ONE growth operator on this mesh, `cell_grow` in diffusion_reaction, and deliberately
 # so. A second one duplicated it and contradicted it: both wrote the same mesh targets, one
 # multiplicatively (V0f <- V0f * g^3) and the other by assignment from its own snapshot
@@ -1848,7 +1974,17 @@ class Divide3D(Structural):
         # the asymmetry the septum actually produces -- CV 0.27 of the two pieces on the reference
         # spheroid -- is the asymmetry the size rules see, and there is nothing left for a
         # target perturbation to add.
-        self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
+        self.cycle_cv = float(params.get("cycle_cv", 0.0))
+        # `skip_queued: true` (exp 11 ladder L3, 2026-09-28; default false): with `skip_sentenced`, a cell waiting in
+        # `cell_die[t2]`'s leaving queue does not divide in place either (on by default it stopped every in-place
+        # division of a gland whose dive queue holds all its ready cells -- exp 11 Finding 136)
+        self.skip_queued = bool(params.get("skip_queued", False))
+        # `size_escape: k` (default 0 = off; exp 11 R2, 2026-09-30): A SIZE CHECKPOINT on the queue above. A queued cell
+        # whose `area` block exceeds k x the median is NOT held back: it divides in place. Wang's surface cells keep a
+        # constant size; a ready cell stretched by a growing branch while it waits to dive otherwise grows flat without
+        # limit (run 460: 55 cells at 4-5x the median basal area, half of them division-ready, Finding 184).
+        self.size_escape = float(params.get("size_escape", 0.0) or 0.0)
+        # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
         self.p0 = float(params.get("p0", 3.72))
@@ -1882,6 +2018,10 @@ class Divide3D(Structural):
         # edge length purely from division, even though its mechanics can no longer leave the
         # plane at all.
         self.project = bool(params.get("project", True))
+        # `skip_sentenced` (default false = unchanged): a cell under a `cell_die` sentence (`apop_flag`)
+        # is not divided. Without it a cell sentenced while in M (`cell_die[t2]` `rule: phase`, exp 11)
+        # is cut while it shrinks and BOTH daughters inherit the sentence -- two cells lost per leaver.
+        self.skip_sentenced = bool(params.get("skip_sentenced", False))
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         """Has this cell earned a division? THE ONLY THING A `model=` VARIANT OF cell_divide CHANGES.
@@ -2001,9 +2141,23 @@ class Divide3D(Structural):
         # among them. `_ready_mask` is the opt-in: a model that defines it gets one per-face boolean
         # computed once, and every model that does not is untouched.
         _mask = self._ready_mask(H, m, nF) if hasattr(self, "_ready_mask") else None
+        _sent = None
+        if self.skip_sentenced and m.get("apop_flag") is not None and len(m["apop_flag"]) == nF:
+            _fl = m["apop_flag"]
+            _sent = (_fl.detach().cpu().numpy() if torch.is_tensor(_fl) else np.asarray(_fl)) > 0
+            # AND THE CELLS WAITING IN `cell_die[t2]`'s LEAVING QUEUE (`m["t2_waiting"]`, cell ids): a cell chosen to
+            # dive but held back by the per-call cap is not free to divide in place meanwhile (exp 11, ladder L3)
+            _wq = m.get("t2_waiting") if getattr(self, "skip_queued", False) else None
+            if _wq:
+                _ci = cell_block(H, self.cell_set, "cell_id", nF)
+                if _ci is not None:
+                    _ar = cell_block(H, self.cell_set, "area", nF) if self.size_escape > 0 else None
+                    _sent = _sent | queued_hold(_ci, _wq, _ar, self.size_escape)
 
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
+                return False
+            if _sent is not None and _sent[f]:
                 return False
             vol_ok = bool(_mask[f]) if _mask is not None else \
                 self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
@@ -2956,7 +3110,9 @@ class Apoptosis3D(Structural):
                 continue
             if size_tgt[f] > crit:
                 continue
-            if not self._to_triangle(rings, pos_t, f):  # the default waits for `edge_flip`
+            _kn_f = self.nb_sides_for(float(size_tgt[f]), crit) if hasattr(self, "nb_sides_for") else None
+            if not (self._to_triangle(rings, pos_t, f, keep_nb_sides=_kn_f) if _kn_f is not None
+                    else self._to_triangle(rings, pos_t, f)):  # the default waits for `edge_flip`
                 continue
             nbrs = [int(g) for g in self._ring_neighbours(rings, f) if g < nF]
             if face_collapse_3d(rings, pos_t, f, births=births):
@@ -3309,6 +3465,54 @@ class Apoptosis3DChemLow(Apoptosis3D):
     DEATH = "chem_low"
 
 
+@register_operator("cell_die", model="chem_rate", set="vertex", kind="die",
+                   family="population", title="Cell death")
+class Apoptosis3DChemRate(Apoptosis3D):
+    """`chem_rate` model of cell_die: a cell LEAVES the epithelium at a rate set by its fate -- the
+    differentiation of neural progenitors, which delaminate from the neuroepithelium at domain-
+    specific rates (Kicheva et al. 2014, Fig. 3C: pMN up to 0.145 per hour, p3 and pI ~0.03, pD ~0.015,
+    against a uniform proliferation of ~0.08 per hour, Fig. 3A).
+
+        fate_j = argmax_k chem_j[fate_cols[k]]   (none if the largest is below `fate_threshold`)
+        after frame `t_start`, mark j with probability fate_rates[fate_j] x `every` per call
+
+    The rates are per frame; the extrusion that follows is the base operator's (the ring contracts,
+    the cell is removed). WHY A NEW MODEL AND NOT `chem_low`: `chem_low` marks a SET -- every cell
+    below a threshold, at once -- where differentiation is a FLUX: a fraction of a domain leaves per
+    unit time and the rest keeps cycling; `field` compares to a median, not a fate. Without rates
+    (`fate_rates` empty or all 0) nothing is marked (tested).
+
+    Reference: Kicheva, A. et al. (2014). Science 345:1254927 (Figs. 3A, 3C, the two-phase model).
+    """
+    DEATH = "chem_rate"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.fate_cols = [int(c) for c in (params.get("fate_cols") or [])]
+        self.fate_rates = [float(r) for r in (params.get("fate_rates") or [])]
+        if len(self.fate_cols) != len(self.fate_rates):
+            raise ValueError("cell_die[chem_rate]: fate_cols and fate_rates must have the same length")
+        self.fate_threshold = float(params.get("fate_threshold", 0.5))
+        self.t_start = float(params.get("t_start", 0.0))
+        self.call_every = max(int(params.get("every", 1)), 1)
+        self._rng = np.random.default_rng(int(params.get("seed", 0)) + 7919)
+
+    def _marked(self, m, H, nF):
+        if not self.fate_cols or not any(r > 0 for r in self.fate_rates):
+            return set()
+        if float(getattr(H, "frame", 0) or 0) < self.t_start:
+            return set()
+        clvl = H.level(self.cat)
+        if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+            return set()
+        h0, _ = clvl.state_schema["chem"]
+        G = clvl.state[:nF, [h0 + c for c in self.fate_cols]].detach().cpu().numpy()
+        fate = np.argmax(G, axis=1)
+        p = np.asarray(self.fate_rates, float)[fate] * self.call_every
+        p[G.max(axis=1) < self.fate_threshold] = 0.0
+        return set(np.where(self._rng.random(nF) < p)[0].tolist())
+
+
 @register_operator("cell_die", model="prescribed", set="vertex", kind="die",
                    family="population", title="Cell death")
 class Apoptosis3DPrescribed(Apoptosis3D):
@@ -3354,6 +3558,66 @@ class Apoptosis3DField(Apoptosis3D):
     DEATH = "field"
 
 
+@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed",
+                   implementation="isotropic", title="Build the cell mesh, no preferred axis")
+class SeedMeshIsotropic(SeedMesh3D):
+    """`isotropic` IMPLEMENTATION of seed_mesh: the default mesh with the disc built by
+    `build_disc_mesh_isotropic` -- a true hexagonal lattice (row pitch sqrt(3)/2), turned by an angle
+    drawn from `seed` -- so the seeded cells carry no shared elongation and the packing no shared axis.
+    Every other shape, and every other parameter, is the default's.
+
+    WHY: exp08 Phase 2 (Finding P3) -- on the default disc the cells are 1.155 times longer along y and
+    a stretch along y ordered the polarity while the same stretch along x did not; an experiment about
+    a deformation setting an axis needs a seed that has none.
+
+    The swap is done for the length of this call only (the default forward looks its builder up by
+    module name at call time), so the default class and every spec using it are untouched.
+    """
+
+    def forward(self, H, mask=None):
+        import plexus.operators.vertex_ops as _V
+        orig = _V.build_disc_mesh
+        _V.build_disc_mesh = build_disc_mesh_isotropic
+        try:
+            return super().forward(H, mask)
+        finally:
+            _V.build_disc_mesh = orig
+
+
+def mutant_patches(m, pos, nF, pool, k, size, rng, centre=None):
+    """k cells of `pool` as patches of `size` adjacent cells: ceil(k / size) patch centres drawn from the
+    pool, each grown by its nearest pool cells (face centroids), the last patch cut to make k in total.
+
+    `centre` (exp 11, default None = the draw above, unchanged): a direction [x, y, z]; then ONE patch of the k
+    pool cells nearest the pool cell whose centroid direction from the tissue's centroid lies closest to it -- a
+    declared site, as a declared hole has an axis."""
+    es = np.asarray(m["E_srce"].detach().cpu() if hasattr(m["E_srce"], "detach") else m["E_srce"], np.int64)
+    ef = np.asarray(m["E_face"].detach().cpu() if hasattr(m["E_face"], "detach") else m["E_face"], np.int64)
+    P = np.asarray(pos.detach().cpu() if hasattr(pos, "detach") else pos, np.float64)
+    live = ef < nF
+    cen = np.zeros((nF, 3))
+    np.add.at(cen, ef[live], P[es[live]])
+    cen /= np.maximum(np.bincount(ef[live], minlength=nF), 1)[:, None]
+    pool = np.asarray(pool, np.int64)
+    if centre is not None:
+        d = np.asarray(centre, np.float64)
+        d = d / max(np.linalg.norm(d), 1e-12)
+        u = cen[pool] - cen[pool].mean(0)
+        u = u / np.maximum(np.linalg.norm(u, axis=1, keepdims=True), 1e-12)
+        c = pool[int(np.argmax(u @ d))]
+        return pool[np.argsort(np.linalg.norm(cen[pool] - cen[c], axis=1), kind="stable")][:k]
+    free = np.ones(nF, bool)
+    chosen = []
+    for c in rng.choice(pool, size=int(np.ceil(k / size)), replace=False):
+        if not free[c]:
+            continue
+        cand = pool[free[pool]]
+        near = cand[np.argsort(np.linalg.norm(cen[cand] - cen[c], axis=1), kind="stable")][:size]
+        free[near] = False
+        chosen.extend(near.tolist())
+    return np.asarray(chosen[:k], np.int64)
+
+
 @register_operator("seed_mesh", "mesh_seed", implementation="lineage", set="vertex", kind="seed",
                    family="seed", title="Build the cell mesh")
 class SeedMeshLineage(SeedMesh3D):
@@ -3385,6 +3649,17 @@ class SeedMeshLineage(SeedMesh3D):
         # `mutant_in: progenitors` (exp 14 Phase 3): the mutant is induced in single PROGENITORS, as Colom
         # 2020 induces DN-Maml1 (Fig. 6c); `mutant_frac` is then a fraction of the progenitors. Default: any cell.
         self.mutant_in = str(params.get("mutant_in", "any"))
+        # `mutant_cluster` (exp 12 Phase 2): the mutants are placed as patches of this many adjacent cells
+        # -- a leader cluster, Cheung 2013's multicellular leading front -- instead of singly. Default 1:
+        # the single-cell draw below, unchanged.
+        self.mutant_cluster = int(params.get("mutant_cluster", 1))
+        # `mutant_centre` (exp 11 Phase 2, default None = unchanged): with `mutant_cluster` > 1, ONE patch of all the
+        # mutants around the cell nearest this direction from the tissue centroid -- a declared site for a hole the
+        # mutant cells digest (`bm_unbond[model: release]`), as a declared hole has an axis.
+        _mc = params.get("mutant_centre", None)
+        self.mutant_centre = None if _mc is None else [float(v) for v in _mc]
+        if self.mutant_cluster < 1:
+            raise ValueError(f"seed_mesh[lineage]: mutant_cluster must be >= 1, got {self.mutant_cluster}")
         if self.mutant_in not in ("any", "progenitors"):
             raise ValueError(f"seed_mesh[lineage]: mutant_in must be any|progenitors, got {self.mutant_in!r}")
         geo = params.get("geometry")
@@ -3421,10 +3696,55 @@ class SeedMeshLineage(SeedMesh3D):
             pool = np.flatnonzero(fate < 0.5) if (self.mutant_in == "progenitors" and fate is not None) \
                 else np.arange(nF)
             k = int(round(self.mutant_frac * len(pool)))
-            if k > 0:
+            if k > 0 and self.mutant_cluster == 1:
                 mut[np.random.default_rng(self.seed + 211).choice(pool, size=k, replace=False)] = 1.0
+            elif k > 0:
+                mut[mutant_patches(m, H.level(self.at).get("pos"), nF, pool, k, self.mutant_cluster,
+                                   np.random.default_rng(self.seed + 211), centre=self.mutant_centre)] = 1.0
             set_cell_block(H, self.cell_set, "mutant", mut, nF)
         return out
+
+
+def adhesion_hazard(B, b_ref, r_mit):
+    """The Type I dive probability of cells ready to divide, from their grip (exp 11 Phase 3 B5, 2026-09-29):
+    h_i = 1 - r_mit min(1, B_i / b_ref). A cell rounding up for mitosis lets go of the matrix (Wang 2021, Fig S2A:
+    delamination visible ~45 min before anaphase; Hsu 2013: outer cells leave the membrane while dividing);
+    r_mit is the share of its grip a mitotic cell keeps, and a cell that keeps it divides at the boundary instead
+    (Type II). B_i the bound integrin (`bm_clutch`'s `itg_B`), b_ref its median at the first use."""
+    c = np.clip(np.asarray(B, np.float64) / max(float(b_ref), 1e-12), 0.0, 1.0)
+    return 1.0 - float(r_mit) * c
+
+
+def adhesion_return_p(p0, lam, G, g_ref, kappa, u=1.0):
+    """A returning body's per-call return probability (exp 11 Phase 3 B5, 2026-09-29), Wang 2021's
+    dE = (e_cc - e_cm) S_B read as a rate: p = p0 lam u exp(-kappa (G - g_ref)), clipped to [0, 1]. The
+    cell-matrix gain is the matrix at the host site times the body's own receptor: lam is `bm_clutch`'s covered
+    fraction times the membrane's mass there (1 at rest; collagenase lowers it), u the body's integrin over the
+    resting total, capped at 1 (a beta1 block lowers it). G is the body's E-cadherin (`cell_protein_level`), g_ref
+    the surface lineage's level: a body inside long enough to raise its E-cadherin binds the core instead."""
+    p = (float(p0) * np.asarray(lam, np.float64) * np.clip(np.asarray(u, np.float64), 0.0, 1.0)
+         * np.exp(-float(kappa) * (np.asarray(G, np.float64) - float(g_ref))))
+    return np.clip(p, 0.0, 1.0)
+
+
+def newborn_pairs(cid, pid, seen, p, rng):
+    """`cell_die[t2]` `rule: newborn`: the face indices of ONE daughter of each in-place division born since the last
+    call -- two cell ids not in `seen` that share a parent_id (a reinsert newcomer is a lone new id and is left out) --
+    each pair taken with probability p. Returns (chosen face indices, the ids now present). The first call (seen None)
+    takes nothing: every cell present then is the seed."""
+    ids = np.rint(np.asarray(cid, np.float64)).astype(np.int64); par = np.rint(np.asarray(pid, np.float64)).astype(np.int64)
+    now = set(ids.tolist())
+    if seen is None:
+        return set(), now
+    by = {}
+    for f in range(len(ids)):
+        if int(ids[f]) not in seen:
+            by.setdefault(int(par[f]), []).append(f)
+    out = set()
+    for _p, fs in sorted(by.items()):
+        if len(fs) == 2 and rng.random() < p:
+            out.add(int(fs[int(rng.integers(2))]))
+    return out, now
 
 
 @register_operator("cell_die", implementation="t2", set="vertex", kind="die", family="population",
@@ -3476,6 +3796,17 @@ class Apoptosis3DT2(Apoptosis3D):
         self.mode = rule
         self.capacity = int(params.get("capacity", 0) or 0)
         self.max_t1 = int(params.get("max_t1", 12))
+        self.newborn_p = float(params.get("newborn_p", 1.0))      # `rule: newborn` only (see `_marked`)
+        self.type2_p = float(params.get("type2_p", 0.0) or 0.0)    # `rule: phase` + Type II (see `_marked`)
+        self.type2_mark = params.get("type2_mark")
+        self._t2_ids = set()
+        # `keep_nb_sides: k` (exp 11, 2026-09-28; default 0 = unchanged): a forced flip on the dying cell's edge must
+        # leave the cell ACROSS that edge with at least k sides, or that edge is skipped this call. Each flip takes a
+        # side from the cell across the edge; shortest-first, on a layer that only loses cells (exp 11's Type I dive),
+        # it made triangles and squares -- 29 triangles in 370 cells at row 80 against none on the dividing control --
+        # and those are strong positive curvature defects: the outermost 2 % of the tent-shaped glands were almost all
+        # triangles (Finding 114). A dying cell with no edge to spare waits for the layer's own flips.
+        self.keep_nb_sides = int(params.get("keep_nb_sides", 0) or 0)
         # WHERE THE EXCESS IS TAKEN. `global`: the rule's worst anywhere in the tissue. `division`:
         # among the neighbours of the cells born this call first (falling back to anywhere when none
         # qualifies) -- a loss coupled to a neighbour's division, which is what defines the
@@ -3511,6 +3842,16 @@ class Apoptosis3DT2(Apoptosis3D):
         # "progenitor cell division is linked to a neighboring cell differentiating and exiting from
         # the basal layer" (Nat. Genet. 52:604, Fig. 5a).
         self.hazard = float(params.get("hazard", 0.0))
+        # `hazard_from: bound` (default `fixed`, the scalar above; exp 11 Phase 3 B5, 2026-09-29): each candidate's
+        # hazard is its own, `adhesion_hazard` of its bound integrin (`bound_block`, default `itg_B`) with the
+        # mitotic grip `r_mit` (default 0.08) -- the Type I / Type II split follows the cell's grip, not a number. The hazard
+        # branch still needs `hazard` > 0 to run (it selects the per-call draw); its value is then not used
+        self.hazard_from = str(params.get("hazard_from", "fixed")).lower()
+        if self.hazard_from not in ("fixed", "bound"):
+            raise ValueError(f"cell_die[t2]: hazard_from is fixed or bound, got {self.hazard_from!r}")
+        self.r_mit = float(params.get("r_mit", 0.08))
+        self.bound_block = str(params.get("bound_block", "itg_B"))
+        self._b_ref = None
         # WHICH COMMITTED CELL GOES, when the capacity takes the excess and more candidates qualify than
         # may go: `random` (the default), or `crowded` -- most neighbours first, the base's own measure of
         # crowding (`rule: crowded`'s), so that with `select: global` a committed cell delaminates where the
@@ -3525,6 +3866,14 @@ class Apoptosis3DT2(Apoptosis3D):
         # will, on average, win and persist" at a clone's edge (Fig. 5a); it acts only where a mutant and a
         # wild-type cell compete for the same exit, and is neutral inside a mutant patch.
         self.resist_block = params.get("resist_block")
+        # PROGENITORS MAY LEAVE TOO (exp 14 Phase 3). With `progenitor_fallback`, `rule: fate` names every
+        # basal cell old enough and the order puts the committed ones first: a progenitor differentiates and
+        # leaves only when too few committed cells are left to pay a division's excess. Without it a
+        # fate-biased mutant patch, which makes progenitors and few committed cells, cannot be thinned: two
+        # runs grew 1,100 -> 3,971-3,998 basal cells (3,690-3,780 progenitors) and filled the cell buffer
+        # (round 19). Colom 2020's model has no committed pool at all -- "progenitor cell division is linked
+        # to a neighboring cell differentiating" (Fig. 5a).
+        self.progenitor_fallback = bool(params.get("progenitor_fallback", False))
         if self.mode == "fate" and not (self.capacity or self.hazard > 0):
             raise ValueError("cell_die[t2] rule: fate needs `hazard` or `capacity` -- with neither, "
                              "every committed cell would be sentenced at once")
@@ -3541,9 +3890,90 @@ class Apoptosis3DT2(Apoptosis3D):
         self.depth0 = float(params.get("depth0", 0.05))
         self.max_depth = float(params.get("max_depth", 0.8))
         self._sb_calls = 0
+        # DIVING IN, NOT SINKING (exp 11; Wang et al. 2021 Cell 184:3702, Fig 2A-B: 92.4 % of the
+        # division-ready surface cells of a salivary bud delaminate and divide in the interior).
+        # `to_set_kinematic: false` (default true = the suprabasal routine above, unchanged): a leaver is
+        # placed ONCE in a free slot of `to_set`, `enter_offset` (world length, default 0.5 -- the inner
+        # cell's radius, `bm_contact[live, side: apical]`'s `offset`) inside the apical surface along the
+        # inward normal -- its centroid + the mean `sep` of its ring (the apical point, half a layer
+        # thickness in) + enter_offset x sep/|sep| -- with zero `vel`, and this operator never moves,
+        # ages or sheds a live particle of `to_set` again: the interior's own mechanics moves them.
+        # Without a `sep` block the inward normal is toward the tissue's centroid, from the centroid.
+        self.to_set_kinematic = bool(params.get("to_set_kinematic", True))
+        self.enter_offset = float(params.get("enter_offset", 0.5))
+        self.enter_divided = bool(params.get("enter_divided", False))
+        # `hold_when_full` (default false; exp 11 Finding 165, 2026-09-29): a cell is sentenced to leave only while
+        # `to_set` has a free slot for it (two with `enter_divided`), counting the leavers already sentenced. Off, a
+        # leaver with no slot is removed from the layer and only counted (`supra_overflow`): exp 11's interior filled
+        # its 1,500 slots at row 220 of a 300-row run and the layer drained 1,310 -> 192 cells into nothing.
+        self.hold_when_full = bool(params.get("hold_when_full", False))
+        self.enter_split = float(params.get("enter_split", 0.5))
+        self.enter_mark = params.get("enter_mark")
+        # `to_children: <point set>` (default none): `to_set` is a set of MPM CELLS, each owning a block of
+        # material points in that set -- a leaver becomes a whole body in the lumen, its block woken as a
+        # uniform ball of `child_volume` (world^3; default the median volume of the live bodies) about the
+        # entry point (`mpm_ops.wake_mpm_body`). exp 11, 2026-09-27: the surface cell that dives in to divide.
+        self.to_children = params.get("to_children")
+        self.child_volume = params.get("child_volume")
+        self.max_leave_per_call = int(params.get("max_leave_per_call", 0) or 0)
+        self.max_leave_frac = float(params.get("max_leave_frac", 0.0) or 0.0)
+        # `rule: phase`: the candidates are the DIVISION-READY cells -- `cycle_progress` at or past
+        # `ready_progress` (default 1.0, the end of the cycle = M on `cell_cycle`'s clock; `phase` >= M
+        # where no `cycle_progress` is declared), each seen ONCE (by `cell_id`) as it becomes ready, so
+        # `hazard` is the probability that a ready cell leaves INSTEAD of dividing in place (Wang's
+        # 0.924), not a per-call rate. A sentenced cell stays in M while it shrinks out of the layer, so
+        # the spec's `cell_divide[model: cycle]` must carry `skip_sentenced: true` or it cuts the leaver
+        # (and both pieces inherit the sentence). Idle while the seed settles, as division is.
+        # `enter_divided: true` (default false): the leaver divides AS it enters -- two particles,
+        # `enter_split` (world, default 0.5) apart across the inward normal -- Wang's "delaminate and
+        # divide in the interior", so a leave followed by the return of both daughters conserves the
+        # division. `enter_mark: <block of to_set>` (default none): that width-1 block is set to 1 on
+        # every particle this operator places (and `cell_divide[model: point]` copies it to their
+        # daughters), which is what `cell_divide[model: reinsert]`'s `mark` reads -- only the progeny
+        # of the cells that dived return, not the interior the rig seeded.
+        self.ready_progress = float(params.get("ready_progress", 1.0))
+        # `collapse_measured: true` (default false = unchanged): the T2 also waits for the cell's MEASURED
+        # volume (`cell_size`, the run's convention) to fall below `critical_frac` x the measured reference,
+        # not only its target. On the apico-basal shell of exp 11 the target shrinks at `shrink_rate` a call
+        # while the polyhedron follows over many frames, so the target test collapsed cells still at full
+        # size into a point, and the yanked neighbours crushed the layer (a 200-cell shell at 92 % leaving:
+        # median cell volume 1.07 -> 0.03 in 30 frames, 22 inverted cells).
+        self.collapse_measured = bool(params.get("collapse_measured", False))
+        self._v_meas = None
+        # `contract` (fraction per call, default 0 = none): every cell already under sentence pulls its
+        # ring vertices that fraction of the way to its centroid at the start of each call -- the
+        # actomyosin ring that closes over an extruding cell (Rosenblatt et al. 2001). The apico-basal
+        # layer's positional bending (`k_bend`) holds a cell's footprint against a shrinking target
+        # alone: measured on exp 11's rig, sentenced cells' targets fell 10x in 8 calls while their
+        # polyhedron volumes stayed at 1.5 (reference 1.0).
+        self.contract = float(params.get("contract", 0.0))
+        # `stuck_frac` (default 0 = off): a sentenced cell whose shrinking target has fallen below stuck_frac x the
+        # collapse size protects its neighbours down to `keep_nb_sides` - 1 sides (never under 4), so a dive the side
+        # rule has held for many calls can finish; the others keep the full rule (all at 4 emptied the layer, R7).
+        self.stuck_frac = float(params.get("stuck_frac", 0.0) or 0.0)
+        # `isolate` (default false): a queued cell is sentenced only if no neighbour is under sentence or picked in the
+        # same call; the others keep their turn in the queue. Adjacent dying cells stall each other's collapse: in exp 11
+        # R9, 89-90 % of the sentenced cells touched another one, and they piled up as flat giants (Finding 193).
+        # Wang's diving cells are scattered through the surface.
+        self.isolate = bool(params.get("isolate", False))
+        self._seen_ready = set()
+        if self.mode == "phase" and not (self.capacity or self.hazard > 0):
+            raise ValueError("cell_die[t2] rule: phase needs `hazard` (the fraction of division-ready "
+                             "cells that leave) or `capacity`")
 
     def _severity(self, m, H, nF, idx):
         """`rule: fate` with `order: crowded`: most neighbours first; otherwise the base's order."""
+        if self.mode == "fate" and self.progenitor_fallback:
+            f = cell_block(H, self.cat, "fate", nF) if H is not None else None
+            base = (-self._nb(m, nF, np.ones(nF))[1][idx].astype(float) if self.order == "crowded"
+                    else np.zeros(len(idx)))
+            if f is not None:
+                base = base + 1e3 * (f[idx] < 0.5)            # committed cells first, progenitors after
+            if self.resist_block:
+                r = cell_block(H, self.cat, self.resist_block, nF) if H is not None else None
+                if r is not None:
+                    base = base + 1e6 * (r[idx] > 0.5)
+            return base
         if self.mode == "fate" and self.order == "crowded":
             sev = -self._nb(m, nF, np.ones(nF))[1][idx].astype(float)
             if self.resist_block:
@@ -3555,6 +3985,39 @@ class Apoptosis3DT2(Apoptosis3D):
 
     def _marked(self, m, H, nF):
         """`rule: fate`: the committed (B) cells old enough to go; any other rule, the base's."""
+        if self.mode == "phase":
+            if settling(H, m):
+                return set()
+            out = self._newly_ready(H, nF)
+            # `type2_p` (exp 11, 2026-09-28; default 0 = off): Wang's Type II division beside the Type I dive, in the SAME
+            # operator (two `cell_die[t2]` would share `apop_flag` and shrink and remove each other's cells): of each
+            # in-place division born since the last call, with probability type2_p one daughter leaves too, and wakes
+            # with `type2_mark` (e.g. `ret`: it returns without dividing inside) instead of `enter_mark`.
+            if self.type2_p > 0:
+                cid = cell_block(H, self.cat, "cell_id", nF); pid = cell_block(H, self.cat, "parent_id", nF)
+                if cid is not None and pid is not None:
+                    rng = np.random.default_rng(self.seed * 6007 + 29 + int(getattr(self, "_k", 0)))
+                    t2, self._nb_seen = newborn_pairs(cid, pid, getattr(self, "_nb_seen", None), self.type2_p, rng)
+                    ids = np.rint(np.asarray(cid, np.float64)).astype(np.int64)
+                    self._t2_ids.update(int(ids[f]) for f in t2)
+                    m["n_type2"] = int(m.get("n_type2", 0)) + len(t2)
+                    self._t2_now = set(t2)                # sentenced OUTSIDE the Type I cap, see `_admit_rule`
+            return out
+        if self.mode == "newborn":
+            # `rule: newborn` (exp 11, 2026-09-28): Wang's Type II division -- of each in-place division born since the
+            # last call (a PAIR of new cell ids sharing a parent_id; a reinsert newcomer is a single new id), with
+            # probability `newborn_p` ONE daughter, at random, leaves the layer (with `enter_mark: ret` it goes in as a
+            # body that returns without dividing). The rest of the T2 machinery is unchanged.
+            if settling(H, m):
+                return set()
+            cid = cell_block(H, self.cat, "cell_id", nF); pid = cell_block(H, self.cat, "parent_id", nF)
+            if cid is None or pid is None:
+                return set()
+            rng = np.random.default_rng(self.seed * 7919 + 17 + int(getattr(self, "_k", 0)))
+            out, self._nb_seen = newborn_pairs(cid, pid, getattr(self, "_nb_seen", None),
+                                               float(getattr(self, "newborn_p", 1.0)), rng)
+            m["n_type2"] = int(m.get("n_type2", 0)) + len(out)
+            return out
         if self.mode != "fate":
             return super()._marked(m, H, nF)
         fate = cell_block(H, self.cat, "fate", nF)
@@ -3563,9 +4026,14 @@ class Apoptosis3DT2(Apoptosis3D):
         ag = m.get("age")
         old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
             else np.ones(nF, bool)
-        return set(np.flatnonzero((fate > 0.5) & old_enough).tolist())
+        who = old_enough if self.progenitor_fallback else ((fate > 0.5) & old_enough)
+        return set(np.flatnonzero(who).tolist())
 
     def forward(self, H, mask=None):
+        if self.contract > 0:
+            self._contract(H)
+        if self.collapse_measured:
+            self._stash_measured(H)
         if not self.to_set:
             return super().forward(H, mask)
         cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
@@ -3580,8 +4048,160 @@ class Apoptosis3DT2(Apoptosis3D):
         if before is not None and after is not None:
             left = set(before["cell_id"].tolist()) - set(after.tolist())
             gone = [i for i, c in enumerate(before["cell_id"].tolist()) if c in left]
-        self._suprabasal(H, m, before, gone)
+        if self.to_set_kinematic:
+            self._suprabasal(H, m, before, gone)
+        else:
+            self._enter(H, m, before, gone)
         return out
+
+    def _contract(self, H):
+        """`contract`: the sentenced cells' ring vertices moved `contract` of the way to its centroid."""
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        fl = m.get("apop_flag") if m is not None else None
+        if fl is None:
+            return
+        nF, nv = int(m["nF"]), int(m["Nv"])
+        fl = (fl.detach().cpu().numpy() if torch.is_tensor(fl) else np.asarray(fl))[:nF]
+        dying = np.flatnonzero(fl > 0)
+        if not len(dying):
+            return
+        ef = m["E_face"].detach().cpu().numpy()
+        es = m["E_srce"].detach().cpu().numpy()
+        p0, p1 = lvl.state_schema["pos"]
+        x = lvl.state[:nv, p0:p1].detach().cpu().numpy().astype(np.float64)
+        for f in dying.tolist():
+            r = es[ef == f]
+            if len(r):
+                c = x[r].mean(0)
+                x[r] = c + (1.0 - self.contract) * (x[r] - c)
+        st = lvl.state.clone()
+        st[:nv, p0:p1] = torch.as_tensor(x, dtype=st.dtype, device=st.device)
+        lvl.state = st
+
+    def _stash_measured(self, H):
+        """`collapse_measured`: every cell's measured volume and reference at the start of the call."""
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0) or 0):
+            self._v_meas = None
+            return
+        v, vr = cell_size(lvl, m, int(m["nF"]), H=H, at=self.at)
+        self._v_meas, self._v_meas_ref = np.asarray(v, np.float64), float(vr)
+
+    def _newly_ready(self, H, nF):
+        """`rule: phase`: the division-ready cells not yet seen ready (by `cell_id`; every ready cell
+        each call when no `cell_id` is declared). Idle while the seed settles, as division is."""
+        p = cell_block(H, self.cat, "cycle_progress", nF)
+        if p is not None:
+            ready = p >= self.ready_progress - 1e-4
+        else:
+            ph = cell_block(H, self.cat, "phase", nF)
+            if ph is None:
+                return set()
+            ready = ph >= CellCycle3D.M - 1e-3
+        cid = cell_block(H, self.cat, "cell_id", nF)
+        if cid is None:
+            return set(np.flatnonzero(ready).tolist())
+        ids = np.rint(cid).astype(np.int64)
+        self._seen_ready &= set(ids.tolist())
+        new = [int(f) for f in np.flatnonzero(ready) if int(ids[f]) not in self._seen_ready]
+        self._seen_ready.update(int(ids[f]) for f in new)
+        return set(new)
+
+    def _entry_points(self, H, m, nF, cen):
+        """Per cell, where a leaver enters `to_set` (`to_set_kinematic: false`) and the inward unit normal:
+        the apical point (centroid + mean ring `sep`) moved `enter_offset` further along sep/|sep|."""
+        vl = H.level(self.at)
+        nv = int(m["Nv"])
+        es = m["E_srce"].detach().cpu().numpy().astype(np.int64)
+        ef = m["E_face"].detach().cpu().numpy().astype(np.int64)
+        ok = (ef >= 0) & (ef < nF)
+        cen = np.asarray(cen, np.float64)[:nF]
+        if "sep" in vl.state_schema:
+            S = vl.get("sep")[:nv].detach().cpu().numpy().astype(np.float64)
+            sm = np.zeros((nF, 3)); cnt = np.zeros(nF)
+            np.add.at(sm, ef[ok], S[es[ok]]); np.add.at(cnt, ef[ok], 1.0)
+            sm /= np.maximum(cnt, 1.0)[:, None]
+            n = sm / np.maximum(np.linalg.norm(sm, axis=1, keepdims=True), 1e-12)
+            return cen + sm + self.enter_offset * n, n
+        X = vl.get("pos")[:nv].detach().cpu().numpy().astype(np.float64)
+        u = X.mean(0) - cen
+        n = u / np.maximum(np.linalg.norm(u, axis=1, keepdims=True), 1e-12)
+        return cen + self.enter_offset * n, n
+
+    def _enter(self, H, m, before, gone):
+        """`to_set_kinematic: false`: this call's leavers woken in free slots of `to_set` at their entry
+        points, `vel` zero, labels carried; nothing else in the set is touched."""
+        if not gone or before is None or "_enter" not in before:
+            return
+        P = H.level(self.to_set)
+        sch = P.state_schema
+        if "pos" not in sch:
+            raise ValueError(f"cell_die[t2]: to_set {self.to_set!r} must declare `pos`")
+        dev, dt = P.state.device, P.state.dtype
+        st, oc = P.state.clone(), P.occ.clone()
+        free = torch.nonzero(oc < 0.5).flatten()
+        per = 2 if self.enter_divided else 1
+        k = min(len(gone), int(free.numel()) // per)
+        if k < len(gone) and m is not None:
+            m["supra_overflow"] = int(m.get("supra_overflow", 0)) + len(gone) - k
+        if k == 0:
+            return
+        idx = np.asarray(gone[:k], np.int64)
+        x = np.asarray(before["_enter"], np.float64)[idx]
+        if per == 2:                                      # the two daughters, across the inward normal
+            n = np.asarray(before["_inward"], np.float64)[idx]
+            ax = np.where(np.abs(n[:, :1]) < 0.9, [[1.0, 0.0, 0.0]], [[0.0, 1.0, 0.0]])
+            t = np.cross(n, ax)
+            t /= np.maximum(np.linalg.norm(t, axis=1, keepdims=True), 1e-12)
+            x = np.concatenate([x - 0.5 * self.enter_split * t, x + 0.5 * self.enter_split * t])
+            idx = np.concatenate([idx, idx])
+        slot = free[:len(idx)]
+        p0, p1 = sch["pos"]
+        st[slot, p0:p1] = torch.as_tensor(x, device=dev, dtype=dt)
+        if "vel" in sch:
+            v0, v1 = sch["vel"]
+            st[slot, v0:v1] = 0.0
+        if "dir" in sch:                                  # outward, as the kinematic routine's
+            d0, d1 = sch["dir"]
+            st[slot, d0:d1] = torch.as_tensor(-before["_inward"][idx], device=dev, dtype=dt)
+        if "age" in sch:
+            st[slot, sch["age"][0]] = 0.0
+        for name, vals in before.items():
+            if name in sch and vals is not None and name != "centroid" and not name.startswith("_"):
+                st[slot, sch[name][0]] = torch.as_tensor(np.asarray(vals)[idx], device=dev, dtype=dt)
+        if self.enter_mark:
+            if self.enter_mark not in sch:
+                raise ValueError(f"cell_die[t2]: enter_mark {self.enter_mark!r} is not a block of {self.to_set!r}")
+            st[slot, sch[self.enter_mark][0]] = 1.0
+        if self.type2_p > 0 and self.type2_mark and self._t2_ids and before.get("cell_id") is not None:
+            if self.type2_mark not in sch:
+                raise ValueError(f"cell_die[t2]: type2_mark {self.type2_mark!r} is not a block of {self.to_set!r}")
+            _g = np.rint(np.asarray(before["cell_id"], np.float64)[idx]).astype(np.int64)
+            _is2 = torch.as_tensor(np.array([int(g) in self._t2_ids for g in _g]), device=slot.device)
+            if bool(_is2.any()):
+                if self.enter_mark:
+                    st[slot[_is2], sch[self.enter_mark][0]] = 0.0
+                st[slot[_is2], sch[self.type2_mark][0]] = 1.0
+                self._t2_ids.difference_update(int(g) for g in _g[_is2.cpu().numpy()])
+        oc[slot] = 1.0
+        P.state, P.occ = st, oc
+        if self.to_children:
+            from plexus.operators.mpm_ops import mpm_blocks, wake_mpm_body
+            if self.child_volume is not None:
+                vol = float(self.child_volume)
+            else:
+                Pc = H.level(self.to_children)
+                blocks, _per = mpm_blocks(H, self.to_set, self.to_children)
+                lv = (oc > 0.5).nonzero(as_tuple=True)[0]
+                bv = Pc.p_vol[blocks[lv]].sum(1) if getattr(Pc, "p_vol", None) is not None else None
+                vol = float(bv.median()) if bv is not None and bv.numel() else 1.0
+            if not hasattr(self, "_wake_gen"):
+                self._wake_gen = torch.Generator(device="cpu").manual_seed(self.seed + 104723)
+            wake_mpm_body(H, self.to_set, self.to_children, slot.tolist(), x, vol, gen=self._wake_gen)
+        if m is not None:
+            m["n_entered"] = int(m.get("n_entered", 0)) + k
 
     def _leaving_labels(self, H, cat, m, nF):
         """Every cell's id, centroid and shared labels at the start of the call -- what a cell that
@@ -3601,7 +4221,10 @@ class Apoptosis3DT2(Apoptosis3D):
         names = [k for k, (a, b) in P.state_schema.items()
                  if b - a == 1 and k not in ("age",) and k in clvl.state_schema
                  and clvl.state_schema[k][1] - clvl.state_schema[k][0] == 1]
-        return {"cell_id": cid, "centroid": cen, **{k: cell_block(H, cat, k, nF) for k in names}}
+        out = {"cell_id": cid, "centroid": cen, **{k: cell_block(H, cat, k, nF) for k in names}}
+        if not self.to_set_kinematic:
+            out["_enter"], out["_inward"] = self._entry_points(H, m, nF, cen)
+        return out
 
     def _suprabasal(self, H, m, before, gone):
         """Age, shed and sink the suprabasal set; put this call's leavers in its free slots."""
@@ -3668,12 +4291,81 @@ class Apoptosis3DT2(Apoptosis3D):
                 m["wound_cells"] = int(hit.sum())
         return flag
 
+    def _room(self, H, flag):
+        """With `hold_when_full`: how many more cells `to_set` can take this call -- its free slots, less the leavers
+        already sentenced (`flag` > 0), per leaver 2 slots with `enter_divided`. None when the guard is off."""
+        if not self.hold_when_full or not getattr(self, "to_set", None) or H is None:
+            return None
+        P = H.level(self.to_set)
+        if P is None:
+            return None
+        free = int((P.occ < 0.5).sum())
+        pending = int((np.asarray(flag) > 0).sum())
+        per = 2 if self.enter_divided else 1
+        return (free - per * pending) // per
+
     def _admit_rule(self, flag, want, m, H, nF):
         if self.hazard > 0:                        # each candidate at `hazard` a call, no ceiling
             rng = np.random.default_rng(self.seed * 1_000_003 + 15485863 + self._k)
             held = {int(x) for x in np.where(flag > 0)[0]}
             cand = np.array(sorted(set(want) - held), dtype=np.int64)
-            flag[cand[rng.random(len(cand)) < self.hazard]] = 1.0
+            hz = self.hazard
+            if self.hazard_from == "bound" and len(cand):
+                Bc = cell_block(H, self.cat, self.bound_block, nF) if H is not None else None
+                if Bc is None:
+                    raise ValueError(f"cell_die[t2]: hazard_from bound needs the width-1 block {self.bound_block!r} "
+                                     f"on {self.cat!r} (written by bm_clutch)")
+                if self._b_ref is None and (Bc > 0).any():
+                    self._b_ref = float(np.median(Bc[Bc > 0]))
+                hz = adhesion_hazard(Bc[cand], self._b_ref or 1.0, self.r_mit)
+                m["hazard_mean"] = float(np.mean(hz))
+            pick = cand[rng.random(len(cand)) < hz]
+            # `max_leave_per_call: N` (default 0 = no ceiling, the line above unchanged): at most N new
+            # sentences a call, a random N of the drawn -- the others stay candidates (a phase-ready cell
+            # stays in M) and are drawn again next call. exp 11: with `hazard` 1 and no division in the
+            # layer, every cell that became ready during the settling window left at once -- 111 of 200 in
+            # 12 frames, the layer crushed (Finding 94); `max_mark_frac` does not reach this branch.
+            _cap = self.max_leave_per_call
+            if self.max_leave_frac > 0:
+                # `max_leave_frac` (default 0 = off): the cap FOLLOWS THE LAYER, max(max_leave_per_call,
+                # ceil(frac x nF)) a call. A fixed cap of 2 met the start of exp 11's Type I loop and throttled
+                # its steady state: ~400 cells on a ~60-frame cycle are ~7 ready a frame, so the queue grew, the
+                # waiting cells kept growing in M and became giant flat facets (the tent-shaped gland of mc_x_cm)
+                _cap = max(_cap, int(math.ceil(self.max_leave_frac * nF)))
+            if _cap > 0:
+                # A QUEUE, NOT A DRAW: `rule: phase` offers each ready cell ONCE (`_ready`, by `cell_id`), so a
+                # cell the cap passed over would never be offered again -- it sat in M, swelled (median volume
+                # 1.15 -> 3.9) and the layer stopped growing (34 dives in 320 frames). The passed-over cells wait,
+                # first come first served, while they stay live and unsentenced.
+                ids = cell_block(H, self.cat, "cell_id", nF) if H is not None else None
+                if ids is not None:
+                    at = {int(ids[f]): int(f) for f in range(nF)}
+                    queued = [at[c] for c in getattr(self, "_leave_q", []) if c in at and flag[at[c]] <= 0]
+                    pool = list(dict.fromkeys(queued + [int(f) for f in pick]))
+                    if self.isolate and m.get("E_face") is not None:
+                        _sel, _rest = isolated_split(pool, flag, m["E_srce"], m["E_trgt"], m["E_face"], nF, _cap)
+                    else:
+                        _sel, _rest = pool[: _cap], pool[_cap:]
+                    pick = np.asarray(_sel, dtype=np.int64)
+                    self._leave_q = [int(ids[f]) for f in _rest]
+                    m["t2_waiting"] = set(self._leave_q)          # read by `cell_divide` `skip_sentenced`
+                elif len(pick) > _cap:
+                    pick = rng.choice(pick, size=_cap, replace=False)
+            room = self._room(H, flag)
+            if room is not None:
+                pick = pick[: max(room, 0)]
+            flag[pick] = 1.0
+            # Type II leavers (`type2_p`) are not queued behind the Type I cap: a boundary division sends its daughter
+            # in at once (with the cap they took the Type I slots and most never left -- exp 11 Finding 134)
+            _t2n = getattr(self, "_t2_now", None)
+            if _t2n:
+                _i = np.asarray(sorted(f for f in _t2n if f < len(flag)), dtype=np.int64)
+                _r = self._room(H, flag)
+                if _r is not None:
+                    _i = _i[: max(_r, 0)]
+                if len(_i):
+                    flag[_i] = 1.0
+                self._t2_now = set()
             return flag
         if self.mode in ("list", "band", "cone") or not self.capacity:
             return super()._admit(flag, want, m, H, nF)
@@ -3756,11 +4448,15 @@ class Apoptosis3DT2(Apoptosis3D):
         nb = twin[ok][young[efn[ok]]]
         return {int(g) for g in nb if not young[g]}
 
-    def _to_triangle(self, rings, pos, f):
+    def _to_triangle(self, rings, pos, f, keep_nb_sides=None):
         """Flip the dying cell's own edges, shortest first, until it has three sides. Each T1 on an
         edge of f takes one side from f and one from the cell across the edge, and gives one to each
         of the two cells at its ends (`t1_flip_3d`, which refuses any flip that would break the
-        closed surface or fold a face). True when f is a triangle."""
+        closed surface or fold a face). True when f is a triangle. With `collapse_measured`, False (not
+        yet) while the cell's measured volume is above `critical_frac` x the measured reference."""
+        if (self.collapse_measured and self._v_meas is not None and f < len(self._v_meas)
+                and self._v_meas[f] > self.crit * self._v_meas_ref):
+            return False
         if len(rings[f]) == 3:
             return True
         emap, vf = _edge_face_map(rings), _vertex_faces(rings)
@@ -3770,10 +4466,24 @@ class Apoptosis3DT2(Apoptosis3D):
                 break
             es = [(r[i], r[(i + 1) % len(r)]) for i in range(len(r))]
             es.sort(key=lambda e: float(np.linalg.norm(np.asarray(pos[e[0]]) - np.asarray(pos[e[1]]))))
+            _kn = self.keep_nb_sides if keep_nb_sides is None else keep_nb_sides
+            if _kn:
+                # the cell across edge (a, b) of f holds the reversed directed edge (b, a)
+                es = [e for e in es if emap.get((e[1], e[0])) is not None
+                      and len(rings[emap[(e[1], e[0])]]) - 1 >= _kn]
             if not any(t1_flip_3d(rings, pos, e, emap=emap, vf=vf, plane_axis=self.plane_axis) is not None
                        for e in es):
                 break
         return len(rings[f]) == 3
+
+    def nb_sides_for(self, size_tgt, crit):
+        """The side floor `_to_triangle` protects this sentenced cell's neighbours with: `keep_nb_sides`, or one less
+        (never under 4) once the cell's shrinking target has fallen below `stuck_frac` x the collapse size -- a dive
+        stuck that long (exp 11 R5: sentenced cells 10 -> 245 over rows 100-240, the stuck ones 9-sided, Finding 190)."""
+        kn = self.keep_nb_sides
+        if kn and self.stuck_frac > 0 and size_tgt < self.stuck_frac * crit:
+            return max(int(kn) - 1, 4)
+        return kn
 
     def _after_topology(self, H, m, es, et):
         """Compact the vertex set to the vertices the new half-edge table still references.
@@ -3830,6 +4540,94 @@ class Divide3DDoubler(Divide3D):
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         return v_now >= self.factor * jit * v_birth
+
+
+@register_operator("cell_divide", model="postmitotic", set="vertex", kind="divide", family="population",
+                   title="Cell division")
+class Divide3DPostmitotic(Divide3D):
+    """The default size rule, except that a POST-MITOTIC cell never divides: a cell whose per-cell
+    block value `veto_block[:, veto_col]` is above `veto_th` (and, if `veto_below_col` is set, whose
+    `veto_block[:, veto_below_col]` is ALSO below `veto_below_th`) is struck from the candidates.
+
+    WHY. Serra et al. 2019 grow intestinal organoids from a single cell, and the first symmetry break
+    is a Delta-high, Notch-low cell -- the lateral-inhibition winner -- that becomes a Paneth cell,
+    and Paneth cells are post-mitotic: the crypt that forms around them is made by their neighbours'
+    divisions, not by theirs. `cell_chem_react[model: notch_delta]` writes that state into the `chem`
+    block of the cell set (column 0 Notch, column 1 Delta), so the defaults read "Delta above 0.5";
+    `veto_below_col: 0, veto_below_th: 0.5` adds "and Notch below 0.5", the winner proper.
+
+    WHAT THE DEFAULT DOES, UNCHANGED. Every other cell divides exactly as `cell_divide` does --
+    v_j >= factor x jit_j x v_ref, the seed-time median volume, after `min_cycle` calls. When no cell
+    is vetoed (or the block or its columns are not declared, which is announced once) `_ready_mask`
+    answers None and `Divide3D.forward` takes its own `_trigger` path verbatim, so the run is
+    bit-identical to the default model. When some cell is vetoed the mask is `_trigger` evaluated on
+    the same four scalars `forward` hands it, with the vetoed cells set False.
+
+    THE `max_cycle` BACKSTOP CANNOT BE VETOED from here (`forward` ORs it in after the mask), so a
+    spec that sets it below 10^9 is refused rather than letting a Paneth cell divide on the clock.
+
+    Reference: Serra, D. et al. (2019). Self-organization and symmetry breaking in intestinal
+    organoid development. Nature 569:66-72 (the Delta-high founder becomes the post-mitotic Paneth
+    cell that seeds the crypt).
+    """
+    MECHANISM_TAGS = ["division", "cell_division", "post_mitotic", "paneth", "lateral_inhibition"]
+    REFERENCE = "Serra, D. et al. (2019). Nature 569:66-72."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.veto_block = str(params.get("veto_block", "chem"))
+        self.veto_col = int(params.get("veto_col", 1))            # Delta of cell_chem_react[notch_delta]
+        self.veto_th = float(params.get("veto_th", 0.5))          # in the block's own units
+        bc, bt = params.get("veto_below_col"), params.get("veto_below_th")
+        if (bc is None) != (bt is None):
+            raise ValueError("cell_divide[postmitotic]: veto_below_col and veto_below_th go together")
+        self.veto_below_col = None if bc is None else int(bc)
+        self.veto_below_th = None if bt is None else float(bt)
+        if self.max_cycle < 10 ** 9:
+            raise ValueError(
+                f"cell_divide[postmitotic]: max_cycle {self.max_cycle} (calls since birth) would force a "
+                f"vetoed cell to divide, since Divide3D ORs the backstop in after the mask. Leave it unset.")
+        self._veto_warned = False
+
+    def _veto(self, H, nF):
+        """Per-cell boolean, True = post-mitotic; None when the block or a column is not there."""
+        cat = self.cell_set
+        lvl = H.level(cat) if cat in H.levels else None
+        need = max(self.veto_col, -1 if self.veto_below_col is None else self.veto_below_col)
+        if lvl is None or getattr(lvl, "state", None) is None or self.veto_block not in lvl.state_schema \
+                or lvl.get(self.veto_block).shape[1] <= need:
+            if not self._veto_warned:
+                print(f"[cell_divide:postmitotic] set {cat!r} has no {self.veto_block!r} block with column "
+                      f"{need}: nothing is vetoed, this is the default size rule")
+                self._veto_warned = True
+            return None
+        blk = lvl.get(self.veto_block)[:nF].detach().cpu().numpy().astype(np.float64)
+        v = blk[:, self.veto_col] > self.veto_th
+        if self.veto_below_col is not None:
+            v &= blk[:, self.veto_below_col] < self.veto_below_th
+        return v
+
+    def _ready_mask(self, H, m, nF):
+        """`_trigger` per cell with the post-mitotic cells False; None (the default path) when none is."""
+        veto = self._veto(H, nF)
+        if veto is None or not veto.any():
+            return None
+        # THE SAME FOUR SCALARS `forward` BUILDS, read the same way: `cell_size` has already run this
+        # call (so its cached reference is fixed), `Vbirth` has already been re-read for age-1 cells,
+        # and the age is the stored one plus this call.
+        lvl = H.level(self.at)
+        Nv = int(m["Nv"])
+        pos_np = lvl.get("pos")[:Nv].detach().cpu().numpy().astype(np.float64)
+        vf, v_ref = cell_size(lvl, m, nF, pos_np, H=H, at=self.at)
+        vf = np.asarray(vf, np.float64)
+        Vbirth = require_cell_block(H, self.cell_set, "Vbirth", nF, "cell_divide").tolist()
+        djit = require_cell_block(H, self.cell_set, "divjit", nF, "cell_divide").tolist()
+        a = m.get("age")
+        age = ([0] * nF) if (a is None or a.shape[0] != nF) else (a.detach().cpu().numpy() + 1).tolist()
+        ready = np.array([bool(self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)) for f in range(nF)],
+                         dtype=bool)
+        m["div_vetoed"] = int((ready & veto).sum())      # ripe cells held back this call, for the record
+        return ready & ~veto
 
 
 @register_operator("cell_divide", model="timer", set="vertex", kind="divide", family="population", title="Cell division")
@@ -4087,6 +4885,26 @@ class SeedCycle3D(Seed):
         return {}
 
 
+def cycle_size(m, nF, v_now, v_ref, size_from="measured", v0_ref=None):
+    """The size `cell_cycle` reads. `measured`: `v_now` (from `cell_size`), unchanged. `target`: the cell's target
+    `V0f` in the measured convention, V0f x v_ref / v0_ref, where `v0_ref` is the SEED's median target (fixed by the
+    caller on its first call) -- so `g1_size` keeps its meaning (a multiple of the seed-time median cell). Not
+    median(V0f_init): `cell_grow` re-baselines that to the current targets at every division, and a floating
+    reference let the median cell never reach the checkpoint (exp 11 mc_e_tc_ctl, first build)."""
+    if size_from not in ("target", "both"):
+        return v_now
+    V0 = np.asarray(m["V0f"][:nF].detach().cpu().numpy() if hasattr(m["V0f"], "detach") else m["V0f"][:nF], np.float64)
+    if v0_ref is None:
+        Vi = m.get("V0f_init")
+        Vi = np.asarray(Vi[:nF].detach().cpu().numpy() if hasattr(Vi, "detach") else (Vi[:nF] if Vi is not None else V0), np.float64)
+        v0_ref = float(np.median(Vi))
+    v_t = V0 * float(v_ref) / max(float(v0_ref), 1e-12)
+    # `both`: the SMALLER of the two -- a cell leaves G1 only when its target has doubled (it wants to) AND its body has
+    # (it can). Reading the target alone divided squeezed cells on schedule, halving volumes they never had; the
+    # layer's median volume fell 1.18 -> 0.12 in 160 rows under every membrane setting (exp 11 Finding 124).
+    return np.minimum(v_t, np.asarray(v_now, np.float64)) if size_from == "both" else v_t
+
+
 @register_operator("cell_cycle", set="vertex", kind="lateral", family="population")
 class CellCycle3D(Lateral):
     """G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule. It divides nothing.
@@ -4175,6 +4993,16 @@ class CellCycle3D(Lateral):
                   float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
         self.g1_size = float(params.get("g1_size", 1.6))
         self.phase_cv = float(params.get("phase_cv", 0.0))
+        # `size_from: target` (exp 11, 2026-09-28; default `measured` = unchanged): the size the cycle reads -- the
+        # sizer's checkpoint, its progress and the birth size -- is the cell's TARGET `V0f`, put in the measured
+        # convention by the seed's ratio v_ref / median(V0f_init) (`cycle_size`). Reading the measured volume, a
+        # squeezed cell never reached the checkpoint while `cell_grow` kept growing its target, and a stretched one
+        # passed it early and divided with a small target that its daughters inherited: the targets spread from
+        # 0.65-1.36x the median at the seed to 0.1-8.4x by row 160 on the healthy gland (exp 11 Finding 119).
+        self.size_from = str(params.get("size_from", "measured")).lower()
+        if self.size_from not in ("measured", "target", "both"):
+            raise ValueError(f"cell_cycle: size_from is measured, target or both, got {self.size_from!r}")
+        self._vb_target = False
         if "seed_async" in params:
             raise ValueError(
                 "cell_cycle no longer takes `seed_async`: spreading a seeded population over the "
@@ -4298,8 +5126,18 @@ class CellCycle3D(Lateral):
         # model's `cyc_vprev` and `g1_size * v_ref` were all stated in a volume the cell does not
         # have, while `cell_mechanics[apicobasal]` was defending the polyhedron.
         v_now, v_ref = cell_size(lvl, m, nF, H=H, at=self.at)
+        if self.size_from in ("target", "both"):
+            if getattr(self, "_v0_ref", None) is None:
+                # the first call after settling, before any division: `V0f_init` is still the seed's targets
+                _vi = m.get("V0f_init", m["V0f"])
+                self._v0_ref = float(np.median(np.asarray(_vi[:nF].detach().cpu().numpy() if hasattr(_vi, "detach")
+                                                          else _vi[:nF], np.float64)))
+            v_now = cycle_size(m, nF, v_now, v_ref, self.size_from, v0_ref=self._v0_ref)
         _dt = float(getattr(H, "dt", 1.0))
         vb0 = cell_block(H, self.cat, "Vbirth", nF)
+        if self.size_from in ("target", "both") and not self._vb_target:
+            # the first call after settling: every cell's birth size restated as its target, once
+            vb0 = v_now.copy(); set_cell_block(H, self.cat, "Vbirth", vb0, nF); self._vb_target = True
         _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
         if _rate_prev is None or len(_rate_prev) != nF:
             _rate_prev = np.zeros(nF)
@@ -4310,6 +5148,10 @@ class CellCycle3D(Lateral):
             born = (age <= 0) & (ph >= self.M)
             ph = np.where(born, float(self.G1), ph)
             pt = np.where(born, 0.0, pt)
+        if self.size_from in ("target", "both") and born.any():
+            # a daughter's birth size is its own halved TARGET, not the volume `cell_divide` measured
+            vb0 = (vb0.copy() if vb0 is not None and len(vb0) == nF else v_now.copy())
+            vb0[born] = v_now[born]; set_cell_block(H, self.cat, "Vbirth", vb0, nF)
         # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
         # statement about volume and not about the rule: a concentration in a growing cell falls.
         #
@@ -5023,6 +5865,407 @@ class Divide3DConcerted(Divide3D):
         return (w * by_size + (1.0 - w) * by_time) >= 1.0
 
 
+# cell_divide[point] -- DIVISION OF A CELL THAT IS ONE PARTICLE (exp 11, 2026-09-27: the inner cells of a
+# stratified bud, replacing the growing-volume clock `k_core`/`core_rate` of cell_mechanics[apicobasal_contact]).
+POINT_DIVIDE_TRACE: list = []       # per call: (frame, divisions, live count)
+
+
+@register_operator("cell_divide", model="point", set="particle", kind="divide", family="population",
+                   title="Cell division",
+                   equation=r"""$$p=e^{r\,\Delta t}-1,\qquad \mathbf x_{m,d}=\mathbf x\mp\tfrac{\delta}{2}\,\hat{\mathbf u}$$""")
+class CellDividePoint(Structural):
+    """`cell_divide` for a set whose cells are POINTS -- one particle per cell, packed by a pair law
+    (`pair_potential[law: harmonic]`) -- rather than faces of a half-edge mesh: a live cell divides
+    into a free slot of its own set, the two daughters placed a small distance apart, and the
+    population grows as exp(rate t).
+
+    particle -> particle: wakes dormant slots (`Level.spawn`, every per-slot buffer copied from the
+    mother), writes the two daughters' positions and zeroes their `vel`; no delta.
+
+        p        = exp(rate dt) - 1                  each live cell divides this call with probability p
+        x_m, x_d = x -/+ (offset / 2) u              u a uniform random unit vector
+
+    so E[N(t + dt)] = N(t) exp(rate dt): `rate` is the population's exponential growth rate in 1/time
+    (dt = general.dt; p must stay below 1). `offset` (world, default 0.5) is the distance between
+    the daughters at birth -- half a cell diameter lets the pair law push them apart smoothly;
+    `max_cells` (default 0 = none) is a population ceiling, as `cell_divide`'s; `seed` this
+    operator's own generator, advanced every call, so a run is reproducible and does not move when
+    another operator draws first. When the buffer has no free slot, the surplus divisions are
+    dropped (printed once): declare the set's `buffer` for the population the run will reach.
+
+    WHY A MODEL OF cell_divide. It is the same transformation -- one cell becomes two, the set gains
+    a member (kind `divide`, family `population`) -- on a cell whose representation is a point.
+    Nothing registered did it: every other `cell_divide` model splits a FACE of a half-edge mesh
+    (a septum, a rebuilt table); `bm_secrete[live]` wakes reserve slots ON a surface, not from a
+    mother; `cell_die[t2]`'s `to_set` fills particle slots from DYING mesh cells (an entry, not a
+    division); `organelle_express` relaxes per-cell piece counts; the `duplicate` / `divide` of
+    `operators/candidates/` are unregistered 2D prototypes on a private occupancy (`H.p_w`).
+
+    Reference: Drasdo, D. & Hoehme, S. (2005). A single-cell-based model of tumor growth in vitro:
+    monolayers and spheroids. Phys. Biol. 2:133-147 (the centre-based cell that divides into two
+    daughters about the mother's centre). The constant rate -- an exponential cycle time -- is the
+    simplest clock, chosen here so the interior's growth is one number set against the layer's.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["rate"]
+    MECHANISM_TAGS = ["division", "cell_division", "proliferation", "centre_based_cells"]
+    PARAM_ROLES = {"rate": "exponential_growth_rate_per_time", "offset": "daughter_separation_at_birth",
+                   "max_cells": "population_ceiling", "seed": "rng_seed"}
+    PARAM_UNITS = {"rate": "1/T", "offset": "length", "max_cells": "count"}
+    REFERENCE = ("Drasdo, D. & Hoehme, S. (2005). Phys. Biol. 2:133-147.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.rate = float(params["rate"])
+        # `rate_decay_T` (default 0 = none): the rate falls as rate / (1 + t / T) -- the same hyperbolic decay as
+        # `cell_grow`'s, so an interior growing with a linearly growing surface (Wang 2021 Fig 1H) keeps its ratio to it.
+        self.rate_decay_T = float(params.get("rate_decay_T", 0.0))
+        self.offset = float(params.get("offset", 0.5))
+        self.max_cells = int(params.get("max_cells", 0) or 0)
+        self.seed = int(params.get("seed", 0))
+        self._gen = torch.Generator().manual_seed(self.seed)
+        self._said_full = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        dt = float(getattr(H, "dt", 1.0) or 1.0)
+        _r = self.rate
+        if self.rate_decay_T > 0:
+            _r = _r / (1.0 + float(getattr(H, "frame", 0) or 0) * dt / self.rate_decay_T)
+        p = math.expm1(_r * dt)
+        if not 0.0 <= p < 1.0:
+            raise ValueError(f"cell_divide[point]: rate {self.rate:g} x dt {dt:g} gives a division probability "
+                             f"{p:.3g} per call; it must lie in [0, 1) -- lower the rate or dt")
+        live = (lvl.occ > 0).nonzero(as_tuple=True)[0]
+        n_live = int(live.numel())
+        fr = getattr(H, "frame", None)
+        fr = -1 if fr is None else int(fr)
+        u = torch.rand(n_live, generator=self._gen)           # drawn for every live cell, every call
+        mother = live[(u < p).to(live.device)]
+        if self.max_cells > 0:
+            mother = mother[: max(0, self.max_cells - n_live)]
+        if mother.numel() == 0:
+            POINT_DIVIDE_TRACE.append((fr, 0, n_live))
+            return {}
+        D = lvl.get("pos").shape[-1]
+        d = torch.randn(int(mother.numel()), D, generator=self._gen)
+        d = (d / d.norm(dim=1, keepdim=True).clamp_min(1e-12)).to(lvl.state.device, lvl.state.dtype)
+        new, src = lvl.spawn(mother)
+        if new.numel() < mother.numel() and not self._said_full:
+            self._said_full = True
+            print(f"[cell_divide/point] `{self.at}` has no free slot for {int(mother.numel() - new.numel())} "
+                  f"division(s) at frame {fr} ({n_live} live of {lvl.n}); raise the set's `buffer`", flush=True)
+        if new.numel():
+            half = 0.5 * self.offset * d[: new.numel()]
+            p0, p1 = lvl.state_schema["pos"]
+            x = lvl.state[src, p0:p1].clone()
+            lvl.state[src, p0:p1] = x - half
+            lvl.state[new, p0:p1] = x + half
+            if "vel" in lvl.state_schema:
+                v0, v1 = lvl.state_schema["vel"]
+                lvl.state[src, v0:v1] = 0.0
+                lvl.state[new, v0:v1] = 0.0
+        POINT_DIVIDE_TRACE.append((fr, int(new.numel()), n_live + int(new.numel())))
+        return {}
+
+
+@register_operator("cell_divide", model="reinsert", set="vertex", kind="divide", family="population",
+                   title="Cell division",
+                   equation=r"""$$P(\text{return per call}\mid h_i\le\text{band})=p_{\rm return},\qquad \frac{p_{\rm return}}{1-p_{\rm return}}\ \text{per call}\ \leftrightarrow\ K=e^{-c\,\Delta E}$$""")
+class Divide3DReinsert(Divide3D):
+    """An inner cell RETURNS to the surface layer: a live particle of `from_set` lying within `band` of
+    the layer's apical surface is taken into the layer as a new surface cell, by the face-division
+    machinery of this operator -- the surface cell nearest the particle (the host) is cut by the same
+    septum `cell_divide` always makes, the appended piece is the newcomer, and the particle is removed
+    (occ 0). Wang et al. 2021 (Cell 184:3702, Fig 2A-B): the daughters of the surface cells that dived
+    in to divide re-insert into the surface, most within 4 h.
+
+    vertex -> vertex (and `from_set` particle -> gone): per call, at most `max_per_call` returns.
+
+        h_i       the particle's height above the apical ring a = pos + sep (into the lumen), from the
+                  nearest fan triangle (`membrane_ops._live_basal(side="apical")` + `_nearest_faces`,
+                  the lookup `bm_contact[live, side: apical]` holds the same particles with)
+        returns   with probability `p_return` per call when h_i <= `band`
+
+    THE HOST DID NOT DIVIDE, so everything the base writes on it is put back: its targets (A0, P0,
+    V0f), `age`, `ndiv`, `Vbirth`, `divjit`, `cell_id`, `parent_id`, and its cycle state (the row copy
+    leaves it untouched); every other old cell's `age` and targets too (the base ages every cell and
+    rewrites P0 = p0 sqrt(A0) at each call), and `n_div`, `div_blocked`, `buf_full` -- so this
+    operator neither ages the layer nor counts as a layer division. The NEWCOMER is a fresh cell:
+    targets `new_frac` (default 0.5) of the host's (the piece a septum makes), `age` 0, `ndiv` 1 (a
+    daughter, so `cell_cycle` holds its clock until its birth volume is read), cycle at (G1, 0),
+    `parent_id` -1, a new `cell_id`; it carries every width-1 label `from_set` and the cell set both
+    declare, except the ids; `cyc_vprev` 0 (not yet read). Counted in `m["n_reinsert"]`.
+
+    THE PARAMETER IS THE PER-CALL PROBABILITY, AND ITS MAPPING TO ADHESION IS DOCUMENTED, NOT CODED.
+    Wang et al.'s STAR Methods (eq 20-22, 29-32) give the equilibrium fraction of inner cells at the
+    surface as K / (1 + K), K = exp(-c dE), dE = (e_cc - e_cm) S_B + E1 + E2, K = 13.285 at control.
+    With a return hazard p_return per call against an exit hazard q per call a two-state chain sits at
+    K = p_return / q; and scaling the adhesion, K = K0^(e_cm / e_cm0) (dE linear in e_cm). A median
+    return time of T calls is p_return = 1 - 2^(-1/T): T = 12 frames (2 h at 600 s) -> 0.056.
+
+    Parameters: `from_set` (required), `band` (world, default 0.6 -- must exceed the `offset` at which
+    `bm_contact[live, side: apical]` holds the set, or nothing is ever near enough), `p_return`
+    (default 0.05), `max_per_call` (default 4), `new_frac` (0.5), `seed` (0; this operator's own
+    generator, advanced every call), `sep_block` ("sep"), `mark` (default none = every live particle may
+    return; a width-1 block of `from_set` -> only particles with it > 0.5, e.g. the progeny of the cells
+    `cell_die[t2]` placed there with `enter_mark`). Needs `cell_id` on the cell set (to tell the
+    hosts from the newcomers after the rebuild). Idle while the seed is settling (`ref_frame`), as
+    every `cell_divide`.
+
+    Reference: Wang, S., Matsumoto, K., Lish, S. R., Cartagena-Rivera, A. X. & Yamada, K. M. (2021).
+    Budding epithelial morphogenesis driven by cell-matrix versus cell-cell adhesion. Cell
+    184:3702-3716.
+    """
+    MECHANISM_TAGS = ["division", "reinsertion", "stratification", "cell_sorting"]
+    PARAM_UNITS = {**Divide3D.PARAM_UNITS, "band": "length", "p_return": "fraction",
+                   "max_per_call": "count", "new_frac": "fraction"}
+    REQUIRES_PARAMS = ["from_set"]
+    _HOST_BLOCKS = ("Vbirth", "divjit", "cell_id", "parent_id")
+    _NEW_ZERO = ("phase", "cycle_progress", "phase_t", "cyc_vprev")
+
+    def __init__(self, params, device="cpu"):
+        p = dict(params)
+        p.setdefault("every", 1)                  # the base's private default (3) would refuse the spec
+        super().__init__(p, device)
+        self.from_set = str(params["from_set"])
+        self.band = float(params.get("band", 0.6))
+        self.host_pick = str(params.get("host_pick", "nearest")).lower()
+        self.p_return = float(params.get("p_return", 0.05))
+        if not 0.0 <= self.p_return <= 1.0:
+            raise ValueError(f"cell_divide[reinsert]: p_return must lie in [0, 1], got {self.p_return}")
+        # `p_from: adhesion` (default `fixed`, p_return for every body; exp 11 Phase 3 B5, 2026-09-29): each body's
+        # own probability, `adhesion_return_p(p_return, lam_host, G_body, g_ref, kappa_G)` -- the matrix at the host
+        # (bm_clutch's covered fraction x the membrane's mass there, by the host's cell_id) and the body's
+        # E-cadherin (`ecad_block` of `from_set`, default `ecad`; `g_ref` 0.35, `kappa_G` 2.0)
+        self.p_from = str(params.get("p_from", "fixed")).lower()
+        if self.p_from not in ("fixed", "adhesion"):
+            raise ValueError(f"cell_divide[reinsert]: p_from is fixed or adhesion, got {self.p_from!r}")
+        self.kappa_G = float(params.get("kappa_G", 2.0))
+        self.g_ref = float(params.get("g_ref", 0.35))
+        self.ecad_block = str(params.get("ecad_block", "ecad"))
+        self.max_per_call = int(params.get("max_per_call", 4))
+        self.new_frac = float(params.get("new_frac", 0.5))
+        self.sep_block = str(params.get("sep_block", "sep"))
+        self.mark = params.get("mark")
+        # `from_children: <point set>` (default none): `from_set` is a set of MPM CELLS -- a returning cell's
+        # block of material points goes back to the dormant pool with it (`mpm_ops.sleep_mpm_body`).
+        self.from_children = params.get("from_children")
+        self.age_layer = bool(params.get("age_layer", False))
+        self.new_frac_of = str(params.get("new_frac_of", "host")).lower()
+        if self.new_frac_of not in ("host", "median", "reference"):
+            raise ValueError(f"cell_divide[reinsert]: new_frac_of is host, median or reference, got {self.new_frac_of!r}")
+        self._ref_targets = {}
+        self.seed = int(params.get("seed", 0))
+        self._rng = np.random.default_rng(self.seed + 7919)
+        self._geo = None
+        self._hosts = []
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        return False
+
+    def _ready_mask(self, H, m, nF):
+        mk = np.zeros(nF, bool)
+        mk[np.asarray(self._hosts, np.int64)] = True
+        return mk
+
+    def _adhesion_p(self, H, m, P, live, face, nF):
+        """Per live body, `adhesion_return_p` at the face under it: the host's matrix from bm_clutch's last call
+        (`clutch_by_id`: cell_id -> covered fraction x mass; 1 where the host is unknown), the body's E-cadherin."""
+        lam = np.ones(len(face))
+        by = m.get("clutch_by_id")
+        ids = cell_block(H, self.cell_set, "cell_id", nF)
+        if by is not None and ids is not None:
+            look = dict(zip(np.asarray(by[0], np.int64).tolist(), np.asarray(by[1], np.float64).tolist()))
+            ff = np.clip(face, 0, nF - 1)
+            hid = np.rint(np.asarray(ids, np.float64)[ff]).astype(np.int64)
+            lam = np.array([look.get(int(k), 1.0) for k in hid])
+        G = np.full(len(face), self.g_ref)
+        if self.ecad_block in P.state_schema:
+            G = P.state[live, P.state_schema[self.ecad_block][0]].detach().cpu().numpy().astype(np.float64)
+            G = np.where(G > 0, G, self.g_ref)
+        # the body's integrin, carried from the layer through the dive (bm_clutch's pools), over the resting U0 = 1
+        u = np.ones(len(face))
+        _it = [b for b in ("itg_I", "itg_A", "itg_N", "itg_B") if b in P.state_schema]
+        if len(_it) == 4:
+            u = sum(P.state[live, P.state_schema[b][0]].detach().cpu().numpy().astype(np.float64) for b in _it)
+            u = np.where(u > 0, u, 1.0)                       # a body that never carried any: no penalty
+        p = adhesion_return_p(self.p_return, lam, G, self.g_ref, self.kappa_G, u)
+        m["return_p_mean"] = float(p.mean()) if len(p) else 0.0
+        return p
+
+    def _returning(self, H, m, nF):
+        """(particle slots, host faces) of this call's returns, one particle per host."""
+        from plexus.operators import membrane_ops as _MO
+        P = H.level(self.from_set)
+        if P is None:
+            raise ValueError(f"cell_divide[reinsert]: from_set {self.from_set!r} is not a set of this spec")
+        live = (P.occ > 0.5).nonzero(as_tuple=True)[0]
+        u = self._rng.random(int(live.numel()))            # drawn for every live particle, every call
+        if not live.numel():
+            return [], []
+        if self._geo is None:
+            self._geo = _MO._basal_lookup()
+        y = P.get("pos")[live]
+        got = _MO._live_basal(H, self.at, self.sep_block, self._geo, y.device, y.dtype, side="apical")
+        if got is None:
+            return [], []
+        _, c, M = got
+        hit, tri, _w, _n, gap = _MO._nearest_faces(M, c, y)
+        h = -gap                                            # height INTO the lumen
+        face = M["ef"][tri].cpu().numpy()
+        pr = self.p_return
+        if self.p_from == "adhesion":
+            pr = self._adhesion_p(H, m, P, live, face, nF)
+        ok = (hit & (h <= self.band)).cpu().numpy() & (u < pr) & (face < nF)
+        if self.mark:
+            if self.mark not in P.state_schema:
+                raise ValueError(f"cell_divide[reinsert]: mark {self.mark!r} is not a block of {self.from_set!r}")
+            ok &= P.state[live, P.state_schema[self.mark][0]].detach().cpu().numpy() > 0.5
+        ring = np.bincount(m["E_face"].cpu().numpy(), minlength=nF)
+        fl = m.get("apop_flag")                            # a cell on its way out hosts no one
+        if fl is not None and len(fl) == nF:
+            fl = fl.detach().cpu().numpy() if torch.is_tensor(fl) else np.asarray(fl)
+            ring = np.where(fl > 0, 0, ring)
+        # `host_pick: largest` (exp 11 ladder L3, 2026-09-28; default `nearest` = unchanged): the newcomer enters by
+        # cutting the LARGEST cell among the face under it and that face's neighbours -- Wang's "sites of easiest
+        # entry"; cutting whichever cell lay under the returning body halved small and large cells alike, and in a
+        # layer that grows only by returns that random halving was the volume spread (CV 0.58-0.72, Finding 139).
+        _vol = _nbr = None
+        if self.host_pick == "largest":
+            _vol = np.asarray(cell_size(H.level(self.at), m, nF, H=H, at=self.at)[0], np.float64)
+            es_, et_, ef_ = (m[k].cpu().numpy() for k in ("E_srce", "E_trgt", "E_face"))
+            _key = {(int(a), int(b)): int(f) for a, b, f in zip(es_, et_, ef_)}
+            _nbr = {}
+            for (a, b), f in _key.items():
+                g = _key.get((b, a))
+                if g is not None and f < nF and g < nF:
+                    _nbr.setdefault(f, set()).add(g)
+        slots, hosts = [], []
+        for i in np.flatnonzero(ok):
+            f = int(face[i])
+            if _vol is not None:
+                cand = [g for g in ([f] + sorted(_nbr.get(f, ()))) if g not in hosts and ring[g] >= 4]
+                if cand:
+                    f = max(cand, key=lambda g: _vol[g])
+            if f in hosts or ring[f] < 4:                  # one return per host; a triangle cannot be cut
+                continue
+            slots.append(int(live[i])); hosts.append(f)
+            if len(hosts) >= self.max_per_call:
+                break
+        return slots, hosts
+
+    def forward(self, H, mask=None):
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None or settling(H, m):
+            return {}
+        nF = int(m["nF"])
+        # `age_layer: true` (default false = unchanged): THIS operator ages every cell of the layer by one per
+        # call. `age` is advanced by `cell_divide`'s base body, which this model restores on the old cells so a
+        # layer that also divides in place is not aged twice; with NO division in the layer (exp 11's Type I
+        # loop: every division dives) nothing aged the cells, every `age` stayed 0, and `cell_cycle`'s birth
+        # test (age 0 while in M) reset each cell that reached M back to (G1, 0) -- after the seeded first wave
+        # no cell ever reached M again and the layer stopped growing (Finding 96).
+        if self.age_layer and "age" in m:
+            a = m["age"].detach().clone()
+            a[:nF] = a[:nF] + 1.0
+            m["age"] = a
+        slots, hosts = self._returning(H, m, nF)
+        if not hosts:
+            return {}
+        cs = self.cell_set
+        cid0 = cell_block(H, cs, "cell_id", nF)
+        if cid0 is None:
+            raise ValueError("cell_divide[reinsert] needs a `cell_id` block on the cell set")
+        keep_m = {k: m[k].detach().clone() for k in ("A0", "P0", "V0f", "age", "ndiv") if k in m}
+        keep_b = {k: cell_block(H, cs, k, nF) for k in self._HOST_BLOCKS}
+        keep_s = {k: m.get(k) for k in ("n_div", "div_blocked", "buf_full")}
+        self._hosts = hosts
+        try:
+            super().forward(H, mask)
+        finally:
+            self._hosts = []
+        m = lvl._mesh
+        nF2 = int(m["nF"])
+        cid = cell_block(H, cs, "cell_id", nF2)
+        # WHO WAS CUT: a host's id was replaced by `next_id`, its appended piece holds `next_id + 1`
+        # (division keeps every old face at its index -- `keep` is the identity -- and appends).
+        by_id = {int(round(v)): j for j, v in enumerate(cid[:nF2])}
+        cut = [f for f in hosts if int(round(cid[f])) != int(round(cid0[f]))]
+        new = [by_id[int(round(cid[f])) + 1] for f in cut]
+        for k, v in keep_m.items():                        # the old cells, as they were
+            a = m[k].detach().clone()
+            a[:nF] = v[:nF].to(a.dtype)
+            # `new_frac_of: median` (default `host`): the newcomer's targets are `new_frac` of the LAYER'S MEDIAN
+            # cell, not of its host's -- a host is often near division size, and a newcomer given its targets
+            # is ready to leave the moment it arrives (exp 11: 302 of 419 layer cells waiting in M, giant facets)
+            ref = None
+            if k in ("A0", "V0f", "P0"):
+                if self.new_frac_of == "median":
+                    ref = float(v[:nF].median())
+                elif self.new_frac_of == "reference":
+                    # `reference`: the layer's median AT THE FIRST RETURN, cached -- a median read each call is a
+                    # RATCHET: newcomers at 0.7 of it pull it down, the next ones are smaller still (0.7^k), and
+                    # the layer thinned to a median volume of 0 by the end of the clip (Finding 101)
+                    if k not in self._ref_targets:
+                        self._ref_targets[k] = float(v[:nF].median())
+                    ref = self._ref_targets[k]
+            for f, j in zip(cut, new):
+                if k in ("A0", "V0f"):
+                    a[j] = self.new_frac * (ref if ref is not None else v[f])
+                elif k == "P0":
+                    a[j] = (ref if ref is not None else v[f]) * math.sqrt(self.new_frac)
+                elif k == "age":
+                    a[j] = 0.0
+                elif k == "ndiv":
+                    a[j] = 1.0
+            m[k] = a
+        for k, v in keep_b.items():
+            if v is None:
+                continue
+            a = np.array(cell_block(H, cs, k, nF2), np.float64)
+            a[:nF] = v[:nF]
+            if k == "parent_id":
+                a[new] = -1.0
+            set_cell_block(H, cs, k, a, nF2)
+        for k in self._NEW_ZERO:
+            a = cell_block(H, cs, k, nF2)
+            if a is not None and new:
+                a = np.array(a, np.float64); a[new] = 0.0
+                set_cell_block(H, cs, k, a, nF2)
+        P = H.level(self.from_set)
+        clvl = H.level(cs)
+        names = [k for k, (a, b) in P.state_schema.items()
+                 if b - a == 1 and k not in ("age", "cell_id", "parent_id") and k in clvl.state_schema
+                 and clvl.state_schema[k][1] - clvl.state_schema[k][0] == 1]
+        gone = [slots[hosts.index(f)] for f in cut]
+        for k in names:
+            a = np.array(cell_block(H, cs, k, nF2), np.float64)
+            a[new] = P.state[gone, P.state_schema[k][0]].detach().cpu().numpy()
+            set_cell_block(H, cs, k, a, nF2)
+        rep = m.get("div_blocked", 0)
+        for k, v in keep_s.items():
+            m[k] = v if v is not None else {"n_div": 0, "div_blocked": 0, "buf_full": False}[k]
+        fl = m.get("apop_flag")                            # a newcomer is not under a host's sentence
+        if fl is not None and new and len(fl) == nF2:
+            fl = fl.clone() if torch.is_tensor(fl) else np.array(fl, np.float64)
+            fl[new] = 0.0
+            m["apop_flag"] = fl
+        m["reinsert_blocked"] = int(rep or 0)
+        if gone:
+            if self.from_children:
+                from plexus.operators.mpm_ops import sleep_mpm_body
+                sleep_mpm_body(H, self.from_set, self.from_children, gone)
+            P.kill(torch.as_tensor(gone, dtype=torch.long, device=P.occ.device))
+        m["n_reinsert"] = int(m.get("n_reinsert", 0)) + len(gone)
+        return {}
+
+
 # ============================================================================================
 #  a colony on a lattice of SITES (exp 15, rig 1; moved from colony_ops.py 2026-09-27, unchanged)
 # ============================================================================================
@@ -5563,6 +6806,10 @@ class ReconnectT1_3D(Rewire):
                    "l_th_frac": "threshold as fraction of the mean edge length",
                    "max_flips": "cap on reconnections per call", "every": "call period (ticks)"}
 
+    # THE FLIP ITSELF, AS AN ATTRIBUTE, so a variant can widen which edges may flip without copying the
+    # loop that chooses them (`edge_flip[boundary]` below). The default is `t1_flip_3d`, unchanged.
+    _t1 = staticmethod(lambda *a, **k: t1_flip_3d(*a, **k))
+
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
@@ -5604,7 +6851,7 @@ class ReconnectT1_3D(Rewire):
             if key in seen or a in used or b in used:
                 continue
             seen.add(key)
-            if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf,
+            if self._t1(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf,
                           plane_axis=_plane) is not None:
                 used.add(a); used.add(b); ndone += 1
                 moved.add(a); moved.add(b)
@@ -5721,6 +6968,140 @@ class ReconnectT1_3D(Rewire):
         lvl.state = st
         m["n_t1"] = int(m.get("n_t1", 0)) + ndone
         return {}
+
+
+def _commit_rings(rings, emap, vf, old_map, new_map):
+    """Write the changed faces back and keep the caller's edge->face and vertex->faces maps in sync."""
+    for fid, ro in old_map.items():
+        rn = new_map[fid]
+        for i in range(len(ro)):
+            emap.pop((ro[i], ro[(i + 1) % len(ro)]), None)
+        for w in ro:
+            s_ = vf.get(w)
+            if s_ is not None:
+                s_.discard(fid)
+    for fid, rn in new_map.items():
+        for i in range(len(rn)):
+            emap[(rn[i], rn[(i + 1) % len(rn)])] = fid
+        for w in rn:
+            vf.setdefault(w, set()).add(fid)
+        rings[fid] = rn
+
+
+def _mates_kept(emap, old_map, new_map):
+    """No directed edge repeats in the new patch, and every edge the patch shared with a face OUTSIDE it
+    is still there -- the closed-surface test without its "rim unchanged" half, which a boundary T1
+    changes by design."""
+    b_new = _boundary_de(new_map)
+    b_old = _boundary_de(old_map)
+    if b_new is None or b_old is None:
+        return False
+    patch = set(old_map)
+    for (x, y) in b_old:
+        f = emap.get((y, x))
+        if f is not None and f not in patch and (x, y) not in b_new:
+            return False
+    return True
+
+
+def t1_flip_boundary(rings, pos, e_uv, new_len=None, emap=None, vf=None, plane_axis=None):
+    """A T1 on an OPEN tissue: the interior T1 where it applies, and the two moves at the free rim that
+    `t1_flip_3d` refuses (a rim vertex has two faces, an interior T1 needs three).
+
+    SPOKE (an edge u-v from an interior vertex u to a rim vertex v, between rim cells A and B, with C the
+    third cell at u): A and B stop touching, C reaches the rim between them --
+        A loses v,  B loses u,  C gains v just before u.
+    This is the interior T1 with the outside medium as its fourth cell.
+    RIM (an edge v->u of cell C on the rim, u shared with A, v with B): the inverse -- C leaves the rim
+    there, A and B meet --
+        C loses v,  A gains v just after u,  B gains u just after v.
+    The geometry is the interior T1's: u and v collapse to their midpoint and reopen perpendicular to the
+    old edge, at `new_len`, both signs tried, kept only if every changed face stays simple and keeps its
+    orientation. Returns (u, v) on success, None when nothing valid exists."""
+    r = t1_flip_3d(rings, pos, e_uv, new_len=new_len, emap=emap, vf=vf, plane_axis=plane_axis)
+    if r is not None:
+        return r
+    if emap is None:
+        emap = _edge_face_map(rings)
+    if vf is None:
+        vf = _vertex_faces(rings)
+    a0, b0 = int(e_uv[0]), int(e_uv[1])
+    fa, fb = emap.get((a0, b0)), emap.get((b0, a0))
+    new_map = old_map = None
+    if fa is not None and fb is not None and fa != fb:                          # SPOKE candidate
+        ca, cb = vf.get(a0, set()) - {fa, fb}, vf.get(b0, set()) - {fa, fb}
+        if len(ca) == 1 and len(cb) == 0 and vf.get(b0, set()) == {fa, fb}:
+            u, v = a0, b0
+        elif len(cb) == 1 and len(ca) == 0 and vf.get(a0, set()) == {fa, fb}:
+            u, v = b0, a0
+        else:
+            return None
+        A, B = emap.get((u, v)), emap.get((v, u))
+        C = (vf[u] - {A, B}).pop()
+        old_map = {A: rings[A], B: rings[B], C: rings[C]}
+        new_map = {A: [w for w in rings[A] if w != v], B: [w for w in rings[B] if w != u],
+                   C: _insert_before(rings[C], u, v)}
+    elif (fa is None) != (fb is None):                                          # RIM candidate
+        v, u = (a0, b0) if fa is not None else (b0, a0)                         # C holds v -> u
+        C = emap[(v, u)]
+        Au, Bv = vf.get(u, set()) - {C}, vf.get(v, set()) - {C}
+        if len(Au) != 1 or len(Bv) != 1:
+            return None
+        A, B = Au.pop(), Bv.pop()
+        if A == B:
+            return None
+        old_map = {A: rings[A], B: rings[B], C: rings[C]}
+        new_map = {A: _insert_after(rings[A], u, v), B: _insert_after(rings[B], v, u),
+                   C: [w for w in rings[C] if w != v]}
+    else:
+        return None
+    if not all(_ring_ok(rn) for rn in new_map.values()) or not _mates_kept(emap, old_map, new_map):
+        return None
+    pu = np.asarray(pos[u], float); pv = np.asarray(pos[v], float)
+    mid = 0.5 * (pu + pv); d = pv - pu; L = np.linalg.norm(d)
+    if L < 1e-12:
+        return None
+    if plane_axis is None:
+        rmid = np.linalg.norm(mid)
+        if rmid < 1e-9:
+            return None
+        n = mid / rmid
+    else:
+        n = np.zeros(3); n[int(plane_axis)] = 1.0
+    perp = np.cross(n, d / L); pn = np.linalg.norm(perp)
+    if pn < 1e-9:
+        return None
+    perp = perp / pn
+    half = 0.5 * (new_len if new_len is not None else L)
+    for sign in (+1.0, -1.0):
+        nu = mid - sign * perp * half; nv = mid + sign * perp * half
+        if plane_axis is not None:
+            nu[int(plane_axis)] = mid[int(plane_axis)]; nv[int(plane_axis)] = mid[int(plane_axis)]
+        getp = lambda i: (nu if i == u else nv if i == v else pos[i])          # noqa: E731
+        if all(_face_ok_3d(rn, getp, normal=None if plane_axis is None else n) for rn in new_map.values()):
+            _commit_rings(rings, emap, vf, old_map, new_map)
+            pos[u] = nu; pos[v] = nv
+            return (u, v)
+    return None
+
+
+@register_operator("edge_flip", model="boundary", set="vertex", kind="rewire", family="topology",
+                   title="T1 neighbour exchange, the free rim included")
+class ReconnectT1Boundary(ReconnectT1_3D):
+    """`edge_flip` on an OPEN tissue: the interior T1 plus the two moves at the free rim, so a cell can
+    reach the boundary or leave it (`t1_flip_boundary`).
+
+    WHY (experiment 9, Phase 2, Finding 16). On a free aggregate the default flips only edges with a
+    cell on both sides and three cells at each end: an edge touching the rim is never flipped, so the
+    cells on the rim at frame 0 are the rim forever. Cerchiari et al. 2015's whole observable -- which
+    cell type ends outside -- is then fixed by the initial random draw (MEP's rim fraction 0.423 in
+    every arm, every row). With the rim moves, the same shortest-first loop, threshold and one-flip-
+    per-vertex rule apply to every edge; interior flips are exactly the default's.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (the reconnection);
+    the rim moves are the same reconnection with the outside medium as the fourth cell.
+    """
+    _t1 = staticmethod(t1_flip_boundary)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -5844,6 +7225,48 @@ def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
     A_lat = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, la)
     s_f = A_ap + A_ba + A_lat
     return v_f, s_f, A_ap, A_ba
+
+
+def isolated_split(pool, flag, es, et, ef, nF, cap):
+    """Walk `pool` (face indices, queue order) and keep, up to `cap`, the faces with no neighbour already under
+    sentence (`flag` > 0) or kept earlier in this walk; return (kept, the rest in their order). Neighbours are read
+    from the half-edge twins (s -> t on face f, t -> s on its neighbour)."""
+    es = np.asarray(es.cpu() if hasattr(es, "cpu") else es, np.int64)
+    et = np.asarray(et.cpu() if hasattr(et, "cpu") else et, np.int64)
+    ef = np.asarray(ef.cpu() if hasattr(ef, "cpu") else ef, np.int64)
+    ok = ef < nF
+    es, et, ef = es[ok], et[ok], ef[ok]
+    face_of = {(int(a), int(b)): int(f) for a, b, f in zip(es, et, ef)}
+    want = set(int(f) for f in pool)
+    nbrs = {f: set() for f in want}
+    for a, b, f in zip(es, et, ef):
+        f = int(f)
+        if f in want:
+            g = face_of.get((int(b), int(a)))
+            if g is not None and g != f:
+                nbrs[f].add(g)
+    fl = np.asarray(flag)
+    busy = set(int(g) for g in np.flatnonzero(fl[:nF] > 0))
+    kept, rest = [], []
+    for f in pool:
+        f = int(f)
+        if len(kept) < cap and not (nbrs.get(f, set()) & busy):
+            kept.append(f); busy.add(f)
+        else:
+            rest.append(f)
+    return kept, rest
+
+
+def queued_hold(cell_id, waiting, area=None, escape=0.0):
+    """Per face, True where the cell waits in `cell_die[t2]`'s leaving queue (`waiting`, cell ids) and is therefore
+    held back from dividing in place (`cell_divide` `skip_queued`) -- unless `escape` > 0 and its `area` exceeds
+    escape x the median area of all faces (the size checkpoint, `size_escape`)."""
+    ci = np.rint(np.asarray(cell_id, np.float64)).astype(np.int64)
+    hold = np.isin(ci, np.asarray(sorted(waiting), np.int64))
+    if escape > 0 and area is not None:
+        a = np.asarray(area, np.float64).reshape(-1)[: ci.size]
+        hold &= ~(a > escape * float(np.median(a)))
+    return hold
 
 
 def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
@@ -6602,7 +8025,9 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
     frozen contact list of `bm_contact[implementation: live]`, its penetrations p_i re-evaluated at
     each iteration. Their gradients: -F on `pos` and +F on `sep` for a force F on the basal point
     b = pos - sep, so a push inward moves the mid-surface and thins the cell by equal shares at
-    `sep_mu` 1, and the tissue settles where its own gradient balances the load.
+    `sep_mu` 1, and the tissue settles where its own gradient balances the load. A list built on the
+    APICAL surface (`bm_contact[live]` with `side: apical` -- the inner cells of a stratified bud held
+    inside the lumen) acts on a = pos + sep: -F on `pos` and -F on `sep`.
 
     After the loop each list's last-iteration pair is booked in the ledger and each membrane node is
     returned F_i / gamma as a delta on its own set -- the force the tissue relaxed against, so the
@@ -6629,6 +8054,13 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
     no membrane (under a hole, in a bud) gains nothing. `e_cm` must stay below `kappa_s`, the tension
     it offsets, or a bound basal cap has a negative tension and its area runs away.
 
+    `e_cm_from: bound` (default `ligand`, the above; exp 11 Phase 3 B2, 2026-09-29): c_f is the cell's
+    BOUND INTEGRIN instead -- the width-1 block `bound_block` (default `itg_B`) of `cell_set` (default
+    `cell`) that `bm_clutch` writes, over its median at the first call, clamped to [0, 1]. A FIXED
+    reference, not this frame's median: a knockdown that halves every cell's bonds halves every c_f
+    (normalised by the frame's median it would vanish). A cell with no bonds -- no membrane, or letting go
+    of it -- gains nothing, whatever membrane is near.
+
     THE INNER CELL MASS AS A GROWING VOLUME, `k_core` (default 0 = none) and `core_rate` (exp 11
     Phase 2). Wang et al. 2021's gland is STRATIFIED: a surface cell layer -- this shell -- wraps an
     interior of tightly packed cells, and their model (STAR Methods, Fig S2G) treats the two as
@@ -6645,6 +8077,85 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
     interior radius over the layer thickness) -- and it resists the inward folds an empty lumen would
     let the layer make. k_core in F/L^5, like `k_v`.
 
+    `core_alpha` (default None: the linear clock above) TIES THE INTERIOR TO THE LAYER instead of to
+    the clock, as Wang define it -- alpha is the interior's gain over the surface layer's gain:
+
+        V*(t) = V_L(0) + core_alpha (V_S(t) - V_S(0))       V_S = the layer's own volume, the volume
+                                                            between its two rings, this frame
+
+    A clock target keeps growing when the membrane slows the layer, so the gap V* - V_L -- and the
+    pressure k_core (V* - V_L) on every apical vertex -- grows without bound until a weak three-cell
+    corner is pushed out through the membrane (batch 3: single vertices drifting 1.3 edge lengths a
+    frame from frame ~110). Tied to the layer, the interior grows only as fast as the layer does.
+
+    `core_from` (default None; a set name, e.g. `icell`) TIES THE INTERIOR TO ITS OWN CELLS, as Wang's two-compartment
+    model does ("the net volume is proportional to cell number", STAR Methods; every cell keeping its size):
+
+        V*(t) = V_L(0) N(t) / N(0)          N = the set's live cells this call, N(0) at the first call
+
+    so each interior cell holds the volume the seeded interior gave it. Without it the lumen is free: exp 11 line W
+    (2026-09-29) measured the interior gaining 0.10-0.22 of the cells Wang's smooth-sphere boundary asks, while the
+    volume the layer enclosed kept pace (0.92-0.98 of it) as empty space -- the layer inflated round instead of
+    folding. Exclusive with `core_alpha`.
+
+    `core_bulk` (default false): THE INTERIOR AS A BULK MATERIAL, U = 1/2 k_core V_L(0) (V_L - V*)^2 / V* -- a
+    bulk modulus k_core V_L(0) acting on the relative volume error, instead of a spring of fixed stiffness on the
+    absolute one. At frame 0 the two are identical. They part as the tissue grows: the fixed spring's stiff mode
+    (uniform inflation) has stiffness k_core x sum (face area)^2, which grows as area^2 / cells and crosses the
+    explicit step's limit once the area has grown ~x3.5 (exp 11 Finding 54: every full-rate run wrecked at the
+    same simulated time, at dt 1 and dt 0.5); the bulk form divides it by V*/V_L(0).
+
+    A COLUMNAR HEIGHT, `k_height` (default 0 = none) and `height_target` (exp 11 Phase 2). The parent's
+    energy charges every face of a cell the same tension, so a growing cell in a confined sheet takes
+    its new volume as HEIGHT, which costs almost nothing, rather than as footprint, which must push the
+    membrane out (measured, 200 cells under the live membrane, 60 frames: thickness x2.2, sheet area
+    x1.02; with the membrane contact off, area x1.56 at thickness x1.2). Wang et al. 2021's surface cells
+    keep a columnar height (h ~ 15 um, "an upper bound", STAR Methods) and the layer grows in area.
+    A spring on each vertex's thickness 2|s_v| toward `height_target` times the first frame's median:
+
+        U_h = 1/2 k_height sum_v (2 |s_v| - h*)^2
+
+    so growth goes into footprint -- the monolayer counterpart of `cell_grow[timer_planar]` (exp 14),
+    which holds height through an AREA target the apico-basal model does not have. k_height in F/L.
+
+    `height_implicit` (default false): the same spring, integrated EXACTLY instead of by the explicit step. The
+    explicit step is stable only while 4 x step x k_height < 2 (k_height 30 gave ~9.6 and threw vertices, exp 11
+    Finding 45; 2.5 is stable but too weak -- the full-rate layer still thickens, Finding 55). Implicit: after each
+    iteration's sep step, each vertex's thickness error u = 2|s| - h* becomes u exp(-4 step k_height) along its
+    own direction -- the exact solution of the spring's own relaxation, stable at any k_height.
+
+    POSITIONAL BENDING, `k_bend` (default 0 = none; exp 11, 2026-09-27): U_b = 1/2 k_bend sum_v |(L x)_v|^2, L the
+    combinatorial Laplacian of the mid-surface over the ring edges ((L x)_v = deg_v x_v - sum of its neighbours). Near
+    zero on a uniformly curved sheet, it charges changes of curvature -- a fold, a single vertex pushed out or in. It
+    is what the layer lacked: with the height locked and kappa_h smoothing the directors, a vertex sliding along its
+    own thickness axis cost only area, and a compressed layer snapped through one vertex at a time (Finding 73).
+    Integrated implicit-explicit, like `kappa_h_implicit`: after the explicit step of every other force,
+    (I + tau L^2) x_new = x + step solved by `k_bend_cg` conjugate-gradient iterations (default 20), tau = eta mu
+    k_bend -- stable at any k_bend, before the per-vertex cap.
+
+    `kappa_h_implicit` (default false) and `kappa_h_jacobi` (default 10): the parent's thickness-field stiffness,
+    1/2 kappa_h sum_e |s_src(e) - s_trgt(e)|^2 over the ring half-edges e (the layer's short-wavelength bending
+    stiffness), integrated by BACKWARD EULER instead of the explicit step. The explicit step's largest eigenvalue on
+    that term is ~2 x (vertex degree, 3-6) x kappa_h, so eta x that < 2 (eta 0.08) holds only for kappa_h <~ 1.5
+    (exp 11 Finding 45); a layer that folds at the scale of a bud rather than wrinkling cell by cell needs kappa_h
+    5-20 (Finding 56). Implicit (IMEX): the term leaves the explicit gradient on s (the loop computes it at
+    kappa_h 0), every other force on s keeps its explicit step ds_ex = -eta mu sep_mu g_s, and the new separation
+    solves
+
+        (I + tau L) s_new = s + ds_ex          tau = eta mu sep_mu kappa_h
+
+    L the Laplacian of the vertices over the ring half-edges with weights w_e = eocc_e (the explicit term's own
+    operator: its gradient on s is kappa_h L s), by `kappa_h_jacobi` Jacobi sweeps started from the current s:
+    s_new_v <- ((s + ds_ex)_v + tau sum_{e at v} w_e s_new_other(e)) / (1 + tau deg_v), deg_v = sum_{e at v} w_e.
+    Each sweep is a weighted average, so it is stable at any kappa_h. The per-vertex cap (`cap_frac` of the frame's
+    mean |s|) then applies to the WHOLE step s_new - s, before `height_implicit`. Why before and whole: capping only
+    the other forces and smoothing after leaves no fixed point once the balance needs a step above the cap -- the
+    smoothing wins every iteration and the layer thins to nothing (measured, 60-cell shell, kappa_h 20, eta 0.08,
+    20 frames: mean |s| 0.19 -> 5e-8, radius 3.2 -> 0.2, where a small-step run, eta 0.005 x 480 iterations,
+    holds |s| at 0.38). With the whole step capped and the sweeps warm-started from s, the iteration stands still
+    exactly where the energy's gradient is zero, whatever the sweep count. It acts on s only, as the explicit
+    term does.
+
     Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (the apico-basal
     vertex model); Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the contact);
     Wang, S. et al. (2021). Cell 184:3702-3716 (the adhesion energy, the two compartments).
@@ -6653,11 +8164,70 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.e_cm = float(params.get("e_cm", 0.0))
+        self.e_cm_from = str(params.get("e_cm_from", "ligand")).lower()
+        if self.e_cm_from not in ("ligand", "bound"):
+            raise ValueError(f"cell_mechanics[apicobasal_contact]: e_cm_from is ligand or bound, got {self.e_cm_from!r}")
+        self.bound_block = str(params.get("bound_block", "itg_B"))
+        self.cm_cell_set = str(params.get("cell_set", "cell"))
+        self._b_ref = None
+        self.apical_sep = str(params.get("apical_sep", "full")).lower()
         if self.e_cm and self.e_cm >= self.kappa_s:
             raise ValueError(f"cell_mechanics[apicobasal_contact]: e_cm {self.e_cm:g} must be below "
                              f"kappa_s {self.kappa_s:g}, the basal tension it offsets")
         self.k_core = float(params.get("k_core", 0.0))
         self.core_rate = float(params.get("core_rate", 0.0))
+        _ca = params.get("core_alpha", None)
+        self.core_alpha = None if _ca is None else float(_ca)
+        self.core_from = params.get("core_from", None)
+        if self.core_from is not None and self.core_alpha is not None:
+            raise ValueError("cell_mechanics[apicobasal_contact]: core_from and core_alpha are two targets; give one")
+        self.k_height = float(params.get("k_height", 0.0))
+        self.core_bulk = bool(params.get("core_bulk", False))
+        self.k_bend = float(params.get("k_bend", 0.0))
+        self.k_bend_cg = int(params.get("k_bend_cg", 20))
+        self.height_implicit = bool(params.get("height_implicit", False))
+        self.height_target = float(params.get("height_target", 1.0))
+        self.kappa_h_implicit = bool(params.get("kappa_h_implicit", False))
+        self.kappa_h_jacobi = int(params.get("kappa_h_jacobi", 10))
+
+    @staticmethod
+    def _kappa_h_backward_euler(r, z, es, et, eocc, tau, sweeps):
+        """(I + tau L) s_new = r by `sweeps` Jacobi sweeps started from z, L the ring half-edge Laplacian."""
+        w = eocc.to(r.dtype)[:, None]
+        deg = torch.zeros(r.shape[0], 1, dtype=r.dtype, device=r.device)
+        deg = deg.index_add(0, es, w).index_add(0, et, w)
+        for _ in range(max(1, sweeps)):
+            nb = torch.zeros_like(r).index_add(0, es, w * z[et]).index_add(0, et, w * z[es])
+            z = (r + tau * nb) / (1.0 + tau * deg)
+        return z
+
+    @staticmethod
+    def _bend_solve(r, x0, es, et, eocc, tau, iters):
+        """(I + tau L^2) x = r by conjugate gradient from x0, L the combinatorial ring-edge Laplacian (symmetric)."""
+        w = eocc.to(r.dtype)[:, None]
+        deg = torch.zeros(r.shape[0], 1, dtype=r.dtype, device=r.device).index_add(0, es, w).index_add(0, et, w)
+
+        def lap(v):
+            nb = torch.zeros_like(v).index_add(0, es, w * v[et]).index_add(0, et, w * v[es])
+            return deg * v - nb
+
+        def A(v):
+            return v + tau * lap(lap(v))
+        x = x0.clone()
+        res = r - A(x)
+        p = res.clone()
+        rr = (res * res).sum(0)
+        for _ in range(max(1, iters)):
+            Ap = A(p)
+            a = rr / (p * Ap).sum(0).clamp_min(1e-30)
+            x = x + a * p
+            res = res - a * Ap
+            rr2 = (res * res).sum(0)
+            if float(rr2.max()) < 1e-20:
+                break
+            p = res + (rr2 / rr.clamp_min(1e-30)) * p
+            rr = rr2
+        return x
 
     @staticmethod
     def _core_grad(x, s, es, et, ef, nF, eocc, core):
@@ -6674,16 +8244,30 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
         """This frame's inner-mass term, or None when `k_core` is 0. The ring and V_L(0) are fixed once."""
         if self.k_core <= 0:
             return None
+        o = x0.mean(dim=0).detach()
+        va = float(enclosed_ring_volume(x0 + s0, es, et, ef, nF, eocc, o))
+        vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
+        n_in = None
+        if self.core_from is not None:
+            L = H.level(self.core_from) if H is not None else None
+            if L is None:
+                raise ValueError(f"cell_mechanics[apicobasal_contact]: core_from set {self.core_from!r} not found")
+            n_in = float((L.occ > 0.5).sum())
         if "core" not in m:
-            o = x0.mean(dim=0).detach()
-            va = float(enclosed_ring_volume(x0 + s0, es, et, ef, nF, eocc, o))
-            vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
-            m["core"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb))
+            m["core"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb), VS_first=abs(vb - va),
+                             N_first=n_in)
         _fr = getattr(H, "frame", None)
         t = 0.0 if _fr is None else float(int(_fr))
         C = m["core"]
-        return dict(k=self.k_core, sgn=C["sgn"], o=x0.mean(dim=0).detach(),
-                    V=C["V_first"] * (1.0 + self.core_rate * t))
+        if n_in is not None:
+            V = C["V_first"] * n_in / max(C["N_first"], 1.0)
+        elif self.core_alpha is not None:
+            V = C["V_first"] + self.core_alpha * (abs(vb - va) - C["VS_first"])
+        else:
+            V = C["V_first"] * (1.0 + self.core_rate * t)
+        m["core_target"] = V
+        k = self.k_core * (C["V_first"] / max(V, 1e-9)) if self.core_bulk else self.k_core
+        return dict(k=k, sgn=C["sgn"], o=o, V=V)
 
     @staticmethod
     def _adhesion_grad(x, s, es, et, ef, nF, cov, e_cm):
@@ -6743,19 +8327,45 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
         _fr, _bc, fext, conts = _frame_loads(H, m, Nv, dev, dt)
         from plexus.operators.contact_ops import linear_contact_forces
         cov = None
-        if self.e_cm > 0:
+        if self.e_cm > 0 and self.e_cm_from == "bound":
+            _b = cell_block_t(H, self.cm_cell_set, self.bound_block, nF)
+            if _b is None:
+                raise ValueError(f"cell_mechanics[apicobasal_contact]: e_cm_from bound needs the width-1 block "
+                                 f"{self.bound_block!r} on the set {self.cm_cell_set!r} (written by bm_clutch)")
+            _b = _b.to(device=dev, dtype=dt)
+            if self._b_ref is None and bool((_b > 0).any()):
+                self._b_ref = float(_b[_b > 0].median())
+            if self._b_ref:
+                cov = (_b / self._b_ref).clamp(0.0, 1.0)
+        elif self.e_cm > 0:
             _lig = m.get("bm_ligand")
             if torch.is_tensor(_lig) and m.get("bm_ligand_frame") == _fr and _lig.shape[0] == nF:
                 cov = (_lig / _lig.median().clamp_min(1e-12)).clamp(0.0, 1.0).to(device=dev, dtype=dt)
         core = self._core_target(H, m, x0, s0, es, et, ef, nF, eocc)
+        h_star = None
+        if self.k_height > 0 and move_sep:
+            if "h_star" not in m:
+                m["h_star"] = self.height_target * float(2.0 * s0.norm(dim=1).median())
+            h_star = m["h_star"]
         x = x0.clone(); s = s0.clone()
+        kh_imp = self.kappa_h_implicit and move_sep and self.kappa_h != 0.0
         for _ in range(max(1, self.relax_iters)):
-            gx, gs = self._grad(x, s, es, et, ef, nF, V_eq, m["alive"], R0t, eocc, vocc, move_sep)
+            # `kappa_h_implicit`: THE GRADIENT AT kappa_h 0 -- `_grad` and the warp kernels both read self.kappa_h
+            _kh = self.kappa_h
+            if kh_imp:
+                self.kappa_h = 0.0
+            try:
+                gx, gs = self._grad(x, s, es, et, ef, nF, V_eq, m["alive"], R0t, eocc, vocc, move_sep)
+            finally:
+                self.kappa_h = _kh
             if cov is not None:
                 gxa, gsa = self._adhesion_grad(x, s, es, et, ef, nF, cov, self.e_cm)
                 gx = gx + gxa
                 if gs is not None:
                     gs = gs + gsa
+            if h_star is not None and not self.height_implicit:
+                sn = s.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                gs = gs + self.k_height * (2.0 * sn - h_star) * 2.0 * s / sn
             if core is not None:
                 gxc, gsc, m["core_volume"] = self._core_grad(x, s, es, et, ef, nF, eocc, core)
                 gx = gx + gxc
@@ -6770,16 +8380,38 @@ class ApicoBasalContactShapeEnergy3D(ApicoBasalShapeEnergy3D):
                 _f = C["_fv"].to(dt)
                 gx = gx - _f
                 if gs is not None:
-                    gs = gs + _f
+                    # a force f on the basal point x - s: -f on x, +f on s; on the APICAL point x + s
+                    # (`bm_contact[live]` with `side: apical`, an inner cell mass): -f on both
+                    if C.get("side") == "apical" and self.apical_sep == "along":
+                        # `apical_sep: along` (default `full` = the line below): the separation takes only the
+                        # part of the reaction ALONG itself -- it may be squeezed, not turned; the sideways part
+                        # moves the mid-surface alone. With 21,760 MPM points on the apical side the full reaction
+                        # turned the layer's prisms 10 -> 44 degrees off the normal in ten frames (the point
+                        # interior: 3-6), and the sheared prisms read as inverted cells (Finding 104).
+                        _sh = s / s.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                        gs = gs - (_f * _sh).sum(1, keepdim=True) * _sh
+                    else:
+                        gs = (gs - _f) if C.get("side") == "apical" else (gs + _f)
             step = -(self.eta * self.mu) * gx
+            if self.k_bend > 0:             # IMEX positional bending, before the cap (docstring)
+                step = self._bend_solve(x + step, x, es, et, eocc, self.eta * self.mu * self.k_bend,
+                                        self.k_bend_cg) - x
             step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
             if self.plane_axis is not None:
                 step[:, self.plane_axis] = 0.0
             x = x + step
             if move_sep:
                 ds = -(self.eta * self.mu * self.sep_mu) * gs
+                if kh_imp:                  # IMEX: the kappa_h term by backward Euler, BEFORE the cap (docstring)
+                    ds = self._kappa_h_backward_euler(s + ds, s, es, et, eocc,
+                                                      self.eta * self.mu * self.sep_mu * self.kappa_h,
+                                                      self.kappa_h_jacobi) - s
                 ds = ds * torch.clamp(cap_s / (ds.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
                 s = s + ds
+                if h_star is not None and self.height_implicit:
+                    sn = s.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                    u = (2.0 * sn - h_star) * math.exp(-4.0 * self.eta * self.mu * self.sep_mu * self.k_height)
+                    s = s / sn * (0.5 * (h_star + u))
         out = self._emit(H, pos_full, x0, s0, x, s, Nv, move_sep, mask)
         return _book_contacts(H, m, _fr, _bc, conts, Nv, dev, out)
 
@@ -6862,7 +8494,14 @@ def region_lumen_energy(pos, sep, es, et, ef, nF, alive, eocc, sig_a=None, sig_b
             E = E + (sig_b * A_ba * alive).sum()
     if lumen is not None:
         V_L = enclosed_ring_volume(pos + lumen["sgn"] * sep, es, et, ef, nF, eocc, lumen["o"])
-        E = E + 0.5 * lumen["k"] * (V_L - lumen["V0"]) ** 2
+        if lumen.get("V0") is not None:
+            E = E + 0.5 * lumen["k"] * (V_L - lumen["V0"]) ** 2
+        if lumen.get("frac") is not None:
+            # THE OSMOTIC LUMEN OF A GROWING ORGANOID: 1/2 k_f V_out (V_L / V_out - f)^2, V_out the volume
+            # inside the outer surface this frame (held fixed in the gradient). Its pressure on the lumen is
+            # -dE/dV_L = k_f (f - V_L / V_out): k_f, a pressure, times the lumen fraction's shortfall.
+            V_out = lumen["V_out"]
+            E = E + 0.5 * lumen["k_f"] * V_out * (V_L / V_out - lumen["frac"]) ** 2
     return E
 
 
@@ -6880,10 +8519,18 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
     frame 1). `k_lumen` (F/L^5, like `k_v`) and `lumen_target` (a fraction of the first frame's lumen
     volume): the lumen term, off at `k_lumen` 0. `v_swell`: [villus, crypt] target-volume factors,
     ramped with the tensions (module docstring).
+
+    `lumen_frac` and `k_lumen_frac` (a pressure): the lumen of a GROWING organoid, inflated toward a fraction
+    `lumen_frac` of the organoid's current volume (the volume inside the outer surface), pressure
+    k_lumen_frac x the shortfall, until frame `lumen_until` (None: always) -- then released, and the lumen
+    free to shrink as in Yang 2021 Figs 1e/f. `lumen_target` holds the FIRST frame's volume and cannot follow
+    an organoid that grows from 12 cells (exp 10 Phase 2: its lumen closed at 24 cells). Off at 0.
+    `lumen_frac` may be [start, end], ramped linearly over the frames `lumen_ramp: [from, to]`.
     """
     PARAM_UNITS = {**ApicoBasalShapeEnergy3D.PARAM_UNITS, "sigma_a": "tension", "sigma_b": "tension",
                    "sigma_ramp": "count", "k_lumen": "F/L^5", "lumen_target": "fraction",
-                   "v_swell": "fraction"}
+                   "v_swell": "fraction", "lumen_frac": "fraction", "k_lumen_frac": "pressure",
+                   "lumen_until": "count", "lumen_ramp": "count"}
     MECHANISM_TAGS = ApicoBasalShapeEnergy3D.MECHANISM_TAGS + ["region_tension", "spontaneous_curvature",
                                                                "lumen_volume"]
     REFERENCE = ("Yang, Q. et al. (2021). Nat. Cell Biol. 23:733-744 (Supplementary Note, Eq. 1, 7); "
@@ -6908,6 +8555,22 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
         self.sigma_ramp = float(params.get("sigma_ramp", 0.0))
         self.k_lumen = float(params.get("k_lumen", 0.0))
         self.lumen_target = float(params.get("lumen_target", 1.0))
+        _lf = params.get("lumen_frac", 0.0)
+        # ONE NUMBER, OR [start, end] RAMPED LINEARLY over the frames `lumen_ramp: [from, to]`: a real
+        # organoid's lumen is ~0.07 of it at 20 cells (LSTree 002-Budding) and ~0.26 before its crypt
+        # bulges (Yang 2021 Fig. 1f), so a growing organoid's target must move between them.
+        # A LIST of targets through the frames `lumen_ramp` (the same length) also works -- Yang's lumen
+        # INFLATES and then DEFLATES (0.26 -> 0.12, Fig. 1f), which one [start, end] pair cannot say.
+        self.lumen_frac_pair = ([float(x) for x in _lf] if isinstance(_lf, (list, tuple)) else [float(_lf)] * 2)
+        self.lumen_frac = max(self.lumen_frac_pair)
+        _lr = params.get("lumen_ramp", None)
+        self.lumen_ramp = None if _lr is None else [float(x) for x in _lr]
+        if self.lumen_ramp is not None and len(self.lumen_ramp) != len(self.lumen_frac_pair):
+            raise ValueError(f"cell_mechanics[apicobasal_region]: lumen_ramp has {len(self.lumen_ramp)} frames, "
+                             f"lumen_frac {len(self.lumen_frac_pair)} values -- one frame per value")
+        self.k_lumen_frac = float(params.get("k_lumen_frac", 0.0))
+        _lu = params.get("lumen_until", None)
+        self.lumen_until = None if _lu is None else float(_lu)
         self.v_swell = _pair(params.get("v_swell", None))
         self._sig_a = self._sig_b = self._lumen = None
 
@@ -6947,7 +8610,10 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
             if self.sigma_b is not None:
                 sig_b = ramp * (self.sigma_b[0] + (self.sigma_b[1] - self.sigma_b[0]) * f)
         lumen = None
-        if self.k_lumen > 0:
+        _fr = getattr(H, "frame", None)
+        frac_on = (self.k_lumen_frac > 0 and self.lumen_frac > 0
+                   and (self.lumen_until is None or (0 if _fr is None else int(_fr)) < self.lumen_until))
+        if self.k_lumen > 0 or frac_on:
             if "ab_lumen" not in m:
                 # ONCE: which ring faces the lumen (the one enclosing less) and its volume now.
                 o = x0.mean(dim=0).detach()
@@ -6955,8 +8621,18 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
                 vb = float(enclosed_ring_volume(x0 - s0, es, et, ef, nF, eocc, o))
                 m["ab_lumen"] = dict(sgn=1.0 if va <= vb else -1.0, V_first=min(va, vb))
             L = m["ab_lumen"]
-            lumen = dict(k=self.k_lumen, V0=self.lumen_target * L["V_first"], sgn=L["sgn"],
-                         o=x0.mean(dim=0).detach())
+            o = x0.mean(dim=0).detach()
+            lumen = dict(k=self.k_lumen, V0=self.lumen_target * L["V_first"] if self.k_lumen > 0 else None,
+                         sgn=L["sgn"], o=o, frac=None)
+            if frac_on:
+                V_out = float(enclosed_ring_volume(x0 - L["sgn"] * s0, es, et, ef, nF, eocc, o))
+                vals = self.lumen_frac_pair
+                if self.lumen_ramp is None or len(set(vals)) == 1:
+                    frac = vals[-1]
+                else:
+                    # PIECEWISE LINEAR through (lumen_ramp[k], lumen_frac[k]), held flat outside.
+                    frac = float(np.interp(0 if _fr is None else int(_fr), self.lumen_ramp, vals))
+                lumen.update(frac=frac, k_f=self.k_lumen_frac, V_out=max(V_out, 1e-12))
         return sig_a, sig_b, lumen
 
     def _grad(self, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, want_sep):
@@ -6984,7 +8660,7 @@ class ApicoBasalRegionShapeEnergy3D(ApicoBasalShapeEnergy3D):
         self._sig_a = self._sig_b = self._lumen = None
         if m is None or self.sep_block not in lvl.state_schema or (
                 self.sigma_a is None and self.sigma_b is None and self.k_lumen <= 0
-                and self.v_swell is None):
+                and self.v_swell is None and not (self.k_lumen_frac > 0 and self.lumen_frac > 0)):
             return super().forward(H, mask)
         pos_full = lvl.get("pos")
         Nv = int(m["Nv"]); nF = int(m["nF"]); es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
@@ -7978,3 +9654,155 @@ def try_apicobasal_grad(op, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc):
                                          surface=op.surface, buffers=op._wbuf,
                                          kappa_h=float(getattr(op, "kappa_h", 0.0)))
     return gx, gs
+
+
+# `cell_divide[model: mpm]` -- REGISTERED HERE, AFTER `cell_divide`'s default body, and not in mpm_ops.py beside the
+# helpers it calls: mpm_ops is imported first, and the first registration of a name becomes its DEFAULT, so living
+# there it made every `cell_divide` without a `model:` resolve to this class (exp 11, 2026-09-27, caught by
+# tests/test_bm_contact_live.py).
+from plexus.operators.mpm_ops import mpm_blocks, _mpm_reset_points, _mpm_label_points  # noqa: E402
+
+@register_operator("cell_divide", model="mpm", set="particle", kind="divide", family="population",
+                   title="Cell division",
+                   equation=r"""$$\xi_i=(\mathbf x_i-\bar{\mathbf x}_c)\cdot\mathbf u_c\ \gtrless\ \tilde\xi_c,\qquad v_i=\frac{V_c}{2\,n},\qquad P(\text{divide per call})=p_{\rm div}$$""")
+class CellDivideMPM(Structural):
+    """A cell made of material points DIVIDES: its points are cut by the plane through their centroid
+    normal to its long axis, and each half becomes one daughter's whole block.
+
+    particle cell -> two particle cells: reads the cell's point block (`points`, the containment map);
+    writes both daughters' blocks, the second daughter in a free slot of this set.
+
+        u_c        the long axis of the cell's points (largest eigenvector of their gyration tensor)
+        xi_i       point i's position along it from the centroid; the cut at the median of xi, so each
+                   half holds half the points
+        daughter   its half's points, each copied once more where the half is short of the block's n
+                   (a copy sits at its source plus a small jitter, clipped to the half's side of the cut),
+                   carrying the source's velocity, F and C; every point's volume V_c / (2 n), so each
+                   daughter holds HALF the mother's material -- a division, not a growth
+        trigger    a live cell whose `mark` block is > 0.5 (default: every live cell) divides with
+                   probability `p_div` per call, at most `max_per_call` per call and while free slots last
+
+    `daughter_mark: <block>` sets that width-1 cell block to 1 on both daughters, and `mark` is cleared
+    on both (`clear_mark`, default true): the progeny of a dived surface cell carry `daughter_mark` to
+    `cell_divide[model: reinsert]`'s `mark`, which lets only them return. Every other width-1 block of
+    the cell set is copied from mother to daughter. `m`: `H.mpm_divisions` counts them.
+
+    Wang et al. 2021 (Cell 184:3702, Fig 2A-B): a division-ready surface cell of the salivary bud dives
+    into the interior, divides there, and its daughters return to the surface -- this is the middle step.
+
+    Reference: Wang, S., Matsumoto, K., Lish, S. R., Cartagena-Rivera, A. X. & Yamada, K. M. (2021).
+    Budding epithelial morphogenesis driven by cell-matrix versus cell-cell adhesion. Cell 184:3702-3716.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["points"]
+    MECHANISM_TAGS = ["division", "mpm_body", "cytokinesis"]
+    PARAM_ROLES = {"points": "the_material_point_set", "mark": "cell_block_that_arms_division",
+                   "p_div": "per_call_probability", "daughter_mark": "cell_block_set_on_daughters",
+                   "max_per_call": "cap", "jitter": "copy_offset_world", "seed": "rng_seed",
+                   "daughter_frac": "daughter_volume_over_mother"}
+    PARAM_UNITS = {"p_div": "fraction", "jitter": "length", "daughter_frac": "fraction"}
+    REFERENCE = "Wang, S. et al. (2021). Cell 184:3702-3716."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.points = str(params["points"])
+        self.mark = params.get("mark")
+        self.p_div = float(params.get("p_div", 0.1))
+        self.daughter_mark = params.get("daughter_mark")
+        self.clear_mark = bool(params.get("clear_mark", True))
+        self.max_per_call = int(params.get("max_per_call", 8))
+        self.jitter = float(params.get("jitter", 0.03))
+        # `gap` (world, default 0.25 -- about the contact distance of the points of two cells): the two
+        # daughters are drawn apart by gap/2 each along the axis, so no point of one starts inside the
+        # other's contact range -- the halves of a cut touch across the plane, and a contact force
+        # that meets two points 0.01 apart throws them (measured: one daughter's point 2.4 units out)
+        self.gap = float(params.get("gap", 0.25))
+        # `daughter_frac` (default 0.5: a division halves the body): each daughter's volume as a fraction of
+        # the mother's. 1.0 is Wang's CONSTANT CELL SIZE -- the daughter has grown back to its mother's size by
+        # its next cycle, so the interior's volume follows its cell count, where the dividing cells are. At 0.5
+        # an interior dividing on its own shrank its bodies instead: exp 11 W-L, radius of gyration 0.46 -> 0.17
+        # over 200 rows while the count went 430 -> 2,309, total material nearly flat (Finding 180).
+        self.daughter_frac = float(params.get("daughter_frac", 0.5))
+        self.seed = int(params.get("seed", 0))
+        self._gen = torch.Generator(device="cpu").manual_seed(self.seed + 60013)
+
+    def forward(self, H, mask=None):
+        C, P = H.level(self.at), H.level(self.points)
+        blocks, per = mpm_blocks(H, self.at, self.points)
+        live = (C.occ > 0.5).detach().cpu().numpy()
+        ok = live.copy()
+        if self.mark:
+            if self.mark not in C.state_schema:
+                raise ValueError(f"cell_divide[mpm]: mark {self.mark!r} is not a block of {self.at!r}")
+            ok &= C.state[:, C.state_schema[self.mark][0]].detach().cpu().numpy() > 0.5
+        cand = np.flatnonzero(ok)
+        if cand.size == 0:
+            return {}
+        u = torch.rand(cand.size, generator=self._gen, dtype=torch.float64).numpy()
+        go = cand[u < self.p_div][: self.max_per_call]
+        free = np.flatnonzero(~live)
+        go = go[: free.size]
+        if go.size == 0:
+            if cand.size and free.size == 0:
+                H.mpm_div_blocked = int(getattr(H, "mpm_div_blocked", 0)) + 1
+            return {}
+        p0, p1 = P.state_schema["pos"]
+        D = p1 - p0
+        for j, c in enumerate(go.tolist()):
+            d = int(free[j])
+            idx = blocks[c]
+            X = P.state[idx, p0:p1].detach().double()
+            vol = float(P.p_vol[idx].sum()) if getattr(P, "p_vol", None) is not None else 1.0
+            xb = X.mean(0)
+            G = ((X - xb)[:, :, None] * (X - xb)[:, None, :]).mean(0)
+            w, V = torch.linalg.eigh(G)
+            ax = V[:, -1]
+            vbar = None
+            if "vel" in P.state_schema:
+                v0, v1 = P.state_schema["vel"]
+                vbar = P.state[idx, v0:v1].detach().mean(0)
+            # MITOTIC ROUNDING: each daughter is born a BALL of half the mother's volume, the two on the
+            # mother's long axis (Hertwig's rule), gap/2 clear of the plane between them -- a daughter
+            # built from the mother's half keeps a half-ball's rest shape, and every later division
+            # flattens it further (measured: median aspect 1.3 -> 2.1 in two generations)
+            v_d = self.daughter_frac * vol
+            r_d = (3.0 * v_d / (4.0 * math.pi)) ** (1.0 / 3.0)
+            new = []
+            for slot, sgn in ((c, 1.0), (d, -1.0)):
+                u = torch.randn(per, D, generator=self._gen, dtype=torch.float64)
+                u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                r = torch.rand(per, 1, generator=self._gen, dtype=torch.float64) ** (1.0 / D)
+                cen = xb + sgn * (r_d + 0.5 * self.gap) * ax
+                new.append((slot, None, cen + (u * r).to(device=cen.device, dtype=cen.dtype) * r_d))
+            for slot, _pick, pos in new:
+                tgt = blocks[slot]
+                _mpm_reset_points(P, tgt, pos.to(device=P.state.device, dtype=P.state.dtype),
+                                  torch.full((per,), v_d / per, dtype=P.state.dtype, device=P.state.device))
+                if vbar is not None:
+                    st = P.state.clone()
+                    st[tgt, v0:v1] = vbar
+                    P.state = st
+                _mpm_label_points(P, tgt, slot, "pid", "cellc")
+                oc = P.occ.clone(); oc[tgt] = 1.0; P.occ = oc
+            # the cell level: the second daughter woken, labels copied, marks moved to the daughters
+            st, oc = C.state.clone(), C.occ.clone()
+            for k, (a, b) in C.state_schema.items():
+                if b - a == 1 or k in ("pos",):
+                    st[d, a:b] = st[c, a:b]
+            c0, c1 = C.state_schema["pos"]
+            for slot, pick, pos in new:
+                st[slot, c0:c1] = pos.mean(0).to(st.dtype)
+            if self.mark and self.clear_mark:
+                st[[c, d], C.state_schema[self.mark][0]] = 0.0
+            if self.daughter_mark:
+                if self.daughter_mark not in C.state_schema:
+                    raise ValueError(f"cell_divide[mpm]: daughter_mark {self.daughter_mark!r} is not a block of {self.at!r}")
+                st[[c, d], C.state_schema[self.daughter_mark][0]] = 1.0
+            oc[d] = 1.0
+            C.state, C.occ = st, oc
+        H.mpm_divisions = int(getattr(H, "mpm_divisions", 0)) + int(go.size)
+        return {}

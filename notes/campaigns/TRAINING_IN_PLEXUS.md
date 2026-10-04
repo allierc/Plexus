@@ -235,6 +235,18 @@ widened `READS`, a relational substitution with no edge set. A live substitution
 **R4** (`5c78e63c`, `39f4f88b`) — `learnable:` in the spec language, both forms, plus
 `spec_trainer` and the eye rig.
 
+**R2 undone (2026-09-29).** `src/plexus/learnables/` is deleted, with `tests/test_learnables.py`.
+Only that test ever imported it: the engine never called `build_substitution`, so a
+`{replaces:, with:}` entry passed the schema and then ran the original operator without a word.
+That form is now refused by `schema._parse_learnable`, by `engine.apply_learnable_blocks`, and in
+run specs, which `spec_trainer.build` now sends through the same check. Decided the same day:
+the ENGINE ONLY SIMULATES AND THE TRAINER TRAINS. The trainer owns every learnable's parameters
+and hands them to each rollout, since `engine.run` builds its operators fresh on every call; the
+rule `apply_learnable_blocks` applies to blocks moves to the trainer. Representations of a value
+(lattice, SIREN, the Instant-NGP hash grid of `models/hashgrid.py`) belong to the trainer, not to
+the operator library. `check_substitution` and the MLP/SIREN/table cores are recoverable from
+`3a5e70cf`.
+
 **R0** — the batch axis. `Level.state` is `[B, N, W]`, created by `expand_batch` *after* build and
 seed so not one of the dozens of seeding paths that write `state[:, a:b]` had to change. Every
 state read moved to the right (`state[..., a:b]`), and so did `Level.n`, which was
@@ -256,7 +268,7 @@ than `repeat` would share storage and make eight identical runs agree with thems
 
 ## The eye rig, measured
 
-`config/run/eye_rig.yaml` fits W_in, W, W_out, the per-neuron τ and the two bias vectors of the
+`config/training/neural_eye/eye_rig.yaml` fits W_in, W, W_out, the per-neuron τ and the two bias vectors of the
 64-unit circuit through the frozen eye, by running the spec — not a transcription of it. The
 table below is the history of getting there; `eye_rig_fit*` no longer exist as configs.
 
@@ -311,12 +323,12 @@ excuses a bad result and so has to be paid for.
 1. **One teacher instead of four: 0.0005 against 0.2598, a factor of 520.** Same circuit, same
    hyperparameters, same 200 epochs. Reproduce it by generating `t1_integrator_tau_sweep` with its
    `conditions:` block deleted and `n_per_cond: 512`, then pointing
-   `config/run/t1_integrator_perfect_ctrnn64.yaml` at it. The corpus and its log directory were a
+   `config/training/neural/t1_integrator_perfect_ctrnn64.yaml` at it. The corpus and its log directory were a
    one-off and are not kept — `t1_integrator_perfect` already stands as the permanent single-law
    control at 0.0008.
 2. **The condition cell as an input: 0.0011**, with the slowest pole back at −0.0298 /s against
    the teacher's −0.0312 where the grid had left it fifteen times too fast. This one is the
-   default and is re-run by `-o train test plot config/run/t1_integrator_tau_sweep_ctrnn64.yaml`.
+   default and is re-run by `-o train test plot config/training/neural/t1_integrator_tau_sweep_ctrnn64.yaml`.
 
 The context channel is on by default for a corpus with more than one cell; `context: false` keeps
 the unanswerable version measurable, because it is a real and instructive failure. This closes the
@@ -408,3 +420,35 @@ silently and a training run launched against a spec that was never written.
 
 A command piped through `grep` reports **grep's** exit code. A run that crashed was recorded as
 successful, and the traceback was filtered out by the pattern meant to summarise it.
+
+## plexus.trainer: the circuit, the morph (2026-09-29)
+
+One trainer (`src/plexus/trainer.py`) beside the engine, driven by three-part training specs in
+`config/training/<model>/` and launched as `Plexus_Main.py -o train_test_analyse <name>`.
+
+Parity with the old `spec_trainer` at today's code, CPU: t1 (3 epochs x 64 trials) fitted tensors
+equal to 6e-7 relative, the eye rig (1 epoch x 256 trials) to 1.4e-7 -- float32 rounding.
+
+t1_integrator_perfect_zf285, full run against 09-18: test mse / target variance 0.00067 -> 0.00056,
+mean |err| 0.0167 -> 0.0156. The fixed analyser puts the slowest pole at -0.0033 1/s (teacher 0);
+the old one read tau from an UNTRAINED copy of the model and put it at -1.81 1/s, so every earlier
+pole panel of a run with learnable tau (all `_zf285`, the eye rigs) is wrong.
+
+Morph (`config/training/morph/<shape>.yaml`, model `config/si_material/morph_ball.yaml`), A100,
+stages 5,000 / 12,500 / 50,000 points x 80 iterations, final loss against morph200 of 09-08:
+
+| shape | previous | new | ratio |
+|---|---|---|---|
+| cow | 0.002184 | 0.002344 | 1.07 |
+| bunny | 0.010737 | 0.011067 | 1.03 |
+| spot | 0.002501 | 0.002431 | 0.97 |
+| armadillo | 0.008346 | 0.007992 | 0.96 |
+| teapot | 0.001950 | 0.002023 | 1.04 |
+| platynereis_body | -- | 0.006869 | new |
+
+All inside the 18-44% repeat spread morph.py measured. Renders in
+`log/training/morph/<shape>/results/`.
+
+Engine defect found on the way, handled in the trainer, not fixed in the engine: with warp bodies,
+a captured substep does not see F written by an operator outside the block -- the trained cow
+rendered as the untouched ball with capture on. deform_control's `field:` path is exposed the same way.

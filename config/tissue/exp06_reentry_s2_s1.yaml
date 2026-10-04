@@ -1,0 +1,78 @@
+general:
+  name: exp06_reentry_s2_s1
+  seed: 1
+  n_frames: 240000
+  dt: 0.0015
+  record_cap: 960
+  boundary: free
+  dim: 3
+  world: [160.0, 160.0, 160.0]
+  units: {length_um: 100.0, time_s: 0.0129}
+sets:
+  cell:
+    n: 10600
+    state:
+      area: {width: 1, record: false}
+      centroid: {width: 3}
+      A0: {width: 1, record: false}
+      P0: {width: 1, record: false}
+      V0f: {width: 1, record: false}
+      alive: {width: 1, record: false}
+      age: {width: 1, record: false}
+      ndiv: {width: 1, record: false}
+      Vbirth: {width: 1, record: false}
+      divjit: {width: 1, record: false}
+      mg_scale: {width: 1, record: false}
+      A0_init: {width: 1, record: false}
+      P0_init: {width: 1, record: false}
+      V0f_init: {width: 1, record: false}
+      apop_flag: {width: 1, record: false}
+      inhib_frac: {width: 1, record: false}
+      chem: {width: 2, integration: first_order}
+  vertex:
+    n: 22000
+    mesh: half_edge
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+  half_edge:
+    n: 64000
+    maps: {srce: vertex, trgt: vertex, face: cell}
+fields: {}
+seed:
+- {op: seed_mesh, at: vertex, shape: plane, n_cells: 10000, radius: 35.3, width: 2.0, jitter: 0.15, p0: 3.5,
+  seed: 1, vseed_cv: 0.15}
+operators:
+- {op: cell_geometry, at: cell, before_frame: 2}
+- {op: cell_neighbours, at: cell, before_frame: 2}
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d: [10.0, 0.0]
+  chi: 1.0
+- op: cell_chem_react
+  at: cell
+  model: aliev_panfilov
+  k: 8.0
+  a: 0.15
+  eps0: 0.002
+  mu1: 0.2
+  mu2: 0.3
+  stim:
+  - times: [0.0]
+    duration: 0.5
+    amp: 5.0
+    below: {axis: 0, value: -66.5}
+  - times: [40.0]
+    duration: 0.5
+    amp: 5.0
+    box:
+    - [-49.7, -40.0]
+    - [-27.6, 0.0]
+schedule: [cell_geometry, cell_neighbours, cell_chem_diffuse, cell_chem_react]
+plotting:
+  duration_s: 10
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: false
+  camera: {elev: 90.0, azim: 0.0}

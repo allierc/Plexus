@@ -401,10 +401,23 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         # and `_movie` drew every element in its hardcoded "#1f77b4" -- so a two-species Turing disc
         # rendered as a uniform tab10 blue, the same numbers the live `2d.png` was drawing as a red
         # and blue pattern. Same law, one function: `plexus.live.chem_rgb`.
-        if f"{sname}__chem" in d.files:
+        # `plotting.color_by: chem` -- OPT-IN, for a segmentation-seeded sheet (exp 6): the chemistry
+        # lives on `cell` and the material points in each cell carry none. Without it, `cell` is a
+        # container drawn as merged blobs in one hue PER CELL ID and its points take their cell's id
+        # hue, so the movie is static confetti whatever `chem` does. With it: a one-column `chem`
+        # is drawn too (the default needs two), the set is drawn as its own dots in that colour
+        # rather than as merged blobs, and a set with no `chem` whose PARENT has one takes the
+        # parent's colour per frame, gathered by `<set>__parent`.
+        _cby_chem = str(style.get("color_by", "") or "").lower() == "chem"
+        _chem_drawn = False
+        _csrc = sname if f"{sname}__chem" in d.files else None
+        if _cby_chem and _csrc is None and par is not None and f"{sname}__parent_name" in d.files:
+            _pn = str(d[f"{sname}__parent_name"])
+            _csrc = _pn if f"{_pn}__chem" in d.files else None
+        if _csrc is not None:
             from plexus.live import chem_rgb
-            _ch = np.asarray(d[f"{sname}__chem"])
-            if _ch.ndim == 3 and _ch.shape[2] >= 2:
+            _ch = np.asarray(d[f"{_csrc}__chem"])
+            if _ch.ndim == 3 and _ch.shape[2] >= (1 if _cby_chem else 2):
                 _cf = [chem_rgb(_ch[t], lut=style.get("species"),
                                 blend=style.get("blend"),
                                 background=style.get("background", "black"),
@@ -412,11 +425,14 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
                        for t in range(_ch.shape[0])]
                 if all(x is not None for x in _cf):
                     color = np.stack(_cf)              # [T, N, 3] -- per FRAME, not per node
+                    if _csrc != sname:                 # the parent's colour, gathered per child
+                        color = color[:, np.clip(np.asarray(par, np.int64), 0, color.shape[1] - 1)]
                     bg = "black"
+                    _chem_drawn = True
         # a container set (parent of a denser child set) is drawn as its MERGED child
         # cloud -- colour the particles by parent cell, then fuse them into one smooth
         # blob per cell -- instead of a bare centroid dot.
-        container = _container_child(d, sname)
+        container = None if (_cby_chem and _chem_drawn) else _container_child(d, sname)
         # per-parent (per-cell) MATERIAL colour from the type palette, so a merged cell<-MPM
         # cloud paints each cell its `plotting.colors` hue (e.g. viscoelastic = purple) instead
         # of a colormap-by-parent hue that ignores the palette.

@@ -223,7 +223,7 @@ def write_two_sets(d, cell_x, U, dt=0.01, time_s=0.0129, n_part=3):
 def test_real_reads_the_cells_not_the_particles_and_reports_ms(tmp_path):
     x = hex_sheet()[:, :2]
     v, dt = 2.0, 0.01                                            # cells per time unit
-    U = planted_wave(np.c_[x, np.zeros(len(x))], v=v, dt=dt, rows=900, origin=(-12.0, 0.0, 0.0))
+    U = planted_wave(np.c_[x, np.zeros(len(x))], v=v, dt=dt, rows=1500, origin=(-12.0, 0.0, 0.0))
     T = write_two_sets(tmp_path / "r", x, U, dt=dt)
     interior = np.abs(x[:, 0]) <= 6.0                            # a planted "fit interior"
     fit = tmp_path / "fit.npz"
@@ -253,3 +253,82 @@ def test_apd_first_and_late(tmp_path):
     r = exp_measures.run_measure("exp06.apd", write_run(tmp_path / "a", x, U, dt=dt))
     assert r["n_fire_max"] == 5 and abs(r["apd_first"] - 25.0) <= dt and abs(r["apd_late"] - 12.0) <= dt
     assert abs(r["apd_ratio"] - 12.0 / 25.0) < 0.03
+
+
+def test_partb_wave_params_and_arrivals(tmp_path):
+    """The Part-B scorer's two own steps (the s4 rollout is the prototype's, tested there)."""
+    import exp06_partb as PB
+    x = hex_sheet(4)[:, :2]
+    rows, dt = 200, 0.01
+    t = np.arange(rows)[:, None] * dt
+    arr = (x[:, 0] - x[:, 0].min()) / 5.0                       # 5 cells per time unit
+    U = ((t >= arr) & (t < arr + 1.0)).astype(float)
+    U[:, 0] = 0.0                                               # one cell never fires
+    d = tmp_path / "run"
+    write_two_sets(d, x, U, dt=dt)
+    dfr, ms = PB.arrivals_frames(str(d))
+    assert np.isnan(dfr[0]) and np.nanmin(dfr) == 0.0
+    j = 1 + int(np.argmax(arr[1:]))
+    assert abs(ms[j] - np.nanmin(ms) - (arr[j] - np.min(arr[1:])) * 12.9) < 12.9 * dt * 1.01
+    z = {"delay": np.ones(len(x)), "g": np.full(len(x), 0.04), "g2": np.full(len(x), -0.03)}
+    w, never = PB.wave_params(z, dfr)
+    assert never[0] and w["g"][0] == 0.0 and w["g2"][0] == 0.0
+    assert np.allclose(w["delay"][1:], 1.0 + dfr[1:]) and w["g"][1] == 0.04
+
+
+def test_follow_reads_activation_past_a_cut(tmp_path):
+    x = hex_sheet()[:, :2]
+    rows = 30
+    exc = x[:, 0] < 0                                            # only the left half excited
+    U = np.zeros((rows, len(x))); U[5:, exc] = 1.0
+    Gm = np.zeros((rows, len(x))); Gm[8:, exc] = 0.6; Gm[8:, ~exc] = 0.0
+    d = tmp_path / "f"
+    write_two_sets(d, x, U)
+    z = dict(np.load(d / "trajectory.npz"))
+    z["cell__gam_prev"] = Gm[..., None].astype(np.float32)
+    np.savez(d / "trajectory.npz", **z)
+    r = exp_measures.run_measure("exp06.follow", open_run(str(d)), cut={"point": [0.0, 0.0], "normal": [1.0, 0.0]})
+    assert r["peak_ratio_beyond"] == 0.0 and abs(r["peak_before"] - 0.6) < 1e-6
+    assert abs(r["frac_excited"] - exc.mean()) < 1e-9 and abs(r["frac_contracting"] - exc.mean()) < 1e-9
+
+
+def _rotating(x, centre, P, dt, rows, sign=1.0):
+    """A planted rotor: cell at angle th about `centre` fires at (sign*th/2pi + k) * P, for P/3."""
+    t = np.arange(rows)[:, None] * dt
+    th = np.mod(sign * np.arctan2(x[:, 1] - centre[1], x[:, 0] - centre[0]), 2 * np.pi)
+    ph = np.mod(t / P - th[None] / (2 * np.pi), 1.0)
+    return (ph < 1.0 / 3.0).astype(float)
+
+
+def test_rotor_cycle_and_winding_round_what_it_turns_round(tmp_path):
+    x = hex_sheet(10)[:, :2]
+    P, dt, rows = 8.0, 0.05, 1600
+    U = _rotating(x, (0.0, 0.0), P, dt, rows)
+    T = write_two_sets(tmp_path / "r", x, U, dt=dt)
+    r = exp_measures.run_measure("exp06.rotor", T, loop={"centre": [0, 0], "r0": 3, "r1": 6})
+    assert abs(r["cycle"] - P) <= 2 * dt and r["alive"] == 1 and r["n_up_min"] >= 9
+    assert abs(r["winding"]) == 1.0 and r["winding_n"] >= 3
+    r3 = exp_measures.run_measure("exp06.rotor", T, scar={"point": [6, 0], "normal": [1, 0], "half_length": 1.0},
+                                  band=(1.0, 3.0), loop={"centre": [0, 0], "r0": 3, "r1": 6})
+    assert r3["winding"] == 0.0 and abs(r3["winding_loop"]) == 1.0          # both read in one pass
+    r = exp_measures.run_measure("exp06.rotor", T, scar={"point": [0, 0], "normal": [1, 0], "half_length": 2.0},
+                                 band=(1.5, 4.0))
+    assert abs(r["winding"]) == 1.0                                   # a band round a segment through the core
+    r = exp_measures.run_measure("exp06.rotor", T, loop={"centre": [6, 0], "r0": 1.5, "r1": 3.5})
+    assert r["winding"] == 0.0                                        # a loop that does not enclose the core
+    r2 = exp_measures.run_measure("exp06.rotor", write_two_sets(tmp_path / "m", x, _rotating(x, (0, 0), P, dt, rows, -1.0), dt=dt),
+                                  loop={"centre": [0, 0], "r0": 3, "r1": 6})
+    assert r2["winding"] == -r["winding"] if r["winding"] else abs(r2["winding"]) == 1.0
+
+
+def test_rotor_plane_waves_wind_zero_and_a_dead_sheet_is_not_alive(tmp_path):
+    x = hex_sheet(8)[:, :2]
+    P, dt, rows = 8.0, 0.05, 1200
+    t = np.arange(rows)[:, None] * dt
+    U = (np.mod(t / P - (x[:, 0] + 8) / 40.0, 1.0) < 1 / 3).astype(float)   # periodic plane waves
+    r = exp_measures.run_measure("exp06.rotor", write_two_sets(tmp_path / "p", x, U, dt=dt),
+                                 loop={"centre": [0, 0], "r0": 3, "r1": 6})
+    assert r["winding"] == 0.0 and abs(r["cycle"] - P) <= 2 * dt
+    U[rows // 2:] = 0.0
+    r = exp_measures.run_measure("exp06.rotor", write_two_sets(tmp_path / "d", x, U, dt=dt))
+    assert r["alive"] == 0

@@ -1,0 +1,36 @@
+name: zap_zs_persist
+model: config/zapbench/zap_gc_base.yaml
+learnable:
+- param: theta
+  op: state_diffuse
+  title: the GraphCast law's weights, one flat tensor
+- block: embedding
+  of: neuron
+  title: each neuron's embedding, 8 numbers
+task:
+  reference:
+    trace_recording: zapbench
+    split: zapbench
+    test_stride: 8
+  drive:
+    set: stimulus
+    block: u
+    window:
+    - -5
+    - 1
+  observe:
+    set: neuron
+    block: dff
+  loss: trace_mse
+training:
+  optimizer: adam
+  lr: 0.001
+  schedule: none
+  clip: 1.0
+  batch: 4
+  seed: 0
+  save_every: 500
+  select: last
+  stages:
+  - horizon: 1
+    iters: 0

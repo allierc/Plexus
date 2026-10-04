@@ -14,8 +14,11 @@ loads  config/interaction/attraction_repulsion.yaml  and writes the trajectory t
 explicitly. The data root defaults to the shared GraphData area; override with
 --output_root or $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT.
 
-Only `generate` is implemented today (the forward simulator); train/test/plot are
-stubbed for the inverse-problem stages and fail until built.
+`train` / `test` / `analyse` take a TRAINING spec instead, found by name under
+config/training/<model>/, and run in `plexus.trainer` -- the engine simulates, the
+trainer trains:
+
+    python Plexus_Main.py -o train_test_analyse t1_integrator_perfect_zf285
 """
 from __future__ import annotations
 
@@ -54,6 +57,9 @@ def main():
     parser.add_argument("--output_root", default=None,
                         help="root for graphs_data/ and log/ (default: $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT / shared GraphData)")
     parser.add_argument("--device", default="cuda:0", help="cuda:N (default) or cpu")
+    parser.add_argument("--checkpoint", default=None,
+                        help="training spec, test/plot: score models/<name>.pt (e.g. stage_05, the end of the horizon-5 "
+                             "stage) instead of best.pt; its results are written as <run>_<name>_* beside the run's own")
     parser.add_argument("--force", action="store_true",
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
@@ -116,10 +122,18 @@ def main():
     if config_name is None:
         parser.error("a config name is required: -o <task> <config_name>")
 
-    for stage in ("train", "test"):
-        if stage in task:
-            raise NotImplementedError(
-                f"task stage {stage!r} is not built yet (inverse-problem stage).")
+    # TRAINING IS A SEPARATE MODULE WITH A SEPARATE SPEC. A training spec names a model, what is
+    # learnable, the task and the scheme; `plexus.trainer` owns the parameters and calls the engine
+    # once per rollout. Nothing below this block knows training exists.
+    phases = [p for p in ("train", "test", "analyse") if p in task]
+    # `-o train_test_plot <training spec>` (the one cluster job of a training experiment, INSTRUCTION.md): for a
+    # TRAINING spec, `plot` is the trainer's plotting phase (figures and movie), which it calls `analyse`.
+    if phases and "plot" in task and "analyse" not in phases:
+        phases.append("analyse")
+    if phases:
+        from plexus.trainer import run_phases
+        run_phases(config_name, phases, device=args.device, checkpoint=args.checkpoint)    # --output_root set the root
+        return
 
     # THE PIPELINE IS ONE FUNCTION AND THIS IS ITS COMMAND LINE. `plexus.pipeline.generate` is what
     # runs here and what the web page's RUN button runs, so a run started from a terminal and one

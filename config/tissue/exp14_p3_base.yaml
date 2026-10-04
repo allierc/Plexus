@@ -65,12 +65,13 @@ operators:
 - {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 2.0, K_R: 0.4, Lambda: 3.0, Gamma: 0.4, p0: 3.5, mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12}
 - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.15, max_flips: 300}
 - {op: cell_divide, at: vertex, model: fate, waiting: exponential, every: 4, engine_clock: true, cycle: 60.0, cycle_cv: 0.4, min_cycle: 10, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.12, advantage: 0.0, r_sym: 0.08, fate_bias: 0.0, seed: 0}
-- {op: cell_die, at: vertex, implementation: t2, rule: fate, hazard: 0.0, select: global, order: crowded, every: 4, engine_clock: true, min_age: 4, capacity: 1100, max_mark_frac: 0.5, shrink_rate: 0.3, critical_frac: 0.15, p0: 3.5, seed: 0, to_set: supra, shed: 0.007576, sink: 0.0015, depth0: 0.05, max_depth: 0.35}
+- {op: cell_die, at: vertex, implementation: t2, rule: fate, hazard: 0.0, select: global, order: crowded, every: 4, engine_clock: true, min_age: 4, capacity: 1100, max_mark_frac: 0.5, shrink_rate: 0.3, critical_frac: 0.3, p0: 3.5, seed: 0, progenitor_fallback: true, to_set: supra, shed: 0.007576, sink: 0.0015, depth0: 0.05, max_depth: 0.35}
 - {op: topo_record, at: vertex, every: 1}
 schedule: [cell_geometry, cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die, topo_record]
 plotting:
   renderer: vtk_points
   subject: vertex
+  also_sets: [supra]
   background: black
   mesh_style: surface
   mesh_edges: true

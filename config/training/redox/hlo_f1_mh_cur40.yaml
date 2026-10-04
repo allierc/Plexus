@@ -1,0 +1,10 @@
+name: hlo_f1_mh_cur40
+model: config/redox/hlo_f1_mesh3_emb6.yaml
+learnable:
+- {param: theta, op: diffuse, title: GraphCast model to learn redox dynamics}
+- {field: embedding, with: hash, levels: 3, features: 2, base: [2, 4, 4], scale: 2.0, log2_table: 16, title: embedding to learn heterogeneity per voxel}
+task:
+  reference: {field_recording: hlo_washout, coarsen: 4, split: all, n_val: 6}
+  observe: {field: ratio}
+  loss: masked_mse
+training: {optimizer: adam, lr: 0.001, lr_min_frac: 0.05, clip: 1.0, iters: 2000, horizon: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], batch: 4, seed: 0, save_every: 200}

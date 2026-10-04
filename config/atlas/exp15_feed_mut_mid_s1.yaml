@@ -1,0 +1,93 @@
+general:
+  name: exp15_feed_mut_mid_s1
+  seed: 0
+  n_frames: 40000
+  record_cap: 2500
+  dt: 0.04
+  dim: 2
+  boundary: free
+  world: [400.0, 400.0]
+sets:
+  cell:
+    n: 102400
+    state:
+      pos: {width: 2, integration: none, boundary: free}
+      chem: {width: 3, integration: first_order, boundary: free}
+      food: {width: 3, integration: none, boundary: free}
+  medium:
+    n: 102400
+    state:
+      pos: {width: 2, integration: none, boundary: free}
+      chem: {width: 3, integration: first_order, boundary: free}
+  host:
+    n: 4096
+    state:
+      pos: {width: 2, integration: none, boundary: free}
+      chem: {width: 1, integration: first_order, boundary: free}
+      phase: {width: 1, integration: first_order, boundary: free}
+      signal: {width: 3, integration: none, boundary: free}
+  contact: {parent: host, edge_set: true, entity: connection, pre: medium, post: host, edges_file: atlas/exp15_contact_64x40_p5.npz}
+  secrete: {parent: medium, edge_set: true, entity: connection, pre: cell, post: medium, edges_file: atlas/exp15_identity_64x40.npz}
+  loss: {parent: medium, edge_set: true, entity: connection, pre: medium, post: medium, edges_file: atlas/exp15_identity_64x40.npz}
+  feedrel: {parent: cell, edge_set: true, entity: connection, pre: medium, post: cell, edges_file: atlas/exp15_identity_64x40.npz}
+fields: {}
+seed:
+- {op: seed_positions, at: cell, model: tiled_lattice, side: 40, tiles: 64, gap: 10}
+- {op: seed_positions, at: medium, model: tiled_lattice, side: 40, tiles: 64, gap: 10}
+- op: seed_cell_chem
+  at: cell
+  model: lattice_sites
+  fractions: [0.25, 0.25, 0.25]
+  seed: 1
+- {op: seed_positions, at: host, model: tiled_lattice, side: 8, tiles: 64, gap: 2, spacing: 5.0}
+operators:
+- {op: radius_graph, at: cell, model: periodic_tiles, radius: 1.0, tile_side: 40}
+- {op: readout, at: cell, edge_set: feedrel, block: chem, into: food}
+- op: cell_chem_react
+  at: cell
+  implementation: rps_lattice
+  a: 1.0
+  rate: 1.0
+  seed: 1
+  feed:
+    block: food
+    matrix:
+    - [0, 4, 4]
+    - [4, 0, 4]
+    - [4, 4, 0]
+- op: cell_chem_diffuse
+  at: cell
+  implementation: lattice_exchange
+  chi: 1.0
+  d: [0.64, 0.64, 0.64]
+  seed: 1
+- {op: radius_graph, at: medium, model: periodic_tiles, radius: 1.0, tile_side: 40}
+- {op: project, at: medium, edge_set: secrete, block: chem, gain: 0.1}
+- {op: project, at: medium, edge_set: loss, block: chem, gain: -0.1}
+- op: cell_chem_diffuse
+  at: medium
+  implementation: graph_laplacian
+  chi: 1.0
+  d: [3.6, 3.6, 3.6]
+- {op: readout, at: host, edge_set: contact, block: chem, into: signal}
+- {op: phase_clock, at: host, block: phase, omega: 0.6283185}
+- op: cell_chem_react
+  at: host
+  model: clock_turnover
+  k_in: 1.0
+  k_out: 0.864
+  g: 2.094
+  K: 0.05
+  weights: [1.0, 0.0, 0.0]
+  gate: {block: phase, floor: 0.2076, offset: 0.0}
+schedule: [radius_graph, readout, cell_chem_react, cell_chem_diffuse, radius_graph, project, project,
+  cell_chem_diffuse, readout, phase_clock, cell_chem_react]
+plotting:
+  renderer: mpl2d
+  background: black
+  blend: additive
+  dot_size: 2
+  species: ['#e8262a', '#2f5fd0', '#f2d21b']
+  duration_s: 10
+  curve:
+  - {quantity: 'species:cell', ylabel: individuals per species, ymin: 0.0, ymax: 102400.0}

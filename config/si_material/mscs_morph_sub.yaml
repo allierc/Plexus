@@ -1,0 +1,51 @@
+general:
+  name: mscs_morph_sub
+  seed: 0
+  n_frames: 20
+  dt: 0.002
+  record_cap: 3
+  boundary: wall
+  dim: 3
+  world: [0.35, 0.35, 0.35]
+  units: {length_um: 0.051428571428571435}
+sets:
+  mpm_particle:
+    n: 13671
+    state:
+      pos: {width: 3, integration: second_order_coordinate, boundary: world, role: coordinate}
+      vel: {width: 3, integration: second_order_rate, role: rate}
+      rate: {width: 6, integration: none, boundary: free}
+      resid: {width: 1, integration: none, unit: '1'}
+    types:
+      protein:
+        fraction: 1.0
+        youngs: 90.0
+        density: 1.0
+        block: [0.08891944444444444, 0.08939583333333333, 0.05680888888888887, 0.26108055555555554, 0.26060416666666664,
+          0.29319111111111107]
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 48}
+seed:
+- op: cloud_seed
+  at: mpm_particle
+  cloud: mscs_morph/closed
+  origin: [0.175, 0.175, 0.175]
+  scale: 19444444.44444444
+- op: seed_state_from_file
+  at: mpm_particle
+  file: shapes/mscs_morph/blocks.npz
+  blocks: {resid: resid}
+operators:
+- {op: pair_potential, implementation: mpm, at: mpm_particle, law: wca, sigma: 0.004331, epsilon: 4.0e-08, exclude: resid,
+  exclude_span: 1}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.5, a_max: 200.0}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.9, vmax: 1000000000.0}
+- {op: deform_control, at: mpm_particle, implementation: block, block: rate, after_frame: 1}
+schedule:
+- substep_dt: 0.00034
+  compile: true
+  steps: [pair_potential, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+- deform_control
+plotting: {}
