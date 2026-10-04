@@ -1858,24 +1858,31 @@ def slides_b6():
         bio = np.load(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1_bio.npz"))
         r_ = np.load(os.path.join(DATA, "baselines_gutbrain_glucose_f1_cells.npz"))["responsive"]
         ib = bio["mask_by_input"]
-        left = ("{\\scriptsize\\textbf{why}}\\\\[2pt]{\\tiny Chen 2026: the gut response is chemosensory -- the beam off the "
-                "gut, fish water and caged L-glucose evoke ~nothing; the true inputs are the vagal (nodose) neurons and the "
-                "area postrema, the rest relays. No atlas registration yet, so the data choose the cells (training pulses "
-                "only). Each input enters only its own cells: a per-input mask (input\\_mask\\_array: mask\\_by\\_input, "
-                "state\\_diffuse's \\_input\\_drive); batch 6 trains it on the neuron graph and on the 4-level mesh "
-                "(gb\\_b6\\_glucose\\_f1\\_bio, \\_mesh4\\_bio).\\par}")
-        right = ("{\\scriptsize\\textbf{the cells each input enters}}\\\\[2pt]{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}p{0.46\\textwidth}@{}}\n"
-                 f"UV pulse, beam & {int(ib[:, 0].sum()):,} cells EXCITED by the gut pulses (top 10 \\% by t), not by the control (t $<$ 2) \\\\\n"
-                 f"grating & {int(ib[:, 3].sum()):,} cells, its coherence (top 10 \\%), as before \\\\\n"
-                 "swim & none: a motor output, not an input \\\\\n"
-                 f"in all & {int(bio['mask'].sum()):,} cells, against {int(old['mask'].sum()):,} in batches 1-5 \\\\\n"
-                 f"gut cells & {100 * ib[r_, 0].mean():.0f} \\% of the {int(r_.sum()):,} gut-responsive cells are UV inputs \\\\\n"
-                 "\\end{tabular}\\par}")
-        body = ("\\vspace*{0.3\\baselineskip}{\\centering\\playmovie[0.74\\textwidth]{Movies/mask3d_f1}\\par}\\vspace{4pt}\n"
-                "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.44\\textwidth}\n" + left + "\n\\end{column}\n"
-                "\\begin{column}{0.54\\textwidth}\n" + right + "\n\\end{column}\n\\end{columns}")
-        out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_input_mask.py --bio, tools/exp20_mask3d.py",
-                                            deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input mask closer to biology")))
+        # Cedric, 2026-10-04: "slide 127 is really not clear" -- first the two masks from above, input by input
+        # (tools/exp20_mask_compare.py), the words plain; then the same in 3-D
+        left = ("{\\scriptsize\\textbf{which cells should an input enter?}}\\\\[2pt]{\\tiny Ideally the body's own input "
+                "neurons: for the gut, the vagal sensory neurons (nodose ganglion) and the area postrema (Chen 2026). "
+                "Picking them needs each cell's brain region, i.e. the fish registered to the Z-Brain atlas -- not done "
+                "yet. Until then the cells are picked from what they DO: their recorded response after the UV pulses, "
+                "counted on the training pulses only (the held-out pulses stay unseen). Batch 6 also routes each input "
+                "to its own cells only (a per-input mask), where batches 1-5 let every input into every masked cell."
+                "\\par}")
+        right = ("{\\scriptsize\\textbf{the gut-responsive cells (yellow)}}\\\\[2pt]{\\tiny The paper's selection "
+                 "(Methods; tools/gutbrain\\_baselines.py): per cell, a regression on the gut-pulse train and the "
+                 "all-UV-pulse train must predict the trace better than the all-UV train alone, with a correlation above "
+                 "the noise (mode + 3 SD of the cells' correlations), and the cell must change more after the gut pulses "
+                 f"than after the control pulses: {int(r_.sum()):,} of {len(r_):,} cells in fish 1 "
+                 f"({100 * r_.mean():.1f} \\%); {100 * ib[r_, 0].mean():.0f} \\% of them are in the batch-6 UV set.\\par}}")
+        if os.path.exists(os.path.join(PRES, "figs", "mask_compare_f1.png")):
+            out.append(("b6_mask_compare", frame_top("the two input masks, input by input", "figs/mask_compare_f1.png", 0.80,
+                                                     left, right, "tools/exp20_mask_compare.py, exp20_input_mask.py --bio",
+                                                     deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input mask "
+                                                                "closer to biology")))
+        body = ("\\vspace*{1.0\\baselineskip}{\\centering\\playmovie[0.92\\textwidth]{Movies/mask3d_f1}\\par}\\vspace{4pt}\n"
+                "{\\tiny\\color{gray} the same two masks in 3-D, turning once about the vertical: red the UV pulse and "
+                "beam, blue the grating, green the swim (batches 1-5 only)\\par}")
+        out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_mask3d.py",
+                                            deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input masks in 3-D")))
     return out
 
 
