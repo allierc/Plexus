@@ -1799,6 +1799,83 @@ def slides_summary():
     return out
 
 
+def slides_b6():
+    """BATCH 6 (Cedric, 2026-10-04, via exp17): exp17's multi-level mesh (graph: mesh, cell_ops.neuron_mesh_levels) on
+    glucose fish 1 -- exp17's mesh slides twinned (tools/exp20_mesh_figures.py: the level panels, GraphCast Fig. 1e, g,
+    and a turntable per level count) -- and the input mask closer to biology (tools/exp20_mask3d.py), at the deck's end."""
+    out = []
+    GM_ = {L_: json.load(open(os.path.join(DATA, f"gcmesh_{L_}.json"))) for L_ in (3, 4, 5)
+           if os.path.exists(os.path.join(DATA, f"gcmesh_{L_}.json"))}
+    um = lambda v: f"{v:.0f}" if v >= 10 else f"{v:.1f}"                        # noqa: E731
+    dt_ = "batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the multi-level mesh, as GraphCast's"
+    if 5 in GM_ and os.path.exists(os.path.join(PRES, "figs", "gcmesh_5_levels.png")):
+        g5 = GM_[5]["per_level"]
+        cubes = " / ".join(f"{l_['cube_um']:g}" for l_ in g5[:-1])
+        body = ("\\vspace*{1.0\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.56\\textheight,"
+                "keepaspectratio]{figs/gcmesh_5_levels.png}\\par\\vspace{6pt}\n"
+                "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\n{\\tiny "
+                "\\textbf{GraphCast} (Lam et al.\\ 2023, Fig.~1g): $M^0$ the icosahedron, each level splitting every "
+                "triangle in 4; the nodes NESTED, a coarse vertex a vertex of every finer level; the multi-mesh = the "
+                "finest level's nodes and EVERY level's edges, the messages along all of them at once (Fig.~1e).\\par}\n"
+                "\\end{column}\n\\begin{column}{0.49\\textwidth}\n{\\tiny "
+                f"\\textbf{{On the cells}} (exp17, cell\\_ops.neuron\\_mesh\\_levels): $M^0$..$M^{{{len(g5) - 2}}}$ cubes of "
+                f"{cubes} \\textmu m on one origin; a cube's node is the coarser level's node in it, else the cell nearest "
+                f"its centroid; $M^{{{len(g5) - 1}}}$ every cell ({GM_[5]['neurons']:,}) -- the cells ARE the finest nodes, "
+                "so no encoder / decoder; each level the Delaunay tetrahedralisation of its nodes, the edges longer than "
+                "2 of its cubes dropped, every node keeping its shortest. White arrows: the edges INTO one node, a node "
+                "of every level; each level a slab one of its cubes thick, from above, head up as exp17's.\\par}\n"
+                "\\end{column}\n\\end{columns}\n")
+        out.append(("b6_mesh_levels", frame_full("the multi-level mesh, level by level", body,
+                                                 "data/gcmesh_5.json, figs/gcmesh_5_levels.png", deck_title=dt_)))
+    for L_, g_ in GM_.items():
+        if not os.path.exists(os.path.join(PRES, "Movies", f"gcmesh_{L_}.mp4")):
+            continue
+        pl_, sd_, mg_ = g_["per_level"], g_["sets_directed"], g_["merged"]
+        tab_ = ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                "level & nodes of & nodes & edges & median \\\\\n\\hline\n"
+                + "".join(f"$M^{i_}$ & {l_['label'].replace(' um', ' \\textmu m').replace('every neuron', 'every cell')} & "
+                          f"{l_['nodes']:,} & {l_['edges']:,} & {um(l_['median_um'])} \\textmu m \\\\\n" for i_, l_ in enumerate(pl_))
+                + "\\end{tabular}\\par}\\vspace{6pt}\n")
+        long_lv = [f"$M^{i_}$" for i_, l_ in enumerate(pl_) if l_["cube_um"] >= 4 * g_["bin_um"]]
+        mid_lv = [f"$M^{i_}$" for i_, l_ in enumerate(pl_) if g_["bin_um"] <= l_["cube_um"] <= 2 * g_["bin_um"]]
+        sets_ = [("short", f"$M^{len(pl_) - 1}$"), ("mid", ", ".join(mid_lv)), ("long", ", ".join(long_lv) or "none")]
+        right = (head(f"the multi-level mesh, {L_} levels") + tab_
+                 + "{\\scriptsize the law's three W sets, every edge both ways:\\par}\\vspace{2pt}\n"
+                 + rows([(k_, f"{lv_}: {sd_[k_]['edges']:,} edges, {sd_[k_]['per_neuron']:.2f} per cell, "
+                              f"mean {um(sd_[k_]['mean_um'])} \\textmu m" if sd_[k_]["edges"] else
+                          "none: no level of 64 \\textmu m or coarser") for k_, lv_ in sets_])
+                 + "{\\scriptsize the merged multi-mesh is ONE graph over "
+                 + (f"all {g_['neurons']:,} cells" if mg_["components"] == 1 else
+                    f"{mg_['largest']:,} of the {g_['neurons']:,} cells")
+                 + f"; fish 1's cells lie 4.0 \\textmu m apart (median nearest neighbour; ZAPBench's 7.5), so exp17's "
+                   "16-\\textmu m finest cube is kept; batch 6 trains the SIREN law of batch 4 on it, the graph alone "
+                   f"changed (gb\\_b6\\_glucose\\_f1\\_mesh{L_})\\par}}\n")
+        out.append((f"b6_mesh{L_}", frame(f"the multi-level mesh, {L_} levels", f"\\playmovie{{Movies/gcmesh_{L_}}}", right,
+                                          f"data/gcmesh_{L_}.json (tools/exp20_mesh_figures.py)", left_gap=True,
+                                          deck_title=f"batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the multi-level mesh, {L_} levels")))
+    if os.path.exists(os.path.join(PRES, "Movies", "mask3d_f1.mp4")):
+        old = np.load(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1.npz"))
+        bio = np.load(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1_bio.npz"))
+        r_ = np.load(os.path.join(DATA, "baselines_gutbrain_glucose_f1_cells.npz"))["responsive"]
+        right = (head("the input mask, closer to biology")
+                 + "{\\scriptsize Chen 2026: the gut response is chemosensory -- the beam off the gut, fish water and caged "
+                   "L-glucose evoke ~nothing; the true inputs are the vagal (nodose) neurons and the area postrema, the "
+                   "rest are relays. No atlas yet, so the data choose:\\par}\\vspace{4pt}\n"
+                 + rows([("uv, beam", f"{int(bio['mask_by_input'][:, 0].sum()):,} cells EXCITED by the training gut pulses "
+                                      "(top 10 \\% by t) and not by the control pulses (t $<$ 2)"),
+                         ("grating", f"{int(bio['mask_by_input'][:, 3].sum()):,} cells, its coherence (top 10 \\%), as before"),
+                         ("swim", "none: a motor output, not an input"),
+                         ("in all", f"{int(bio['mask'].sum()):,} cells, against {int(old['mask'].sum()):,} in batches 1-5"),
+                         ("gut cells", f"{100 * bio['mask_by_input'][r_, 0].mean():.0f} \\% of the {int(r_.sum()):,} "
+                                       "gut-responsive cells are uv inputs")])
+                 + "{\\scriptsize every input enters every cell of the mask (the law's mask is one per cell); batch 6 "
+                   "trains it on the neuron graph and on the 4-level mesh (gb\\_b6\\_glucose\\_f1\\_bio, \\_mesh4\\_bio)\\par}\n")
+        out.append(("b6_mask3d", frame("the input masks in 3-D", "\\playmovie{Movies/mask3d_f1}", right,
+                                       "tools/exp20_input_mask.py --bio, tools/exp20_mask3d.py", left_gap=True,
+                                       deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input mask closer to biology")))
+    return out
+
+
 def main():
     for d in ("slides", "Movies", "figs"):
         os.makedirs(os.path.join(PRES, d), exist_ok=True)
@@ -1841,6 +1918,10 @@ def main():
             deck += slides_b4_fish(c, k)
         except Exception as e:
             print(f"[slides] batch 4 {c} {k} FAILED: {e!r}")
+    try:
+        deck += slides_b6()                                # batch 6 at the deck's end (Cedric, 2026-10-04)
+    except Exception as e:
+        print(f"[slides] slides_b6 FAILED: {e!r}")
     deck.append(slide_overview())
     out = []
     for stem, body in deck:
