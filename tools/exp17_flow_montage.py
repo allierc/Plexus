@@ -68,16 +68,17 @@ def graphs():
 def summary(tag="g17sel"):
     d = os.path.join(EXP, "png")
     ins = ["-i", os.path.join(d, f"wind_movie_consensus_mean_{tag}.mp4"), "-i", os.path.join(d, f"wind_movie_consensus_median_{tag}.mp4"),
-           "-i", os.path.join(G, "zap_e15_cur", "results", "movie.mp4")]
+           "-i", os.path.join(d, f"wind_movie_consensus_median_rec_{tag}.mp4")]     # the median over the RECORDED dF/F
     fc = (f"[0:v]split[m0][m1];[m0]crop={EX},scale=600:294[me];[m1]crop={IN},scale=600:294[mi];"
           f"[me][mi]hstack,pad=1200:330:0:36:black[r0];"
           f"[1:v]split[d0][d1];[d0]crop={EX},scale=600:294[de];[d1]crop={IN},scale=600:294[di];"
           f"[de][di]hstack,pad=1200:330:0:36:black[r1];"
-          f"[2:v]crop=562:275:0:150,scale=600:294,pad=1200:330:13:36:black[r2];"
+          f"[2:v]split[q0][q1];[q0]crop={EX},scale=600:294[qe];[q1]crop={IN},scale=600:294[qi];"
+          f"[qe][qi]hstack,pad=1200:330:0:36:black[r2];"
           f"[r0][r1][r2]vstack=inputs=3[g];[g][3:v]overlay=0:0:shortest=1[v]")
     ins += ["-loop", "1", "-i", _labels((1200, 990), [((8, 8), "MEAN flow of the 5 graphs   (excitatory | inhibitory)"),
                                                        ((8, 338), "MEDIAN flow of the 5 graphs   (excitatory | inhibitory)"),
-                                                       ((8, 668), "RECORDED dF/F (destriped), the same 800 frames")], 22)]
+                                                       ((8, 668), "MEDIAN flow over the RECORDED dF/F   (excitatory | inhibitory)")], 22)]
     run(ins + ["-filter_complex", fc, "-map", "[v]", "-r", "25"], os.path.join(EXP, "presentation", "Movies", "flow_summary.mp4"))
 
 

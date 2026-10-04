@@ -1257,6 +1257,61 @@ def REC_CACHE(r):
     return _REC[k]
 
 
+def g17_comment(n):
+    """One sentence for a batch-17 arm's results slide (Cedric, 2026-10-03), every number from the result files."""
+    jc, jw, jp = (os.path.join(EXP, "data", f) for f in ("graph_curves.json", "wind_consensus_g17sel.json", "param_compare.json"))
+    if not (os.path.exists(jc) and os.path.exists(jp)):
+        return ""
+    C, Pc = json.load(open(jc)), json.load(open(jp))["corr_with_base"]
+    b, r = C["zap_e15_cur"], C.get(n)
+    if r is None:
+        return ""
+    sim = ""
+    if os.path.exists(jw):
+        W_ = json.load(open(jw))
+        mr = W_.get("matrix_runs", [])
+        if n in mr and "zap_e15_cur" in mr:
+            i, j = mr.index("zap_e15_cur"), mr.index(n)
+            sim = (f"; its flow keeps {W_['similarity']['ex']['movie'][i][j]:.2f} / "
+                   f"{W_['similarity']['in']['movie'][i][j]:.2f} of the base's (excitatory / inhibitory)")
+    num = (f"long MSE {r['mse_long']:.3f} against the base's {b['mse_long']:.3f}, brain-mean R$^2$ {r['bm_r2']:+.3f} "
+           f"against {b['bm_r2']:+.3f}")
+    s_ = {"zap_g17_rot45": f"Turning the axes by 45 deg changes nothing measurable: {num}{sim}.",
+          "zap_g17_randdir": f"Random directions per neuron forecast as the base does: {num}{sim}.",
+          "zap_g17_knn18": f"Local edges only (the 18 nearest neurons): {num} -- the batch's highest brain-mean R$^2$: "
+                           "the long-range edges are not needed.",
+          "zap_g17_nolong": f"Without the highways: {num} -- the 128 um edges add little.",
+          "zap_g17_r16_64": f"Shorter reaches: {num}{sim}.",
+          "zap_g17_r64_256": f"Longer reaches: {num}{sim} -- no gain, and the flow least like the base's.",
+          "zap_g17_random": f"The null, 18 senders drawn anywhere in the brain, does as well as every spatial graph: {num}, "
+                            f"and the batch's best per-neuron R$^2$ ({r['per_neuron_r2']:+.3f}): each neuron needs to hear 18 "
+                            "others, not particular ones.",
+          "zap_g17_s1": f"Seed 1 on the base graph: {num}; its learned tau, V, W, B correlate "
+                        + ", ".join(f"{Pc[k]['zap_g17_s1']:+.2f}" for k in ("tau", "V", "W", "B"))
+                        + f" with seed 0{sim}: the training is reproducible, the graph moves the flow."}.get(n, "")
+    return ("{\\scriptsize " + s_.replace("um ", "\\textmu m ") + "\\par}\\vspace{6pt}\n") if s_ else ""
+
+
+def sing_block():
+    """The flow's sinks against the graph's own geometry (tools/exp17_flow_singularities.py), for the flow slide."""
+    jf = os.path.join(EXP, "data", "flow_singularities.json")
+    if not os.path.exists(jf):
+        return ""
+    F = json.load(open(jf))
+    own = [F[n][s]["r_own_graph"] for n in F for s in ("ex", "inh")]
+    den = [F[n][s]["r_density"] for n in F for s in ("ex", "inh")]
+    b = F["zap_e15_cur"]
+    return (head("do the sinks sit on the graph?")
+            + "{\\scriptsize the flow's convergence ($-\\nabla\\cdot w$, where the particles pile up) against the graph's "
+              "own convergence (every edge, weight 1, same grid and smoothing): r "
+            + f"{min(own):+.2f} .. {max(own):+.2f} over the 8 graphs (median {np.median(own):+.2f}); the base "
+            + f"{b['ex']['r_own_graph']:+.2f} / {b['inh']['r_own_graph']:+.2f} with its own graph, "
+            + f"{b['ex']['r_other_graph']:+.2f} / {b['inh']['r_other_graph']:+.2f} with the random graph's; neuron "
+            + f"density {min(den):+.2f} .. {max(den):+.2f}. The scaffold explains a small part (median r$^2$ "
+            + f"{100 * np.median(own) ** 2:.0f} \\%) of where "
+              "the flow converges: its sinks are compact blobs, not the graph's broad midline ring.\\par}\\vspace{6pt}\n")
+
+
 def slides_run(r, landed=None, inset=None):
     """Two slides per landed run: its movie (recorded left, learned right) and its curves against the baselines."""
     import shutil
@@ -1273,8 +1328,9 @@ def slides_run(r, landed=None, inset=None):
           ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]
     ms = mse_summary(t)
     num = (("\\includegraphics[width=\\linewidth]{" + inset + "}\\par\\vspace{4pt}\n" if inset else "")
-           + head(f"{tag}: {n.replace('_', chr(92) + '_')}") +
-           "{\\scriptsize " + _tex(r["row"].get("what changed", "")) + "\\par}\\vspace{6pt}\n"
+           + (g17_comment(n) if n.startswith("zap_g17_") else "")
+           + ("" if n.startswith("zap_g17_") else head(f"{tag}: {n.replace('_', chr(92) + '_')}")) +
+           ("" if n.startswith("zap_g17_") else "{\\scriptsize " + _tex(r["row"].get("what changed", "")) + "\\par}\\vspace{6pt}\n")   # batch 17: the inset and the comment say it (Cedric, 2026-10-03)
            + network_table(r, landed or {})           # first: the network test (Cedric, 2026-10-03)
            + head("MSE, $10^{-3}$ dF/F$^2$ (lower is better)") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}r@{\\hspace{7pt}}r@{}}\n"
            + "& h 1-3 & h 16-32 \\\\\n" + "".join(f"{lab} & {_f3(ms[k + '_s'])} & {_f3(ms[k + '_l'])} \\\\\n" for lab, k in (
@@ -1367,7 +1423,7 @@ BATCHES = (
     ("batch 16: batch 15 with the calcium indicator, tau_ca fixed, latent substeps", None,
      (("tau_ca learned", "zap_c16_learn"), ("tau_ca 1 s", "zap_c16_t1"), ("tau_ca 2 s", "zap_c16_t2"), ("tau_ca 3 s", "zap_c16_t3"), ("2 s, 5 substeps", "zap_c16_t2_s5"), ("2 s, 10 substeps", "zap_c16_t2_s10"), ("2 s + SIREN Omega", "zap_c16_t2_siren"), ("trained with no network", "zap_c16_t2_now")), ()),
     ("batch 17: batch 15.1 over different graphs", None,
-     (("axes turned 45 deg", "zap_g17_rot45"), ("random directions", "zap_g17_randdir"), ("18 nearest only", "zap_g17_knn18"), ("no highways", "zap_g17_nolong"), ("reaches 16 / 64 um", "zap_g17_r16_64"), ("reaches 64 / 256 um", "zap_g17_r64_256"), ("random graph (null)", "zap_g17_random"), ("base, seed 1", "zap_g17_s1")), ()),
+     (("axes turned 45 deg", "zap_g17_rot45"), ("random directions", "zap_g17_randdir"), ("18 nearest only", "zap_g17_knn18"), ("no highways", "zap_g17_nolong"), ("reaches 16 / 64 um", "zap_g17_r16_64"), ("reaches 64 / 256 um", "zap_g17_r64_256"), ("base, seed 1", "zap_g17_s1"), ("random graph (null)", "zap_g17_random")), ()),
 )
 # the law of each batch, in the title of every one of its slides (Cedric: which slide belongs to which batch)
 BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4": "GraphCast law",
@@ -1394,7 +1450,7 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
                 "17": "the graph: rotated or random directions, kNN only, no highways, reaches, random graph, seed"}
 
 
-SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
+SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren", "batch 16": "zap_c16_t2"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
 HIDE_BATCHES_UPTO = 7     # batches whose own slides are commented out of all.tex (Cedric, 2026-10-02)
 HIDE_BATCHES = {"10", "12", "13"}     # single batches hidden (Cedric: 10 on 2026-10-02; 12 and 13 on 2026-10-03)
 HIDDEN_BATCHES: set = set()   # Cedric hid batch 4 while one arm had landed (2026-09-30); back with all 8 (2026-10-01)
@@ -2364,7 +2420,7 @@ def main():
         right_fs = (head("does the flow depend on the graph?")
                     + "{\\scriptsize the mean and the median, frame by frame, of the flow movies of 5 graphs (base, axes "
                       "turned 45 deg, random directions, reaches 16 / 64 and 64 / 256 \\textmu m), each scaled by its own "
-                      "strength; below them the recorded dF/F\\par}\\vspace{6pt}\n"
+                      "strength; below, the median over the RECORDED dF/F\\par}\\vspace{6pt}\n"
                     + head("similarity of the flow movies") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
                       "& excitatory & inhibitory \\\\\n\\hline\n"
                     + f"same graph, another seed & {su_['ex']['seed_ref_movie']:.2f} & {su_['in']['seed_ref_movie']:.2f} \\\\\n"
@@ -2374,6 +2430,7 @@ def main():
                       "& excitatory & inhibitory \\\\\n\\hline\n"
                     + "".join(f"{_tex(r_.replace('zap_', ''))} & {ag_[r_]['ex']:.2f} & {ag_[r_]['in']:.2f} \\\\\n" for r_ in Wd_["runs"])
                     + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                    + sing_block()
                     + "{\\tiny\\color{gray} similarity: per frame, the cosine of the two vector fields over the brain, "
                       "averaged over the 800 frames (1 = the same flow); a structure the data imposes would hold across "
                       "graphs as it does across seeds\\par}\n")
@@ -2418,7 +2475,65 @@ def main():
         deck.append(("11f_graph_curves", frame("the graphs: brain-mean dF/F and R$^2$ over the 2 h",
                                                "\\panel{figs/graph_curves.png}", right_gc, "tools/exp17_graph_curves.py",
                                                left_gap=True, deck_title="batch 17 $\\cdot$ every graph's free rollout")))
-    MOVE_TO_END = ("08b_calcium_result", "02b_models")      # Cedric, 2026-10-03: the models table closes the deck       # Cedric, 2026-10-03: the latent-calcium slide now opens batch 16   # Cedric, 2026-10-02 / 10-03: calcium closes the deck
+    # Cedric, 2026-10-04: the experiment's summary, exp17 beside exp19, and the outlook -- the deck's last slide
+    try:
+        def ms_(n):
+            return mse_summary(landed[n]["test"])
+
+        def bm_(n, v=""):
+            return bm_metrics(os.path.join(landed[n]["dir"], "results", f"{n}{v}_movie.npz"))["r2"]
+        r13 = [ms_(n)["model_l"] for n in landed if n.startswith("zap_r13_") and not n.endswith("_now")]
+        GCs = json.load(open(os.path.join(EXP, "data", "graph_curves.json")))
+        sims = json.load(open(os.path.join(EXP, "data", "wind_consensus_g17sel.json")))["similarity_summary"]
+        PCs = json.load(open(os.path.join(EXP, "data", "param_compare.json")))["corr_with_base"]
+        sp_r = [PCs[k][n] for k in ("tau", "V", "B") for n in PCs[k] if n not in ("zap_e15_cur", "zap_g17_s1", "zap_g17_random")]
+        gl = [v["mse_long"] for v in GCs.values()]
+        gb = [v["bm_r2"] for v in GCs.values()]
+        e154, e16 = ms_("zap_e15_cur_siren"), ms_("zap_c16_t2_siren")
+        left_s = (head("what exp17 found (17 batches, 183 runs)")
+                  + "{\\scriptsize\\begin{itemize}\\setlength\\itemsep{1pt}\n"
+                  f"\\item \\textbf{{Forecast.}} Held out (ZAPBench's split): long MSE {min(r13):.3f}--{max(r13):.3f} "
+                  f"against the mean's {ms_('zap_r13_ex')['mean_l']:.3f} ($10^{{-3}}$ dF/F$^2$), but above the mean at h 1--3. "
+                  f"In sample, ephys + SIREN: {e154['model_l']:.3f}, and {e16['model_l']:.3f} with the indicator (mean {e154['mean_l']:.3f}).\n"
+                  "\\item \\textbf{Free rollout.} One recorded frame + the stimulus, nothing else (leak test): the rig of batch 13 "
+                  "stays on the recording for the whole 2 h.\n"
+                  f"\\item \\textbf{{Network test.}} Brain-mean R$^2$ of 15.4: {bm_('zap_e15_cur_siren'):+.2f} with the network, "
+                  f"{bm_('zap_e15_cur_siren', '_W0'):+.2f} with W = 0, {bm_('zap_e15_cur_siren', '_no_stimulus'):+.2f} with no stimulus, "
+                  f"{bm_('zap_e15_now'):+.2f} trained with no network. The per-neuron R$^2$ barely sees it.\n"
+                  f"\\item \\textbf{{Not a particular network.}} 8 graphs, a random one included: long MSE {min(gl):.3f}--{max(gl):.3f}, "
+                  f"brain-mean R$^2$ {min(gb):+.2f}--{max(gb):+.2f}. Each neuron's constants are the data's (r {min(sp_r):.2f}--{max(sp_r):.2f} "
+                  "across graphs); the coupling is needed, its wiring is not identified.\n"
+                  f"\\item \\textbf{{The flow is the graph's.}} Flow movies {sims['ex']['seed_ref_movie']:.2f} alike between seeds, "
+                  f"{sims['ex']['movie_mean_offdiag']:.2f} / {sims['in']['movie_mean_offdiag']:.2f} between graphs (excitatory / inhibitory).\n"
+                  "\\item \\textbf{No help:} the GNN-MLP (drifts; leaky, still runs away), conductance, a learned indicator, "
+                  "more substeps; the learned clusters are cuts of continua.\n"
+                  "\\end{itemize}\\par}\n")
+        right_s = (head("exp17 and exp19 (whole-body, WHOLISTIC f338)")
+                   + "{\\scriptsize\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{1.25cm}@{\\hspace{4pt}}"
+                     ">{\\raggedright\\arraybackslash}p{2.45cm}@{\\hspace{4pt}}>{\\raggedright\\arraybackslash}p{2.45cm}@{}}\n"
+                     "& \\textbf{exp17} & \\textbf{exp19} \\\\\n\\hline\n"
+                     "unit & a segmented neuron, fixed position & a voxel; the tissue moves \\\\\n"
+                     "stimulus & known: 22 visual + 5 ephys & unknown: a learned forcing $I(t)$ \\\\\n"
+                     "network & carries the brain-wide swings & carries nothing measurable (its finding 5) \\\\\n"
+                     "forecast & beats the mean far ahead & beats it to $\\sim$4 volumes (its finding 3) \\\\\n"
+                     "identity & per-neuron constants, reproducible & a per-voxel identity hurts (motion) \\\\\n"
+                     "\\end{tabular}\\par}\\vspace{3pt}\n"
+                     "{\\scriptsize Shared: the controls (leak test, W = 0, a twin with no network, brain-mean R$^2$), and a "
+                     "GLOBAL drive explaining most of the activity. Different: registered neurons and a known stimulus leave "
+                     "the coupling something to explain; moving voxels and a fitted forcing do not.\\par}\\vspace{5pt}\n"
+                   + head("outlook")
+                   + "{\\scriptsize\\begin{itemize}\\setlength\\itemsep{1pt}\n"
+                     "\\item Identify the wiring: the forecast cannot; a measured connectome (the fish's EM), perturbations, or a "
+                     "strong sparsity prior.\n"
+                     "\\item A held-out SIREN: $\\Omega$ of position and stimulus, not of absolute time.\n"
+                     "\\item The leaky GNN-MLP with a bounded message.\n"
+                     "\\item exp19: registration before any network claim; its stimulus sessions as known forcings.\n"
+                     "\\end{itemize}\\par}\n")
+        deck.append(("99_summary", frame("summary and outlook", "\\vspace*{2\\baselineskip}\\fitcol{%\n" + left_s + "}", right_s, "exp17_zapbench_graphcast.md, ## Summary",
+                                          deck_title="multi-level GNN on fish 2 $\\cdot$ summary and outlook")))
+    except (KeyError, FileNotFoundError) as e_:
+        print(f"[summary] not made: {e_}")
+    MOVE_TO_END = ("08b_calcium_result", "02b_models", "99_summary")      # Cedric, 2026-10-03: the models table closes the deck       # Cedric, 2026-10-03: the latent-calcium slide now opens batch 16   # Cedric, 2026-10-02 / 10-03: calcium closes the deck
     deck = [x for x in deck if x[0] not in MOVE_TO_END] + [x for x in deck if x[0] in MOVE_TO_END]
     # Cedric, 2026-10-02: one slide of GraphCast results right after the GraphCast slides -- the best GraphCast run's
     # movie (batch 4's curriculum to 40), shown although batch 4's own slides are hidden
@@ -2464,7 +2579,10 @@ def main():
     HIDDEN_SLIDES |= {"13_clusters_3d_e15", "13_clusters_k16_montage_e15", "13_clusters_k32_montage_e15",
                       "zap_gc_cur40_movie", "zap_b8_lin_W0", "zap_ds_ng_base_W0", "zap_e15_cur_siren_curves",
                       "13_clusters_k4_montage_e15", "13_cluster_profile_e15", "13_clusters_k8_montage_e15",
-                      "zap_e15_cur_siren_W0", "zap_e15_cur_siren_lead_left_quarter"}           # Cedric, 2026-10-03
+                      "zap_e15_cur_siren_W0", "zap_e15_cur_siren_lead_left_quarter",
+                      "zap_dm_ng_rl1lo_curves", "zap_dm_ng_rl1lo_W0", "zap_dm_ng_now_movie",
+                      "zap_v14_cur_siren_movie", "zap_v14_cur_siren_curves", "zap_v14_cur_siren_W0",
+                      "zap_v14_cur_siren_lead_left_quarter"}           # Cedric, 2026-10-03
     # Cedric, 2026-10-03: batch 11's cluster and edge slides commented out; batch 15's best run carries them now
     HIDDEN_SLIDES |= {name for name, _ in deck if name.startswith("13_") and name.endswith("_dm")}
     pages, shown = {}, 0

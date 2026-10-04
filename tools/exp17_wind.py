@@ -212,7 +212,10 @@ def render(name, D, n_part=6000, seed=0):
     cur = m_.axvline(tm[0], color="#ff7f0e", lw=0.9)
     for f in range(F):
         bg = np.clip(act[f] / amax, 0, 1)
-        bgc = (np.stack([bg * 0.45, bg * 0.40, bg * 0.45], -1) * ins[..., None]).repeat(S, 0).repeat(S, 1) * 0.45
+        if D.get("bg_style") == "activity":             # the activity itself, as the run movies draw it (inferno)
+            bgc = (matplotlib.colormaps["inferno"](bg)[..., :3] * ins[..., None]).repeat(S, 0).repeat(S, 1) * 0.75
+        else:
+            bgc = (np.stack([bg * 0.45, bg * 0.40, bg * 0.45], -1) * ins[..., None]).repeat(S, 0).repeat(S, 1) * 0.45
         for k, mp_ in maps.items():
             mp_.step(f)
             ims[k].set_data(np.clip(bgc + mp_.canvas, 0, 1))
