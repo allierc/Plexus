@@ -1917,9 +1917,7 @@ def slides_b6():
                     "\\begin{center}\\includegraphics[width=\\textwidth,height=0.84\\textheight,keepaspectratio]"
                     "{figs/atlas_f1.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     if os.path.exists(os.path.join(PRES, "Movies", "mask3d_f1.mp4")):
-        body = ("\\vspace*{1.0\\baselineskip}{\\centering\\playmovie[0.92\\textwidth]{Movies/mask3d_f1}\\par}\\vspace{4pt}\n"
-                "{\\tiny\\color{gray} the gut-input cells of the six rules in 3-D, turning once about the vertical: red the "
-                "gut-input cells (the law's UV-pulse and beam inputs), blue the grating's, green the swim's (batches 1-5 only)\\par}")
+        body = "\\vspace*{1.0\\baselineskip}{\\centering\\playmovie[0.92\\textwidth]{Movies/mask3d_f1}\\par}"   # no caption (Cedric)
         out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_mask3d.py",
                                             deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input masks in 3-D")))
     return out
