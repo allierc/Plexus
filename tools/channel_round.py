@@ -72,6 +72,14 @@ def launch(labels):
         if lab in S.RAN:
             raise SystemExit(f"{lab} has run (channel_spec.RAN); a new round needs new labels")
         ch = S.VERSIONS[lab]["channel"]
+        if S.VERSIONS[lab].get("builder") == "bilayer":            # Phase G's membrane with a core (no channel)
+            S.build_bilayer(lab, S.params_of_bilayer(lab))
+            run = f"exp04_v{lab}"
+            jd = job_dir(4, run)
+            os.makedirs(jd, exist_ok=True)
+            ids[run] = _submit_streamed(f"python -u Plexus_Main.py -o generate channel/{run} --device cuda:0 --force", jd, run)
+            print(f"  {run:16s} bilayer job {ids[run]}")
+            continue
         P = S.params_of(lab) if S.VERSIONS[lab].get("builder") != "flow" else None
         if P is not None and S.VERSIONS[lab].get("builder") == "mechano":
             S.build_mechano(lab, P, ch)

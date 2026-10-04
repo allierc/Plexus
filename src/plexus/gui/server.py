@@ -515,8 +515,12 @@ def g_watch_open3d(h, q):
         _done = f"3D: {name!r} is ready after {_el:.1f}s -- drag to turn, wheel to zoom"
         print(f"[watch] {_done}", flush=True)
         _journal(_done, q)
+        try:
+            glass = bool(bio_view.current().glass_state())
+        except Exception:                                        # noqa: BLE001
+            glass = False
         return h._send_json({"name": name, "spec": dst, "seconds": round(_el, 1), "n_kept": n_kept,
-                             "total_ns": round(total_ns, 4) if total_ns else None, "camera": camera})
+                             "total_ns": round(total_ns, 4) if total_ns else None, "camera": camera, "glass": glass})
     except Exception as e:                                       # noqa: BLE001
         return h._send_json({"error": f"{type(e).__name__}: {e}"[:300]}, 400)
 
@@ -722,6 +726,8 @@ def g_picture(h, q, route):
             return h._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
         if q.get("cut") and (_q1(q, "cut") in ("1", "far", "on", "true")) != bool(getattr(v, "cut", False)):
             v.set_cut(_q1(q, "cut") in ("1", "far", "on", "true"))     # the slice: the near half cut away
+        if q.get("glass") and (_q1(q, "glass") in ("1", "on", "true")) != bool(v.glass_state()):
+            v.set_glass(_q1(q, "glass") in ("1", "on", "true"))            # translucent skins
         if q.get("azim") or q.get("elev") or q.get("zoom"):
             v.set_camera(*(float((q.get(k) or [str(getattr(v, k, 0.0) or 0.0)])[0])
                            for k in ("azim", "elev", "zoom", "roll")))

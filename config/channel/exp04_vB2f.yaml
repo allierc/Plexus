@@ -1,0 +1,160 @@
+general:
+  name: exp04_vB2f
+  seed: 0
+  n_frames: 300000
+  dt: 8.092469352014011e-07
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  record_cap: 3001
+  field_record_cap: 2
+  units: {length_um: 0.025, time_s: 8.599249964205639e-07, force_nN: 0.00016439999999999998}
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.5]
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      tension: {width: 1, integration: none, unit: tension, title: membrane tension}
+      tension_applied: {width: 1, integration: none, unit: tension, title: applied tension}
+      strain: {width: 1, integration: none, unit: '1', title: membrane strain}
+    title: the cell's interior (the voltage-clamped compartment)
+  lipid:
+    n: 2022
+    start:
+    - [0.5, 0.5, 0.5]
+    type_layout: ordered
+    types:
+      head: {count: 674}
+      tail: {count: 1348}
+    state:
+      pos: {width: 3, role: coordinate, integration: first_order, boundary: world, title: position}
+      mol: {width: 1, integration: none, unit: '1'}
+    title: membrane lipids
+  frame:
+    n: 756
+    start:
+    - [0.5, 0.5, 0.5]
+    type_layout: ordered
+    types:
+      head: {count: 252}
+      tail: {count: 504}
+    state:
+      pos: {width: 3, role: coordinate, integration: none, boundary: world, title: position}
+      force: {width: 3, integration: none, unit: force, title: force from the ions}
+    title: frozen lipids at the patch's rim (they hold the tension)
+fields: {}
+seed:
+- op: cloud_seed
+  at: lipid
+  cloud: exp04b_B2f/lipid
+  origin: [0.5, 0.5, 0.5]
+  scale: 40000000.0
+- op: cloud_seed
+  at: frame
+  cloud: exp04b_B2f/frame
+  origin: [0.5, 0.5, 0.5]
+  scale: 40000000.0
+- op: seed_state_from_file
+  at: lipid
+  file: shapes/exp04b_B2f/blocks.npz
+  blocks: {mol: mol}
+operators:
+- {op: elastic_network, at: lipid, within: mol, cutoff: 0.08, k: 29296.874999999993, go_epsilon: 0.0, mobility: 1.0,
+  f_max: 988.5734072022161}
+- op: pair_potential
+  model: table
+  at: lipid
+  pair_table:
+    head:
+      head: {law: wca, sigma: 0.0304}
+      tail: {law: wca, sigma: 0.0304}
+    tail:
+      head: {law: wca, sigma: 0.0304}
+      tail: {law: cooke, sigma: 0.032, epsilon: 1.0, tail: 0.05120000000000001}
+  exclude: mol
+  mobility: 1.0
+  f_max: 988.5734072022161
+- op: pair_potential
+  model: table
+  at: lipid
+  with: frame
+  pair_table:
+    head:
+      head: {law: wca, sigma: 0.0304}
+      tail: {law: wca, sigma: 0.0304}
+    tail:
+      head: {law: wca, sigma: 0.0304}
+      tail: {law: cooke, sigma: 0.032, epsilon: 1.0, tail: 0.05120000000000001}
+  mobility: 1.0
+  react: false
+  f_max: 988.5734072022161
+- {op: brownian, at: lipid, kT: 1.0, mobility: 1.0, seed: 1}
+- op: radial_drive
+  at: frame
+  protocol:
+  - [0, 0.0]
+  - [20000, 0.0]
+  - [60000, 608.2725060827253]
+  - [300000, 608.2725060827253]
+  mode: tension
+  mobility_R: 0.23578510087688198
+  cell: cell
+  axis: 2
+  centre: [0.5, 0.5, 0.5]
+  max_step: 0.0003766823624169872
+  avg_frames: 2000.0
+  affine_sets: [lipid]
+schedule: [elastic_network, pair_potential, pair_potential, brownian, radial_drive]
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  compartment_sets: [lipid]
+  hide_sets: [frame, cell]
+  surface:
+    lipid: {render: surface, spacing: 0.016, blur: 2.0, iso_frac: 0.3, smooth: 30, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+  opacity: {lipid: 0.6}
+  colors:
+    lipid: [0.82, 0.82, 0.84]
+  camera: {elev: 20.0, azim: 30.0}
+  zoom: 1.0
+  curve:
+  - {quantity: 'block:cell:tension', unit: tension_mN_m, smooth: 50.0, ymin: -5.0, ymax: 15.0, ylabel: membrane
+      tension, font_size: 21, tick_font_size: 16}
+  - {quantity: 'block:cell:strain', ymin: -0.12, ymax: 0.2, ylabel: patch strain, font_size: 21, tick_font_size: 16,
+    smooth: 50.0}
+  subject: lipid
+  keep_stills: true
+  stills: 8
+  max_frames: 300
+  real_time: false
+  duration_s: 10.0
+  curve_time: {per_frame_s: 6.958916678564171e-13, unit: ns}
+  replay_curves: true
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a single, roughly ellipsoidal particle undergoing a rapid change
+      in internal stress and position. Initially, the particle remains relatively static with minimal
+      internal tension. Around the 40 ns mark, there is a sharp spike in the "membrane tension" and a
+      corresponding shift in the "particle strain." Following this peak, the tension stabilizes at a high
+      constant value while the particle strain exhibits small, high-frequency oscillations.
+    objects: The scene contains a single, grey, three-dimensional ellipsoidal particle centered within
+      a bounding box. The particle has a rough, irregular surface texture and is approximately 0.01 $\mu$m
+      in length. It is situated in a void, represented by a black background with white wireframe axes.
+      The simulation includes two line graphs on the right that track the particle's physical properties
+      over a 200 ns time period.

@@ -1014,6 +1014,47 @@ def build_mechano(label, P, channel):
                     continue
             lipid.append((x, y, zl))
     lipid = np.array(lipid); frame = np.array(frame)
+    C3 = None
+    if P.get("lipid_model") == "cooke3":
+        # PHASE G B3 (2026-09-30): THE MEMBRANE WITH A CORE around the channel -- Cooke's three-bead lipids (BILAYER's
+        # parameters, the build_bilayer geometry: heads at +-(0.5 sigma + 2 b) about the OPM centre, tails inward), a
+        # molecule kept only if none of its beads is within `lipid_excl_nm` of an alpha carbon or inside the protein's
+        # ring at that bead's height (+-15 deg sector, +-1.2 nm); the rim's molecules frozen as the frame. Beads ordered
+        # heads first, then tail pairs, as `type_layout: ordered` types them; `mol` numbers the molecules.
+        B_ = {**BILAYER, **(P.get("cooke3") or {})}
+        s3 = B_["sigma_nm"]; b3 = B_["bond_sigma"] * s3
+        a3 = math.sqrt(2.0 * B_["area_per_lipid_sigma2"] * s3 * s3 / math.sqrt(3.0))
+        zh3 = 0.5 * s3 + 2 * b3
+        lat3 = hex_lattice(a3, R_frame_out + 0.1)
+        thp = np.arctan2(X_all[:, 1], X_all[:, 0]); rp_ = np.hypot(X_all[:, 0], X_all[:, 1])
+        mols, rims = [], []
+        for sgn in (1.0, -1.0):
+            for (x, y) in lat3:
+                r = math.hypot(x, y)
+                m = [(x, y, sgn * zh3), (x, y, sgn * (zh3 - b3)), (x, y, sgn * (zh3 - 2 * b3))]
+                if r > R_patch:
+                    if r <= R_frame_out:
+                        rims.append(m)
+                    continue
+                bad = False
+                for (bx, by, bz) in m:
+                    if np.sqrt((X_all[:, 0] - bx) ** 2 + (X_all[:, 1] - by) ** 2 + (X_all[:, 2] - bz) ** 2).min() < P["lipid_excl_nm"]:
+                        bad = True; break
+                    near = np.abs(X_all[:, 2] - bz) < 1.2
+                    dth = np.abs((thp - math.atan2(by, bx) + np.pi) % (2 * np.pi) - np.pi)
+                    sect = rp_[near & (dth < math.radians(15))]
+                    if sect.size and r < sect.max():
+                        bad = True; break
+                if not bad:
+                    mols.append(m)
+        mols, rims = np.array(mols), np.array(rims)
+        lipid = np.concatenate([mols[:, 0], mols[:, 1:].reshape(-1, 3)])
+        frame = np.concatenate([rims[:, 0], rims[:, 1:].reshape(-1, 3)])
+        mol3 = np.concatenate([np.arange(len(mols)), np.repeat(np.arange(len(mols)), 2)])
+        bl_ = dict(np.load(os.path.join(folder, "blocks.npz")))
+        bl_["lipid_mol"] = mol3.astype(np.float64)[:, None]
+        np.savez_compressed(os.path.join(folder, "blocks.npz"), **bl_)
+        C3 = {"B": B_, "s": s3, "b": b3, "nL": len(mols), "nF": len(rims)}
     np.savez_compressed(os.path.join(folder, "membrane.npz"),
                         lipid=(lipid * 1e-9).astype(np.float32), frame=(frame * 1e-9).astype(np.float32))
 
@@ -1042,6 +1083,10 @@ def build_mechano(label, P, channel):
                else max(57.1 * eps_LL / nm(sigma_LL) ** 2, eps_LL * math.pi ** 2 / (2.0 * nm(P["lipid_tail_over_sigma"] * sigma_LL) ** 2)))
     go_curv = 72.0 * P["go_eps_kT"] / nm(0.6) ** 2
     lam = max(24 * k_enm, 6 * lj_curv, 6 * go_curv, E_to_sim(P["lipid_z_k_kT_nm2"]))
+    if C3 is not None:
+        k3 = E_to_sim(C3["B"]["k_bond_kT_sigma2"] / C3["s"] ** 2)
+        lam = max(24 * k_enm, 6 * go_curv, 4 * k3, 6 * 57.1 / nm(C3["B"]["head_b"] * C3["s"]) ** 2,
+                  6 * 57.1 * P["lipid_protein_eps_kT"] / nm(P["lipid_protein_sigma_nm"]) ** 2)
     dt = P["dt_safety"] / lam
     if IL is not None:
         dt = min(dt, IL["dt"])                                            # the ions' contacts may be the stiffer
@@ -1075,11 +1120,30 @@ def build_mechano(label, P, channel):
     f0 = 0
     prot = [[0, 0.0]]
     f0 += seg[0]; prot.append([f0, 0.0])
-    f0 += seg[1]; prot.append([f0, T])
-    f0 += seg[2]; prot.append([f0, T])
-    f0 += seg[3]; prot.append([f0, 0.0])
-    f0 += seg[4]; prot.append([f0, 0.0])
-    mu_R = 1.0 / (4 * math.pi * KA_sim * 0.2 * tau_patch)
+    # `tension_cycles: n` (Phase G, 2026-09-29): stretch, hold, release, hold -- n times, so one run shows the gate
+    # opening AND closing more than once (the human: "to see multiple closing/opening")
+    for _c in range(int(P.get("tension_cycles", 1))):
+        f0 += seg[1]; prot.append([f0, T])
+        f0 += seg[2]; prot.append([f0, T])
+        f0 += seg[3]; prot.append([f0, 0.0])
+        f0 += seg[4]; prot.append([f0, 0.0])
+    n_frames = f0
+    if P.get("strain_top_linear") is not None:
+        # PHASE G1 (2026-09-29): THE STRETCH GIVEN AS TWO LINEAR STRAINS OF THE FRAME, from batch 12's own calibration
+        # (12a/12b: tension = -4.7 + 57 x area strain, mN/m, over the holds): `rest_strain_linear` puts the patch at zero
+        # tension from frame 0 (area strain 0.083 -> linear 0.040; unstretched it rests at -4.7 mN/m, compressed), and
+        # `strain_top_linear` is held after one ramp to the end of the run (no release: a clamped gate's mean force
+        # needs one long hold). Frames: `hold_frames` = [settle, ramp, hold].
+        s0, s1 = float(P.get("rest_strain_linear", 0.0)), float(P["strain_top_linear"])
+        if P["drive_mode"] == "tension":
+            # G1' (2026-09-29): CONSTANT TENSION, not constant frame area -- at a fixed frame the open end's outline
+            # swallowed ~40 lipids and stretched the rest of the patch (G1a-e: 3.8 -> 8.1 mN/m from lambda 0 to 1 "at
+            # rest"), so the two tensions were not two tensions. The frame now moves until the membrane carries the value.
+            s0, s1 = tension_sim(float(P.get("rest_tension_mN_m", 0.0))), tension_sim(float(P["hold_tension_mN_m"]))
+        fs = [int(x) for x in P["hold_frames"]]
+        prot = [[0, s0], [fs[0], s0], [fs[0] + fs[1], s1], [sum(fs), s1]]
+        n_frames = sum(fs)
+    mu_R = 1.0 / (4 * math.pi * KA_sim * 0.2 * tau_patch) * float(P.get("mobility_R_factor", 1.0))
     # ONE GUARD FOR EVERY BOND, CONTACT AND PAIR: no single force may move a bead more than 0.02 nm in
     # one step (mobility 1: dx = f dt). A numerical guard, counted in the log whenever it acts; the
     # uncapped Go wall blew round 1 up (exp04, 2026-09-25).
@@ -1118,7 +1182,9 @@ def build_mechano(label, P, channel):
         "tension_applied": {"width": 1, "integration": "none", "unit": "tension"},
         "strain": {"width": 1, "integration": "none", "unit": "1"},
         "pore_r": {"width": 1, "integration": "none", "unit": "length"},
-        **({"w_open": {"width": 1, "integration": "none", "unit": "1"}, **IL["cell_blocks"]} if IL is not None else {})}}}
+        **({"w_open": {"width": 1, "integration": "none", "unit": "1"}, **IL["cell_blocks"]} if IL is not None else {}),
+        **({"w_open": {"width": 1, "integration": "none", "unit": "1"}} if (IL is None and P.get("morph")) else {}),
+        **({"f_gate": {"width": 1, "integration": "none", "unit": "energy"}} if P.get("morph_clamp") is not None else {})}}}
     bead_state = {"pos": {"width": 3, "role": "coordinate", "integration": "first_order", "boundary": "world"}}
     # `rigid_merge: [[a, b, ...], ...]` -- DOMAINS THAT MOVE AS ONE BODY, for the rigid-body projection only:
     # MscL's iris tilts each subunit's TM1-TM2 pair as a unit (Sukharev & Guy 2001; Wang 2014's helix
@@ -1146,6 +1212,12 @@ def build_mechano(label, P, channel):
     sets["frame"] = {"n": int(len(frame)), "start": [[0.5, 0.5, round(zc, 6)]], "state": {
         "pos": {"width": 3, "role": "coordinate", "integration": "none", "boundary": "world"},
         "force": {"width": 3, "integration": "none", "unit": "force"}}}
+    if C3 is not None:
+        sets["lipid"].update({"type_layout": "ordered", "types": {"head": {"count": C3["nL"]}, "tail": {"count": 2 * C3["nL"]}}})
+        sets["lipid"]["state"]["mol"] = {"width": 1, "integration": "none", "unit": "1"}
+        sets["frame"].update({"type_layout": "ordered", "types": {"head": {"count": C3["nF"]}, "tail": {"count": 2 * C3["nF"]}}})
+        for nmk in names:                                             # one type per chain: the table's second index
+            sets[nmk].update({"type_layout": "ordered", "types": {"residue": {"count": sets[nmk]["n"]}}})
     origin = [0.5, 0.5, round(zc, 6)]
     seeds = [{"op": "cloud_seed", "at": nmk, "cloud": f"{shp}/{ck}", "origin": origin, "scale": world_per_m}
              for nmk, ck in zip(names, chains)]
@@ -1160,6 +1232,8 @@ def build_mechano(label, P, channel):
     pz["lipid"] = (lipid * 1e-9).astype(np.float32)
     pz["frame"] = (frame * 1e-9).astype(np.float32)
     np.savez_compressed(os.path.join(folder, "points.npz"), **pz)
+    if C3 is not None:
+        seeds.append({"op": "seed_state_from_file", "at": "lipid", "file": f"shapes/{shp}/blocks.npz", "blocks": {"mol": "lipid_mol"}})
     seeds += [{"op": "cloud_seed", "at": "lipid", "cloud": f"{shp}/lipid", "origin": origin, "scale": world_per_m},
               {"op": "cloud_seed", "at": "frame", "cloud": f"{shp}/frame", "origin": origin, "scale": world_per_m}]
 
@@ -1225,9 +1299,10 @@ def build_mechano(label, P, channel):
          "epsilon": eps_LL * P["frame_eps_ratio"], "mobility": 1.0, "react": False, "f_max": f_cap},
         {"op": "tether", "at": "lipid", "k": E_to_sim(P["lipid_z_k_kT_nm2"]), "axes": [2], "mobility": 1.0,
          **({"thin_with": {"set": "cell", "block": "strain", "mid": round(zc, 6)}} if P.get("thinning") else {})},
-        {"op": "brownian", "at": "lipid", "kT": P["kT_noise"], "mobility": 1.0, "seed": 1},
-    ] + [{"op": "brownian", "at": nmk, "kT": P["kT_noise"], "mobility": 1.0, "seed": 10 + i}
-         for i, nmk in enumerate(names)] + [
+        {"op": "brownian", "at": "lipid", "kT": P["kT_noise"], "mobility": 1.0, "seed": 1 + 1000 * int(P.get("noise_replicate", 0))},
+    ] + [{"op": "brownian", "at": nmk, "kT": 0.0 if P.get("protein_brownian") is False else P["kT_noise"],
+          "mobility": 1.0, "seed": 10 + i}                 # kT 0, not dropped: a set with no motion operator is
+         for i, nmk in enumerate(names)] + [                # not integrated at all (the G1 smoke test froze)
         {"op": "radial_drive", "at": "frame", "protocol": prot, "mode": P["drive_mode"], "mobility_R": mu_R,
          "cell": "cell", "axis": 2, "centre": origin, "max_step": nm(0.01 * a_L), "avg_frames": 2000.0,
          **({"affine_sets": ["lipid"]} if P.get("affine_stretch") else {})},
@@ -1243,6 +1318,31 @@ def build_mechano(label, P, channel):
          "every": P["conduct_every"], "iters": P["conduct_iters"], "iters_first": 6000, "omega": 1.0,
          **({"probe_radius": nm(P["probe_nm"])} if P.get("probe_nm") else {})},
     ]
+    if C3 is not None:
+        # THE COOKE MEMBRANE'S OPERATORS replace the one-bead lipid's (its pair law, its rim law, its depth spring):
+        # bonds inside each lipid, the head/tail table within the membrane and against the rim, and against each chain
+        # a table of its own -- heads WCA at `lipid_protein_sigma_nm`, tails that WCA plus the cos^2 tail of depth
+        # `lipid_protein_eps_kT` (the hydrophobic belt: a tail sticks to the protein's core, a head does not).
+        B_ = C3["B"]; s3 = C3["s"]
+        hb, sw, wt = nm(B_["head_b"] * s3), nm(s3), nm(B_["tail_width_sigma"] * s3)
+        sp, wp = nm(P["lipid_protein_sigma_nm"]), nm(B_["tail_width_sigma"] * P["lipid_protein_sigma_nm"])
+        tab = {"head": {"head": {"law": "wca", "sigma": hb}, "tail": {"law": "wca", "sigma": hb}},
+               "tail": {"head": {"law": "wca", "sigma": hb},
+                        "tail": {"law": "cooke", "sigma": sw, "epsilon": B_["eps_tail_kT"], "tail": wt}}}
+        tabp = {"head": {"residue": {"law": "wca", "sigma": sp}},
+                "tail": ({"residue": {"law": "wca", "sigma": sp}} if P.get("lipid_protein_repulsive") else
+                         {"residue": {"law": "cooke", "sigma": sp, "epsilon": P["lipid_protein_eps_kT"], "tail": wp}})}
+        keep = [o for o in ops if not (o["op"] in ("pair_potential", "tether") and o.get("at") == "lipid")]
+        at_ = next(i for i, o in enumerate(keep) if o["op"] == "brownian" and o.get("at") == "lipid")
+        new3 = [{"op": "elastic_network", "at": "lipid", "within": "mol", "cutoff": nm(2.5 * C3["b"]),
+                 "k": E_to_sim(B_["k_bond_kT_sigma2"] / s3 ** 2), "go_epsilon": 0.0, "mobility": 1.0, "f_max": f_cap},
+                {"op": "pair_potential", "model": "table", "at": "lipid", "pair_table": tab, "exclude": "mol",
+                 "mobility": 1.0, "f_max": f_cap},
+                {"op": "pair_potential", "model": "table", "at": "lipid", "with": "frame", "pair_table": tab,
+                 "mobility": 1.0, "react": False, "f_max": f_cap}] + [
+                {"op": "pair_potential", "model": "table", "at": "lipid", "with": nmk, "pair_table": tabp,
+                 "mobility": 1.0, "mobility_with": 1.0, "react": True, "f_max": f_cap} for nmk in names]
+        ops = keep[:at_] + new3 + keep[at_:]
     if P.get("insertion_drive"):
         # THE HYDROPHOBIC EFFECT ON EVERY RESIDUE (residue_slab, Wimley-White): what carries a pore-former's
         # stems across the core; along the morph path its pull is projected like the lipids' push
@@ -1255,12 +1355,26 @@ def build_mechano(label, P, channel):
         # not let 12 mN/m move a helix bundle through thousands of kT of springs (batch 11).
         if not basin:
             raise SystemExit("morph: needs `two_basin` (the open state) to build its path")
-        ops = [o for o in ops if o["op"] not in ("shape_match", "elastic_network")]
+        ops = [o for o in ops if not (o["op"] in ("shape_match", "elastic_network") and o.get("at") != "lipid")]
         ops.insert(0, {"op": "morph_gate", "at": names[0], "sets": names, "open_reference": basin["open_reference"],
                        "open_parts": basin["open_parts"], "open_scale": basin["open_scale"], "origin": origin,
                        "basin_offset": basin["basin_offset"], "barrier": float(P.get("morph_barrier_kT", 0.0)),
                        "gate_block": ["cell", "w_open"], "mobility": 1.0,
                        **({"tension_block": ["cell", "tension"], "area_change": dA_world} if P.get("morph_tension_work") else {})})
+        if P.get("morph_waypoints"):
+            # PHASE G: the gate on a RECORDED path (morph_gate[waypoints]) -- the parts w<j>_c<k> of the named shape,
+            # the seed's own frame (the rig's closed beads), c<k> in the protein sets' order
+            wp = P["morph_waypoints"]
+            ops[0].update({"model": "waypoints", "open_reference": wp["shape"], "waypoints": int(wp["n"]),
+                           "open_parts": [f"c{k}" for k in range(len(names))]})
+        if P.get("morph_clamp") is not None:
+            # PHASE G1: the gate HELD at lambda0 on the recorded path, the lipids' push along it recorded
+            # (morph_gate[clamp]; thermodynamic integration -- the free gate needs ~230 ns to cross, batch 13)
+            if not P.get("morph_waypoints"):
+                raise SystemExit("morph_clamp: needs `morph_waypoints` (the clamp is a waypoints model)")
+            ops[0].update({"model": "clamp", "lambda0": float(P["morph_clamp"]), "force_block": ["cell", "f_gate"]})
+            for k_ in ("basin_offset", "barrier", "tension_block", "area_change"):
+                ops[0].pop(k_, None)
     if IL is not None:
         # THE VOLTAGE CLAMPED (as the rig's): one ion crossing a 10-20 nm patch would move it by tens of mV;
         # the conduction solve's lumen is the ion paths' (and it writes the potential the ions feel)
@@ -1325,7 +1439,7 @@ def build_mechano(label, P, channel):
              "ymax": round(2 * r_open * 1e9 * 1.6, 1), "ylabel": "pore diameter"},
             {"quantity": "block:cell:tension", "unit": "tension_mN_m", "smooth": 50.0, "ymin": -5.0,
              "ymax": round(P["tension_max_mN_m"] * 1.3, 0), "ylabel": "membrane tension"}],
-        "subject": names[0], "keep_stills": True, "stills": 8, "max_frames": 300,
+        "subject": names[0], "keep_stills": True, "stills": 8, "max_frames": int(P.get("movie_frames", 300)),
         "real_time": False, "duration_s": 10.0, "curve_time": {"per_frame_s": dt * tau_s, "unit": "ns"},
         # THE LIVE MOVIE IS THE MOVIE: a replay from trajectory.npz has no grid fields and would drop
         # the current slice; every panel declares ymin/ymax, so the live pass draws them.
@@ -1341,6 +1455,12 @@ def build_mechano(label, P, channel):
         plotting["curve"] = [pl["curves"][0],
                              {"quantity": "block:cell:w_open", "ymin": 0.0, "ymax": 1.0,
                               "ylabel": "gate: 0 closed, 1 open"}, plotting["curve"][2]]
+    if P.get("morph_clamp") is not None:
+        # PHASE G panels (the human, 2026-09-29: "replace the middle curve by a tension plot"): the push along the
+        # path, the TENSION in the middle, the pore
+        plotting["curve"] = [{"quantity": "block:cell:f_gate", "smooth": 200.0, "ymin": -400.0, "ymax": 400.0,
+                              "ylabel": "push along path (kT)"},
+                             plotting["curve"][2], plotting["curve"][1]]
     for cv in plotting["curve"]:
         cv.setdefault("font_size", 21); cv.setdefault("tick_font_size", 16)
 
@@ -3028,3 +3148,354 @@ for _lab, _shape, _r, _why in (
 # ---- FROZEN (2026-09-26, the experiment stopped after batch 15): every label that ran is a record, never re-launched --
 RAN |= {"H4", "H5", "H6"} | {f"{b}{c}" for b in (10, 11, 12, 13, 14) for c in "abcdefghijklmnopqrst"} \
     | {"15e", "15f", "15i", "15j", "15k", "15l", "15q", "15r"}
+# ---- MscS ONLY, FROM 2026-09-29 (the human): the morph trainer and the rig, tested together (tools/mscs_morph.py) ----
+# Records, never launched through channel_round: each is a path of the 13,671 atoms both deposited states share.
+for _lab, _why in (("M1a", "MscS closed -> open by the morph trainer: a learned rest-shape rate field fitted to the open outline (grid mass)"),
+                   ("M1b", "MscS closed (6PWN) -> open (2VV5), the straight path through every atom (the path morph_gate uses)")):
+    VERSIONS[_lab] = {"channel": "mscs", "parent": None, "change": {}, "why": _why, "builder": "morph"}
+RAN |= {"M1a", "M1b"}
+VERSIONS["M2a"] = {"channel": "mscs", "parent": "M1a", "change": {}, "builder": "morph",
+                   "why": "M1a through the trainer's new objective: log_mse + volume (0.5) + shrink prior 1e-4 on the rate field"}
+RAN |= {"M2a"}
+VERSIONS["M3a"] = {"channel": "mscs", "parent": "M2a", "change": {}, "builder": "morph",
+                   "why": "M2a + the per-atom term point_mse (weight 100): each atom trained to its own open position"}
+RAN |= {"M3a"}
+VERSIONS["M3b"] = {"channel": "mscs", "parent": "M3a", "change": {}, "builder": "morph",
+                   "why": "M3a on a finer control lattice (K 12 -> 24, nodes ~0.6 nm apart) so neighbouring regions can stretch differently"}
+RAN |= {"M3b"}
+VERSIONS["M3c"] = {"channel": "mscs", "parent": "M3b", "change": {}, "builder": "morph",
+                   "why": "M3b + excluded volume: pair_potential[mpm] WCA between atoms (contact 0.25 nm, skipping same and adjacent residues)"}
+RAN |= {"M3c"}
+for _lab, _why in (("M4a", "M3c with the repulsion inside the MPM substep (recomputed every substep)"),
+                   ("M4b", "M4a with the repulsion 5x stronger (eps 2e-7) and the scatter's acceleration cap 200 -> 2000"),
+                   ("M4c", "M4a on a 10x stiffer material (youngs 90 -> 900): the grid-scale resistance to compression"),
+                   ("M4d", "M3b (no repulsion) with a spatial smooth prior (1e-4) on the rate lattice"),
+                   ("M4e", "M4a with a finer last grid (64 -> 96, 0.19 nm cells): does resolution let the repulsion act")):
+    VERSIONS[_lab] = {"channel": "mscs", "parent": "M3c", "change": {}, "builder": "morph", "why": _why}
+RAN |= {"M4a", "M4b", "M4c", "M4d", "M4e"}
+VERSIONS["M5a"] = {"channel": "mscs", "parent": "M4e", "change": {}, "builder": "morph",
+                   "why": "M4e done properly: grid 96 in the last stage with the substep halved (0.00034 -> 0.00017), repulsion inside the substep"}
+VERSIONS["M5b"] = {"channel": "mscs", "parent": "M3b", "change": {}, "builder": "morph",
+                   "why": "the hybrid: M3b's MPM path, each frame's atoms relaxed at the atom scale (bonds at closed lengths, WCA 0.25 nm, tether to the MPM frame)"}
+RAN |= {"M5a", "M5b"}
+VERSIONS["M5c"] = {"channel": "mscs", "parent": "M5b", "change": {}, "builder": "morph",
+                   "why": "M5b relaxed harder: 1000 steps a frame, tether to the MPM frame 1 -> 0.1, WCA 1 -> 5"}
+RAN |= {"M5c"}
+# ---- PHASE G (2026-09-29): MscS opens BECAUSE the membrane is stretched -- the gate on the recorded hybrid path M5c
+# (morph_gate[waypoints]), NO stated offset (dV 0) and NO stated tension-work term: what the lipids and the ions push
+# along the path is the whole energy. Three stretch-release cycles to 12 mN/m, 1000 movie frames (the human).
+_G3 = {**_M13, "rig_shape": "mscs_c", "rig_open": "mscs_o", "dV_kT": 0.0,
+       "morph_waypoints": {"shape": "exp04r_mscs_path", "n": 21}, "tension_cycles": 3, "movie_frames": 1000}
+mech_version("G3a", "mscs", None, dict(_G3), "MscS on the recorded path M5c, no offset, 3 stretch-release cycles to 12 mN/m")
+mech_version("G3b", "mscs", "G3a", {"tension_max_mN_m": 0.0}, "G3a with no tension (the control: must stay shut)")
+mech_version("G3c", "mscs", None, {**_G3, "lipid_protein_eps_kT": 2.0}, "G3a with the lipid-protein adhesion 2 kT")
+mech_version("G3d", "mscs", "G3c", {"tension_max_mN_m": 0.0}, "G3c with no tension (the control)")
+mech_version("G3t", "mscs", "G3a", {"n_frames_override": 600, "tension_cycles": 1}, "G3a smoke test (/tmp, never a row)")
+# ---- PHASE G1 (2026-09-29, revision 1): THE LIPIDS' WORK ON THE GATE, MEASURED BY CLAMPING IT -----------------------
+# Batch 13's free gate could not cross in a run (a net 10 kT moves lambda 0.02 in the hold; ~230 ns to cross), so the
+# test is thermodynamic: lambda HELD at 0, 0.25, 0.5, 0.75, 1 on the M5c path (morph_gate[clamp]) and the push along the
+# path averaged over a long hold, at zero tension (a-e: the patch pre-stretched to its zero-tension size, linear
+# strain 0.040 from batch 12's calibration tension = -4.7 + 57 x area strain) and at 8 mN/m (f-j: linear 0.106, area
+# 0.223). No ions (they do not see the tension; the conduction solve runs once), the protein's Brownian kicks off
+# (it is held on the path; they would only add noise to the force). tools/gate_pmf.py integrates G(lambda) per tension.
+_G1 = {**_G3, "ions": False, "tension_cycles": 1, "movie_frames": 300, "protein_brownian": False,
+       "conduct_every": 50000, "rest_strain_linear": 0.040, "hold_frames": [20000, 60000, 220000]}
+for _i, _lam in enumerate((0.0, 0.25, 0.5, 0.75, 1.0)):
+    mech_version(f"G1{'abcde'[_i]}", "mscs", None, {**_G1, "morph_clamp": _lam, "strain_top_linear": 0.040},
+                 f"MscS clamped at lambda {_lam} on the M5c path, the patch at zero tension: the push along the path")
+    mech_version(f"G1{'fghij'[_i]}", "mscs", None, {**_G1, "morph_clamp": _lam, "strain_top_linear": 0.106},
+                 f"MscS clamped at lambda {_lam} on the M5c path, the patch stretched to 8 mN/m: the push along the path")
+mech_version("G1s", "mscs", "G1j", {"hold_frames": [200, 200, 600]}, "G1j smoke test (/tmp, never a row)")
+# ---- G1' = T0a-i / T8a-i (2026-09-29): G1 at CONSTANT TENSION (the frame's set-point mode, 5x faster: its response ~8k frames against the
+# 2,000-frame running mean it reads), nine lambdas 0.125 apart (G1's push jumped between neighbours), 0 and 8 mN/m.
+_G1p = {**_G1, "drive_mode": "tension", "mobility_R_factor": 5.0, "rest_tension_mN_m": 0.0, "strain_top_linear": 0.0}
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"T0{'abcdefghi'[_i]}", "mscs", None, {**_G1p, "morph_clamp": _lam, "hold_tension_mN_m": 0.0},
+                 f"MscS clamped at lambda {_lam} on the M5c path, the membrane HELD at 0 mN/m (set-point): the push along the path")
+    mech_version(f"T8{'abcdefghi'[_i]}", "mscs", None, {**_G1p, "morph_clamp": _lam, "hold_tension_mN_m": 8.0},
+                 f"MscS clamped at lambda {_lam} on the M5c path, the membrane HELD at 8 mN/m (set-point): the push along the path")
+mech_version("T8t", "mscs", "T8i", {"hold_frames": [5000, 5000, 20000]}, "T8i tension-mode check (/tmp, never a row)")
+VERSIONS["G2a"] = {"channel": "mscs", "parent": None, "change": {}, "builder": "analysis",
+                   "why": "G2 on G1a-j (tools/gate_pmf.py): G(lambda) at the two frame strains, the lipids' work W, dA_eff, tau_1/2"}
+RAN |= {f"G1{c}" for c in "abcdefghij"} | {"G2a"}
+VERSIONS["G2b"] = {"channel": "mscs", "parent": "G2a", "change": {}, "builder": "analysis",
+                   "why": "G2 on T0a-i / T8a-i (tools/gate_pmf.py): G(lambda) at 0 and 8 mN/m HELD, the protein's own share, the lipids' work W(lambda)"}
+RAN |= {f"T{t_}{c}" for t_ in "08" for c in "abcdefghi"} | {"G2b"}
+# ---- G2c's batch (2026-09-29, night): IS THE STRETCH'S WORK LINEAR IN TENSION (the force-from-lipids signature, W = tau
+# dA_eff), and does W survive a second noise history? T4a-i: held at 4 mN/m; T9a-i: 8 mN/m again, the lipids' noise
+# seeded differently (noise_replicate 1). Same nine lambdas as T0/T8.
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"T4{'abcdefghi'[_i]}", "mscs", None, {**_G1p, "morph_clamp": _lam, "hold_tension_mN_m": 4.0},
+                 f"MscS clamped at lambda {_lam} on the M5c path, the membrane HELD at 4 mN/m: the push along the path")
+    mech_version(f"T9{'abcdefghi'[_i]}", "mscs", None, {**_G1p, "morph_clamp": _lam, "hold_tension_mN_m": 8.0, "noise_replicate": 1},
+                 f"T8{'abcdefghi'[_i]} again (lambda {_lam}, 8 mN/m) with the lipids' noise seeded differently: the replicate")
+# ---- G1'' (2026-09-29, night): THE CLAMP ON THE STRAIGHT PATH (6PWN -> 2VV5, as a one-waypoint path) -- at the rig's
+# C-alpha level it is sterically clean (inter-chain WCA 24-30 kT all along, closest pair 0.435 nm), where M5c climbs to
+# 263 kT of the protein's own clashes; and it ends ON the open structure (path gate). S0a-i: 0 mN/m; S8a-i: 8 mN/m.
+_S = {**_G1p, "morph_waypoints": {"shape": "exp04r_mscs_straight", "n": 2}}
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"S0{'abcdefghi'[_i]}", "mscs", None, {**_S, "morph_clamp": _lam, "hold_tension_mN_m": 0.0},
+                 f"MscS clamped at lambda {_lam} on the STRAIGHT path, the membrane HELD at 0 mN/m: the push along the path")
+    mech_version(f"S8{'abcdefghi'[_i]}", "mscs", None, {**_S, "morph_clamp": _lam, "hold_tension_mN_m": 8.0},
+                 f"MscS clamped at lambda {_lam} on the STRAIGHT path, the membrane HELD at 8 mN/m: the push along the path")
+mech_version("S8t", "mscs", "S8i", {"hold_frames": [200, 200, 600]}, "S8i smoke test (/tmp, never a row)")
+VERSIONS["G2c"] = {"channel": "mscs", "parent": "G2b", "change": {}, "builder": "analysis",
+                   "why": "G2 on T0 against T8, T9 (8 mN/m, another noise) and T4 (4 mN/m): is W linear in tension; the joint dA_eff and tau_1/2"}
+RAN |= {f"T{t_}{c}" for t_ in "49" for c in "abcdefghi"} | {"G2c"}
+VERSIONS["G2d"] = {"channel": "mscs", "parent": "G2b", "change": {}, "builder": "analysis",
+                   "why": "G2 on the STRAIGHT path, S0a-i against S8a-i (tools/gate_pmf.py): W, dA_eff, tau_1/2, the protein's own share"}
+RAN |= {f"S{t_}{c}" for t_ in "08" for c in "abcdefghi"} | {"G2d"}
+
+
+# ================================================================================ B: a bilayer WITH A CORE (Phase G)
+# 2026-09-30: the rig's lipids are one bead per leaflet at the head planes, so tension grips the protein only there
+# (G2d: the straight path, which widens in the core and not at the upper head plane, received W = -1.4 +- 3.3 kT). The
+# membrane below is Cooke, Kremer & Deserno's (2005, PRE 72:011506) three-bead lipid: a head and two tail beads,
+# heads WCA at b = 0.95 sigma against every bead, tails WCA at sigma plus the cos^2 tail (depth eps, width 1.6 sigma)
+# among themselves. Bonds and the head-to-tail-end stiffness are harmonic springs inside each lipid (elastic_network
+# `within: mol`, Cooke's FENE + bending replaced by springs at the seeded lengths -- stated), the non-bonded table
+# skips pairs inside a lipid (`exclude: mol`). No depth spring: the membrane can thin. The rim: frozen lipids of the
+# same kind, read by the pipette (radial_drive) as the rig's frame.
+BILAYER = {
+    "sigma_nm": 0.8,                  # Cooke's sigma: the core (4 tail beads) ~3.2-3.4 nm, MscS closed 3.38 (OPM 6PWN)
+    "area_per_lipid_sigma2": 1.2,     # the seeded area per lipid per leaflet, sigma^2 (Cooke 2005's fluid bilayers: ~1.2)
+    "eps_tail_kT": 0.91,              # kT / eps = 1.1: inside Cooke's fluid window at w_c = 1.6 sigma
+    "tail_width_sigma": 1.6,
+    "head_b": 0.95,                   # the head's WCA size, in sigma
+    "bond_sigma": 1.0,                # seeded bond length, sigma (springs rest there)
+    "k_bond_kT_sigma2": 30.0,         # Cooke's FENE stiffness scale; one k for bonds and the head-tail-end spring
+    "R_patch_nm": 9.0, "frame_rows": 2, "bath_nm": 3.0,
+    "eta_Pa_s": 1.0e-3, "bead_stokes_nm": 0.3, "kT_noise": 1.0, "dt_safety": 0.3,
+    "tension_mN_m": 0.0,              # the pipette's set-point over the hold
+    "hold_frames": [20000, 40000, 240000],
+    "mobility_R_factor": 5.0,
+    "movie_frames": 300,
+}
+
+
+def build_bilayer(label, P):
+    from plexus.paths import graphs_data_path
+    s = P["sigma_nm"]
+    b = P["bond_sigma"] * s
+    A = P["area_per_lipid_sigma2"] * s * s
+    a_hex = math.sqrt(2.0 * A / math.sqrt(3.0))
+    R, Rf = P["R_patch_nm"], P["R_patch_nm"] + P["frame_rows"] * a_hex * math.sqrt(3) / 2
+    z_head = 0.5 * s + 2 * b                                   # tail ends 0.5 sigma off the mid-plane
+    lat = hex_lattice(a_hex, Rf + 0.1)
+    r_lat = np.hypot(lat[:, 0], lat[:, 1])
+    mols, rims = [], []
+    for sgn in (1.0, -1.0):
+        for (x, y), r in zip(lat, r_lat):
+            m = [(x, y, sgn * z_head), (x, y, sgn * (z_head - b)), (x, y, sgn * (z_head - 2 * b))]
+            (mols if r <= R else rims if r <= Rf else []).append(m)
+    mols, rims = np.array(mols), np.array(rims)                   # [n, 3 beads, 3]
+    L = math.ceil(max(2 * (Rf + 1.5), 2 * z_head + 2 * P["bath_nm"]))
+    zc = 0.5
+    world_per_m = 1.0 / (L * 1e-9)
+    nm = lambda x: x / L                                              # noqa: E731
+    zeta = 6 * math.pi * P["eta_Pa_s"] * P["bead_stokes_nm"] * 1e-9
+    tau_s = zeta * (L * 1e-9) ** 2 / KT_J
+    force_nN = KT_J / (L * 1e-9) * 1e9
+    tension_sim = lambda mN_m: mN_m * 1e-3 * (L * 1e-9) ** 2 / KT_J     # noqa: E731
+    # beads ordered HEADS FIRST, then the tail pairs (`type_layout: ordered` gives the first n the first type)
+    def order(M):
+        return np.concatenate([M[:, 0], M[:, 1:].reshape(-1, 3)]), np.concatenate(
+            [np.arange(len(M)), np.repeat(np.arange(len(M)), 2)])
+    Xl, mol = order(mols); Xf, _ = order(rims)
+    shp = f"exp04b_{label}"
+    folder = os.path.join(graphs_data_path(), "shapes", shp)
+    os.makedirs(folder, exist_ok=True)
+    np.savez_compressed(os.path.join(folder, "points.npz"), lipid=(Xl * 1e-9).astype(np.float64),
+                        frame=(Xf * 1e-9).astype(np.float64))
+    np.savez_compressed(os.path.join(folder, "blocks.npz"), mol=mol.astype(np.float64)[:, None])
+    k_sim = P["k_bond_kT_sigma2"] / (s * s) * L * L
+    lam = max(4.0 * k_sim, 6 * 57.1 / nm(P["head_b"] * s) ** 2)
+    dt = P["dt_safety"] / lam
+    f_cap = nm(0.02) / dt
+    sw = nm(s); hb = nm(P["head_b"] * s); wt = nm(P["tail_width_sigma"] * s)
+    table = {"head": {"head": {"law": "wca", "sigma": hb}, "tail": {"law": "wca", "sigma": hb}},
+             "tail": {"head": {"law": "wca", "sigma": hb},
+                      "tail": {"law": "cooke", "sigma": sw, "epsilon": P["eps_tail_kT"], "tail": wt}}}
+    fs = [int(x) for x in P["hold_frames"]]
+    T = tension_sim(P["tension_mN_m"])
+    prot = [[0, 0.0], [fs[0], 0.0], [fs[0] + fs[1], T], [sum(fs), T]]
+    KA_guess = 200.0 * 1e-3 * (L * 1e-9) ** 2 / KT_J                 # sim; only the pipette's response time
+    tau_patch = 2.0 / nm(A) * nm(R) ** 2 / KA_guess
+    mu_R = 1.0 / (4 * math.pi * KA_guess * 0.2 * tau_patch) * P["mobility_R_factor"]
+    origin = [0.5, 0.5, zc]
+    nL, nF = len(mols), len(rims)
+    sets = {"cell": {"n": 1, "start": [[0.5, 0.5, zc]], "state": {
+                "pos": {"width": 3, "role": "coordinate", "integration": "none", "boundary": "world"},
+                "tension": {"width": 1, "integration": "none", "unit": "tension"},
+                "tension_applied": {"width": 1, "integration": "none", "unit": "tension"},
+                "strain": {"width": 1, "integration": "none", "unit": "1"}}},
+            "lipid": {"n": int(3 * nL), "start": [origin], "type_layout": "ordered",
+                      "types": {"head": {"count": int(nL)}, "tail": {"count": int(2 * nL)}},
+                      "state": {"pos": {"width": 3, "role": "coordinate", "integration": "first_order", "boundary": "world"},
+                                "mol": {"width": 1, "integration": "none", "unit": "1"}}},
+            "frame": {"n": int(3 * nF), "start": [origin], "type_layout": "ordered",
+                      "types": {"head": {"count": int(nF)}, "tail": {"count": int(2 * nF)}},
+                      "state": {"pos": {"width": 3, "role": "coordinate", "integration": "none", "boundary": "world"},
+                                "force": {"width": 3, "integration": "none", "unit": "force"}}}}
+    seeds = [{"op": "cloud_seed", "at": "lipid", "cloud": f"{shp}/lipid", "origin": origin, "scale": world_per_m},
+             {"op": "cloud_seed", "at": "frame", "cloud": f"{shp}/frame", "origin": origin, "scale": world_per_m},
+             {"op": "seed_state_from_file", "at": "lipid", "file": f"shapes/{shp}/blocks.npz", "blocks": {"mol": "mol"}}]
+    ops = [
+        {"op": "elastic_network", "at": "lipid", "within": "mol", "cutoff": nm(2.5 * b), "k": k_sim, "go_epsilon": 0.0,
+         "mobility": 1.0, "f_max": f_cap},
+        {"op": "pair_potential", "model": "table", "at": "lipid", "pair_table": table, "exclude": "mol", "mobility": 1.0,
+         "f_max": f_cap},
+        {"op": "pair_potential", "model": "table", "at": "lipid", "with": "frame", "pair_table": table, "mobility": 1.0,
+         "react": False, "f_max": f_cap},
+        {"op": "brownian", "at": "lipid", "kT": P["kT_noise"], "mobility": 1.0, "seed": 1},
+        {"op": "radial_drive", "at": "frame", "protocol": prot, "mode": "tension", "mobility_R": mu_R, "cell": "cell",
+         "axis": 2, "centre": origin, "max_step": nm(0.01 * a_hex), "avg_frames": 2000.0, "affine_sets": ["lipid"]},
+    ]
+    from bfm_scaffold_spec import LOOKS
+    plotting = {"renderer": "vtk_points", "up_axis": 2, "box_frame": True, **LOOKS["cryo"],
+                "render_3d": "compartments", "compartment_sets": ["lipid"], "hide_sets": ["frame", "cell"],
+                "surface": {"lipid": {"render": "surface", "spacing": round(nm(0.4), 6), "blur": 2.0, "iso_frac": 0.3,
+                                      "smooth": 30, "specular": 0.0, "ambient": 0.32, "diffuse": 0.72, "recontour": True}},
+                "opacity": {"lipid": 0.6}, "colors": {"lipid": LIPID_COLOR},
+                "camera": {"elev": 20.0, "azim": 30.0}, "zoom": 1.0,
+                "curve": [{"quantity": "block:cell:tension", "unit": "tension_mN_m", "smooth": 50.0, "ymin": -5.0,
+                           "ymax": 15.0, "ylabel": "membrane tension", "font_size": 21, "tick_font_size": 16},
+                          {"quantity": "block:cell:strain", "smooth": 50.0, "ymin": -0.12, "ymax": 0.2, "ylabel": "patch strain",
+                           "font_size": 21, "tick_font_size": 16}],
+                "subject": "lipid", "keep_stills": True, "stills": 8, "max_frames": int(P["movie_frames"]),
+                "real_time": False, "duration_s": 10.0, "curve_time": {"per_frame_s": dt * tau_s, "unit": "ns"},
+                "replay_curves": False}
+    spec = {"general": {"name": f"exp04_v{label}", "seed": 0, "n_frames": int(sum(fs)), "dt": dt, "boundary": "wall",
+                        "dim": 3, "world": [1.0, 1.0, 1.0], "record_cap": 3001, "field_record_cap": 2,
+                        "units": {"length_um": L * 1e-3, "time_s": tau_s, "force_nN": force_nN}},
+            "sets": sets, "fields": {}, "seed": seeds, "operators": ops, "schedule": [o["op"] for o in ops],
+            "plotting": plotting}
+    out = os.path.join(REPO, "config", "channel", f"exp04_v{label}.yaml")
+    with open(out, "w") as f:
+        yaml.safe_dump(_py(titled(spec)), f, sort_keys=False, default_flow_style=None, width=110)
+    pred = {"box_nm": L, "R_patch_nm": R, "lipids": nL, "rim_lipids": nF, "beads": 3 * nL, "sigma_nm": s, "area_per_lipid_nm2": A,
+            "z_head_nm": z_head, "core_seeded_nm": 2 * (z_head - b) + 0.0, "dt_ps": dt * tau_s * 1e12,
+            "sim_time_ns": sum(fs) * dt * tau_s * 1e9, "tension_mN_m": P["tension_mN_m"], "eps_tail_kT": P["eps_tail_kT"]}
+    json.dump(pred, open(out.replace(".yaml", ".pred.json"), "w"), indent=1, default=float)
+    print(f"wrote {os.path.relpath(out, REPO)} ({VERSIONS[label]['why']})")
+    for k_, v_ in pred.items():
+        print(f"  {k_:24s} {v_}")
+    return spec, pred
+
+
+def bil_version(label, change, why):
+    VERSIONS[label] = {"channel": "bilayer", "parent": None, "change": dict(change), "builder": "bilayer", "why": why}
+
+
+def params_of_bilayer(label):
+    return {**BILAYER, **VERSIONS[label]["change"]}
+
+
+bil_version("B2t", {"hold_frames": [2000, 2000, 6000], "tension_mN_m": 8.0}, "Cooke bilayer smoke test (/tmp, never a row)")
+# B2 (2026-09-30): the protein-free Cooke patch -- held at 0, 4, 8, 12 mN/m (the pipette's set-point): its rest area
+# per lipid, K_A (Rawicz 2000: 230-265 mN/m), thickness and thinning under tension, and whether it stays a fluid.
+# Two tail depths: kT/eps 1.1 (a-d) and 1.0 (e-h), both inside Cooke's fluid window at w_c = 1.6 sigma.
+for _i, _tau in enumerate((0.0, 4.0, 8.0, 12.0)):
+    bil_version(f"B2{'abcd'[_i]}", {"tension_mN_m": _tau}, f"Cooke bilayer (tail depth 0.91 kT), no protein, held at {_tau:g} mN/m")
+    bil_version(f"B2{'efgh'[_i]}", {"tension_mN_m": _tau, "eps_tail_kT": 1.0}, f"Cooke bilayer (tail depth 1.0 kT), no protein, held at {_tau:g} mN/m")
+RAN |= set()
+# B3 smoke: MscS clamped on the straight path in the Cooke membrane
+_B3 = {**_S, "lipid_model": "cooke3", "lipid_protein_eps_kT": 1.0}
+mech_version("B3t", "mscs", None, {**_B3, "morph_clamp": 1.0, "hold_tension_mN_m": 8.0, "hold_frames": [300, 300, 1400]},
+             "MscS in the Cooke membrane, clamped open on the straight path, 8 mN/m: smoke test (/tmp, never a row)")
+VERSIONS["B2r"] = {"channel": "bilayer", "parent": None, "change": {}, "builder": "analysis",
+                   "why": "B2's ruler (tools/bilayer_ruler.py): rest area per lipid, K_A, thickness and thinning, lateral diffusion of the Cooke patch"}
+RAN |= {f"B2{c}" for c in "abcdefgh"} | {"B2r"}
+# ---- B3 (2026-09-30, 01:20): MscS IN THE MEMBRANE WITH A CORE, clamped on the STRAIGHT path, 0 and 8 mN/m -- does the
+# stretch's work W appear once the tails can pull on the protein across the core (G2d: -1.4 +- 3.3 kT with one-bead
+# lipids)? The membrane is B2's tail depth 0.91 kT, seeded at its measured rest area (0.671 nm^2 = 1.05 sigma^2).
+_B3c = {**_S, "lipid_model": "cooke3", "lipid_protein_eps_kT": 1.0, "cooke3": {"area_per_lipid_sigma2": 1.05}}
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"C0{'abcdefghi'[_i]}", "mscs", None, {**_B3c, "morph_clamp": _lam, "hold_tension_mN_m": 0.0},
+                 f"MscS in the Cooke membrane (a core), clamped at lambda {_lam} on the straight path, HELD at 0 mN/m")
+    mech_version(f"C8{'abcdefghi'[_i]}", "mscs", None, {**_B3c, "morph_clamp": _lam, "hold_tension_mN_m": 8.0},
+                 f"MscS in the Cooke membrane (a core), clamped at lambda {_lam} on the straight path, HELD at 8 mN/m")
+VERSIONS["G2e"] = {"channel": "mscs", "parent": "G2d", "change": {}, "builder": "analysis",
+                   "why": "G2 on the straight path IN THE COOKE MEMBRANE, C0a-i against C8a-i (tools/gate_pmf.py): does W appear once the core can pull"}
+RAN |= {f"C{t_}{c}" for t_ in "08" for c in "abcdefghi"} | {"G2e"}
+# ---- B3' (2026-09-30, ~03:00): B3 was an artifact -- the tails walked into the C-alpha model's gaps (C0a: 28 lipid beads in
+# the pore, 101 among the helices, against 0 and 9 with the one-bead lipid) and their 1 kT pull, summed over ~500
+# touching beads, made pushes of thousands of kT. Here a residue has its side chains' size (lipid beads kept >= 1.0 nm
+# from an alpha carbon: WCA sigma 0.89 nm, seeding exclusion 1.0 nm) and NO stickiness (heads and tails both WCA): the
+# clean force-from-lipid test, tension transmitted through excluded volume alone.
+_B3r = {**_B3c, "lipid_protein_repulsive": True, "lipid_protein_sigma_nm": 0.89, "lipid_excl_nm": 1.0}
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"D0{'abcdefghi'[_i]}", "mscs", None, {**_B3r, "morph_clamp": _lam, "hold_tension_mN_m": 0.0},
+                 f"MscS in the Cooke membrane, residues sized and not sticky, clamped at lambda {_lam} (straight path), 0 mN/m")
+    mech_version(f"D8{'abcdefghi'[_i]}", "mscs", None, {**_B3r, "morph_clamp": _lam, "hold_tension_mN_m": 8.0},
+                 f"MscS in the Cooke membrane, residues sized and not sticky, clamped at lambda {_lam} (straight path), 8 mN/m")
+mech_version("D0t", "mscs", "D0a", {"hold_frames": [2000, 2000, 16000]}, "D0a intrusion check (/tmp, never a row)")
+VERSIONS["G2f"] = {"channel": "mscs", "parent": "G2e", "change": {}, "builder": "analysis",
+                   "why": "G2 on the straight path in the Cooke membrane with sized, non-sticky residues, D0a-i against D8a-i (tools/gate_pmf.py)"}
+RAN |= {f"D{t_}{c}" for t_ in "08" for c in "abcdefghi"} | {"G2f"}
+# ---- B3'' (2026-09-30, 04:00): G2f's membrane (sized, non-sticky residues) at 4 and 12 mN/m -- is W linear in tension,
+# and does the fully emergent landscape (no stated energy: +40.8 kT at rest, -28.0 kT of stretch work at 7.95 mN/m)
+# really tip open near its predicted 11.6 mN/m? B2d held 12 mN/m without tearing.
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"D4{'abcdefghi'[_i]}", "mscs", None, {**_B3r, "morph_clamp": _lam, "hold_tension_mN_m": 4.0},
+                 f"MscS in the Cooke membrane, residues sized and not sticky, clamped at lambda {_lam} (straight path), 4 mN/m")
+    mech_version(f"D12{'abcdefghi'[_i]}", "mscs", None, {**_B3r, "morph_clamp": _lam, "hold_tension_mN_m": 12.0},
+                 f"MscS in the Cooke membrane, residues sized and not sticky, clamped at lambda {_lam} (straight path), 12 mN/m")
+VERSIONS["G2g"] = {"channel": "mscs", "parent": "G2f", "change": {}, "builder": "analysis",
+                   "why": "G2 on D0 against D4, D8, D12 (tools/gate_pmf.py --more): W against tension, and where the emergent landscape tips open"}
+RAN |= {"G2g"}
+RAN |= {f"D{t_}{c}" for t_ in ("4", "12") for c in "abcdefghi"}
+# ---- wetting checks (2026-09-30, 05:05): D's non-sticky residues DEWET -- 5-8 lipid beads within 1.3 nm of a TM C-alpha at
+# rest, 0 at 12 mN/m: the Cooke tails leave a void around a purely repulsive protein. Sized residues (1.0 nm) WITH a tail
+# attraction (the hydrophobic belt): does it wet without intruding?
+for _e, _l in ((0.5, "W5t"), (1.0, "W1t")):
+    mech_version(_l, "mscs", None, {**_B3c, "lipid_protein_sigma_nm": 0.89, "lipid_excl_nm": 1.0, "lipid_protein_eps_kT": _e,
+                                    "morph_clamp": 0.0, "hold_tension_mN_m": 0.0, "hold_frames": [2000, 2000, 26000]},
+                 f"sized residues, tail attraction {_e} kT: wetting and intrusion check (/tmp, never a row)")
+# ---- E (2026-09-30, 05:20): sized residues (1.0 nm) AND tails attracted to them at 0.5 kT: the membrane wets the protein
+# (first shell ~250 beads at rest, W5t) without entering the pore; clamped on the straight path, 0 and 8 mN/m.
+_E = {**_B3c, "lipid_protein_sigma_nm": 0.89, "lipid_excl_nm": 1.0, "lipid_protein_eps_kT": 0.5}
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"E0{'abcdefghi'[_i]}", "mscs", None, {**_E, "morph_clamp": _lam, "hold_tension_mN_m": 0.0},
+                 f"MscS in the Cooke membrane, residues sized and wetted (tails 0.5 kT), clamped at lambda {_lam} (straight path), 0 mN/m")
+    mech_version(f"E8{'abcdefghi'[_i]}", "mscs", None, {**_E, "morph_clamp": _lam, "hold_tension_mN_m": 8.0},
+                 f"MscS in the Cooke membrane, residues sized and wetted (tails 0.5 kT), clamped at lambda {_lam} (straight path), 8 mN/m")
+RAN |= {f"E{t_}{c}" for t_ in "08" for c in "abcdefghi"}
+VERSIONS["G2h"] = {"channel": "mscs", "parent": "G2g", "change": {}, "builder": "analysis",
+                   "why": "G2 on the straight path in the Cooke membrane with sized residues the tails WET (0.5 kT), E0a-i against E8a-i (tools/gate_pmf.py)"}
+RAN |= {"G2h"}
+# ---- F (2026-09-30, 06:28): the wetting scan between D (repulsive: W 28 kT, dewets) and E (tails 0.5 kT: wets, W 4 +- 12 kT,
+# lipids in the pockets and the pore, rest cost 461 kT): tails at 0.15 (Fa..) and 0.3 kT (Fb..), 5 lambdas, 0 and 8 mN/m.
+# labels F<tension><letter>: letters p-t are tails 0.15 kT at lambda 0, 0.25, 0.5, 0.75, 1; u-y the same at 0.3 kT
+for _e, _letters in ((0.15, "pqrst"), (0.3, "uvwxy")):
+    for _lam, _c in zip((0.0, 0.25, 0.5, 0.75, 1.0), _letters):
+        for _t in (0, 8):
+            mech_version(f"F{_t}{_c}", "mscs", None,
+                         {**_E, "lipid_protein_eps_kT": _e, "morph_clamp": _lam, "hold_tension_mN_m": float(_t)},
+                         f"MscS in the Cooke membrane, sized residues, tails {_e} kT, clamped at lambda {_lam} (straight path), {_t} mN/m")
+RAN |= {f"F{t_}{c}" for t_ in "08" for c in "pqrstuvwxy"}
+VERSIONS["G2i"] = {"channel": "mscs", "parent": "G2h", "change": {}, "builder": "analysis",
+                   "why": "G2 on the wetting scan, tails 0.15 kT (F0p-t against F8p-t; tools/gate_pmf.py)"}
+VERSIONS["G2j"] = {"channel": "mscs", "parent": "G2h", "change": {}, "builder": "analysis",
+                   "why": "G2 on the wetting scan, tails 0.3 kT (F0u-y against F8u-y; tools/gate_pmf.py)"}
+RAN |= {"G2i", "G2j"}
+# ---- H (2026-09-30, 07:33): the wetting window CONFIRMED or not -- tails 0.15 kT (G2i: W 21.9 +- 6.3 kT, dA_eff 11.3 +- 3.2
+# nm^2 on 5 lambdas), now 9 lambdas and a second noise history (noise_replicate 1), 0 and 8 mN/m.
+_H = {**_E, "lipid_protein_eps_kT": 0.15, "noise_replicate": 1}
+for _i in range(9):
+    _lam = _i / 8.0
+    mech_version(f"H0{'abcdefghi'[_i]}", "mscs", None, {**_H, "morph_clamp": _lam, "hold_tension_mN_m": 0.0},
+                 f"MscS in the Cooke membrane, sized residues, tails 0.15 kT, clamped at lambda {_lam} (straight path), 0 mN/m, replicate noise")
+    mech_version(f"H8{'abcdefghi'[_i]}", "mscs", None, {**_H, "morph_clamp": _lam, "hold_tension_mN_m": 8.0},
+                 f"MscS in the Cooke membrane, sized residues, tails 0.15 kT, clamped at lambda {_lam} (straight path), 8 mN/m, replicate noise")
+RAN |= {f"H{t_}{c}" for t_ in "08" for c in "abcdefghi"}
+VERSIONS["G2k"] = {"channel": "mscs", "parent": "G2i", "change": {}, "builder": "analysis",
+                   "why": "G2 on H0a-i against H8a-i (tails 0.15 kT, nine lambdas, another noise history): the wetting window confirmed or not"}
+RAN |= {"G2k"}

@@ -1,0 +1,251 @@
+general:
+  name: exp04_vM4a
+  title: M4a
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  record_cap: 201
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  units: {length_um: 0.018000000000000002}
+sets:
+  MscS_1:
+    n: 1953
+    title: MscS, chain 1 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_2:
+    n: 1953
+    title: MscS, chain 2 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_3:
+    n: 1953
+    title: MscS, chain 3 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_4:
+    n: 1953
+    title: MscS, chain 4 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_5:
+    n: 1953
+    title: MscS, chain 5 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_6:
+    n: 1953
+    title: MscS, chain 6 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_7:
+    n: 1953
+    title: MscS, chain 7 (atoms)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_1_atoms:
+    n: 1953
+    title: 'MscS, chain 1: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_2_atoms:
+    n: 1953
+    title: 'MscS, chain 2: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_3_atoms:
+    n: 1953
+    title: 'MscS, chain 3: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_4_atoms:
+    n: 1953
+    title: 'MscS, chain 4: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_5_atoms:
+    n: 1953
+    title: 'MscS, chain 5: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_6_atoms:
+    n: 1953
+    title: 'MscS, chain 6: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  MscS_7_atoms:
+    n: 1953
+    title: 'MscS, chain 7: its atoms'
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+  path:
+    n: 1
+    start:
+    - [0.5, 0.5, 0.05]
+    title: the path's own readings (the ruler)
+    state:
+      pos: {width: 3, integration: none, boundary: world, role: coordinate}
+      pore_r: {width: 1, integration: none, unit: '1', title: pore radius (nm)}
+      rmsd_open: {width: 1, integration: none, unit: '1', title: RMSD to open (nm)}
+      clashes: {width: 1, integration: none, unit: '1', title: clashes (pairs)}
+seed:
+- op: cloud_seed
+  at: MscS_1
+  cloud: mscs_morph/closed_A
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_1_atoms
+  cloud: mscs_morph/closed_A
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_2
+  cloud: mscs_morph/closed_B
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_2_atoms
+  cloud: mscs_morph/closed_B
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_3
+  cloud: mscs_morph/closed_C
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_3_atoms
+  cloud: mscs_morph/closed_C
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_4
+  cloud: mscs_morph/closed_D
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_4_atoms
+  cloud: mscs_morph/closed_D
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_5
+  cloud: mscs_morph/closed_E
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_5_atoms
+  cloud: mscs_morph/closed_E
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_6
+  cloud: mscs_morph/closed_F
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_6_atoms
+  cloud: mscs_morph/closed_F
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_7
+  cloud: mscs_morph/closed_G
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+- op: cloud_seed
+  at: MscS_7_atoms
+  cloud: mscs_morph/closed_G
+  origin: [0.5, 0.5, 0.5]
+  scale: 55555555.555555545
+fields: {}
+operators: []
+schedule: []
+plotting:
+  renderer: vtk_points
+  up_axis: 2
+  box_frame: true
+  background: black
+  ssao: true
+  ssao_radius_frac: 0.03
+  legend: false
+  silhouette: {color: black, width: 1.5}
+  surface_specular: 0.0
+  surface_ambient: 0.32
+  surface_diffuse: 0.72
+  light: studio
+  render_3d: compartments
+  surface_min_points: 8
+  compartment_sets: [MscS_1, MscS_2, MscS_3, MscS_4, MscS_5, MscS_6, MscS_7, MscS_1_atoms, MscS_2_atoms, MscS_3_atoms,
+    MscS_4_atoms, MscS_5_atoms, MscS_6_atoms, MscS_7_atoms]
+  hide_sets: [path]
+  subject: MscS_1
+  surface:
+    MscS_1: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_2: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_3: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_4: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_5: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_6: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_7: {render: surface, spacing: 0.016667, blur: 1.5, iso_frac: 0.3, smooth: 20, specular: 0.0, ambient: 0.32,
+      diffuse: 0.72, recontour: true}
+    MscS_1_atoms: {render: dots, point_size: 4.0}
+    MscS_2_atoms: {render: dots, point_size: 4.0}
+    MscS_3_atoms: {render: dots, point_size: 4.0}
+    MscS_4_atoms: {render: dots, point_size: 4.0}
+    MscS_5_atoms: {render: dots, point_size: 4.0}
+    MscS_6_atoms: {render: dots, point_size: 4.0}
+    MscS_7_atoms: {render: dots, point_size: 4.0}
+  opacity: {MscS_1: 0.25, MscS_2: 0.25, MscS_3: 0.25, MscS_4: 0.25, MscS_5: 0.25, MscS_6: 0.25, MscS_7: 0.25, MscS_1_atoms: 1.0,
+    MscS_2_atoms: 1.0, MscS_3_atoms: 1.0, MscS_4_atoms: 1.0, MscS_5_atoms: 1.0, MscS_6_atoms: 1.0, MscS_7_atoms: 1.0}
+  colors:
+    MscS_1: &id001 [0.36, 0.58, 0.8]
+    MscS_2: &id002 [0.9, 0.62, 0.36]
+    MscS_3: &id003 [0.47, 0.72, 0.52]
+    MscS_4: &id004 [0.84, 0.47, 0.47]
+    MscS_5: &id005 [0.66, 0.56, 0.79]
+    MscS_6: &id006 [0.62, 0.5, 0.42]
+    MscS_7: &id007 [0.86, 0.6, 0.74]
+    MscS_1_atoms: *id001
+    MscS_2_atoms: *id002
+    MscS_3_atoms: *id003
+    MscS_4_atoms: *id004
+    MscS_5_atoms: *id005
+    MscS_6_atoms: *id006
+    MscS_7_atoms: *id007
+  camera: {elev: 40.0, azim: 30.0}
+  zoom: 1.0
+  duration_s: 10.0
+  real_time: false
+  max_frames: 201
+  stills: 4
+  keep_stills: false
+  replay_curves: true
+  curve:
+  - {quantity: 'block:path:pore_r', ymin: 0.0, ymax: 0.8, ylabel: pore radius (nm), font_size: 28, tick_font_size: 20}
+  - {quantity: 'block:path:rmsd_open', ymin: 0.0, ymax: 1.5, ylabel: RMSD to open (nm), font_size: 28, tick_font_size: 20}
+  - {quantity: 'block:path:clashes', ymin: 0.0, ymax: 1600.0, ylabel: clashes (pairs), font_size: 28, tick_font_size: 20}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a cluster of multi-colored particles that gradually expands and
+      shifts its internal structure over time. As the frames progress, the individual clusters within
+      the main body become more distinct and separated. The "clusters (calls)" graph on the right indicates
+      a significant increase in the number of identified clusters as the simulation reaches its final
+      frames. The "peer radius" and "RMSD" graphs show that the overall spatial distribution remains relatively
+      stable while internal dynamics evolve.
+    objects: The scene contains a large, irregular aggregate composed of several smaller, interconnected
+      sub-clusters. These sub-clusters are color-coded in various hues, including pink, blue, orange,
+      green, and brown. Each sub-cluster is bounded by a thin black outline that defines its individual
+      topology within the larger group. The particles are small and densely packed, forming a complex,
+      organic-looking shape centered within a 3D bounding box.

@@ -235,6 +235,48 @@ class View:
     def set_cut(self, on: bool):
         return _vtk(self._set_cut, bool(on))
 
+    # THE GLASS SWITCH (the human, 2026-09-29), two looks: GLASS -- every surface skin at opacity 0.25 and the particles
+    # drawn inside it shown (a set named `<skin>_atoms`: exp04's MscS atoms); SOLID -- every skin opaque and those
+    # inner particles hidden. Other dot sets (ions) stay as they are. The view starts in the look its spec draws.
+    def glass_state(self):
+        return _vtk(self._glass_state)
+
+    def _glass_state(self):
+        if getattr(self, "glass", None) is None:
+            ops = [sk["actor"].GetProperty().GetOpacity() for sk in (getattr(self.lm, "_skins", None) or [])
+                   if isinstance(sk, dict) and sk.get("kind") == "surface" and sk.get("actor") is not None]
+            self.glass = bool(ops) and min(ops) < 0.9
+        return self.glass
+
+    def set_glass(self, on: bool):
+        return _vtk(self._set_glass, bool(on))
+
+    def _set_glass(self, on: bool):
+        lm = self.lm
+        if lm is None:
+            return
+        # A PLAIN-COLOURED DOT SET KEEPS NO ACTOR in its skin entry (live_movie adds the mesh and drops what add_mesh
+        # returns), so its actor is found by its own point data: the renderer actor whose mapper reads that polydata.
+        by_input = {}
+        for a in lm.p.renderer.GetActors():
+            m = a.GetMapper()
+            d = m.GetInput() if m is not None else None
+            if d is not None:
+                by_input[d.GetAddressAsString("vtkObject")] = a
+        for sk in getattr(lm, "_skins", None) or []:
+            if not isinstance(sk, dict):
+                continue
+            act = sk.get("actor")
+            if act is None and sk.get("surf") is not None:
+                act = by_input.get(sk["surf"].GetAddressAsString("vtkObject"))
+            if act is None:
+                continue
+            if sk.get("kind") == "surface":
+                act.GetProperty().SetOpacity(0.25 if on else 1.0)
+            elif str(sk.get("name", "")).endswith("_atoms"):
+                act.SetVisibility(bool(on))
+        self.glass = on
+
     def _set_cut(self, on: bool):
         lm = self.lm
         if lm is None:
@@ -586,6 +628,16 @@ class View:
                 # THE SMALL SETS' RECORDED BLOCKS TOO (a cell's counts, its current, its gate): a replayed frame put
                 # the particles back but left `nK_in`, `q_in`, `w_open` at the seed's values, so the 3-D view's panels
                 # read nothing while the slider moved through the run (2026-09-26). Only sets of <= 16 elements.
+                # AND THE COLOUR'S OWN BLOCK, whatever the set's size: a training run's view (gui/train_view.py,
+                # exp17) colours 71,721 neurons by their learned `dff`, and a replay that left it at the seed showed
+                # one colour on every frame (2026-10-01)
+                _cf = str(((getattr(getattr(self, "lm", None), "style", None)) or {}).get("color_field") or "")
+                if _cf and _cf in self.H.level(n).state_schema._slices and f"{n}__{_cf}" in z.files \
+                        and self.H.level(n).state.shape[0] > 16:
+                    a = z[f"{n}__{_cf}"][rows]
+                    for j in range(len(rows)):
+                        snaps[j].setdefault(n, {})[_cf] = torch.as_tensor(np.ascontiguousarray(a[j]), dtype=torch.float32)
+                    del a
                 if self.H.level(n).state.shape[0] <= 16:
                     for blk in self.H.level(n).state_schema._slices:
                         if blk in ("pos", "sep"):

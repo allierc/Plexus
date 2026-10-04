@@ -1003,6 +1003,56 @@ def _type_index(lvl, name, where):
         raise ValueError(f"{where}: type {name!r} is not one of the set's types {names}")
     return names.index(name)
 
+# ---- pair_potential[mpm]: the same pair law, delivered to MATERIAL POINTS (exp04 MscS morph, 2026-09-29) ---------
+@register_operator("pair_potential", implementation="mpm", family="interaction", set="particle", kind="exchange",
+                   title="Pair potential between two sets, on material points",
+                   equation=r"""$$\mathbf a_i=\frac{1}{m_i}\sum_j -\nabla_i U(r_{ij})$$""")
+class PairPotentialMPM(PairPotential):
+    """`pair_potential` for a set the MPM substep integrates: the SAME law, laws, sigma, epsilon, charges and cutoffs as
+    the default, but each bead's force is divided by its mass and emitted as an acceleration (`EMIT =
+    mpm_acceleration`, routed to the substep as `a_ext`, as `stator_push` and `mpm_anchor` do). The default is
+    overdamped (`EMIT = velocity`, v = mobility x force): a material point is not moved by a velocity written from
+    outside its substep, so the default's excluded volume never reached the MPM protein of exp04's morph test, whose
+    atoms interpenetrated (1,811 clashing pairs in M3a). WHY AN IMPLEMENTATION: the biology -- the pair law -- is
+    unchanged; only how its force enters the integrator differs.
+
+    `mobility` is fixed to 1 inside (the force itself), so `step_max` (a cap in length per frame) is refused here;
+    `f_max` caps the force as in the default. A set without a `mass` attribute is taken as unit mass.
+    """
+    EMIT = "mpm_acceleration"
+
+    # `exclude_span: s` (with `exclude: <block>`): skip a pair when its two block values differ by AT MOST s -- with
+    # the block a residue number (chain x 10000 + residue), s = 1 keeps a residue's own atoms and the peptide bond to
+    # its neighbour (0.13 nm) out of the repulsion, as a clash count does; the default's `exclude` skips equals only.
+    def __init__(self, params, device="cpu"):
+        if params.get("step_max") is not None:
+            raise ValueError("pair_potential[mpm]: `step_max` caps a step of an overdamped bead; use `f_max`")
+        self.span = params.get("exclude_span")
+        if self.span is not None and not params.get("exclude"):
+            raise ValueError("pair_potential[mpm]: `exclude_span` needs `exclude: <block>` to read")
+        params = {k: v for k, v in params.items() if k != "exclude_span"}
+        params = {**params, "mobility": 1.0}
+        if params.get("react"):
+            params["mobility_with"] = 1.0
+        super().__init__(params, device)
+
+    def _pairs(self, Xa, Xb, oa, ob, ga, gb, ba, bb):
+        if self.span is None or ba is None or bb is None:
+            yield from super()._pairs(Xa, Xb, oa, ob, ga, gb, ba, bb)
+            return
+        for gi, jj in super()._pairs(Xa, Xb, oa, ob, ga, gb, None, None):
+            keep = (ba[gi] - bb[jj]).abs() > float(self.span)
+            yield gi[keep], jj[keep]
+
+    def forward(self, H, mask=None):
+        out = super().forward(H, mask)
+        for nm, F in list(out.items()):
+            m = getattr(H.level(nm), "mass", None)
+            if m is not None:
+                out[nm] = F / m.to(F.dtype).reshape(-1, 1).clamp_min(1e-30)
+        return out
+
+
 
 @register_operator("pair_potential", model="typed", family="interaction", set="particle", kind="exchange",
                    title="Pair potential with a well depth per pair of types",
@@ -1074,6 +1124,111 @@ class PairPotentialTyped(PairPotential):
         if self._tab is None or self._tab.device != X.device:
             self._tab = self._table(lvl, X.device, X.dtype)
         self._nt = lvl.node_type.to(X.device).long()
+        return super().forward(H, mask)
+
+
+# ---- pair_potential[table]: a LAW, a size and a depth per pair of types, within one set or across two -------------
+# (exp04 Phase G, 2026-09-30: Cooke, Kremer & Deserno's three-bead lipid needs heads repulsive at 0.95 sigma against
+# every bead and tails attractive among themselves, inside the lipid set AND against the frozen lipids of the rim.)
+@register_operator("pair_potential", model="table", family="interaction", set="particle", kind="exchange",
+                   title="Pair potential with its law, size and depth chosen per pair of types",
+                   equation=r"""$$U_{ij}=U_{\ell(\tau_i,\tau_j)}\big(r_{ij};\,\sigma_{\tau_i\tau_j},\epsilon_{\tau_i\tau_j}\big)$$""")
+class PairPotentialTable(PairPotential):
+    """`pair_potential` where each pair of TYPES has its own law, sigma and depth:
+
+        pair_table: {head: {head: {law: wca, sigma: s_h}, tail: {law: wca, sigma: s_h}},
+                     tail: {tail: {law: cooke, sigma: s, epsilon: e, tail: w}}}
+
+    tau_i is bead i's `node_type` (the set's declared types; `type_layout: ordered` places them). Within one set
+    (`at` with itself) or between two (`with: <set>`, whose own types key the table's second index); every pair of
+    types that meets must be given (one order is enough within a set; across two sets the row is A's type). Laws:
+    `wca`, `lj`, `cooke` (the parent's formulas at the entry's sigma and depth; `tail` in world for cooke, default
+    1.6 sigma). The parent's neighbour search, `exclude` (an integer block, e.g. the molecule: no non-bonded force
+    between beads of one lipid), `f_max`, mobilities, `react` and the B side's `force` readout are unchanged.
+
+    WHY A MODEL: `typed` scales one law by a depth per type pair, so it cannot make a head purely repulsive and a
+    tail attractive, nor reach a second set; Cooke's lipid (heads WCA at b = 0.95 sigma against everything, tails
+    WCA + a cos^2 tail among themselves) needs both. Reference: Cooke, I.R., Kremer, K. & Deserno, M. (2005). Phys.
+    Rev. E 72:011506.
+    """
+    REQUIRES_PARAMS = ["pair_table"]
+    PARAM_ROLES = dict(PairPotential.PARAM_ROLES, pair_table="law_sigma_epsilon_per_pair_of_types")
+
+    def __init__(self, params, device="cpu"):
+        tab = params["pair_table"]
+        reach = 0.0
+        for a, row in tab.items():
+            for b, e in (row or {}).items():
+                s = float(e["sigma"]); law = str(e.get("law", "wca")).lower()
+                if law not in ("wca", "lj", "cooke"):
+                    raise ValueError(f"pair_potential[table]: law of ({a}, {b}) is wca, lj or cooke, got {law!r}")
+                r_ = {"wca": 2 ** (1 / 6) * s, "lj": 2.5 * s,
+                      "cooke": 2 ** (1 / 6) * s + float(e.get("tail", 1.6 * s))}[law]
+                reach = max(reach, r_)
+        p = dict(params); p["law"] = "lj"; p["sigma"] = reach / 2.5; p.setdefault("cutoff", reach)
+        super().__init__(p, device)
+        self.cutoff = reach
+        if len(self.A) != 1 or len(self.B) != 1:
+            raise ValueError("pair_potential[table]: one set on each side (their types key the table)")
+        self.table_spec = tab
+        self._cur = None
+        self._entries = None
+
+    def _build(self, la, lb):
+        na = list(getattr(la, "type_names", None) or []); nb = list(getattr(lb, "type_names", None) or [])
+        ent = {}
+        for a, row in self.table_spec.items():
+            for b, e in (row or {}).items():
+                ia = _type_index(la, str(a), "pair_potential[table]"); ib = _type_index(lb, str(b), "pair_potential[table]")
+                v = (str(e.get("law", "wca")).lower(), float(e["sigma"]), float(e.get("epsilon", 1.0)),
+                     float(e.get("tail", 1.6 * float(e["sigma"]))))
+                ent[(ia, ib)] = v
+                if self.same:
+                    ent[(ib, ia)] = v
+        miss = [(na[i], nb[j]) for i in range(len(na)) for j in range(len(nb)) if (i, j) not in ent]
+        return ent, miss
+
+    def _pairs(self, *a, **kw):
+        for gi, jj in super()._pairs(*a, **kw):
+            self._cur = (gi, jj)
+            yield gi, jj
+
+    def _force(self, d, r, *a, **kw):
+        gi, jj = self._cur
+        ta, tb = self._ta[gi], self._tb[jj]
+        mag = torch.zeros_like(r)
+        n_capped = 0
+        for (ia, ib), (law, s, eps, w) in self._entries.items():
+            m = (ta == ia) & (tb == ib)
+            if not bool(m.any()):
+                continue
+            rr = r[m]
+            sr6 = (s / rr) ** 6
+            if law in ("wca", "lj"):
+                cut = 2 ** (1 / 6) * s if law == "wca" else 2.5 * s
+                g = torch.where(rr < cut, 24.0 * eps * (2.0 * sr6 * sr6 - sr6) / rr, torch.zeros_like(rr))
+            else:
+                rc = 2 ** (1 / 6) * s
+                x = (math.pi / (2.0 * w)) * (rr - rc)
+                g = torch.where(rr < rc, 24.0 * eps * (2.0 * sr6 * sr6 - sr6) / rr, torch.zeros_like(rr)) + \
+                    torch.where((rr >= rc) & (rr <= rc + w), -eps * (math.pi / (2.0 * w)) * torch.sin(2.0 * x), torch.zeros_like(rr))
+            if self.f_max > 0:
+                n_capped += int((g.abs() >= 0.999 * self.f_max).sum()); g = g.clamp(-self.f_max, self.f_max)
+            mag[m] = g
+        return -(mag / r)[:, None] * d, n_capped, None
+
+    def forward(self, H, mask=None):
+        la, lb = H.level(self.A[0]), H.level(self.B[0])
+        if self._entries is None:
+            self._entries, miss = self._build(la, lb)
+            live_a = set(la.node_type.long().unique().tolist()); live_b = set(lb.node_type.long().unique().tolist())
+            names_a = list(la.type_names); names_b = list(lb.type_names)
+            miss = [m_ for m_ in miss if names_a.index(m_[0]) in live_a and names_b.index(m_[1]) in live_b]
+            if miss:
+                raise ValueError(f"pair_potential[table]: no entry for the type pairs {miss}")
+        X = la.get("pos")
+        self._ta = la.node_type.to(X.device).long()
+        self._tb = lb.node_type.to(X.device).long()
         return super().forward(H, mask)
 
 
@@ -1490,6 +1645,157 @@ class MorphGate(Lateral):
         if fr in _REPORT:
             print(f"[morph_gate f{fr}] lambda {self.lam:.4f} (0 closed, 1 open); the last step's push along the path "
                   f"{float((delta * self._D).sum()) / self._D2:+.3e}, the offset's pull {-self.mu * h * dU / self._D2:+.3e}", flush=True)
+        out, s0 = {}, 0
+        for nm_, lv in zip(self.sets, lvls):
+            n = lv.get("pos").shape[0]
+            out[nm_] = V[s0:s0 + n] * lv.occ[:, None]
+            s0 += n
+        return out
+
+
+# ---- morph_gate[waypoints]: the gate along a RECORDED path (exp04 Phase G, 2026-09-29) --------------------------
+@register_operator("morph_gate", model="waypoints", family="mechanics", set="particle", kind="lateral",
+                   title="A channel's gate moving along a recorded path between its two states",
+                   equation=r"""$$\mathbf x(\lambda)=\mathbf P_k+(K\lambda-k)(\mathbf P_{k+1}-\mathbf P_k),\quad \dot\lambda=\frac{\mu}{\sum_i|\mathbf d_i(\lambda)|^2}\Big(\sum_i\mathbf f_i\cdot\mathbf d_i(\lambda)-\frac{\partial U}{\partial\lambda}\Big)$$""")
+class MorphGateWaypoints(MorphGate):
+    """`morph_gate` on a path through K+1 recorded conformations P_0..P_K instead of the one straight line: x(lambda) is
+    piecewise linear, lambda measured by ARC LENGTH (breakpoints at the cumulative path length), the tangent
+    d_i = (P_{k+1} - P_k) / (s_{k+1} - s_k) of one size along the whole path, and lambda moves by the
+    same projected overdamped rule. WHY A MODEL: the biology differs -- a different hypothesis about the states between
+    closed and open (exp04: the MscS hybrid path M5c, the MPM morph relaxed at the atom scale: 0.47 nm from the open
+    atoms, 342 clashes at its peak against the straight line's 114 -- and the straight line is the default).
+
+    `waypoints: K+1` and parts `w<j>_<part>` for every part in `open_parts`, in the `open_reference` shape (same scale
+    and origin as the default's open state). P_0 is the seed itself. With K = 1 and w01 = the open state it IS the
+    default (the identity test). U, the offset, the barrier and the tension-work term are the default's.
+    """
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.K = int(params["waypoints"]) - 1
+        if self.K < 1:
+            raise ValueError("morph_gate[waypoints]: `waypoints` counts the conformations, at least 2")
+
+    def _load(self, X):
+        import os
+        import numpy as np
+        from plexus import shapes
+        path = next((os.path.join(r, self.open_ref, "points.npz") for r in shapes.roots()
+                     if os.path.exists(os.path.join(r, self.open_ref, "points.npz"))), None)
+        if path is None:
+            raise FileNotFoundError(f"morph_gate[waypoints]: no shapes/{self.open_ref}/points.npz")
+        Ps = [X.detach().clone()]
+        with np.load(path) as z:
+            for j in range(1, self.K + 1):
+                W = np.concatenate([np.asarray(z[f"w{j:02d}_{p_}"], np.float64) * self.scale for p_ in self.open_parts])
+                Ps.append(torch.as_tensor(W + np.asarray(self.origin)[None, :], device=X.device, dtype=X.dtype))
+        self._P = torch.stack(Ps)                                       # [K+1, N, 3]
+        self._Xc = Ps[0]
+        seg = self._P[1:] - self._P[:-1]
+        # BY ARC LENGTH, NOT BY WAYPOINT INDEX: lambda's breakpoints s_k are the path's cumulative length (all beads),
+        # so the tangent has the same size everywhere. By index, a path whose first conformations barely move (the MPM
+        # morph's) had a tangent 20x too short there, and thermal noise projected on it threw lambda from 0 to 1 in
+        # ten frames with no tension at all (the Phase G smoke test, 2026-09-29).
+        L = seg.reshape(self.K, -1).norm(dim=1).clamp_min(1e-30)
+        self._s = torch.cat([torch.zeros(1, dtype=L.dtype, device=L.device), torch.cumsum(L, 0)]) / L.sum()
+        print(f"[morph_gate:waypoints] {self.K + 1} conformations from {self.open_ref}: {X.shape[0]} beads, total path "
+              f"{float(seg.norm(dim=2).sum(0).mean()):.4g} world per bead, dV {self.dV:.4g}", flush=True)
+
+    def _at(self, lam):
+        k = int(torch.searchsorted(self._s, torch.tensor(float(lam), dtype=self._s.dtype, device=self._s.device),
+                                   right=True)) - 1
+        k = min(max(k, 0), self.K - 1)
+        ds = float(self._s[k + 1] - self._s[k])
+        u = (lam - float(self._s[k])) / ds
+        D = (self._P[k + 1] - self._P[k]) / ds
+        return self._P[k] + u * (self._P[k + 1] - self._P[k]), D
+
+    def forward(self, H, mask=None):
+        lvls = [H.level(s_) for s_ in self.sets]
+        X = torch.cat([lv.get("pos") for lv in lvls])
+        if self._Xc is None:
+            self._load(X)
+        h = float(getattr(H, "dt", 1.0))
+        on, D = self._at(self.lam)
+        D2 = float((D * D).sum()) or 1e-30
+        delta = (X - on).detach()
+        dU = self.dV + self.barrier * 4.0 * (1.0 - 2.0 * self.lam)
+        if self.tension_block:
+            tau = float(_block(H.level(str(self.tension_block[0])), str(self.tension_block[1]))[0, 0])
+            dU -= (tau if math.isfinite(tau) else 0.0) * self.dA
+        dlam = float((delta * D).sum()) / D2 - self.mu * h * dU / D2
+        if math.isfinite(dlam):
+            self.lam = min(max(self.lam + dlam, 0.0), 1.0)
+        target, _ = self._at(self.lam)
+        V = (target - X) / h
+        if self.gate_block:
+            lv_ = H.level(str(self.gate_block[0]))
+            _write(lv_, str(self.gate_block[1]), torch.full((lv_.get("pos").shape[0], 1), self.lam, dtype=X.dtype, device=X.device))
+        fr = _frame(H)
+        if fr in _REPORT:
+            print(f"[morph_gate:waypoints f{fr}] lambda {self.lam:.4f} (0 closed, 1 open)", flush=True)
+        out, s0 = {}, 0
+        for nm_, lv in zip(self.sets, lvls):
+            n = lv.get("pos").shape[0]
+            out[nm_] = V[s0:s0 + n] * lv.occ[:, None]
+            s0 += n
+        return out
+
+
+# ---- morph_gate[clamp]: the gate HELD at one lambda, the force along the path recorded (exp04 Phase G1) ---------
+@register_operator("morph_gate", model="clamp", family="mechanics", set="particle", kind="lateral",
+                   title="A channel's gate held at one point of its recorded path, the push along the path measured",
+                   equation=r"""$$\mathbf x_i=\mathbf x_i(\lambda_0),\qquad F_\lambda=\sum_i\mathbf f_i\cdot\mathbf d_i(\lambda_0)=\frac{1}{\mu\,\Delta t}\sum_i\boldsymbol\delta_i\cdot\mathbf d_i,\qquad G(\lambda)=-\int_0^\lambda\langle F_\lambda\rangle\,d\lambda$$""")
+class MorphGateClamp(MorphGateWaypoints):
+    """`morph_gate[waypoints]` with lambda HELD at `lambda0`: every frame the protein is put back on its recorded path at
+    lambda0, and what the other operators did to it in the frame before -- delta_i, the displacement mu dt f_i each
+    bead received -- is projected on the path's tangent d_i(lambda0) and written, as the generalized force
+    F = sum_i f_i . d_i (energy per unit lambda; kT when the spec's energy unit is kT), into `force_block`.
+
+    WHY A MODEL: the free gate cannot show the energetics inside a run -- in exp04 batches 12-13 a net 10 kT moved
+    lambda 0.02 in the 51,612-frame hold (mobility mu / sum|d|^2 over 1,960 beads), so a crossing needs ~230 ns. Held,
+    the mean force <F>(lambda0) converges in nanoseconds, and its integral over lambda is the free energy of the path
+    (thermodynamic integration along a constrained coordinate: Carter et al. 1989, Chem. Phys. Lett. 156:472; the
+    path coordinate of Maragliano et al. 2006). The difference of G between two tensions is the work the lipids
+    actually do on the gate -- measured, whatever its route (the outline, the pockets). The Jacobian correction of a
+    curvilinear coordinate is neglected: it does not depend on tension, so it cancels in that difference.
+
+    The offset, barrier and tension-work terms are not applied (lambda does not move); `basin_offset` is ignored.
+    """
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.force_block = params.get("force_block")
+
+    def forward(self, H, mask=None):
+        lvls = [H.level(s_) for s_ in self.sets]
+        X = torch.cat([lv.get("pos") for lv in lvls])
+        first = self._Xc is None
+        if first:
+            self._load(X)
+            self._F_sum, self._F_n = 0.0, 0
+        h = float(getattr(H, "dt", 1.0))
+        on, D = self._at(self.lam)
+        delta = (X - on).detach()
+        # THE FIRST FRAME IS THE SNAP from the seed (lambda 0) onto lambda0, not a push: reported as 0, not averaged.
+        # Written as it was (-1.7e7 at lambda 1), it set the live movie's axis to -3e7 and flattened the trace (G1j).
+        F = 0.0 if first else float((delta * D).sum()) / (self.mu * h)
+        if not math.isfinite(F):
+            F = float("nan")
+        V = (on - X) / h
+        if self.gate_block:
+            lv_ = H.level(str(self.gate_block[0]))
+            _write(lv_, str(self.gate_block[1]), torch.full((lv_.get("pos").shape[0], 1), self.lam, dtype=X.dtype, device=X.device))
+        fb = self.force_block
+        if fb:
+            lv_ = H.level(str(fb[0]))
+            _write(lv_, str(fb[1]), torch.full((lv_.get("pos").shape[0], 1), F, dtype=X.dtype, device=X.device))
+        if math.isfinite(F) and not first:
+            self._F_sum += F; self._F_n += 1
+        fr = _frame(H)
+        if fr in _REPORT:
+            print(f"[morph_gate:clamp f{fr}] lambda held at {self.lam:.3f}; force along the path now {F:+.4g}, "
+                  f"mean {self._F_sum / max(self._F_n, 1):+.4g} (energy per unit lambda)", flush=True)
         out, s0 = {}, 0
         for nm_, lv in zip(self.sets, lvls):
             n = lv.get("pos").shape[0]

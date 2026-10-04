@@ -1,0 +1,33 @@
+name: mscs_m5a
+model: config/si_material/mscs_morph_sub_fine.yaml
+learnable:
+- block: rate
+  of: mpm_particle
+  with: lattice
+  over: material
+  K: 24
+  extent: [0.175, 0.175, 0.175, 0.13764]
+  prior: {shrink: 0.0001}
+task:
+  reference:
+    shape: mscs_open_surface
+    size: 0.238416
+    centre: [0.174979, 0.175501, 0.172083]
+    points: mscs_morph/open
+  observe: {set: mpm_particle, block: pos, measure: grid_mass, grid: mpm_grid}
+  loss:
+  - {term: point_mse, weight: 100.0}
+  - {term: log_mse}
+  - {term: volume, weight: 0.5}
+training:
+  optimizer: adam
+  lr: 3.0
+  lr_min: 0.15
+  schedule: cosine
+  seed: 0
+  stages:
+  - resolution: {mpm_grid: 64}
+    iters: 80
+  - resolution: {mpm_grid: 96}
+    iters: 120
+  render: {frames: 200, px: 1100}

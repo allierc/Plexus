@@ -1,0 +1,14 @@
+{
+ "box_nm": 25,
+ "lipids": 674,
+ "rim_lipids": 252,
+ "beads": 2022,
+ "sigma_nm": 0.8,
+ "area_per_lipid_nm2": 0.768,
+ "z_head_nm": 2.0,
+ "core_seeded_nm": 2.4,
+ "dt_ps": 0.6958916678564171,
+ "sim_time_ns": 208.76750035692515,
+ "tension_mN_m": 4.0,
+ "eps_tail_kT": 0.91
+}
