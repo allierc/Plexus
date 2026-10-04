@@ -180,13 +180,16 @@ def skills(model_c: np.ndarray, mean_c: np.ndarray) -> dict:
 
 
 # ============================================================================== figures
-def render_curves(res: dict, path: str, names, gates: dict | None = None, history: list | None = None):
+def render_curves(res: dict, path: str, names, gates: dict | None = None, history: list | None = None,
+                  brain_mean: tuple | None = None):
     """THE PREDICTION AGAINST THE BASELINES, black (the deck and the watcher).
     a  MSE per step ahead: the grand average of the learned law (thick), of the best mean baseline, persistence, the
        stimulus lookup and the noise floor sigma^2, and the learned law in each condition (thin, one colour each);
     b  the training loss against the updates, one curriculum stage per horizon: a line where a stage begins and its
        horizon above it (Cedric, 2026-10-01: the loss per horizon in place of the skill panel);
-    c  the free rollout of the whole recording: R^2 per frame, raw and denoised, the conditions as bands."""
+    c  the free rollout of the whole recording: R^2 per frame, raw and denoised, the conditions as bands; or, with
+       `brain_mean` = (t_min, recorded, learned), the brain-mean dF/F, recorded (green) and learned (white) -- the
+       curves the brain-mean R2 is computed on (exp17, Cedric 2026-10-04: its main metric)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -247,12 +250,21 @@ def render_curves(res: dict, path: str, names, gates: dict | None = None, histor
                   color=cmap(ci), alpha=0.15, lw=0)
         c.text((off[ci] + off[ci + 1]) / 2 * res["frame_s"] / 60, 1.02, names[ci], fontsize=7, ha="center",
                transform=c.get_xaxis_transform())
-    c.plot(t, res["free_r2_raw"], color="0.6", lw=0.6, label="R$^2$ raw")
-    c.plot(t, res["free_r2_denoised"], color="#4c72b0", lw=0.8, label="R$^2$ denoised")
-    c.axhline(0, color="0.6", lw=0.7)
-    r2d = np.asarray(res["free_r2_denoised"], dtype=float)
-    c.set_ylim(0, 1)                               # every R2 axis 0..1 (Cedric, 2026-10-02): runs compare at a glance
-    bad = ~np.isfinite(r2d) | (r2d < -1)
+    if brain_mean is not None:
+        tb, bo, bp = (np.asarray(v, dtype=float) for v in brain_mean)
+        c.plot(tb, bo, color="#2ca02c", lw=1.1, label="recorded")
+        c.plot(tb, bp, color="white", lw=0.8, label="learned")
+        ok = np.isfinite(bo) & np.isfinite(bp)
+        lo_, hi_ = np.percentile(np.concatenate([bo[ok], bp[ok]]), [0.2, 99.8])
+        c.set_ylim(lo_ - 0.1 * (hi_ - lo_), hi_ + 0.15 * (hi_ - lo_))
+        bad = np.zeros(0, bool)
+    else:
+        c.plot(t, res["free_r2_raw"], color="0.6", lw=0.6, label="R$^2$ raw")
+        c.plot(t, res["free_r2_denoised"], color="#4c72b0", lw=0.8, label="R$^2$ denoised")
+        c.axhline(0, color="0.6", lw=0.7)
+        r2d = np.asarray(res["free_r2_denoised"], dtype=float)
+        c.set_ylim(0, 1)                           # every R2 axis 0..1 (Cedric, 2026-10-02): runs compare at a glance
+        bad = ~np.isfinite(r2d) | (r2d < -1)
     if bad.any():                                  # where the rollout leaves the axis for good, said in words
         c.text(0.99, 0.04, f"diverges from t = {t[int(np.argmax(bad))]:.0f} min (R$^2$ < -1)", color="#d62728",
                fontsize=8, ha="right", transform=c.transAxes)
@@ -261,7 +273,7 @@ def render_curves(res: dict, path: str, names, gates: dict | None = None, histor
         c.text(0.99, 0.93, f"{int(sil[-1]):,} exploding neuron{'s' if sil[-1] != 1 else ''} silenced, the first at "
                f"t = {t[int(np.argmax(sil > 0))]:.0f} min", color="#ff7f0e", fontsize=8, ha="right", transform=c.transAxes)
     c.set_xlabel("time, min (free rollout from the law's own context frames)")
-    c.set_ylabel("R$^2$ per frame over neurons")
+    c.set_ylabel("brain-mean dF/F" if brain_mean is not None else "R$^2$ per frame over neurons")
     c.legend(frameon=False, fontsize=8, loc="lower left")
     c.text(0.0, 1.08, "c", transform=c.transAxes, fontsize=12)
     for ax in (a, b, c):

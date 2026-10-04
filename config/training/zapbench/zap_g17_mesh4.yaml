@@ -7,21 +7,21 @@ learnable:
   prior:
     l1: 7.5e-05
     l2: 7.5e-07
-  title: one weight per short edge (6 nearest neurons)
+  title: one weight per short edge (the finest level, every neuron's Delaunay neighbours)
 - param: W_mid
   op: state_diffuse
   lr: 0.0009
   prior:
     l1: 7.5e-05
     l2: 7.5e-07
-  title: one weight per middle edge
+  title: one weight per middle edge (the 16- and 32-um levels)
 - param: W_long
   op: state_diffuse
   lr: 0.0009
   prior:
     l1: 7.5e-05
     l2: 7.5e-07
-  title: one weight per long edge
+  title: one weight per long edge (the 64-um and coarser levels)
 - block: tau
   of: neuron
   lr: 0.0018

@@ -2064,39 +2064,76 @@ _NG_GRAPH_CACHE: dict = {}
 _NG_MOD_CACHE: dict = {}
 
 
-def _neuron_mesh_edges(P, levels, bin_um):
-    """{short, mid, long: (senders, receivers)}: the multi-level Delaunay mesh over positions P (see
-    StateDiffuseNeuronGraph's `graph: mesh`)."""
+def neuron_mesh_levels(P, levels, bin_um):
+    """THE MULTI-LEVEL MESH over element positions P (exp17 batch 17, Cedric 2026-10-04: "a proper multi-level mesh",
+    GraphCast's construction -- papers/graphcast_code_v0.2/graphcast/icosahedral_mesh.py -- on the neurons, no
+    encoder / decoder). [(label, bin_um, nodes, edges)], COARSE TO FINE as GraphCast's M0..M_R:
+      - `levels` - 1 binned levels, cubes of bin_um x 2^(levels-2) .. bin_um, all on ONE origin so every cube splits
+        into 8 of the next level's; a cube's node is the coarser level's node when it holds one, else the element nearest
+        the cube's centroid -- the node sets are NESTED (GraphCast: a coarse vertex is a vertex of every finer level) and
+        each level lists the coarser nodes first;
+      - the finest level: every element (the mesh's finest nodes are the neurons themselves);
+      - each level's mesh: the Delaunay tetrahedralisation of its nodes (the 3-D triangles), its edges; the edges longer
+        than 2 of the level's bins dropped (the hull's edges across the brain's concavities), every node keeping at least
+        its shortest edge (bin of the finest level: bin_um / 2, the neurons' own spacing);
+      - edges undirected here ([E, 2], node indices into P); the edge length halves from level to level.
+    The multi-mesh is the union of every level's edges (GraphCast's merge_meshes)."""
     import numpy as np
     from scipy.spatial import Delaunay, cKDTree
+    P = np.asarray(P, dtype=np.float64)
+    N, lo = len(P), P.min(0)
+    tree = cKDTree(P)
 
-    def tri(idx, max_len):
+    def nested(b, prev):
+        key = np.floor((P - lo) / b).astype(np.int64)
+        _, inv = np.unique(key, axis=0, return_inverse=True)
+        inv = inv.reshape(-1)
+        cnt = np.bincount(inv)
+        cen = np.stack([np.bincount(inv, P[:, d]) / cnt for d in range(3)], 1)
+        rep = tree.query(cen)[1]
+        if len(prev):
+            hold = np.full(len(cnt), -1, np.int64)
+            hold[inv[prev]] = prev
+            rep = np.where(hold >= 0, hold, rep)
+        return np.concatenate([prev, np.setdiff1d(np.unique(rep), prev)])
+
+    def edges(idx, b):
         if len(idx) < 5:
             return np.zeros((0, 2), np.int64)
         s = Delaunay(P[idx]).simplices
         e = np.unique(np.sort(np.concatenate([s[:, [i, j]] for i in range(4) for j in range(i + 1, 4)]), 1), axis=0)
         e = idx[e]
-        keep = np.linalg.norm(P[e[:, 0]] - P[e[:, 1]], axis=1) <= max_len
+        ln = np.linalg.norm(P[e[:, 0]] - P[e[:, 1]], axis=1)
+        keep = ln <= 2.0 * b
+        # every node keeps its shortest edge: both ends' edges sorted by length, the first per node. (Not a fancy
+        # assignment in sorted order: with repeated indices numpy keeps the LAST write, the node's LONGEST edge -- the
+        # hull edges up to 935 um the first mesh kept, 2026-10-04.)
+        nd, ei = e.T.reshape(-1), np.tile(np.arange(len(e)), 2)
+        o = np.argsort(ln[ei], kind="stable")
+        keep[ei[o[np.unique(nd[o], return_index=True)[1]]]] = True
         return e[keep]
-    tree = cKDTree(P)
+    out, prev = [], np.zeros(0, np.int64)
+    for lv in range(levels - 1):
+        b = bin_um * 2 ** (levels - 2 - lv)
+        prev = nested(b, prev)
+        out.append((f"{b:g} um cubes", b, prev, edges(prev, b)))
+    allp = np.concatenate([prev, np.setdiff1d(np.arange(N), prev)])      # every element, the coarser nodes first
+    out.append(("every neuron", bin_um / 2, allp, edges(allp, bin_um / 2)))
+    return out
+
+
+def _neuron_mesh_edges(P, levels, bin_um):
+    """{short, mid, long: (senders, receivers)} of the multi-level mesh (neuron_mesh_levels), every edge both ways:
+    short = the finest level (every neuron), mid = the 16- and 32-um levels, long = 64 um and coarser."""
+    import numpy as np
     sets = {"short": [], "mid": [], "long": []}
-    for lv in range(levels):
-        if lv == 0:
-            idx, b = np.arange(len(P)), bin_um
-        else:
-            b = bin_um * 2 ** (lv - 1)
-            key = np.floor((P - P.min(0)) / b).astype(np.int64)
-            _, inv = np.unique(key, axis=0, return_inverse=True)
-            inv = inv.reshape(-1)
-            cnt = np.bincount(inv)
-            cen = np.stack([np.bincount(inv, P[:, d]) / cnt for d in range(3)], 1)
-            idx = np.unique(tree.query(cen)[1])                     # the element nearest each cube's centroid
-        e = tri(idx, 3 * b)
-        sets["short" if lv == 0 else "mid" if lv <= 2 else "long"].append(e)
+    for lab, b, _, e in neuron_mesh_levels(P, levels, bin_um):
+        k = "short" if lab == "every neuron" else ("mid" if b <= 2 * bin_um else "long")
+        sets[k].append(e)
     out = {}
     for k, es in sets.items():
-        e = np.concatenate(es) if es else np.zeros((0, 2), np.int64)
-        out[k] = (np.concatenate([e[:, 0], e[:, 1]]), np.concatenate([e[:, 1], e[:, 0]]))    # both ways
+        e = np.unique(np.concatenate(es), axis=0) if es else np.zeros((0, 2), np.int64)
+        out[k] = (np.concatenate([e[:, 0], e[:, 1]]), np.concatenate([e[:, 1], e[:, 0]]))
     return out
 
 
@@ -2209,13 +2246,10 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         if self.graph_kind not in ("spatial", "random", "mesh"):
             raise ValueError("state_diffuse[neuron_graph] `graph:` spatial (default), random or mesh")
         self.graph_seed = int(params.get("graph_seed", 0))
-        # THE MESH (exp17 batch 17, Cedric 2026-10-04: "a meshing closer to GraphCast: a 3-D mesh with triangles from the
-        # neuron positions, successive binning over 3, 4 and 5 levels"): level 0 the Delaunay triangulation of every
-        # element; level l >= 1 the elements binned in cubes of `mesh_bin_um` x 2^(l-1) um, the element nearest each
-        # occupied cube's centroid its representative, and the Delaunay triangulation of the representatives. Every
-        # level drops the edges longer than 3 of its bin sizes (level 0: 3 x `mesh_bin_um`), so no edge spans the
-        # brain's concave outline; every edge both ways. The levels fill the three learned sets: 0 -> short,
-        # 1-2 -> mid, 3+ -> long.
+        # THE MULTI-LEVEL MESH (exp17 batch 17, Cedric 2026-10-04: GraphCast's nested multi-mesh, on the neurons):
+        # `mesh_levels` levels, coarse to fine -- binned in cubes of `mesh_bin_um` x 2^(levels-2) .. `mesh_bin_um`,
+        # nested, then every neuron -- each a Delaunay tetrahedralisation; the multi-mesh the union of their edges
+        # (neuron_mesh_levels). Sets: short = every neuron's level, mid = the 16 / 32 um levels, long = 64 um and up.
         self.mesh_levels = int(params.get("mesh_levels", 0))
         self.mesh_bin = float(params.get("mesh_bin_um", 16.0))
         if (self.graph_kind == "mesh") != (self.mesh_levels > 0):
