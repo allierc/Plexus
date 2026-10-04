@@ -71,10 +71,13 @@ def render(name, D, n_part=6000, seed=0):
                 transform=m_.get_xaxis_transform())
     m_.plot(tm, mo, color="#2ca02c", lw=0.7)
     m_.plot(tm, mp, color="white", lw=0.7)
+    for f_, site_ in zip(rec["trials"][:, 0], rec["trials"][:, 2]):     # the UV pulses: yellow on the gut, grey off the fish
+        m_.axvline(f_ * D["frame_s"] / 60, color="#ffd54f" if int(site_) != 1 else "0.55", lw=0.6, alpha=0.8)
     m_.set_xlim(tm[0], tm[-1])
     m_.set_yticks([])
     m_.tick_params(colors="0.6", labelsize=7)
-    fig.text(0.05, 0.255, "brain-mean dF/F: recorded (green), learned (white); time, min", color="0.7", fontsize=8)
+    fig.text(0.05, 0.255, "brain-mean dF/F: recorded (green), learned (white); UV pulses: yellow on the gut, grey off the "
+             "fish; time, min", color="0.7", fontsize=8)
     cur = m_.axvline(tm[0], color="#ff7f0e", lw=0.9)
     for f in range(F):
         bg = np.clip(act[f] / amax, 0, 1)
@@ -105,7 +108,7 @@ def gut_flow(name, D, ev_s=20.0):
     fish -- against every other frame): the mean wind speed, excitatory and inhibitory, in each; their ratio; the net
     direction along the body (toward_tail: +1 all toward the tail, -1 all toward the head; x grows toward the tail,
     the head drawn left); and the map of the speed difference (gut - rest).
-    Writes data/gutflow_<run>.json and png/gutflow_<run>.png."""
+    Writes data/gutflow_<run>.json, data/gutflow_<run>.npz (the two difference maps) and png/gutflow_<run>.png."""
     import json
     import matplotlib
     matplotlib.use("Agg")
@@ -122,6 +125,7 @@ def gut_flow(name, D, ev_s=20.0):
         json.dump(out, open(os.path.join(EXP, "data", f"gutflow_{name}.json"), "w"), indent=1)
         return out
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.4), facecolor="black")
+    maps = {}
     for a_, k, cm in zip(ax, ("ex", "in"), ("Reds", "Blues")):
         W = D["wind"][k]                                         # [F, 2, ny, nx]
         sp = np.linalg.norm(W, axis=1)                           # [F, ny, nx]
@@ -131,6 +135,7 @@ def gut_flow(name, D, ev_s=20.0):
                   "toward_tail_gut": vx(gut), "toward_tail_rest": vx(~gut)}
         dmap = sp[gut].mean(0) - sp[~gut].mean(0)
         dmap[~ins] = np.nan
+        maps[k] = dmap
         lim = np.nanpercentile(np.abs(dmap), 99)
         a_.imshow(dmap, cmap="RdBu_r" if k == "ex" else "PuOr_r", vmin=-lim, vmax=lim, origin="lower")
         if D.get("landmarks"):
@@ -146,6 +151,8 @@ def gut_flow(name, D, ev_s=20.0):
     fig.savefig(os.path.join(EXP, "png", f"gutflow_{name}.png"), dpi=130, facecolor="black")
     plt.close(fig)
     json.dump(out, open(os.path.join(EXP, "data", f"gutflow_{name}.json"), "w"), indent=1)
+    np.savez_compressed(os.path.join(EXP, "data", f"gutflow_{name}.npz"), ex=maps["ex"], inh=maps["in"],   # the montage's
+                        grid=np.array(D["grid"]), inside=ins)                                         # (exp20_flow_montage)
     print(f"[gutflow] {name}: excitatory x{out['ex']['ratio']:.2f}, inhibitory x{out['in']['ratio']:.2f} in the gut "
           f"windows; toward the tail (ex) {out['ex']['toward_tail_gut']:+.2f} gut / {out['ex']['toward_tail_rest']:+.2f} rest")
     return out

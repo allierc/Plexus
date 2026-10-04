@@ -183,9 +183,10 @@ def figures(rows):
         fig.savefig(os.path.join(FIGS, f"compare24_traces_{h}.png"), dpi=160, facecolor="black")
         plt.close(fig)
     # the conditions: the replicable response, the recorded and learned evoked change
-    fig, ax = plt.subplots(1, 3, figsize=(14, 4), facecolor="black")
-    for a_, (key, ttl) in zip(ax, (("top1_heldout", "replicable response, held-out gut pulses (dF/F)"),
-                                   ("rec", "recorded evoked change at the gut sites (dF/F)"),
+    fig, ax = plt.subplots(1, 4, figsize=(18, 4.2), facecolor="black")
+    for a_, (key, ttl) in zip(ax, (("frac", "gut-responsive cells, % of the brain's cells"),
+                                   ("top1_heldout", "replicable response, held-out pulses (dF/F)"),
+                                   ("rec", "recorded evoked change, stimulated sites (dF/F)"),
                                    ("ratio", "the law's evoked change / recorded"))):
         a_.set_facecolor("black")
         for sp in a_.spines.values():
@@ -198,13 +199,16 @@ def figures(rows):
                     continue
                 g = r.get("gut") or {}
                 v = (r.get("top1_heldout") if key == "top1_heldout" else g.get("rec") if key == "rec"
-                     else (g["law"] / g["rec"] if g.get("rec") and abs(g["rec"]) > 0.02 else None))
+                     else 100.0 * r["gut_responsive"] / r["cells"] if key == "frac" and r.get("gut_responsive") and r.get("cells")
+                     else (g["law"] / g["rec"] if key == "ratio" and g.get("rec") and abs(g["rec"]) > 0.02 else None))
                 if v is not None:
                     ys.append(v)
             a_.scatter(np.full(len(ys), i) + np.linspace(-0.12, 0.12, max(len(ys), 1))[:len(ys)], ys, color="white", s=14)
             if ys:
                 a_.plot([i - 0.25, i + 0.25], [np.median(ys)] * 2, color="#ffd54f", lw=2)
         a_.axhline(0, color="0.5", lw=0.6)
+        if key == "frac":
+            a_.set_yscale("log")
         a_.set_xticks(range(len(COND)), [c[1].replace(", ", "\n") for c in COND], fontsize=7, color="0.9")
         a_.set_title(ttl, color="white", fontsize=10)
     fig.tight_layout()
@@ -217,17 +221,19 @@ def main():
     rows = [per_fish(c, k, D) for c, _ in COND for k in sorted(kk for cc, kk in D if cc == c)]
     tests = {}
     fm = []
-    for r in rows:
-        s = r.get("sites", {})
-        if "2" in s and "5" in s and s["2"]["rec"]:
-            fm.append({"fish": f"{r['condition']} {r['fish']}", "site5_over_site2_rec": s["5"]["rec"] / s["2"]["rec"],
-                       "site5_over_site2_law": (s["5"]["law"] / s["2"]["law"]) if s["2"]["law"] else None})
+    second = {"glucose": "5", "Lglucose": "4"}             # the other gut spot (galvo x 1 V further; blood glucose has
+    for r in rows:                                          # one beam position for every site: not a gut spot)
+        s, o = r.get("sites", {}), second.get(r["condition"])
+        if o and "2" in s and o in s and s["2"]["rec"]:
+            fm.append({"fish": f"{r['condition']} {r['fish']}", "site5_over_site2_rec": s[o]["rec"] / s["2"]["rec"],
+                       "site5_over_site2_law": (s[o]["law"] / s["2"]["law"]) if s["2"]["law"] else None})
     tests["foregut_midgut"] = fm
-    wid = {"gut": [], "vessel": []}
+    wid = {"gut": [], "gut_controls": [], "vessel": []}      # the paper's Fig. 5d: nutrients in the gut against the vessel
     for r in rows:
         g = r.get("gut")
         if g and g.get("fwhm_rec") is not None and g.get("rec", 0) > 0.03:
-            wid["vessel" if r["condition"] == "blood_glucose" else "gut"].append(
+            wid["vessel" if r["condition"] == "blood_glucose" else "gut_controls"
+                if r["condition"] in ("Lglucose", "fish_water") else "gut"].append(
                 {"fish": f"{r['condition']} {r['fish']}", "fwhm_rec": g["fwhm_rec"], "fwhm_law": g.get("fwhm_law")})
     tests["fwhm"] = wid
     json.dump({"rows": rows, "tests": tests}, open(os.path.join(DATA, "compare24.json"), "w"), indent=1, default=float)
