@@ -60,6 +60,21 @@ def test_priors_and_refusals(tmp_path):
     o, P, nb = setup(str(tmp_path))
     for k in ("monotone", "pin", "input_group_l1"):
         assert torch.isfinite(o.prior_term("theta_g", k))
-    for bad in ({"synapse": "conductance"}, {"modulation": "siren"}, {"activation": "relu"}, {"message": "edge"}):
+    for bad in ({"synapse": "conductance"}, {"activation": "relu"}, {"message": "edge"}):   # modulation: allowed since batch 18
         with pytest.raises(ValueError):
             setup(str(tmp_path), **bad)
+
+
+def test_siren_modulation_starts_at_one(tmp_path):
+    """exp17 batch 18: the leaky GNN-MLP takes the SIREN modulation; its last layer starts at 0, so Omega = 1 and the
+    modulated law equals the unmodulated one until the SIREN learns."""
+    o, P, nb = setup(str(tmp_path))
+    m, _, _ = setup(str(tmp_path), modulation="siren")
+    m.n_frames_ref, m.frame = 100, 10
+    for name in ("W_short", "W_mid", "W_long"):
+        w = getattr(o, name).clone() + 0.05
+        setattr(o, name, w)
+        setattr(m, name, w.clone())
+    m.theta_g = o.theta_g.clone()
+    x, u = torch.randn(len(P), 1), torch.randn(22, 1)
+    assert torch.allclose(o.step(x, P, None, u, nb=nb), m.step(x, P, None, u, nb=nb), atol=1e-6)

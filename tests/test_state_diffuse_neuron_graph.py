@@ -244,3 +244,25 @@ def test_graph_topologies(tmp_path):
         setup(str(tmp_path), reach_rotation_deg=30.0)                                 # an angle needs `rotated`
     with pytest.raises(ValueError):
         setup(str(tmp_path), graph="smallworld")
+
+
+def test_mesh_graph(tmp_path):
+    """exp17 batch 17: the multi-level Delaunay mesh -- every edge both ways, no self edge, every level's edges within
+    3 of its bin sizes, the coarse levels fill mid (1-2) and long (3+), and more levels only add coarse edges."""
+    import pytest
+    o3 = setup(str(tmp_path), graph="mesh", mesh_levels=3, mesh_bin_um=16.0)[0]
+    o5, P, _ = setup(str(tmp_path), graph="mesh", mesh_levels=5, mesh_bin_um=16.0)
+    e3, e5 = _edges(o3), _edges(o5)
+    for e in (e3, e5):
+        for k, (s, r) in e.items():
+            if len(s):
+                pairs = set(zip(s.tolist(), r.tolist()))
+                assert all((b, a) in pairs for a, b in list(pairs)[:500]) and not np.any(s == r)
+    ln = lambda s, r: np.linalg.norm(P.numpy()[s] - P.numpy()[r], axis=1)
+    assert ln(*e5["short"]).max() <= 3 * 16.0 + 1e-6 and ln(*e5["mid"]).max() <= 3 * 32.0 + 1e-6
+    assert len(e3["long"][0]) == 0 and len(e5["long"][0]) > 0                   # levels 3, 4 -> long
+    assert np.array_equal(e3["short"][0], e5["short"][0]) and np.array_equal(e3["mid"][0], e5["mid"][0])
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), graph="mesh")                                        # levels needed
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), mesh_levels=3)                                       # only with graph: mesh

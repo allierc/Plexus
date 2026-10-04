@@ -1423,7 +1423,10 @@ BATCHES = (
     ("batch 16: batch 15 with the calcium indicator, tau_ca fixed, latent substeps", None,
      (("tau_ca learned", "zap_c16_learn"), ("tau_ca 1 s", "zap_c16_t1"), ("tau_ca 2 s", "zap_c16_t2"), ("tau_ca 3 s", "zap_c16_t3"), ("2 s, 5 substeps", "zap_c16_t2_s5"), ("2 s, 10 substeps", "zap_c16_t2_s10"), ("2 s + SIREN Omega", "zap_c16_t2_siren"), ("trained with no network", "zap_c16_t2_now")), ()),
     ("batch 17: batch 15.1 over different graphs", None,
-     (("axes turned 45 deg", "zap_g17_rot45"), ("random directions", "zap_g17_randdir"), ("18 nearest only", "zap_g17_knn18"), ("no highways", "zap_g17_nolong"), ("reaches 16 / 64 um", "zap_g17_r16_64"), ("reaches 64 / 256 um", "zap_g17_r64_256"), ("base, seed 1", "zap_g17_s1"), ("random graph (null)", "zap_g17_random")), ()),
+     (("axes turned 45 deg", "zap_g17_rot45"), ("random directions", "zap_g17_randdir"), ("18 nearest only", "zap_g17_knn18"), ("no highways", "zap_g17_nolong"), ("reaches 16 / 64 um", "zap_g17_r16_64"), ("reaches 64 / 256 um", "zap_g17_r64_256"), ("base, seed 1", "zap_g17_s1"), ("random graph (null)", "zap_g17_random"), ("mesh, 3 levels", "zap_g17_mesh3"), ("mesh, 4 levels", "zap_g17_mesh4"), ("mesh, 5 levels", "zap_g17_mesh5")), ()),
+    ("batch 18: longer training of the three best laws", None,
+     tuple((f"{lab} h{H} x{xf}", f"zap_b18_{k}_h{H}_x{xs}") for k, lab in (("si", "SIREN"), ("ca", "calcium + SIREN"), ("ml", "leaky MLP + SIREN"))
+           for H in (50, 100, 200) for xs, xf in (("25", "2.5"), ("5", "5"))), ()),
 )
 # the law of each batch, in the title of every one of its slides (Cedric: which slide belongs to which batch)
 BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4": "GraphCast law",
@@ -1435,7 +1438,8 @@ BATCH_LAW = {"1": "GraphCast law", "2": "MLP, mesh", "3": "known ODE, mesh", "4"
              "14": "neuron graph, modulation / conductance, destriped",
              "15": "neuron graph, modulation / conductance, destriped + ephys",
              "16": "neuron graph + calcium indicator, destriped + ephys",
-             "17": "neuron graph topologies, destriped + ephys"}            # Cedric's names, 2026-10-01
+             "17": "neuron graph topologies, destriped + ephys",
+             "18": "the three best laws, longer training"}            # Cedric's names, 2026-10-01
 BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh levels", "2": "regularisers, synapse, substeps, levels",
                 "3": "activation, substeps, levels, synapse", "4": "seed, history 12/24, embedding 2/16, stimulus window, curriculum 5/40",
                 "5": "W prior, row lasso, edge reach, no graph", "6": "batch 5 + indicator; indicator start, k fixed",
@@ -1447,7 +1451,8 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
                 "14": "conductance, Omega by hash grid or SIREN, in sample",
                 "15": "batch 14 with 5 ephys features in the stimulus and the mask",
                 "16": "calcium indicator: tau_ca learned or fixed 1 / 2 / 3 s, latent substeps, SIREN, no network",
-                "17": "the graph: rotated or random directions, kNN only, no highways, reaches, random graph, seed"}
+                "17": "the graph: rotated or random directions, kNN only, no highways, reaches, random graph, seed, mesh",
+                "18": "updates x2.5 / x5, horizons to 50 / 100 / 200"}
 
 
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren", "batch 16": "zap_c16_t2"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
@@ -2447,7 +2452,7 @@ def main():
                 for k_ in cr_}
         deck.append(("11e_param_all", frame_wide(
             "the learned constants on every graph",
-            "\\vspace*{0.1\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.80\\textheight,"
+            "\\vspace*{0.1\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.62\\textheight,"
             "keepaspectratio]{figs/param_compare_all.png}\\par\\vspace{2pt}"
             "{\\tiny\\color{gray} each row on the base run's colour scale (2nd-98th percentiles); r: per-neuron correlation "
             "with the base 15.1 -- the 6 other spatial graphs: " + "; ".join(
@@ -2508,26 +2513,28 @@ def main():
                   "\\item \\textbf{No help:} the GNN-MLP (drifts; leaky, still runs away), conductance, a learned indicator, "
                   "more substeps; the learned clusters are cuts of continua.\n"
                   "\\end{itemize}\\par}\n")
-        right_s = (head("exp17 and exp19 (whole-body, WHOLISTIC f338)")
-                   + "{\\scriptsize\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{1.25cm}@{\\hspace{4pt}}"
-                     ">{\\raggedright\\arraybackslash}p{2.45cm}@{\\hspace{4pt}}>{\\raggedright\\arraybackslash}p{2.45cm}@{}}\n"
-                     "& \\textbf{exp17} & \\textbf{exp19} \\\\\n\\hline\n"
-                     "unit & a segmented neuron, fixed position & a voxel; the tissue moves \\\\\n"
-                     "stimulus & known: 22 visual + 5 ephys & unknown: a learned forcing $I(t)$ \\\\\n"
-                     "network & carries the brain-wide swings & carries nothing measurable (its finding 5) \\\\\n"
-                     "forecast & beats the mean far ahead & beats it to $\\sim$4 volumes (its finding 3) \\\\\n"
-                     "identity & per-neuron constants, reproducible & a per-voxel identity hurts (motion) \\\\\n"
+        right_s = (head("exp17 and exp20 (gut-brain, Chen et al. 2026)")
+                   + "{\\scriptsize\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{1.45cm}@{\\hspace{4pt}}"
+                     ">{\\raggedright\\arraybackslash}p{2.25cm}@{\\hspace{4pt}}>{\\raggedright\\arraybackslash}p{2.25cm}@{}}\n"
+                     "& \\textbf{exp17} & \\textbf{exp20} \\\\\n\\hline\n"
+                     "law & known ODE on the neuron graph & the same law, adopted \\\\\n"
+                     "neurons & 100,759, 0.914 s, 2 h & 190,346, 1.117 s, 41 min, far noisier \\\\\n"
+                     "drive & visual stimulus, always on (+ ephys) & sparse gut-glucose UV pulses, grating, swim \\\\\n"
+                     "what the network carries & the brain-wide swings & the evoked gut response (its finding 10) \\\\\n"
+                     "W = 0 / no network & swings flatten & response gone: 0.04 / 0.07 of recorded vs 0.84 \\\\\n"
+                     "per-neuron R$^2$ & barely sees the network & favours no network (+0.41) \\\\\n"
                      "\\end{tabular}\\par}\\vspace{3pt}\n"
-                     "{\\scriptsize Shared: the controls (leak test, W = 0, a twin with no network, brain-mean R$^2$), and a "
-                     "GLOBAL drive explaining most of the activity. Different: registered neurons and a known stimulus leave "
-                     "the coupling something to explain; moving voxels and a fitted forcing do not.\\par}\\vspace{5pt}\n"
+                     "{\\scriptsize Shared: the law, the controls (leak test, W = 0, a twin with no network, the brain-mean R$^2$), "
+                     "the Euler runaway (exponential step since). In both, a neuron's own leak forgets its input fast and the "
+                     "RECURRENCE holds it; the per-neuron R$^2$ misses it. Open for exp20: is it a particular wiring, or any "
+                     "graph (exp17's random graph does as well)?\\par}\\vspace{5pt}\n"
                    + head("outlook")
                    + "{\\scriptsize\\begin{itemize}\\setlength\\itemsep{1pt}\n"
-                     "\\item Identify the wiring: the forecast cannot; a measured connectome (the fish's EM), perturbations, or a "
-                     "strong sparsity prior.\n"
+                     "\\item Identify the wiring: the forecast cannot; a measured connectome (the fish's EM), perturbations, "
+                     "or a strong sparsity prior.\n"
+                     "\\item exp20: the random-graph null on the gut response; then where it travels (DVC, PBN, idMO).\n"
                      "\\item A held-out SIREN: $\\Omega$ of position and stimulus, not of absolute time.\n"
                      "\\item The leaky GNN-MLP with a bounded message.\n"
-                     "\\item exp19: registration before any network claim; its stimulus sessions as known forcings.\n"
                      "\\end{itemize}\\par}\n")
         deck.append(("99_summary", frame("summary and outlook", "\\vspace*{2\\baselineskip}\\fitcol{%\n" + left_s + "}", right_s, "exp17_zapbench_graphcast.md, ## Summary",
                                           deck_title="multi-level GNN on fish 2 $\\cdot$ summary and outlook")))
