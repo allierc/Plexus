@@ -36,7 +36,7 @@ def netlist_cell(cir: str):
     return c, own, gr, gi, glob
 
 
-def cell_schematic(path: str, cir: str) -> int:
+def cell_schematic(path: str, cir: str, dark: bool = False) -> int:
     """The cell AS NETLISTED: every symbol is one SPICE element of `cir` (name, type, value), drawn from ground up
     to its net and wired by net labels, as in an LTspice / KiCad schematic. Row 1: the broadcast (Vknob, Bcos,
     Bsin), the stimulus (Vu) and the two synapse nodes (GR..., Rsr / GI..., Rsi); row 2: the membrane (Bin, C, R)
@@ -46,14 +46,19 @@ def cell_schematic(path: str, cir: str) -> int:
     c, own, gr, gi, glob = netlist_cell(cir)
     v = lambda line: line.split()[-1]
     H, W = 2.4, 3.3                                       # element height, spacing of parallel elements
+    net = "#7fb2ff" if dark else "#1f4e9c"
     with schemdraw.Drawing(file=path, show=False, fontsize=10) as d:
         d.config(unit=H)
+        if dark:
+            d.config(color="white", bgcolor="black")
+
+        net_color = net
 
         def column(x, y, net, elements):
             top = y + H
             if len(elements) > 1:
                 elm.Line().at((x, top)).right(W * (len(elements) - 1))
-            elm.Label().at((x + W * (len(elements) - 1) / 2, top + 0.45)).label(net, fontsize=11, color="#1f4e9c")
+            elm.Label().at((x + W * (len(elements) - 1) / 2, top + 0.45)).label(net, fontsize=11, color=net_color)
             for k, (cls, lab) in enumerate(elements):
                 elm.Ground().at((x + W * k, y))
                 cls().at((x + W * k, y)).up().label(lab, loc="bottom", fontsize=8.5, ofst=0.15)
@@ -77,40 +82,51 @@ def cell_schematic(path: str, cir: str) -> int:
     return int(c)
 
 
+DECK = os.path.join(ROOT, "experiments", "exp18_phase_modulation", "presentation", "figs")
+
+
+def traces(data, path, dark=False):
+    import matplotlib.pyplot as plt
+    cols_fit = "white" if dark else "black"
+    rows = {r["law"]: r for r in data["rows"]}
+    with plt.style.context("dark_background" if dark else "default"):
+        fig = plt.figure(figsize=(12.5, 6.4), facecolor="black" if dark else "white")
+        gs = fig.add_gridspec(2, 3)
+        for k, (name, tr) in enumerate(data["traces"].items()):
+            a = fig.add_subplot(gs[k // 3, k % 3])
+            t = np.array(tr["t"])
+            n = min(len(t), len(tr["spice"]), len(tr["target"]))
+            a.plot(t[:n], np.array(tr["target"])[:n], color="#2e8b4f", lw=2.4, label="target law")
+            a.plot(t[:n], np.array(tr["spice"])[:n], color=cols_fit, lw=0.9, label="ngspice circuit")
+            r = rows[name]
+            a.set_title(f"{'abcdef'[k]}   knob at {r['alpha']:+.3f} rad: {name}   (error {r['spice_vs_target']:.3f})",
+                        loc="left", fontsize=8.5)
+            a.tick_params(labelsize=7)
+            if k % 3 == 0:
+                a.set_ylabel("output y", fontsize=8)
+            if k >= 3:
+                a.set_xlabel("time (task s; circuit ms)", fontsize=8)
+            if k == 0:
+                a.legend(fontsize=7, frameon=False, loc="upper left")
+        fig.tight_layout()
+        fig.savefig(path, dpi=150 if dark else 110, facecolor=fig.get_facecolor(), bbox_inches="tight")
+        plt.close(fig)
+
+
 def main():
     import matplotlib
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
     data = json.load(open(os.path.join(SP, f"network_{RUN}.json")))
-    png = os.path.join(SP, "cell_schematic.png")
     cir = os.path.join(SP, f"network_{RUN}_integrate.cir")
-    cell = cell_schematic(png, cir)
+    cell = cell_schematic(os.path.join(SP, "cell_schematic.png"), cir)
     cell_schematic(OUT + "_cell.pdf", cir)                  # the same drawing, vector, for the paper
-    cols = {"integrate": "#1f4e9c", "delay": "#c0392b", "lowpass": "#8e44ad", "highpass": "#e67e22",
-            "resonator": "#16a085", "differentiate": "#555555"}
-    fig = plt.figure(figsize=(12.5, 6.4))
-    gs = fig.add_gridspec(2, 3)
-    rows = {r["law"]: r for r in data["rows"]}
-    for k, (name, tr) in enumerate(data["traces"].items()):
-        a = fig.add_subplot(gs[k // 3, k % 3])
-        t = np.array(tr["t"])
-        n = min(len(t), len(tr["spice"]), len(tr["target"]))
-        a.plot(t[:n], np.array(tr["target"])[:n], color="#2e8b4f", lw=2.4, label="target law")
-        a.plot(t[:n], np.array(tr["spice"])[:n], color="black", lw=0.9, label="ngspice circuit")
-        r = rows[name]
-        a.set_title(f"{'abcdef'[k]}   knob at {r['alpha']:+.3f} rad: {name}   (error {r['spice_vs_target']:.3f})",
-                    loc="left", fontsize=8.5)
-        a.tick_params(labelsize=7)
-        if k % 3 == 0:
-            a.set_ylabel("output y", fontsize=8)
-        if k >= 3:
-            a.set_xlabel("time (task s; circuit ms)", fontsize=8)
-        if k == 0:
-            a.legend(fontsize=7, frameon=False, loc="upper left")
-    fig.tight_layout()
-    fig.savefig(OUT + ".pdf", bbox_inches="tight")
-    fig.savefig(OUT + ".png", dpi=110, bbox_inches="tight")
-    print("wrote", OUT + ".pdf")
+    traces(data, OUT + ".pdf")
+    traces(data, OUT + ".png")
+    # the deck: black (Cedric 2026-10-04)
+    os.makedirs(DECK, exist_ok=True)
+    cell_schematic(os.path.join(DECK, "spice_cell.png"), cir, dark=True)
+    traces(data, os.path.join(DECK, "spice_traces.png"), dark=True)
+    print("wrote", OUT + ".pdf", "and the deck's spice_cell.png / spice_traces.png; cell", cell)
 
 
 if __name__ == "__main__":

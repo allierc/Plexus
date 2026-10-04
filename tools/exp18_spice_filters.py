@@ -19,6 +19,7 @@ scaled frequency. Op-amps are ideal (a voltage-controlled voltage source of gain
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -119,13 +120,15 @@ def ac(name: str, body: str, f: np.ndarray) -> np.ndarray:
     return a[:, 1] + 1j * a[:, 2]
 
 
-def schematic(name: str, path: str) -> None:
+def schematic(name: str, path: str, dark: bool = False) -> None:
     """A drawn schematic of one law's circuit (schemdraw), components labelled with their values."""
     import schemdraw
     import schemdraw.elements as elm
     lw = laws()[name]
     with schemdraw.Drawing(file=path, show=False, fontsize=11) as d:
         d.config(unit=2.2)
+        if dark:
+            d.config(color="white", bgcolor="black")
         if name == "resonator":
             body, _ = netlist(name, lw)
             v = {l.split()[0]: float(l.split()[-1]) for l in body.strip().splitlines()}
@@ -181,7 +184,7 @@ def schematic(name: str, path: str) -> None:
             elm.Line().up().toy(op.out)
 
 
-def main():
+def main(dark: bool = False):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -189,7 +192,11 @@ def main():
     L = laws()
     order = ["integrate", "delay", "lowpass", "highpass", "resonator", "differentiate"]
     f_task = np.linspace(0.05, 2.0, 160)                  # Hz in the task's units: the stimulus band
-    fig, axes = plt.subplots(2, 6, figsize=(17, 5.6), gridspec_kw={"height_ratios": [1.0, 1.0]})
+    if dark:
+        plt.style.use("dark_background")
+    fit_col = "white" if dark else "black"
+    fig, axes = plt.subplots(2, 6, figsize=(17, 5.6), gridspec_kw={"height_ratios": [1.0, 1.0]},
+                             facecolor="black" if dark else "white")
     report = []
     for c, name in enumerate(order):
         body, text = netlist(name, L[name])
@@ -198,19 +205,19 @@ def main():
         err = float(np.max(np.abs(Hc - Ht)) / np.max(np.abs(Ht)))
         report.append((name, text, err))
         open(os.path.join(OUT, f"law_{name}.cir"), "w").write(f"* exp18 law {name}: {text}\n{OPAMP}{body}")
-        png = os.path.join(OUT, f"law_{name}_schematic.png")
-        schematic(name, png)
+        png = os.path.join(OUT, f"law_{name}_schematic{'_dark' if dark else ''}.png")
+        schematic(name, png, dark)
         axes[0, c].imshow(plt.imread(png))
         axes[0, c].axis("off")
         axes[0, c].set_title(name, fontsize=10)
         ax = axes[1, c]
         if name == "delay":                           # an all-pass delay is flat in gain: its law is the PHASE
             ax.plot(f_task, np.degrees(np.unwrap(np.angle(Ht))), color="#2e8b4f", lw=2.4, label="target law")
-            ax.plot(f_task, np.degrees(np.unwrap(np.angle(Hc))), color="black", lw=1.0, label="ngspice circuit")
+            ax.plot(f_task, np.degrees(np.unwrap(np.angle(Hc))), color=fit_col, lw=1.0, label="ngspice circuit")
             ax.set_ylabel("phase (degrees)", fontsize=8)
         else:
             ax.loglog(f_task, np.abs(Ht), color="#2e8b4f", lw=2.4, label="target law")
-            ax.loglog(f_task, np.abs(Hc), color="black", lw=1.0, label="ngspice circuit")
+            ax.loglog(f_task, np.abs(Hc), color=fit_col, lw=1.0, label="ngspice circuit")
         ax.set_xlabel("task frequency (Hz)  [circuit: x1000]", fontsize=7)
         ax.tick_params(labelsize=7)
         ax.text(0.03, 0.04, f"max |dH| / max |H| = {err:.1e}", transform=ax.transAxes, fontsize=7)
@@ -218,11 +225,17 @@ def main():
             ax.set_ylabel("gain |H|", fontsize=8)
             ax.legend(fontsize=7, frameon=False)
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "six_laws_circuits.png"), dpi=130, bbox_inches="tight")
-    fig.savefig(os.path.join(OUT, "six_laws_circuits.pdf"), bbox_inches="tight")
+    if dark:
+        deck = os.path.join(ROOT, "experiments", "exp18_phase_modulation", "presentation", "figs")
+        fig.savefig(os.path.join(deck, "spice_six_circuits.png"), dpi=150, facecolor="black", bbox_inches="tight")
+        json.dump([{"law": n, "err": e} for n, _, e in report], open(os.path.join(deck, "spice_six_circuits.json"), "w"))
+    else:
+        fig.savefig(os.path.join(OUT, "six_laws_circuits.png"), dpi=130, bbox_inches="tight")
+        fig.savefig(os.path.join(OUT, "six_laws_circuits.pdf"), bbox_inches="tight")
     for name, text, err in report:
         print(f"{name:14s} {err:9.2e}   {text}")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(dark="--dark" in sys.argv)
