@@ -37,7 +37,7 @@ PAPERS = os.path.join(EXP, "papers")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
-HIDDEN = {"04_fig3d", "90_overview"}
+HIDDEN = {"04_fig3d", "90_overview", "b6_mask_rules"}   # b6_mask_rules: Cedric, 2026-10-04 "delete slide 127"
 HIDDEN_BATCHES = {"1", "2", "3"}  # Cedric, 2026-10-04: "comment batch 1 2 and 3 slides" (kept in slides/, out of the deck)
 HIDDEN_PAT = ("gb_ex_f4",)
 # batch 4's per-fish W = 0 slide and no-network-twin movie (Cedric, 2026-10-04: "put in comments slide W=0 and no_W"):
