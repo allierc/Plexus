@@ -910,3 +910,83 @@ def test_rate_decay_slows_growth_hyperbolically(tmp_path):
     plain = v0f_growth("rd0", {})
     slow = v0f_growth("rd1", {"rate_decay_T": 5.0})
     assert slow < plain
+
+
+def test_core_from_holds_each_interior_cell_its_first_volume(tmp_path):
+    """`core_from`: the interior's target is its first volume x (live cells now / live cells at the first call) --
+    unchanged at the same count, doubled when the count doubles, whatever the layer does; exclusive with core_alpha."""
+    from types import SimpleNamespace
+    from plexus.operators.vertex_ops import ApicoBasalContactShapeEnergy3D as Op
+    H, _ = _run(_spec(tmp_path, "cf", n_frames=0, hole=False, k=0.0, sense=False, gated=False))
+    m = H.level("vertex")._mesh
+    nv, nF = int(m["Nv"]), int(m["nF"])
+    x, sp = H.level("vertex").get("pos")[:nv], H.level("vertex").get("sep")[:nv]
+    es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
+    eo = torch.ones(es.shape[0])
+    occ = torch.zeros(100); occ[:40] = 1.0
+    icell = SimpleNamespace(occ=occ)
+    Hs = SimpleNamespace(frame=0, level=lambda name: icell if name == "icell" else None)
+    op = Op(dict(k_core=0.3, core_from="icell"))
+    mm = {}
+    V0 = op._core_target(Hs, mm, x, sp, es, et, ef, nF, eo)["V"]
+    Hs.frame = 7
+    x2 = x * 1.2                                           # the layer inflates; the target must not follow it
+    assert op._core_target(Hs, mm, x2, sp, es, et, ef, nF, eo)["V"] == pytest.approx(V0)
+    occ[40:80] = 1.0
+    assert op._core_target(Hs, mm, x2, sp, es, et, ef, nF, eo)["V"] == pytest.approx(2 * V0)
+    with pytest.raises(ValueError, match="core_from and core_alpha"):
+        Op(dict(k_core=0.3, core_from="icell", core_alpha=1.0))
+
+
+def _bare_cap_series(tmp_path, name, impl, n_frames=12, heal_extra=None):
+    """The membrane is stripped from a 25-degree cap about +x after frame 1 (nodes put dormant, as dead nodes are);
+    per frame, the live nodes inside that cap. No growth (the cells keep their size), a reserve of one slot per
+    sheet slot."""
+    sec = dict(_SECRETE, implementation=impl, heal_tau=3.0, **(heal_extra or {})) if impl == "heal" else dict(_SECRETE)
+    rec = []
+    cosc = math.cos(math.radians(25.0))
+
+    def on_frame(H, t, rec=rec):
+        lv = H.level("bm_node")
+        p = lv.get("pos")
+        c = p[H.membrane_alive].mean(0)
+        d = p - c
+        cap = (d[:, 0] / d.norm(dim=1).clamp_min(1e-9)) >= cosc
+        if int(t) == 1:
+            kill = cap & H.membrane_alive
+            al = H.membrane_alive.clone(); al[kill] = False; H.membrane_alive = al
+            oc = lv.occ.clone(); oc[kill] = 0.0; lv.occ = oc
+        rec.append(int((cap & H.membrane_alive).sum()))
+    sim = _spec(tmp_path, name, n_frames=n_frames, hole=False, sense=False, gated=False,
+                cm_extra=dict(k_height=30.0), n_bm=3000, seed_extra=dict(reserve=1.0),
+                op_extra={"bm_bond": dict(overdamped_gamma=1.0, k=0.1), "cell_grow": dict(rate=0.0)},
+                add_ops=[(sec, "bm_contact")])
+    MO.CONTACT_TRACE.clear()
+    MO.SECRETE_LIVE_TRACE.clear()
+    engine.run(sim, device="cpu", on_frame=on_frame)
+    return rec
+
+
+def test_secrete_heal_recovers_a_bare_patch_that_live_leaves_bare(tmp_path):
+    """`bm_secrete[heal]` lays nodes back on the cells the membrane left: a stripped cap regains all its nodes within
+    ~5 frames at heal_tau 3 (measured 69 -> 0 -> 73). `bm_secrete[live]` refills only the GLOBAL count, sparsest first
+    among cells that still hold membrane, so it closes the cap's rim and stalls once the count is met (measured
+    69 -> 0 -> 22)."""
+    live = _bare_cap_series(tmp_path, "bare_live", "live")
+    heal = _bare_cap_series(tmp_path, "bare_heal", "heal")
+    n0 = live[0]
+    assert n0 > 20, "the cap must hold nodes before it is stripped"
+    assert heal[-1] >= 0.9 * n0, heal
+    assert live[-1] <= 0.5 * n0, live
+
+
+def test_secrete_heal_max_over_bounds_the_count(tmp_path):
+    """The bounded heal -- `heal_frac` 0.5, `global_floor`, `max_over` 1.15: cells under half the setpoint are served
+    first, so the stripped cap regains at least 40 % of its nodes within 10 frames (`live`: 32 %, and only at its rim),
+    and the live count never exceeds 1.15 x the global setpoint n0 A / A0. Unbounded, the median setpoint keeps half
+    the cells "in deficit" for ever: R1 used all 120,000 slots by row 200 (Finding 187)."""
+    rec = _bare_cap_series(tmp_path, "bare_heal_cap", "heal",
+                           heal_extra=dict(max_over=1.15, heal_frac=0.5, global_floor=True))
+    assert rec[-1] >= 0.4 * rec[0], rec
+    over = [(n_live + add) / want for (_f, n_live, add, want, _A) in MO.SECRETE_LIVE_TRACE if add > 0]
+    assert over and max(over) <= 1.15 + 1e-3, over

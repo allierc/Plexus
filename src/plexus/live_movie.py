@@ -1396,6 +1396,7 @@ class LiveMovie:
         self._chain_update(H)
         self._spheres_update(H)
         self._also_update(H)
+        self._protein_insets_update(H)
         self._field_slice_update(H)
         self._field_iso_update(H)
         self._glyph_update(lvl)
@@ -1441,6 +1442,9 @@ class LiveMovie:
             # `colour_by` ALREADY CARRIES THE RANGE AND THE MAP -- `_rgb_field` builds it as
             # "<label> <range> (<cmap>)" -- so appending them here printed each of them twice.
             _lut = f"\ncolour = {self.colour_by}"
+        # `mesh_chem_label`: what the layer's face colour means, as a line of this header (the human, 2026-09-29)
+        if (self.style or {}).get("mesh_chem_label") and bool((self.style or {}).get("mesh_chem", True)):
+            _lut += f"\n{self.style['mesh_chem_label']}"
         # `nodes`, NOT `particles`. What is drawn is the members of a SET -- vertices of a mesh,
         # cells, neurons -- and only one substrate in this tree calls them particles.
         # "4,440 of 25,584 nodes" while a set is growing into its reservoir, and plainly
@@ -1532,15 +1536,17 @@ class LiveMovie:
         if q.count(":") != 2:
             return False
         _, name, block = q.split(":", 2)
+        blocks = [b for b in block.split("@") if b]                  # `total:<set>:<block>@<weight>`
         if name in getattr(H, "levels", {}):
             sch = getattr(H.level(name), "state_schema", None)
             try:
-                return sch is None or block in sch
+                return sch is None or all(b in sch for b in blocks)
             except TypeError:
                 return True
         m = getattr(lvl, "mesh", None)
         nF = int(m.get("nF", 0) or 0) if m is not None else 0
-        return bool(nF) and block in self._cell_cols(H, lvl, nF)
+        cc = self._cell_cols(H, lvl, nF) if nF else {}
+        return bool(nF) and all(b in cc for b in blocks)
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -1991,6 +1997,10 @@ class LiveMovie:
                                            y=float(_loc[1]) + float(_sz[1]) + 0.004,
                                            fs=int(cfg.get("value_font_size", 11))))
             self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
+                                 # `legend_frac` (default 0.03): the legend shows over the first 3 % of the run's
+                                 # frames only -- it is readable while the panel is still empty, and the curves
+                                 # it names then run under it (the human, 2026-09-29). 1.0 keeps it throughout.
+                                 "legend": bool(cfg.get("labels")), "legend_frac": float(cfg.get("legend_frac", 0.03)),
                                  "sd": bool(cfg.get("sd", q not in ("cells", "phase") and not str(q).startswith("species:")))
                                        or _clones is not None,
                                  "nsurv": None if _clones is None else _clones[2],
@@ -2055,6 +2065,10 @@ class LiveMovie:
                     [S, np.full((_want - S.shape[0],) + S.shape[1:], np.nan)], 0)
                 cv["ch"].x_axis.range = [0.0, float(S.shape[0] - 1) * getattr(self, "_curve_xs", 1.0)]
             t = min(int(tick), S.shape[0] - 1)
+            if cv.get("legend"):
+                _on = int(tick) <= max(1.0, cv["legend_frac"] * float(S.shape[0] - 1))
+                if bool(cv["ch"].legend_visible) != _on:
+                    cv["ch"].legend_visible = _on
             if cv.get("live") and H is not None:
                 # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
                 # BY NAME, NOT BY OBJECT: `engine.run` builds and seeds its OWN hierarchy, so a panel
@@ -3510,6 +3524,11 @@ class LiveMovie:
         if H is None:
             return None
         st = self.style or {}
+        # `mesh_chem: false` (default true): the layer keeps `mesh_color` even though its cells carry `chem` -- exp 11,
+        # 2026-09-29: `bm_sense` writes a membrane deficit into chem channel 0, and it painted those cells orange on
+        # the main view, a colour nobody had asked for and no label named
+        if not bool(st.get("mesh_chem", True)):
+            return None
         v = None
         try:
             v = H.level(str(st.get("mesh_chem_set", "cell"))).get("chem")
@@ -5320,7 +5339,26 @@ class LiveMovie:
         st = self.style or {}
         fixed = (st.get("also_colors") or {}).get(nm) if isinstance(st.get("also_colors"), dict) else None
         cols = None
-        if fixed is not None:
+        # `color_block.<set>` ON AN `also_sets` SET (exp 11, 2026-09-29: the membrane's mass or bonds, `bm_M`, `bond_P`):
+        # the set's dots -- and its `also_mesh` wireframe, which takes these colours per node -- through the block's
+        # colormap at its fixed range, instead of one flat `also_colors` hue. Absent, nothing changes.
+        _cb = self._block_cfg(nm)
+        if _cb is not None:
+            try:
+                from matplotlib import colormaps
+                _v, _lo, _hi, _cmap, _ = self._block_values(H, nm, _cb)
+                _v = np.asarray(_v, float)[:n]
+                _t = np.clip((_v - _lo) / max(_hi - _lo, 1e-12), 0.0, 1.0)
+                _t = np.where(np.isfinite(_t), _t, 0.0)
+                cols = colormaps[str(_cmap or "magma")](_t)[:, :3]
+            except Exception as e:                                   # noqa: BLE001 -- the flat hue, loudly
+                if not getattr(self, f"_cb_warn_{nm}", False):
+                    setattr(self, f"_cb_warn_{nm}", True)
+                    print(f"[live-movie] color_block.{nm} on also_sets not drawn ({type(e).__name__}: {e})", flush=True)
+                cols = None
+        if cols is not None:
+            pass
+        elif fixed is not None:
             cols = np.tile(np.asarray(to_rgb(fixed), float), (n, 1))
         else:
             try:
@@ -5377,6 +5415,15 @@ class LiveMovie:
             self._also.append((nm, pd))
             print(f"[live-movie] also_sets: {nm!r} drawn over the subject, {P.shape[0]:,} nodes, "
                   f"{_ps:g} px", flush=True)
+        # `plotting.protein_bars` (exp 11, 2026-09-29): COLOUR BARS for what the picture is painted with -- the
+        # layer's `mesh_color_by` (when `mesh_color_scale: continuous` and `mesh_color_range` are given; its title
+        # `mesh_color_label`) and every `color_block` set among `also_sets` (its `label`) -- side by side at the
+        # bottom right of the scene, clear of the section inset at the bottom left. Opt-in: absent, no bar.
+        if (self.style or {}).get("protein_bars"):
+            try:
+                self._protein_bars(H)
+            except Exception as e:                                   # noqa: BLE001 -- not the movie
+                print(f"[live-movie] protein_bars not drawn ({type(e).__name__}: {e})", flush=True)
         # `plotting.also_mesh: [set, ...]` -- THE SET DRAWN AS A SHEET, not only as dots (exp 11, 2026-09-27: the
         # basement membrane). Each frame its LIVE nodes are triangulated by the convex hull of their directions from
         # their own centroid -- a spherical Delaunay, right for a star-shaped sheet such as a membrane around a
@@ -5396,9 +5443,15 @@ class LiveMovie:
                 mpd = self.pv.PolyData(P, faces)
                 from matplotlib.colors import to_rgb
                 col = ((self.style or {}).get("also_colors") or {}).get(str(nm), "#ffffff")
-                self.p.add_mesh(mpd, style="wireframe", color=to_rgb(col), lighting=False,
-                                line_width=float((self.style or {}).get("also_mesh_line_width", 1.0)),
-                                render_lines_as_tubes=False)
+                _lw = float((self.style or {}).get("also_mesh_line_width", 1.0))
+                _op = float((self.style or {}).get("also_mesh_opacity", 1.0))
+                if self._block_cfg(str(nm)) is not None:        # the wireframe in the block's colours, per node
+                    mpd.point_data["rgb"] = self._also_rgb(H, str(nm), lv, P.shape[0], live)
+                    self.p.add_mesh(mpd, style="wireframe", scalars="rgb", rgb=True, lighting=False,
+                                    line_width=_lw, opacity=_op, render_lines_as_tubes=False)
+                else:
+                    self.p.add_mesh(mpd, style="wireframe", color=to_rgb(col), lighting=False,
+                                    line_width=_lw, opacity=_op, render_lines_as_tubes=False)
                 self._also_mesh.append((str(nm), mpd))
                 print(f"[live-movie] also_mesh: {nm!r} drawn as a hull-triangulated wireframe", flush=True)
             except Exception as e:                                   # noqa: BLE001 -- not the movie
@@ -5506,6 +5559,229 @@ class LiveMovie:
         tri = tri[e.max(1) <= 3.0 * float(np.median(e))]
         return np.hstack([np.full((len(tri), 1), 3), tri]).astype(np.int64).ravel()
 
+    # ---- `plotting.protein_insets`: SMALL 3D MAPS OF ONE BLOCK EACH, beside the section inset ------------------
+    #
+    #     protein_insets:
+    #       - {what: mesh, block: itg_B, cmap: viridis, label: bound integrin}     # the layer's cells
+    #       - {what: bm_node, block: bm_M, cmap: magma, label: BM mass}            # a set's elements, as points
+    #     protein_inset_size: 0.215     # each inset's height, a fraction of the window's
+    #
+    # exp 11, 2026-09-29, the human: the proteins painted on the main view saturated (a fixed range) and the
+    # membrane's mass could not be read on the spheroid, "two inlets ... to see separately bound integrin and BM
+    # mass 3D maps, no colorbar". Each inset is its own renderer on the MAIN CAMERA (it turns with the scene), a
+    # square viewport in a row just right of the section inset, a label inside its top edge and no bar. `range: auto`
+    # (the default) is the block's 2nd-98th percentile over EVERY recorded row on a replay (positive values; the
+    # set's live elements for a set), else the first frame's, then fixed: one colour, one number, all movie. A
+    # quantity with an absolute meaning declares `range: [lo, hi]` instead, so its colour compares ACROSS runs: the
+    # membrane's mass, 1 at rest, is [0, 2] in exp 11 (a per-run range had nothing to spread where it never moves).
+    def _protein_insets_update(self, H):
+        cfgs = (self.style or {}).get("protein_insets") or []
+        if not cfgs:
+            return
+        try:
+            if getattr(self, "_pins", None) is None:
+                self._pins = []
+                s = float((self.style or {}).get("protein_inset_size", 0.17))
+                csl = ((self.style or {}).get("cross_section") or {}).get("loc") or (0.015, 0.03)
+                csh = float((self.style or {}).get("cross_section_height", 0.26))
+                x_first = float(csl[0]) + csh / self.aspect + 0.008
+                for k, cfg in enumerate(cfgs):
+                    # IN A ROW along the section inset's bottom edge, not a column (the human, 2026-09-29): side
+                    # by side the two maps are read together, at the same height as the section
+                    x0 = x_first + k * (s / self.aspect + 0.008)
+                    y0 = float(csl[1])
+                    ren = self.pv.Renderer(self.p, border=True, border_color="#9a9a9a", border_width=1.0)
+                    ren.SetViewport(x0, y0, x0 + s / self.aspect, y0 + s)
+                    ren.set_background("black")
+                    # ITS OWN CAMERA (`_pin_camera`): the main view's direction, centred on the inset's object
+                    from vtkmodules.vtkRenderingCore import vtkCamera
+                    ren.SetActiveCamera(vtkCamera())
+                    self.p.ren_win.AddRenderer(ren)
+                    # THE TITLE ABOVE THE INSET, on the main scene: inside it, the inset's own renderer painted over it
+                    _t = str(cfg.get("label", cfg.get("block", "")))
+                    if len(_t) > 18 and " " in _t:            # two lines, split at the space nearest the middle
+                        _sp = [i for i, ch in enumerate(_t) if ch == " "]
+                        _i = min(_sp, key=lambda i: abs(i - len(_t) / 2))
+                        _t = _t[:_i] + "\n" + _t[_i + 1:]
+                    self.p.add_text(_t, position=(x0, y0 + s + 0.006),
+                                    viewport=True, font_size=int((self.style or {}).get("protein_inset_font_size", 11)),
+                                    color=self._fg, name=f"pin_label_{k}")
+                    self._pins.append({"cfg": dict(cfg), "ren": ren, "pd": None, "rng": None})
+            for pin in self._pins:
+                self._pin_frame(H, pin)
+                self._pin_camera(pin)
+        except Exception as e:                                       # noqa: BLE001 -- not the movie
+            if not getattr(self, "_pins_warned", False):
+                self._pins_warned = True
+                print(f"[live-movie] protein_insets not drawn ({type(e).__name__}: {e})", flush=True)
+
+    def _pin_camera(self, pin):
+        """THE MAIN VIEW'S DIRECTION, THE INSET'S OWN FRAMING (the human, 2026-09-29: "the spheroid is not well
+        centred in the small inlet"): looking along the main camera, centred on the inset's own object and fitted
+        to its bounds every frame, since it grows. A copy of the main camera kept the object where it sits in the
+        wide main view, off the side of a square inset. `protein_inset_zoom` (default 1.15) tightens the fit."""
+        pd = pin.get("pd")
+        if pd is None or pd.n_points == 0:
+            return
+        mc = self.p.renderer.GetActiveCamera()
+        cam = pin["ren"].GetActiveCamera()
+        b = pd.bounds
+        c = np.array([(b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2])
+        d = np.asarray(mc.GetPosition(), float) - np.asarray(mc.GetFocalPoint(), float)
+        cam.SetFocalPoint(*c)
+        cam.SetPosition(*(c + d))
+        cam.SetViewUp(*mc.GetViewUp())
+        cam.SetViewAngle(mc.GetViewAngle())
+        pin["ren"].ResetCamera(b)
+        cam.Zoom(float((self.style or {}).get("protein_inset_zoom", 1.15)))
+        pin["ren"].ResetCameraClippingRange()
+
+    @staticmethod
+    def _pin_actor(ren, pd, cells, point_size=3.0):
+        """A plain VTK actor on the inset renderer (pyvista's Renderer has no add_mesh): the `pin_rgb` array
+        drawn as colours directly, unlit, per cell or per point."""
+        from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper
+        mp = vtkPolyDataMapper()
+        mp.SetInputData(pd)
+        mp.SetColorModeToDirectScalars()
+        if cells:
+            mp.SetScalarModeToUseCellFieldData()
+        else:
+            mp.SetScalarModeToUsePointFieldData()
+        mp.SelectColorArray("pin_rgb")
+        mp.ScalarVisibilityOn()
+        a = vtkActor()
+        a.SetMapper(mp)
+        a.GetProperty().LightingOff()
+        a.GetProperty().SetPointSize(float(point_size))
+        ren.AddActor(a)
+        return a
+
+    def _pin_range(self, H, cfg, now):
+        r = cfg.get("range", "auto")
+        if isinstance(r, (list, tuple)) and len(r) == 2:
+            return float(r[0]), float(r[1])
+        allv = None
+        what, b = str(cfg.get("what", "mesh")), str(cfg["block"])
+        try:
+            if what == "mesh":
+                for name, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                    cb = getattr(H.level(name), "_cell_blocks", {}) or {}
+                    if b in cb:
+                        allv = np.asarray(cb[b], np.float64).reshape(-1)
+                        break
+            else:
+                lv = H.level(what)
+                ser = (getattr(lv, "_blocks", {}) or {}).get(b)
+                if ser is not None:
+                    v = np.asarray(ser, np.float64).reshape(ser.shape[0], ser.shape[1], -1)[:, :, 0]
+                    oc = getattr(lv, "_occ", None)
+                    if oc is not None:
+                        oc = oc.detach().cpu().numpy() if hasattr(oc, "detach") else np.asarray(oc)
+                        v = v[np.asarray(oc).reshape(v.shape) > 0.5]
+                    allv = v.reshape(-1)
+        except Exception:                                            # noqa: BLE001 -- the frame's own range
+            allv = None
+        pool = allv if allv is not None else np.asarray(now, np.float64)
+        pool = pool[np.isfinite(pool) & (pool > 0)]
+        if not pool.size:
+            return 0.0, 1.0
+        lo, hi = float(np.percentile(pool, 2)), float(np.percentile(pool, 98))
+        # A BLOCK THAT DOES NOT VARY (the membrane's mass at its rest point, 1 everywhere) sat at one end of the map
+        # -- black on black for magma. It is drawn mid-map instead, on a range from 0 to twice its value.
+        if hi - lo < 0.05 * max(abs(hi), 1e-12):
+            mid = 0.5 * (lo + hi)
+            lo, hi = 0.0, (2.0 * mid if mid > 0 else 1.0)
+        return lo, hi
+
+    def _pin_frame(self, H, pin):
+        from matplotlib import colormaps
+        cfg, ren = pin["cfg"], pin["ren"]
+        what, b = str(cfg.get("what", "mesh")), str(cfg["block"])
+        cmap = colormaps[str(cfg.get("cmap", "viridis"))]
+        if what == "mesh":
+            got = None
+            for name, _nv, mpd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                lvl = H.level(name)
+                m = getattr(lvl, "mesh", None)
+                if m is None:
+                    continue
+                cc = self._cell_cols(H, lvl, int(m["nF"]))
+                if b in cc:
+                    _v = cc[b]
+                    _v = _v.detach().cpu().numpy() if hasattr(_v, "detach") else _v   # live: a CUDA tensor
+                    got = (mpd, np.asarray(_v, np.float64))
+                    break
+            if got is None:
+                return
+            mpd, v = got
+            if pin["rng"] is None:
+                pin["rng"] = self._pin_range(H, cfg, v)
+                print(f"[live-movie] protein_insets: {cfg.get('label', b)} ({b}) coloured over [{pin['rng'][0]:.4g}, "
+                      f"{pin['rng'][1]:.4g}] ({'declared' if isinstance(cfg.get('range'), (list, tuple)) else 'the whole run, 2nd-98th percentile'})", flush=True)
+            lo, hi = pin["rng"]
+            if pin["pd"] is None:
+                pin["pd"] = self.pv.PolyData()
+            pd = pin["pd"]
+            pd.copy_from(mpd)
+            t = np.clip((v[: pd.n_cells] - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+            rgb = (cmap(np.where(np.isfinite(t), t, 0.0))[:, :3] * 255).astype(np.uint8)
+            if rgb.shape[0] < pd.n_cells:
+                rgb = np.vstack([rgb, np.zeros((pd.n_cells - rgb.shape[0], 3), np.uint8)])
+            pd.cell_data["pin_rgb"] = rgb
+            pd.Modified()
+            if not pin.get("actor"):
+                pin["actor"] = self._pin_actor(ren, pd, cells=True)
+        else:
+            lv = H.level(what)
+            P, live = self._also_xyz(lv)
+            if P is None:
+                return
+            vals = lv.get(b)
+            vals = np.asarray(vals.detach().cpu().numpy() if hasattr(vals, "detach") else vals, np.float64).reshape(P.shape[0], -1)[:, 0]
+            keep = live if live is not None else np.ones(P.shape[0], bool)
+            keep = keep & np.isfinite(P).all(1)
+            if cfg.get("skip_zero"):                  # e.g. a membrane node laid this frame, its mass not yet set (bm_mass
+                keep = keep & (vals != 0)             # runs first next frame): drawn as a black speck, it is not a value
+            if pin["rng"] is None:
+                pin["rng"] = self._pin_range(H, cfg, vals[keep])
+                print(f"[live-movie] protein_insets: {cfg.get('label', b)} ({b}) coloured over [{pin['rng'][0]:.4g}, "
+                      f"{pin['rng'][1]:.4g}] ({'declared' if isinstance(cfg.get('range'), (list, tuple)) else 'the whole run, 2nd-98th percentile'})", flush=True)
+            lo, hi = pin["rng"]
+            t = np.clip((vals[keep] - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+            rgb = (cmap(t)[:, :3] * 255).astype(np.uint8)
+            pts = self.pv.PolyData(P[keep].astype(np.float32))
+            pts.point_data["pin_rgb"] = rgb
+            if pin["pd"] is None:
+                pin["pd"] = self.pv.PolyData()
+                pin["pd"].copy_from(pts)
+                pin["actor"] = self._pin_actor(ren, pin["pd"], cells=False, point_size=float(cfg.get("point_size", 3.0)))
+            else:
+                pin["pd"].copy_from(pts)
+            pin["pd"].Modified()
+
+    def _protein_bars(self, H):
+        st = self.style or {}
+        bars = []
+        if str(st.get("mesh_color_scale", "")).lower() == "continuous" and st.get("mesh_color_range"):
+            lo, hi = (float(x) for x in st["mesh_color_range"])
+            bars.append((str(st.get("mesh_color_label", st.get("mesh_color_by", ""))), str(st.get("mesh_cmap", "viridis")), lo, hi))
+        for nm in self._also_names(H):
+            cb = self._block_cfg(nm)
+            if cb is not None and cb.get("range"):
+                lo, hi = (float(x) for x in cb["range"])
+                bars.append((str(cb.get("label", cb["block"])), str(cb.get("cmap", "magma")), lo, hi))
+        x0 = float(st.get("protein_bars_x", 0.60))
+        for k, (title, cmap, lo, hi) in enumerate(bars):
+            dummy = self.pv.PolyData(np.zeros((2, 3)))
+            dummy["v"] = np.array([lo, hi], np.float32)
+            args = {**self._legend_args(title), "position_x": x0 + 0.075 * k, "position_y": 0.06, "height": 0.25,
+                    "title_font_size": int(st.get("protein_bars_font_size", 16)), "label_font_size": int(st.get("protein_bars_font_size", 16)) - 2}
+            self.p.add_mesh(dummy, scalars="v", cmap=cmap, clim=[lo, hi], opacity=0.0, show_scalar_bar=True,
+                            scalar_bar_args=args)
+        if bars:
+            print(f"[live-movie] protein_bars: " + ", ".join(f"{t} [{lo:g}, {hi:g}] {c}" for t, c, lo, hi in bars), flush=True)
+
     def _also_update(self, H):
         for nm, mpd in getattr(self, "_also_mesh", []) or []:
             try:
@@ -5522,6 +5798,8 @@ class LiveMovie:
                         keep = ((P[tri].mean(1) - ctr) @ n) <= 0.0
                         faces = np.hstack([np.full((int(keep.sum()), 1), 3), tri[keep]]).astype(np.int64).ravel()
                     mpd.copy_from(self.pv.PolyData(P, faces))
+                    if self._block_cfg(nm) is not None:
+                        mpd.point_data["rgb"] = self._also_rgb(H, nm, H.level(nm), P.shape[0], live)
             except Exception as e:                                   # noqa: BLE001
                 print(f"[live-movie] also_mesh: {nm!r} not updated ({type(e).__name__}: {e})", flush=True)
         if getattr(self, "_iso", None) is not None:

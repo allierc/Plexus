@@ -531,6 +531,9 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
         # its own being registered for each -- the block IS the quantity. Bare units; a spec puts
         # a `factor:` on the curve to draw it in mV or in protons.
         _, name, block = q.split(":", 2)
+        # `total:<set>:<block>@<weight>` -- a density times the element's own size (`total:cell:itg_A@area`: an
+        # integrin density per unit area, summed as an AMOUNT)
+        block, _, wblock = block.partition("@")
         if name not in getattr(H, "levels", {}):
             # THE CELL SET ON A REPLAY IS NOT A LEVEL OF ITS OWN: its width-1 blocks reach the renderer as
             # the mesh's cell columns (`cell_cols`, as `phase` does), one value per live face.
@@ -540,6 +543,10 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
             if block not in _cc:
                 return row
             v = np.asarray(_np(_cc[block]), float).reshape(-1)[:_nF]
+            if wblock:
+                if wblock not in _cc:
+                    return row
+                v = v * np.asarray(_np(_cc[wblock]), float).reshape(-1)[:_nF]
             if q.startswith("total:"):
                 row[0] = (float(np.nansum(v)), 0.0)
             elif v.size:
@@ -557,6 +564,7 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
                 lv.t = int(getattr(lvl, "t", _t0))
             try:
                 val = _np(lv.get(block))
+                wval = _np(lv.get(wblock)) if wblock else None
             finally:
                 if _t0 is not None and hasattr(lv, "_pos") and lv is not lvl:
                     lv.t = _t0
@@ -571,6 +579,10 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
             occ = getattr(lv, "occ", None)
         live = _np(occ).astype(bool) if occ is not None else np.ones(val.shape[0], bool)
         v = np.asarray(val, float)[live][:, 0] if val.ndim == 2 else np.asarray(val, float)[live]
+        if wval is not None:
+            if wval.ndim == 3:
+                wval = wval[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
+            v = v * (np.asarray(wval, float)[live][:, 0] if wval.ndim == 2 else np.asarray(wval, float)[live])
         if q.startswith("total:"):
             row[0] = (float(np.nansum(v)), 0.0)
         elif v.size:

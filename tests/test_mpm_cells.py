@@ -268,6 +268,25 @@ def test_mpm_division_halves_a_body_into_two_round_daughters():
         assert np.sqrt(w[2] / w[0]) < 1.6
 
 
+def test_mpm_division_daughter_frac_one_keeps_the_cell_size():
+    """PLANTED: `daughter_frac` 1.0 -- each daughter holds its MOTHER's whole volume (Wang's constant cell size),
+    so the interior's material doubles with its count; the default (0.5) is the halving test above."""
+    text = _spec(n=8, frames=1, rec=2, sp=4.0, f=0.0, grid=", per_parent: icell, cell_box: 4.7", ng=10)
+    text = text.replace("  icell:\n    n: 8\n", "  icell:\n    n: 8\n    buffer: 16\n")
+    text = text.replace("- {op: aggregate_centroid, at: icell, child: ipt}",
+                        "- {op: aggregate_centroid, at: icell, child: ipt}\n"
+                        "- {op: cell_divide, model: mpm, at: icell, points: ipt, p_div: 1.0, max_per_call: 8, seed: 2, "
+                        "daughter_frac: 1.0}")
+    text = text.replace("- aggregate_centroid\n", "- aggregate_centroid\n- cell_divide\n")
+    H, a = _run(text)
+    C, P = H.level("icell"), H.level("ipt")
+    live = (C.occ > 0.5).cpu().numpy()
+    assert live.sum() == 16
+    vol = P.p_vol.cpu().numpy().reshape(16, -1)[live].sum(1)
+    V0 = 4.0 / 3.0 * np.pi * 0.55 ** 3
+    assert np.allclose(vol, V0, rtol=0.05), (vol, V0)
+
+
 def test_wake_and_sleep_a_body():
     """PLANTED: `wake_mpm_body` puts a dormant cell's whole block live as a ball of the given volume at
     the given centre; `sleep_mpm_body` puts it back to the dormant pool."""

@@ -45,3 +45,12 @@ def test_total_on_the_cell_set_reads_the_mesh_cell_columns():
     assert tuple(curve_row(H, lvl, "total:cell:itg_A", None, 1, cell_cols)[0]) == (4.0, 0.0)
     assert np.isclose(curve_row(H, lvl, "block:cell:itg_A", None, 1, cell_cols)[0, 0], 4.0 / 3)
     assert np.isnan(curve_row(H, lvl, "total:cell:missing", None, 1, cell_cols)[0, 0])
+
+
+def test_total_weighted_by_a_second_block_is_an_amount():
+    class Mesh:
+        mesh = {"nF": 2}
+    cols = {"itg_A": np.array([0.5, 2.0]), "area": np.array([4.0, 1.0])}
+    H = _H({})
+    row = curve_row(H, Mesh(), "total:cell:itg_A@area", None, 1, lambda H_, l_, nF: {k: v[:nF] for k, v in cols.items()})
+    assert tuple(row[0]) == (4.0, 0.0)

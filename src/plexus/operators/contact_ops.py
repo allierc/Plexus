@@ -1040,6 +1040,13 @@ class BMSenseLive(BMSense3D):
         self.sharp = float(params.get("sharp", 1.0))
         self.chan = int(params.get("chan", 0))
         self.receptor = float(params.get("receptor", 1.0))
+        # `source: matrix` (default `nodes`, the membrane's node density `bm_ligand`; exp 11 Phase 3 B6, 2026-09-29):
+        # read the MATTER a cell stands on instead -- `bm_clutch`'s covered fraction x the mass of the nodes it
+        # touches (`m["clutch_matrix"]`) -- so a membrane the protease has thinned reads as a deficit even where
+        # `bm_secrete` has kept its node density even. Needs `bm_clutch` earlier in the same frame.
+        self.source = str(params.get("source", "nodes")).lower()
+        if self.source not in ("nodes", "matrix"):
+            raise ValueError(f"bm_sense[live]: source is nodes or matrix, got {self.source!r}")
         self._said = False
         self._warned = False
 
@@ -1052,7 +1059,8 @@ class BMSenseLive(BMSense3D):
         nF = int(m["nF"])
         f = getattr(H, "frame", None)
         f = -1 if f is None else int(f)
-        rho, fr = m.get("bm_ligand"), m.get("bm_ligand_frame")
+        rho, fr = ((m.get("clutch_matrix"), m.get("clutch_matrix_frame")) if self.source == "matrix"
+                   else (m.get("bm_ligand"), m.get("bm_ligand_frame")))
         if not torch.is_tensor(rho) or fr is None or f - int(fr) not in (0, 1) or rho.shape[0] != nF:
             if not self._warned and f > 1:
                 self._warned = True

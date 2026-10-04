@@ -718,6 +718,12 @@ class BasementMembraneBond(Lateral):
         self.snapshot_every = int(params.get("snapshot_every", 20))
         self.rebond_every = int(params.get("rebond_every", 20))   # ongoing crosslinking
         self.aniso = float(params.get("aniso", 1.0))          # circumferential : meridional stiffness
+        # `k_block` (default none): each bond's stiffness scaled by the mean of a width-1 block of its two
+        # nodes -- the membrane's own mass `bm_M` (exp 11 Phase 3 B3, 2026-09-29), so a thicker membrane is a
+        # stiffer one (collagen IV is its stiffness, Topfer 2022) -- capped at `k_block_cap` (default 3.0)
+        # times k, and the explicit-integration guard below is checked at the cap
+        self.k_block = params.get("k_block", None)
+        self.k_block_cap = float(params.get("k_block_cap", 3.0))
         self.record_hoop = bool(params.get("record_hoop", False))
         self.centre_t = torch.tensor([float(v) for v in params.get("centre", [0.5, 0.5, 0.5])])
         # the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it
@@ -772,9 +778,10 @@ class BasementMembraneBond(Lateral):
             k_max = (2.0 * self.gamma / dt_frame - self.k_adh_hint) / z
         else:
             k_max = (1.0 / dt_frame ** 2 - self.k_adh_hint) / z
-        if self.k > k_max:
+        _k_top = self.k * (self.k_block_cap if self.k_block else 1.0)
+        if _k_top > k_max:
             raise RuntimeError(
-                f"bm_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "
+                f"bm_bond: k = {_k_top:.3g} (k x the k_block cap when a block scales it) exceeds the explicit-integration ceiling "
                 f"{k_max:.3g} for graph mode at dt = {dt_frame:g} with {bonds_per_node:.1f} bonds per "
                 f"node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "
                 f"cannot carry the stiffness the MPM path could: this run would return an infinite "
@@ -987,6 +994,28 @@ class BasementMembraneBond(Lateral):
             par = par / sin_th.clamp_min(1e-12)
             circ = ((d / L[:, None]) * par).sum(1).abs() * sin_th[:, 0]
             kk = self.k * (1.0 + (self.aniso - 1.0) * circ)
+        if self.k_block:
+            if self.k_block not in lvl.state_schema:
+                raise ValueError(f"bm_bond: k_block {self.k_block!r} is not a block of {self.at!r}")
+            _mb = lvl.get(self.k_block)[:, 0]
+            kk_base = kk
+            kk = kk * (0.5 * (_mb[self.i] + _mb[self.j])).clamp(0.0, self.k_block_cap)
+            # THE NODE'S OWN CEILING (exp 11 Finding 149): an overdamped explicit node is stable while
+            # deg_n k + k_contact < 2 gamma / dt, and the DEGREE is the node's, not the mean -- secretion keeps
+            # bonding new nodes to old ones, and at 2x stiffness a node with 12 bonds (12 x 0.2 + 0.5 = 2.9) flung
+            # itself to 1e19 at frame 156 of BB-94 while the mean (6.4) passed the guard. The scaled stiffness
+            # of a bond is held to 0.9 of what BOTH its nodes can carry; never below the base k, so a run at mass 1
+            # is unchanged; the share of bonds held is `H.bm_k_capped_frac`.
+            if self.gamma > 0:
+                _dtf = float(getattr(H, "dt", 1.0) or 1.0)
+                _ones = torch.ones(int(self.alive.sum()), device=dev, dtype=dt_)
+                _deg = torch.zeros(pos.shape[0], device=dev, dtype=dt_)
+                _deg.index_add_(0, self.i[self.alive], _ones).index_add_(0, self.j[self.alive], _ones)
+                _kn = 0.9 * (2.0 * self.gamma / _dtf - self.k_adh_hint) / _deg.clamp_min(1.0)
+                _lim = torch.maximum(torch.minimum(_kn[self.i], _kn[self.j]),
+                                     kk_base if torch.is_tensor(kk_base) else torch.full_like(kk, float(kk_base)))
+                H.bm_k_capped_frac = float(((kk > _lim) & self.alive).sum()) / max(int(self.alive.sum()), 1)
+                kk = torch.minimum(kk, _lim)
         f = (kk * (L - self.rest) * self.alive.to(dt_))[:, None] * (d / L[:, None])
         # the sheet's own hoop tension, by direction -- this is what a corset would press with, and it is
         # what the growth gate can read in the next pass. Without it the corset cannot reach the tissue.
@@ -1502,6 +1531,16 @@ class BasementMembraneRemodel(Lateral):
         self.cap = float(params.get("cap", 0.02))
         self.target = str(params.get("target", "own")).lower()    # "own" | "mesh" | "fixed"
         self.mesh_w = float(params.get("mesh_w", 1.0))            # how far toward the common spacing
+        # `tau_block` (default none; exp 11 Phase 3 B6e, 2026-09-29): each bond's turnover time scaled by the mean of
+        # a width-1 block of its two nodes -- the membrane's mass `bm_M` -- raised to `tau_power` (default 1),
+        # clipped to [`tau_min_frac`, `tau_max_frac`] (0.1, 10) of tau. A membrane the protease has thinned FORGETS
+        # ITS STRAIN FASTER: under a long base tau the sheet holds the tissue, and yields where it is cut
+        # (Villeneuve 2024: proteolytic softening releases pressure; Harunaga 2014: the tip's distensibility needs
+        # protease). Absent, every bond keeps the one tau.
+        self.tau_block = params.get("tau_block", None)
+        self.tau_power = float(params.get("tau_power", 1.0))
+        self.tau_min_frac = float(params.get("tau_min_frac", 0.1))
+        self.tau_max_frac = float(params.get("tau_max_frac", 10.0))
         lst = params.get("l_star", 0.0)
         self._l_star = float(lst) if lst else None                # None = freeze it from frame 0
         self._said = False
@@ -1549,7 +1588,14 @@ class BasementMembraneRemodel(Lateral):
             tgt = (1.0 - self.mesh_w) * L + self.mesh_w * l_star
         else:
             tgt = L
-        d = ((tgt - rest) / max(self.tau, 1e-9)).clamp(-self.cap * rest, self.cap * rest)
+        tau = max(self.tau, 1e-9)
+        if self.tau_block:
+            if self.tau_block not in lvl.state_schema:
+                raise ValueError(f"bm_remodel: tau_block {self.tau_block!r} is not a block of {self.at!r}")
+            _mb = lvl.get(self.tau_block)[:, 0].to(rest.dtype)
+            _m = (0.5 * (_mb[i] + _mb[j])).clamp_min(1e-6)
+            tau = (self.tau * _m ** self.tau_power).clamp(self.tau_min_frac * self.tau, self.tau_max_frac * self.tau)
+        d = ((tgt - rest) / tau).clamp(-self.cap * rest, self.cap * rest)
         rest += d * alive.to(rest.dtype)
         if not self._said:
             print(f"[bm_remodel] crosslink turnover tau={self.tau} frames "
@@ -2597,6 +2643,18 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
         self._n0 = self._a0 = self._lstar = self._farea = self._spent = None
         self._said_spent = False
 
+    def _count(self, want, n_live, lig, farea):
+        """How many nodes to lay this call: up to the areal setpoint `want`, at most `rate` x n_live."""
+        return min(want - n_live, int(math.ceil(self.rate * n_live)))
+
+    def _weights(self, gain, lig, farea):
+        """Per cell, its share of the new nodes: the basal area it gained, if it holds membrane (else its area)."""
+        bound = (lig > 0).to(farea.dtype)
+        w = gain * bound
+        if float(w.sum()) <= 0:
+            w = farea * bound
+        return w
+
     def _onto(self, M, c, y):
         """y moved along the nearest face's outward normal to the basal surface + offset; found [n]."""
         found, _, _, nh, gap = _nearest_faces(M, c, y)
@@ -2658,7 +2716,7 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
         k_ = min(prev.numel(), nF)
         gain[:k_] = (farea[:k_] - prev[:k_]).clamp_min(0.0)
         want = int(round(self._n0 * A / max(self._a0, 1e-30)))
-        add = min(want - n_live, int(math.ceil(self.rate * n_live)))
+        add = self._count(want, n_live, lig.to(dev), farea)
         if add <= 0:
             SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
             return {}
@@ -2684,11 +2742,8 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
             return {}
         add = int(slots.numel())
 
-        # WHO: cells that grew and hold membrane
-        bound = lig.to(dev) > 0
-        w = gain * bound.to(dt_)
-        if float(w.sum()) <= 0:
-            w = farea * bound.to(dt_)
+        # WHO: cells that grew and hold membrane (`_weights`; a variant may choose otherwise)
+        w = self._weights(gain, lig.to(dev), farea)
         if float(w.sum()) <= 0:
             SECRETE_LIVE_TRACE.append((f, n_live, 0, want, A))
             return {}
@@ -2769,6 +2824,76 @@ class BasementMembraneSecreteLive(BasementMembraneSecrete):
 
 # Per call of `bm_secrete[live]`: (frame, live nodes before, nodes added, n_want, basal area A_b).
 SECRETE_LIVE_TRACE: list = []
+
+
+@register_operator("bm_secrete", implementation="heal", family="population", set="particle",
+                   kind="structural",
+                   equation=r"""$$d_f=\max\big(0,\ \rho^\ast-\rho_f\big)\,a_f,\qquad \Delta n=\min\Big(\big\lceil \textstyle\sum_f d_f/\tau_h\big\rceil,\ \lceil r\,n_{\rm live}\rceil\Big)$$""")
+class BasementMembraneSecreteHeal(BasementMembraneSecreteLive):
+    """`bm_secrete[live]` with a LOCAL setpoint: the membrane re-covers the cells it left, within `heal_tau` frames.
+
+    basement_membrane_node -> basement_membrane_node: as `bm_secrete[live]` (reserve slots only, sparsest first,
+    never in a declared hole), but WHO secretes and HOW MUCH follow each cell's own deficit:
+
+        rho*   the median bound density `m["bm_ligand"]` (nodes within the contact band per unit basal area) at the
+               first call -- the density the sheet was laid at, counted the way `bm_contact[live]` counts it
+        d_f    = max(0, rho* - rho_f) a_f      cell f's missing nodes, a_f its basal area; a BARE cell (rho_f 0) too
+        add    = min(ceil(sum_f d_f / heal_tau), ceil(rate n_live))
+        w_f    = d_f                            the new nodes land on the cells that lack them
+
+    `bm_secrete[live]` holds the GLOBAL count n0 A / A0 and lays nodes only under cells that grew AND already hold
+    membrane, so a patch the membrane has left never gets it back while the count is met by nodes crowded elsewhere:
+    exp 11 run 460 (mc_W3_b1block) held 16.2-16.5 nodes per unit basal area over the whole run while the median
+    density near a cell fell 15 -> 8.9 and 45 cells had no node within 10 um by row 140 -- the branches ran bare. Here
+    the epithelium keeps depositing where its own basement membrane is thin (Harunaga 2014: continuous deposition,
+    thin but unbroken at the tips).
+
+    `heal_tau` (frames, default 6 = 1 h) is how fast a deficit closes; `max_over` and `global_floor` bound the
+    total (below). Everything else is `bm_secrete[live]`'s.
+    """
+    MECHANISM_TAGS = ["secretion", "material_addition", "local_density_setpoint", "basal_deposition", "repair"]
+    PARAM_ROLES = {**BasementMembraneSecreteLive.PARAM_ROLES, "heal_tau": "frames_to_close_a_local_deficit"}
+    PARAM_UNITS = {"heal_tau": "frames"}
+
+    # `max_over` (default none = unbounded): the live count never exceeds max_over x the global setpoint n0 A / A0.
+    # Unbounded, the local rule kept adding: R1 (exp 11, 2026-09-30) climbed to 19-25 nodes per unit area near a cell
+    # (seeded 15) and used all 120,000 slots by row 200, after which nothing healed (Finding 187).
+    # `global_floor` (default false): lay at least what `bm_secrete[live]` would (want - n_live) when the local
+    # deficits ask for less, so the sheet's density never falls below its setpoint as the tissue grows.
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.heal_tau = float(params.get("heal_tau", 6.0))
+        _mo = params.get("max_over", None)
+        self.max_over = None if _mo is None else float(_mo)
+        self.global_floor = bool(params.get("global_floor", False))
+        # `heal_frac` (default 1.0): a cell is in deficit only below heal_frac x rho*. At 1.0 the setpoint is the median,
+        # so half the cells are always "in deficit" and draw nodes for ever -- the overshoot of R1; at 0.5 only cells
+        # clearly thinner than the sheet are healed, up to half its density, and the rest is the global rule's.
+        self.heal_frac = float(params.get("heal_frac", 1.0))
+        self._rho_star = None
+
+    def _deficit(self, lig, farea):
+        if self._rho_star is None:
+            self._rho_star = float(torch.median(lig[farea > 0])) if bool((farea > 0).any()) else 0.0
+            print(f"[bm_secrete/heal] local setpoint {self._rho_star:.4g} bound nodes per unit basal area; "
+                  f"deficits close in {self.heal_tau:g} frames", flush=True)
+        return (self.heal_frac * self._rho_star - lig).clamp_min(0.0) * farea
+
+    def _count(self, want, n_live, lig, farea):
+        d = self._deficit(lig, farea)
+        add = int(math.ceil(float(d.sum()) / max(self.heal_tau, 1e-9)))
+        if self.global_floor:
+            add = max(add, want - n_live)
+        if self.max_over is not None:
+            add = min(add, int(math.ceil(self.max_over * want)) - n_live)
+        return min(add, int(math.ceil(self.rate * n_live)))
+
+    def _weights(self, gain, lig, farea):
+        d = self._deficit(lig, farea)
+        if float(d.sum()) <= 0 and self.global_floor:
+            return BasementMembraneSecreteLive._weights(self, gain, lig, farea)
+        return d
+
 
 
 SECRETE_TRACE = []

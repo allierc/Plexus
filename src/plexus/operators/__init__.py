@@ -12,6 +12,7 @@ other is how anyone can tell which one a specification is getting.
     junction_ops         myosin, on junctions and across the apex, plus the cytokinetic ring
     ecm_ops              the forces the matrix carries, and the stiff blocks that confine it
     membrane_ops         the basement membrane, its crosslink network, and the integrin links
+    surface_protein_ops  the budding proteins of exp 11 Phase 3 on a live membrane: integrin-laminin bonds
     contact_ops          where a triangulated surface meets a continuum, both directions
     cell_ops             the cell as a composition: compartment pieces, the atlas that places
                          them, and the centroid that aggregates a level onto the one above
@@ -66,6 +67,7 @@ from . import junction_ops          # noqa: F401  junction_myosin (default|two_p
 from . import ecm_ops               # noqa: F401  ecm_stress/from_cell, cell_exclude,
 #                                                 block_seed/stress
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
+from . import surface_protein_ops   # noqa: F401  bm_clutch -- integrin beta1-laminin bonds on the live membrane
 from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track,
 #                                                 plate_confine, bm_sense, ecm_load, ecm_gate_growth
 from . import io_ops               # noqa: F401  load_run -- x_0 from a finished run

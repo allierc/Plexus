@@ -349,7 +349,9 @@ class MeshTable(dict):
     #                 -- |net force| of the worst interface scaled by the largest contact force, and
     #                 that force -- so "the bodies create no force" is read per row (exp05, exp11)
     SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill", "renumber_failed", "mono_h", "n_div", "n_reinsert", "n_type2",
-                     "interface_force_sum", "interface_force_max")
+                     "interface_force_sum", "interface_force_max", "itg_fresh", "itg_carry_err", "itg_bound_frac",
+                     "itg_bound_amount", "bm_mass_mean", "bm_dead",
+                     "ecad_surface_mean", "ecad_interior_mean", "mt2_surface_mean", "mt2_interior_mean")
 
     # PER-HALF-EDGE STATE, and it is a THIRD ragged length. `myo` has one entry per half-edge, not
     # per face and not per row, so it cannot ride in `FACE_RECORD` (which drops anything shorter
