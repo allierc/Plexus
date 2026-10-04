@@ -245,7 +245,7 @@ def _inset(frame, png, box, label=None):
 
 
 def render_pair_3d(obs, pred, mask, dx_um, dz_um, path, labels=("recorded", "learned"), times_min=None,
-                   clim=None, duration_s=10.0, window=(1200, 560), elev=35.0, azim=-60.0,
+                   clim=None, duration_s=5.0, window=(1200, 560), elev=35.0, azim=-60.0,
                    show_r2=True, insets=(), mask_pred=None, obs_denoised=None, mask_obs=None, iou=None):
     """A movie of two volume sequences side by side -- the recording LEFT, the model RIGHT -- each frame
     the redox ratio of the tissue as a translucent volume under an OBLIQUE camera (elevation `elev`,

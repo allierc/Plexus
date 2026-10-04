@@ -74,9 +74,12 @@ MOVIES = [("hlo_f1_base", "frame 1 only, the GraphCast law on the voxel lattice"
           ("hlo_fit_mesh_hash_I", "4 frames of history, mesh + embedding + I(t) (best 4-frame law)", "4 frames of history"),
           ("hlo_f1_mh_cur40", "frame 1 only, curriculum 1..40", "curriculum 1..40"),
           ("hlo_f1_mh_norm", "frame 1 only, GraphCast's normalisation", "normalisation"),
-          ("hlo_ko_full", "the known ODE: relaxation + exchange + global forcing", "relaxation + exchange"),
-          ("hlo_ko_nocoup", "the known ODE without exchange", "no exchange"),
-          ("hlo_ko_uniform", "the known ODE with uniform exchange (no embedding)", "uniform exchange"),
+          ("hlo_f1_hash", "frame 1 only, the multi-mesh removed: the voxel lattice + the embedding", "no multi-mesh"),
+          # 2026-10-02, Cedric: every shown known ODE drives with (1 + beta) I(t) -- v50, v51 retrained, v39 for uniform;
+          # until a retrain lands its beta I(t) original stands in (FALLBACK)
+          ("hlo_ko2_emb", "the known ODE: relaxation + exchange gated by an embedding + global forcing", "relaxation + exchange"),
+          ("hlo_ko2_nocoup", "the known ODE without exchange", "no exchange"),
+          ("hlo_ko2_drive", "the known ODE with uniform exchange", "uniform exchange"),
           ("hlo_ko2_full", "the known ODE, fixed: (1 + beta) I(t) and a per-voxel barrier", "barrier + drive"),
           ("hlo_ko2_sparse", "the known ODE, fixed, thin membranes (L1 on the barrier)", "thin membranes")]
 # THE LADDER: every phase-2 run, grouped, in the order a reader climbs it.
@@ -84,7 +87,11 @@ LADDER = [("4 frames of history, from frame 4", ["hlo_fit_base", "hlo_fit_mesh",
           ("frame 1 only", ["hlo_f1_base", "hlo_f1_mesh", "hlo_f1_mesh_hash", "hlo_f1_mesh_hash_I"]),
           ("frame 1, batch 8", ["hlo_f1_mh_s1", "hlo_f1_mh_s2", "hlo_f1_mh_cur40", "hlo_f1_mh_norm"]),
           ("the known ODE", ["hlo_ko_full", "hlo_ko_nocoup", "hlo_ko_uniform", "hlo_ko_noI"]),
-          ("the known ODE, fixed", ["hlo_ko2_full", "hlo_ko2_drive", "hlo_ko2_barrier", "hlo_ko2_sparse"])]
+          ("the known ODE, (1 + beta) I(t)", ["hlo_ko2_emb", "hlo_ko2_nocoup"]),
+          ("the known ODE, fixed", ["hlo_ko2_full", "hlo_ko2_drive", "hlo_ko2_barrier", "hlo_ko2_sparse"]),
+          ("GraphCast, no multi-mesh", ["hlo_f1_hash", "hlo_f1_hash_die"]),
+          ("known ODE + cell death", ["hlo_ko2_die_ratio", "hlo_ko2_die_washout", "hlo_ko2_die_const", "hlo_ko2_die_both",
+                                      "hlo_ko2_die_ratio_z", "hlo_ko2_die_ratio_bce"])]
 
 
 def _black(ax):
@@ -240,6 +247,7 @@ def slide_mesh(rec):
                      ("", f"{G['mm'][0].numel():,} in the mesh"), ("", f"{G['m2g'][0].numel():,} mesh to grid")])
              + "{\\footnotesize\\parbox{6.2cm}{encode the voxels onto the mesh, pass messages over all levels at once, decode back: a "
                "change can cross the organoid in a few layers instead of one voxel per layer.}\\par}\n")
+    right += head("one step of the law") + gnn_equation("hlo_f1_mh_cur40")
     return wide_frame("model: multi-mesh", panel("figs/02_multimesh.png"), right, "DiffuseGraphCast.mesh",
                       deck_title=f"{GC} -- multi-mesh")
 
@@ -303,7 +311,9 @@ def slide_forcing(rec):
                  "log/training/redox/hlo_f1_mesh_hash_I", left_gap=True, deck_title=f"{GC} -- global forcing I(t)")
 
 
-def slide_known_ode(rec):
+def slide_known_ode(rec, recd):
+    """THE LAW, as two slides like every run (Cedric, 2026-10-02): its 3-D movie, then its learned maps -- the best known-ODE
+    run (v38, hlo_ko2_full), whose own movie/maps pair is therefore not repeated with the runs."""
     eq = ("{\\footnotesize $\\displaystyle \\frac{dr_i}{dt}=\\frac{r^*_i-r_i}{\\tau_i}+\\sum_{j}\\kappa_{ij}(r_j-r_i)+(1+\\beta_i) I(t)$,"
           "\\quad $\\kappa_{ij}=\\kappa_{\\rm axis}\\,e^{-(b_i+b_j)}$\\par}\\vspace{6pt}")
     words = rows([("$r^*_i$", "set point"), ("$1/\\tau_i$", "relaxation rate"),
@@ -319,9 +329,11 @@ def slide_known_ode(rec):
         extra = rows([("kappa", ", ".join(f"{k:.3f}" for k in kap) + " per 10 min (z, y, x)"),
                       ("R$^2$", f"raw {t['r2']:+.3f}, denoised {t.get('r2_denoised', float('nan')):+.3f}"),
                       ("numbers", f"{r['report'].get('n_params', 0):,}")])
-    right = (head("the interpretable rival: a known ODE") + (ko_equation(run) + ko_words(run) if r is not None else eq + words)
-             + extra)
-    return wide_frame("model: known ODE", left, right, f"log/training/redox/{run}", deck_title=f"{KO} -- the law")
+    right = head("known ODE") + (ko_equation(run) + ko_words(run) if r is not None else eq + words) + extra
+    maps = wide_frame("model: known ODE", left, right, f"log/training/redox/{run}", deck_title=f"{KO} -- the law")
+    mv = slide_movie(r, "the known ODE: relaxation, exchange across per-voxel barriers and the global forcing", rec, recd,
+                     "the law") if r is not None else ""
+    return [mv, maps]
 
 
 def ko_equation(run):
@@ -378,6 +390,39 @@ def ko_words(run):
     return rows(w)
 
 
+def gnn_equation(run):
+    """GraphCast's one step AS TRAINED for this run (Cedric, 2026-10-02: "write GNN equation in every slide"), from its
+    own spec: on the multi-mesh (encoder grid -> mesh, processor on every mesh level, decoder mesh -> grid) or on the
+    voxel lattice, with the embedding a_i and the global forcing I(t) in the encoder when the run has them --
+    DiffuseGraphCast's docstring, field_ops.py."""
+    import yaml
+    spec = yaml.safe_load(open(os.path.join(ROOT, "config", "training", "redox", f"{run}.yaml")))
+    op = next(o for o in yaml.safe_load(open(os.path.join(ROOT, spec["model"])))["operators"]
+              if o.get("model") == "graphcast")
+    ins = "r_i" + (", a_i" if op.get("embedding") else "") + (", I(t)" if op.get("forcing") else "")
+    L, Lm = int(op.get("layers", 2)), int(op.get("mesh_levels", 0))
+    if Lm > 0:
+        lines = [("encode", f"$g_i=\\phi_g({ins}),\\; m_a=\\phi_m(0)$"),
+                 ("grid$\\to$mesh", "$m_a\\mathrel{+}=\\chi\\big(m_a,\\sum_{i\\in a}\\psi(e_{ia},g_i,m_a)\\big)$"),
+                 (f"process $\\times{L}$", "$e_{ab}\\mathrel{+}=\\psi_l(e_{ab},m_a,m_b),\\; m_a\\mathrel{+}=\\chi_l\\big(m_a,\\sum_b e_{ab}\\big)$"),
+                 ("mesh$\\to$grid", "$g_i\\mathrel{+}=\\chi'\\big(g_i,\\sum_a \\psi'(e_{ai},m_a,g_i)\\big)$"),
+                 ("decode", "$r_i\\mathrel{+}=\\delta(g_i)$")]
+        where = (f"$g_i$, $m_a$ latents of voxel $i$ and mesh node $a$; $e$ edge latents from the steps in um; "
+                 f"{Lm} mesh levels, edges of 1, 2, 4 mesh steps")
+    else:
+        lines = [("encode", f"$h_i=\\phi_v({ins}),\\; e_{{ij}}=\\phi_e(d_{{ij}})$"),
+                 (f"process $\\times{L}$", "$e_{ij}\\mathrel{+}=\\psi_l(e_{ij},h_i,h_j),\\; h_i\\mathrel{+}=\\chi_l\\big(h_i,\\sum_j e_{ij}\\big)$"),
+                 ("decode", "$r_i\\mathrel{+}=\\delta(h_i)$")]
+        where = "$h_i$ latent of voxel $i$; $e_{ij}$ of the edge to its 6 lattice neighbours, from the step $d_{ij}$ in um"
+    if op.get("embedding"):
+        where += "; $a_i$ the learned embedding"
+    if op.get("forcing"):
+        where += "; $I(t)$ the global forcing"
+    return ("{\\footnotesize\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{}}\n"
+            + "".join(f"{k} & {v} \\\\\n" for k, v in lines) + "\\end{tabular}\\par}\\vspace{3pt}\n"
+            + para(where + "; $\\delta$ starts at 0, so the untrained law is persistence."))
+
+
 # ============================================================================== what each run learned, as maps
 def learned_maps(run, rec, name=None):
     """The run's learned per-voxel fields on the middle z-plane, one panel each, plus I(t) when the law has it. Each map is
@@ -402,7 +447,9 @@ def learned_maps(run, rec, name=None):
     z = rec["ratio"].shape[1] // 2
     m3 = rec["mask"][0]
     m = m3[z]
-    g = {k: H.fields[k].grid.detach().numpy() for k in ("rest", "rate", "beta", "barrier", "embedding") if k in H.fields}
+    learned = {e["field"] for e in spec["learnable"] if "field" in e}   # a field the run did not learn is its zeros: not drawn
+    g = {k: H.fields[k].grid.detach().numpy() for k in ("rest", "rate", "beta", "barrier", "embedding")
+         if k in H.fields and k in learned}
     ko = "rest" in g
     maps = []                                            # (label, 2-D map on plane z, mask, colormap, 3-D values for the row)
     if ko:
@@ -416,7 +463,7 @@ def learned_maps(run, rec, name=None):
             maps.append(("barrier b (0 = open)", g["barrier"][0, z], m, "gray_r", g["barrier"][0][m3]))
         elif "embedding" in g and "diffuse.kappa" in fitted:      # v34: the embedding's exchange factor along x
             a = g["embedding"][:, z]
-            maps.append(("embedding exchange factor along x", np.exp(-((a[:, :, 1:] - a[:, :, :-1]) ** 2).sum(0)),
+            maps.append(("embedding gate on exchange, x", np.exp(-((a[:, :, 1:] - a[:, :, :-1]) ** 2).sum(0)),
                          m[:, 1:], "gray", None))
     elif "embedding" in g:
         E = g["embedding"]                               # hash: levels x features channels -> its first 3 principal components
@@ -429,7 +476,7 @@ def learned_maps(run, rec, name=None):
             maps.append((f"embedding PC{c + 1} ({100 * ev[c]:.0f}% of its variance)", pc[z], m, "PuOr", pc[m3]))
     I = fitted["diffuse.I"].numpy() if "diffuse.I" in fitted else None
     n = len(maps) + (I is not None)
-    if n <= 4:                                           # 2 x 2; with 4 maps AND I(t), I(t) is a strip below the maps
+    if I is None:                                        # ONE TEMPLATE (Cedric, 2026-10-02): 2 x 2 maps, I(t) a strip below
         fig, ax = plt.subplots(2, 2, figsize=(6.8, 5.4), facecolor="black")
         ax = list(ax.ravel())
         Iax = ax[len(maps)] if I is not None else None
@@ -440,6 +487,9 @@ def learned_maps(run, rec, name=None):
         Iax = fig.add_subplot(gs[2, :])
     for axx, (lab, img, mm, cm, _) in zip(ax, maps):
         lo, hi = np.percentile(img[mm], [2, 98])
+        key = next((k for p_, k in MAP_KEYS if lab.startswith(p_)), None)
+        if key in MAP_LIM:                               # one colour range per quantity across the slides (Cedric, 2026-10-02)
+            lo, hi = MAP_LIM[key]
         if hi <= lo:                                     # a constant map (sparse barrier: all 0) -- keep a visible range
             hi = lo + 1e-3
         im = axx.imshow(np.where(mm, img, np.nan), cmap=cm, vmin=lo, vmax=hi)
@@ -452,6 +502,8 @@ def learned_maps(run, rec, name=None):
         axx = Iax
         _black(axx)
         axx.plot(np.arange(1, len(I) + 1), I, color="tab:cyan", lw=1.2)
+        if I_YLIM is not None:                           # one y axis for every run's I(t) (Cedric, 2026-10-02)
+            axx.set_ylim(*I_YLIM)
         axx.axhline(0, color="0.5", lw=0.6)
         axx.set_xlabel("frame (10 min each)", fontsize=10)
         axx.tick_params(labelsize=9)
@@ -481,9 +533,9 @@ def slide_maps(r, got, short=""):
     if got is None:
         return ""
     # Cedric, 2026-10-01: the equation as trained and its variables, as slide 15 -- no value table
-    right = head(_tex(n) + ": what it learned") + ko_equation(n) + ko_words(n)
+    right = head(_tex(n)) + ko_equation(n) + ko_words(n)   # Cedric, 2026-10-02: no "what it learned"
     return wide_frame(_tex(n) + " maps", panel(got[0]), right, f"log/training/redox/{n}/models/best.pt",
-                      deck_title=f"{family(n)} -- {_tex(short)}, learned maps" if short else f"{family(n)} -- learned maps")
+                      deck_title=f"{family(n)} -- {_tex(short)}" if short else family(n))   # Cedric, 2026-10-02: no "learned maps"
 
 
 # ============================================================================== movies and metrics
@@ -504,6 +556,7 @@ def slide_movie(r, what, rec, recd, short=""):
     den = FR._r2_upto(recd["ratio"][o + 1:o + 1 + k], P, m)[-1]
     right = (head(_tex(n))
              + para(_tex(what) + ".")         # Cedric, 2026-10-01: the rollout length is said once, on the data slides
+             + (gnn_equation(n) if family(n) == GC else ko_equation(n))   # Cedric, 2026-10-02: the equation on every slide
              + head("R$^2$ per frame, mean $\\pm$ SD")
              + rows([("raw", f"{raw[0]:+.3f} $\\pm$ {raw[1]:.3f}"), ("denoised", f"{den[0]:+.3f} $\\pm$ {den[1]:.3f}"),
                      ("pooled, denoised", f"{t.get('r2_denoised', float('nan')):+.3f}"),
@@ -601,6 +654,157 @@ def slide_death(rec):
                       deck_title=f"{KO} -- cell death (proposed)", left_gap=True)   # top aligned with the text
 
 
+# SLIDES KEPT BUT NOT SHOWN (Cedric, 2026-10-02: "remove slide, put them in comments, with graphcast and iou mask"):
+# batch 2b's GraphCast-without-the-mesh movie and the cell-death (IoU mask) slides are written to slides/ and left as
+# commented-out \\input lines in slides/all.tex -- delete the `% ` to show one again.
+HIDDEN = "%%HIDDEN%%"
+I_YLIM = None                                            # set in main from every shown known-ODE run's I(t)
+MAP_LIM = {}                                             # set in main: per quantity, the widest 2-98th pct range shown
+MAP_KEYS = (("set point", "rest"), ("rate", "rate"), ("sensitivity", "beta"), ("barrier", "barrier"))
+FALLBACK = {"hlo_ko2_emb": "hlo_ko_full", "hlo_ko2_nocoup": "hlo_ko_nocoup"}
+# 2026-10-02, Cedric: "for graphcast keep only slide 12 + slide 2" -- the multi-mesh and the curriculum-1..40 movie
+HIDE = {"hlo_f1_hash", "hlo_f1_base", "hlo_f1_mesh", "hlo_f1_mesh_hash", "hlo_f1_mesh_hash_I", "hlo_fit_mesh_hash_I",
+        "hlo_f1_mh_norm",
+        "hlo_ko2_sparse",                                  # Cedric, 2026-10-02: "remove slide thin membranes" (movie + maps)
+        "hlo_ko2_full",                                    # 2026-10-02: shown as "the law" (slide_known_ode), not twice
+        "hlo_ko2_nocoup"}                                  # 2026-10-02, Cedric: "put in comment slide 8 and 9" (no exchange)
+
+
+def hidden(body):
+    return HIDDEN + body if body else body
+
+
+def slide_death_result(rec):
+    """Batch 2b's answer (2026-10-01): the death law learned k = 0 in every IoU arm, and a scan of the operator on the
+    recorded masks shows why -- every erosion rate lowers the IoU -- while the tissue's centroid drifts."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import torch
+    from plexus.models.registry import get_contract
+    import plexus.operators  # noqa: F401
+    runs = [landed(n) for n in ("hlo_ko2_die_const", "hlo_ko2_die_ratio_bce")]
+    if any(r is None for r in runs):
+        return ""
+    C = get_contract("decay").implementations["surface_death"]
+    M = torch.as_tensor(rec["mask"]).float()
+    T = M.shape[0]
+
+    def soft(A, m):
+        i = (A * m).sum()
+        return float(i / (A.sum() + m.sum() - i))
+    fig, ax = plt.subplots(1, 2, figsize=(7.2, 3.6), facecolor="black")
+    a = ax[0]
+    _black(a)
+    fr = np.arange(2, T + 1)
+    for k, col in ((0.0, "0.85"), (0.02, "tab:orange"), (0.05, "tab:red"), (0.10, "tab:purple")):
+        o = C({"_at": "alive", "hazard": "constant", "substeps": 4})
+        o.k = torch.tensor([k])
+        A, v = M[0][None].clone(), []
+        for t in range(T - 1):
+            A = o.step(A, A)
+            v.append(soft(A[0], M[t + 1]))
+        a.plot(fr, v, color=col, lw=1.3, label=f"k {k:.2f}" + ("  (no death)" if k == 0 else ""))
+    bce = runs[1]["test"]["shape_iou"]
+    a.plot(fr[:len(bce)], bce, color="tab:cyan", lw=1.3, ls="--", label="cross-entropy run (v47)")
+    a.set_xlabel("frame (10 min each)", fontsize=9)
+    a.set_ylabel("IoU with the recorded tissue", fontsize=9)
+    a.tick_params(labelsize=8)
+    a.legend(frameon=False, fontsize=7, labelcolor="0.85", loc="lower left")
+    a.set_title("any death lowers the IoU", color="0.85", fontsize=11, loc="left")
+    a = ax[1]
+    _black(a)
+    m = rec["mask"]
+    Z, Y, X = m.shape[1:]
+    yy, xx = np.meshgrid(np.arange(Y) * rec["dx_um"], np.arange(X) * rec["dx_um"], indexing="ij")
+    cy = np.array([yy[m[t].any(0)].mean() for t in range(T)])
+    cx = np.array([xx[m[t].any(0)].mean() for t in range(T)])
+    a.plot(np.arange(1, T + 1), cy - cy[0], color="tab:orange", lw=1.3, label="y")
+    a.plot(np.arange(1, T + 1), cx - cx[0], color="tab:cyan", lw=1.3, label="x")
+    a.set_xlabel("frame (10 min each)", fontsize=9)
+    a.set_ylabel("centroid shift from frame 1, um", fontsize=9)
+    a.tick_params(labelsize=8)
+    a.legend(frameon=False, fontsize=8, labelcolor="0.85")
+    a.set_title("the tissue drifts", color="0.85", fontsize=11, loc="left")
+    fig.tight_layout()
+    fig.savefig(os.path.join(PRES, "figs", "07_death_result.png"), dpi=150, facecolor="black")
+    plt.close(fig)
+    right = (head("result: the law kills nothing")
+             + rows([("IoU arms", "k $\\to$ 0 in all 6 (ratio, global course, both, constant, z, GraphCast)"),
+                      ("shape IoU", "0.715 = frame 1's mask held"),
+                      ("cross-entropy", f"kills the organoid: {runs[1]['test']['tissue_voxels_model'][-1]:,} voxels left"),
+                      ("ratio R$^2$", "unchanged, 0.763 denoised (death does not feed back)")])
+             + head("why")
+             + rows([("erosion", "every rate lowers the IoU (left)"),
+                      ("drift", "+20 um in y, +10 um in x over 11 h (right)"),
+                      ("shift", "frame 1 moved 4 voxels in y: IoU 0.644 vs 0.607"),
+                      ("next", "transport of the tissue, not a surface hazard")]))
+    return wide_frame("result: cell death", panel("figs/07_death_result.png"), right, "batch 2b, v42-v49",
+                      deck_title=f"{KO} -- cell death, result", left_gap=True)
+
+
+def slide_nomesh_result(rec, recd):
+    """Batch 2b's GraphCast arms (2026-10-01, Cedric: "only use the smaller mesh?"): the same law on the voxel lattice
+    alone, against the 3-level multi-mesh, with and without the per-voxel embedding."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    names = ("hlo_f1_base", "hlo_f1_mesh", "hlo_f1_hash", "hlo_f1_mesh_hash", "hlo_f1_mh_s1", "hlo_f1_mh_s2")
+    R = {n: landed(n) for n in names}
+    if any(r is None for r in R.values()):
+        return ""
+    den = {n: R[n]["test"]["r2_denoised"] for n in names}
+    seeds = [den["hlo_f1_mesh_hash"], den["hlo_f1_mh_s1"], den["hlo_f1_mh_s2"]]
+    fig, ax = plt.subplots(1, 2, figsize=(7.2, 3.6), facecolor="black")
+    a = ax[0]
+    _black(a)
+    x = np.array([0, 1])
+    a.bar(x - 0.18, [den["hlo_f1_base"], den["hlo_f1_hash"]], 0.34, color="tab:orange", label="voxel lattice only")
+    a.bar(x + 0.18, [den["hlo_f1_mesh"], np.mean(seeds)], 0.34, color="tab:blue", label="+ 3-level multi-mesh")
+    a.scatter(np.full(3, 1.18), seeds, color="white", s=10, zorder=3, label="mesh + embedding, 3 seeds")
+    a.set_xticks(x)
+    a.set_xticklabels(["no embedding", "+ embedding"], fontsize=9, color="0.85")
+    a.set_ylim(0.4, 0.92)                              # room above the bars for the legend
+    a.set_ylabel("R2 against the denoised recording", fontsize=9)
+    a.tick_params(labelsize=8)
+    a.legend(frameon=False, fontsize=7, labelcolor="0.85", loc="upper left")
+    a.set_title("the mesh helps only with the embedding", color="0.85", fontsize=10, loc="left")
+    a = ax[1]
+    _black(a)
+    T = rec["ratio"].shape[0]
+    for n, col, lab in (("hlo_f1_mesh_hash", "tab:blue", "mesh + embedding"), ("hlo_f1_hash", "tab:orange", "lattice + embedding")):
+        z = np.load(os.path.join(R[n]["dir"], "results", f"{n}_free.npz"))
+        P, o = z["pred"].astype(np.float32), int(z["origin"])
+        k = P.shape[0]
+        obs = recd["ratio"][o + 1:o + 1 + k]
+        m = rec["mask"][o + 1:o + 1 + k] & rec["mask"][o]
+        xbar = float(obs[m].mean())
+        r2 = [1 - float(((P[t][m[t]] - obs[t][m[t]]) ** 2).sum()) / float(((obs[t][m[t]] - xbar) ** 2).sum()) for t in range(k)]
+        a.plot(np.arange(o + 2, o + 2 + k), r2, color=col, lw=1.3, label=lab)
+    a.set_xlabel("frame (10 min each)", fontsize=9)
+    a.set_ylabel("R2 per frame, denoised", fontsize=9)
+    a.tick_params(labelsize=8)
+    a.legend(frameon=False, fontsize=7, labelcolor="0.85", loc="lower left")
+    a.set_title("the gap opens late in the rollout", color="0.85", fontsize=10, loc="left")
+    fig.tight_layout()
+    fig.savefig(os.path.join(PRES, "figs", "08_nomesh_result.png"), dpi=150, facecolor="black")
+    plt.close(fig)
+    rw = lambda n: f"{R[n]['test']['r2']:+.3f} / {den[n]:+.3f} / {R[n]['report'].get('n_params', 0):,}"   # noqa: E731
+    right = (head("result: keep the multi-mesh")
+             + "{\\footnotesize\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{}}\nlaw & raw / denoised R$^2$ / weights \\\\\n\\hline\n"
+             + f"lattice & {rw('hlo_f1_base')} \\\\\n+ mesh & {rw('hlo_f1_mesh')} \\\\\n"
+             + f"lattice + emb. & {rw('hlo_f1_hash')} \\\\\n+ mesh + emb. & {rw('hlo_f1_mesh_hash')} \\\\\n"
+             + f"\\quad 3 seeds & denoised {np.mean(seeds):+.3f} $\\pm$ {np.std(seeds):.3f} \\\\\n"
+             + "\\end{tabular}\\par}\\vspace{8pt}"
+             + head("reading")
+             + rows([("no embedding", f"the mesh costs {den['hlo_f1_base'] - den['hlo_f1_mesh']:.2f}: the level drifts"),
+                     ("+ embedding", f"the mesh adds {np.mean(seeds) - den['hlo_f1_hash']:.2f}, 8x the seed spread"),
+                     ("caveat", "the mesh law has 1.5x the weights; one lattice seed"),
+                     ("+ death (v49)", f"{den.get('hlo_f1_hash', 0):+.3f} -> {landed('hlo_f1_hash_die')['test']['r2_denoised']:+.3f}: k -> 0")]))
+    return wide_frame("result: no multi-mesh", panel("figs/08_nomesh_result.png"), right, "batch 2b, v48-v49 against v22-v24",
+                      deck_title=f"{GC} -- no multi-mesh, result", left_gap=True)
+
+
 def slide_ladder():
     import matplotlib
     matplotlib.use("Agg")
@@ -639,32 +843,59 @@ def main():
     recd = FR.denoise(rec)
     prov = json.load(open(os.path.join(GD, "graphs_data", "redox", "hlo_washout_recording.provenance.json")))
     refs, sig, sigd = references(rec, recd)
-    parts = [slide_mesh(rec)] + slides_data(rec, recd, prov, refs, sig, sigd)    # Cedric: the multi-mesh first
+    # Cedric: the multi-mesh first; 2026-10-02 "remove slide 3": the data slide is commented out
+    parts = [slide_mesh(rec)] + [hidden(x) for x in slides_data(rec, recd, prov, refs, sig, sigd)]
     base = landed("hlo_f1_base")
     if base is not None and os.path.exists(os.path.join(base["dir"], "results", "movie.mp4")):
         import shutil
         shutil.copy(os.path.join(base["dir"], "results", "movie.mp4"), os.path.join(PRES, "Movies", "hlo_f1_base.mp4"))
         poster(os.path.join(PRES, "Movies", "hlo_f1_base.mp4"), os.path.join(PRES, "Movies", "hlo_f1_base.png"))
-    parts += [slide_graphcast(base["report"].get("n_params", 0) if base else 0), slide_embedding(),
-              slide_forcing(rec)]
-    ko_law = slide_known_ode(rec)                        # Cedric, 2026-10-01: the known ODE's law opens its own movies
+    parts += [hidden(slide_graphcast(base["report"].get("n_params", 0) if base else 0)), hidden(slide_embedding()),
+              hidden(slide_forcing(rec))]
+    global I_YLIM
+    import torch
+    shown = ["hlo_ko2_full"] + [n if landed(n) else FALLBACK.get(n, n) for n, _, _ in MOVIES
+                                if family(n) == KO and n not in HIDE]
+    Is = [torch.load(os.path.join(landed(n)["dir"], "models", "best.pt"), weights_only=False,
+                     map_location="cpu")["fitted"]["diffuse.I"].numpy() for n in shown if landed(n)]
+    lo, hi = min(float(i.min()) for i in Is), max(float(i.max()) for i in Is)
+    pad = 0.08 * (hi - lo)
+    I_YLIM = (lo - pad, hi + pad)
+    m3 = rec["mask"][0]
+    mu = float(rec["ratio"][rec["mask"]].mean())
+    for n in shown:
+        f = torch.load(os.path.join(landed(n)["dir"], "models", "best.pt"), weights_only=False, map_location="cpu")["fitted"]
+        for k in ("rest", "rate", "beta", "barrier"):
+            if f"field.{k}" in f:
+                v = f[f"field.{k}"].numpy()[0][m3] + (mu if k == "rest" else 0.0)
+                a, b = np.percentile(v, [2, 98])
+                lo0, hi0 = MAP_LIM.get(k, (a, b))
+                MAP_LIM[k] = (min(lo0, a), max(hi0, b))
+    ko_law = slide_known_ode(rec, recd)                        # Cedric, 2026-10-01: the known ODE's law opens its own movies
     for n, what, short in MOVIES:
-        r = landed(n)
+        r = landed(n) or (landed(FALLBACK[n]) if n in FALLBACK else None)
+        n = r["name"] if r is not None else n
         if r is not None:
             if family(n) == KO and ko_law:
-                parts.append(ko_law)
-                ko_law = ""
-            parts.append(slide_movie(r, what, rec, recd, short))
+                parts += ko_law
+                ko_law = []
+            mv = slide_movie(r, what, rec, recd, short)
+            parts.append(hidden(mv) if n in HIDE else mv)
             if family(n) == KO:                          # Cedric, 2026-10-01: maps slides for the known ODE only
-                parts.append(slide_maps(r, learned_maps(n, rec), short))
-    parts += [ko_law, slide_death(rec), slide_ladder()]
+                mp = slide_maps(r, learned_maps(n, rec), short)
+                parts.append(hidden(mp) if n in HIDE else mp)
+    # the batch's two results together, before the run list (Cedric, 2026-10-01: not after the no-mesh movie)
+    parts += ko_law + [hidden(slide_death(rec)), hidden(slide_death_result(rec)), hidden(slide_nomesh_result(rec, recd)),
+              hidden(slide_ladder())]                      # Cedric, 2026-10-02: "delete slide 12" (every run)
     names = []
-    for i, body in enumerate(p for p in parts if p):
+    for i, body in enumerate(p for p in parts if p and p != HIDDEN):
         nm = f"{i:02d}"
-        open(os.path.join(PRES, "slides", f"{nm}.tex"), "w").write(body)
-        names.append(nm)
-    open(os.path.join(PRES, "slides", "all.tex"), "w").write("".join(f"\\input{{slides/{n}}}\n" for n in names))
-    print(f"[slides] {len(names)} slides -> {PRES}/slides/all.tex")
+        off = body.startswith(HIDDEN)
+        open(os.path.join(PRES, "slides", f"{nm}.tex"), "w").write(body[len(HIDDEN):] if off else body)
+        names.append(("% " if off else "") + f"\\input{{slides/{nm}}}" + ("   % hidden (Cedric, 2026-10-02)" if off else ""))
+    open(os.path.join(PRES, "slides", "all.tex"), "w").write("".join(n + "\n" for n in names))
+    print(f"[slides] {sum(not n.startswith('%') for n in names)} slides shown, "
+          f"{sum(n.startswith('%') for n in names)} commented out -> {PRES}/slides/all.tex")
 
 
 if __name__ == "__main__":
