@@ -37,17 +37,18 @@ def main():
             img, ext, xy = F.max(0), [0, F.shape[2] * 0.798, F.shape[1] * 0.798, 0], (A[:, 0], A[:, 1])
         else:
             img, ext, xy = F.max(2).T, [0, F.shape[0] * 2.0, F.shape[1] * 0.798, 0], (A[:, 2], A[:, 1])
-        ax.imshow(img, cmap="gray", extent=ext, vmax=np.percentile(img, 99.5))
-        ax.scatter(xy[0][::12], xy[1][::12], s=0.15, c="#4fc3f7", alpha=0.35, lw=0)
+        ax.imshow(img, cmap="gray", extent=ext, vmax=2.2 * np.percentile(img, 99.5))     # dimmed: the cells show on it
+        ax.scatter(xy[0][::8], xy[1][::8], s=0.5, c="#29b6f6", alpha=0.6, lw=0)
         ax.scatter(xy[0][resp], xy[1][resp], s=0.8, c="#ffeb3b", lw=0)
         ax.scatter(xy[0][entry], xy[1][entry], s=3.0, c="#ff4040", lw=0)
         if j == 0:                                          # the legend (Cedric, 2026-10-04: "what are yellow vs red")
             from matplotlib.lines import Line2D
             mk = lambda c: Line2D([], [], marker="o", ls="", color=c, markersize=7)   # noqa: E731
-            ax.legend([mk("#ffeb3b"), mk("#ff4040"), mk("#4fc3f7")],
+            from matplotlib.patches import Patch
+            ax.legend([mk("#ffeb3b"), mk("#ff4040"), mk("#29b6f6"), Patch(color="0.45")],
                       [f"gut-responsive ({int(resp.sum()):,}, the paper's rule)",
                        f"area postrema + vagal ganglia ({int(entry.sum()):,}, atlas)",
-                       "fish 1's cells (1 in 12)"],
+                       "fish 1's other cells (1 in 8)", "grey: the Z-Brain reference brain"],
                       loc="lower left", bbox_to_anchor=(0.0, -0.02), frameon=True, facecolor="black", edgecolor="0.5",
                       labelcolor="white", fontsize=8)
         ax.set_title(f"Z-Brain {title}", color="white", fontsize=10)
