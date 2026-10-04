@@ -1037,12 +1037,7 @@ def slides_sites(name, now, b, fish=""):
         right = (head(f"site {site}: {REGION_TXT[reg].split(':')[0]}") + "{\\scriptsize " + REGION_TXT[reg] + "\\par}\\vspace{6pt}\n"
                  + head(f"evoked change, 0-20 s, mean of {n} pulses") + rows(
                      [("recorded", f"{rec:+.3f} dF/F"), ("network law", frac("full")), ("W = 0", frac("W0"))]
-                     + ([("no\\_W", frac("now"))] if "now" in ev else []))
-                 + head("read") + rows([
-                     ("", "free rollout from one recorded volume, inputs only;"),
-                     ("", "every pulse of the site, held-out ones included;"),
-                     ("", "the law never sees the site label, only the beam"),
-                     ("", "position: off-fish pulses must stay flat")]))
+                     + ([("no\\_W", frac("now"))] if "now" in ev else [])))
         out.append((f"batch_{b}_site{site}_{name}", frame(f"site {site}", f"\\panel{{figs/{png}}}", right,
                                                           f"{name}_freetrial.json", deck_title=net_deck(b, fish) + f" $\\cdot$ site {site}")))
     return out
@@ -1310,13 +1305,7 @@ def slide_sites_b4(name, now, fish):
                    for s, e in ev.items())
     right = (head("evoked change at every pulse, 0-20 s") + "{\\scriptsize\\begin{tabular}{@{}r@{\\hspace{4pt}}l@{\\hspace{5pt}}r"
              "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n& & recorded & \\multicolumn{3}{c}{over the recorded} \\\\\n"
-             "site & spot & dF/F & law & W = 0 & no\\_W \\\\\n\\hline\n" + body + "\\end{tabular}\\par}\\vspace{6pt}\n"
-             + head("read") + rows([
-                 ("", "free rollout from one recorded volume, inputs only;"),
-                 ("", "every pulse of the site, held-out ones included"),
-                 ("", "(the gut-responsive cells were chosen on the"),
-                 ("", "training pulses: the recorded change is biased up);"),
-                 ("", "the law sees the beam position, never the site label")]))
+             "site & spot & dF/F & law & W = 0 & no\\_W \\\\\n\\hline\n" + body + "\\end{tabular}\\par}")
     return (f"b4_{name}_sites", frame("the pulse sites", f"\\panel{{figs/{png}}}", right, f"{name}_freetrial.json",
                                       deck_title=f"batch 4 $\\cdot$ {fish} $\\cdot$ network dynamics, every site"))
 
@@ -1388,12 +1377,12 @@ def slides_b4_compare():
                          f"{_f(r.get('top1_heldout'), '{:+.3f}')} & {_f(g.get('rec'), '{:+.3f}')} & {ratio('law')} & {ratio('W0')} & {ratio('now')} & "
                          f"{_f(r.get('brain_r2'))} & {_f(r.get('brain_r2_W0'))} & {_f(r.get('brain_r2_now'))} & "
                          f"{_f(r.get('omega_mean'), '{:.2f}')} \\\\")
-        body = ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r"
+        body = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r"
                 "@{\\hspace{6pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{6pt}}r@{}}\n"
                 "& & & gut- & & replicable & \\multicolumn{4}{c}{evoked, 0-20 s, free rollout} & \\multicolumn{3}{c}{brain-mean R$^2$} & \\\\\n"
                 "fish & min & cells & responsive & pulses & held out & recorded & law/rec & W = 0 & no\\_W & law & W = 0 & no\\_W & $\\bar\\Omega$ \\\\\n"
                 "\\hline\n" + "\n".join(lines) + "\n\\end{tabular}\\par}\\vspace{8pt}\n"
-                "{\\scriptsize replicable: the top-1 \\% cells (chosen on the training pulses) on the HELD-OUT gut pulses, recorded (the "
+                "{\\tiny replicable: the top-1 \\% cells (chosen on the training pulses) on the HELD-OUT gut pulses, recorded (the "
                 "paper's test of a response); evoked: the gut-responsive cells' mean dF/F 0-20 s after a stimulated pulse minus "
                 "the 10 s before, mean over the fish's stimulated pulses (blood glucose: the vessel), inside the free rollout of "
                 "the whole session; law / rec: the law's over the recorded; no\\_W: the twin trained with no network; "
