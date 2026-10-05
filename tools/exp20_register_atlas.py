@@ -42,9 +42,22 @@ DATA = os.path.join(EXP, "data")
 FIGS = os.path.join(EXP, "presentation", "figs")
 ZB = os.path.join(DATA, "atlas", "zbrain", "Additional_mat_files")
 VOX = (0.8125, 0.8125, 2.0)                 # x, y, z um (export_gutbrain_recording.VOXEL_UM, inferred)
+# THE PLANE STEP PER STACK (iteration 5, 2026-10-05): the exporter's 2.0 um was inferred from the 151-plane fish (150 x
+# 2 = 300 um, the brain's depth); the 9 fish-water and blood-glucose fish are 51-plane stacks, and the registration
+# itself stretched their depth 2.5-3.6x onto fish 1 (the 151-plane fish 1.0-1.15x): the same 300 um in 50 steps of 6 um
+ZSPAN_UM = 300.0
+
+
+def zstep(nz):
+    """um per plane of a stack of nz planes (151 -> 2.0, 51 -> 6.0); only with a variant's `zstep`, else VOX[2]."""
+    return ZSPAN_UM / (nz - 1)
 ZVOX = (0.798, 0.798, 2.0)
 RES_UM = 4.0
-DECK = "aff_bs_xr"                  # the variant the deck shows (the 3rd iteration, 2026-10-05)
+DECK = "aff_bs_xz"                  # the variant the deck shows (iteration 5, 2026-10-05): both starts, no atlas-side
+                                    # refinement (it raised rho but moved the area postrema off in 18 of 22 fish), each
+                                    # stack's own plane step
+THREADS = 8                         # fixed: SimpleITK's random metric samples are drawn per thread, so the thread count
+                                    # changes the result (fish water 3, the same start: score 0.09 on 8 threads, 0.25 on 30)
 FISH = ([("glucose", k) for k in range(1, 7)] + [("glutamate", k) for k in range(1, 6)] + [("Lglucose", k) for k in range(1, 5)]
         + [("fish_water", k) for k in range(1, 5)] + [("blood_glucose", k) for k in range(1, 6)])
 VARIANTS = {"aff": {"bspline": None}, "aff_bs": {"bspline": (6, 3, 3)},
@@ -52,7 +65,11 @@ VARIANTS = {"aff": {"bspline": None}, "aff_bs": {"bspline": (6, 3, 3)},
             # L-glucose fields of view sit further back -- so first an exhaustive search of the shift (and a small turn)
             "aff_bs_x": {"bspline": (6, 3, 3), "search": True},
             # 3rd iteration (Cedric: "the side is wrong"): the atlas side refined by intensity on top of the landmarks
-            "aff_bs_xr": {"bspline": (6, 3, 3), "search": True, "refine": True}}
+            "aff_bs_xr": {"bspline": (6, 3, 3), "search": True, "refine": True},
+            # 5th iteration: aff_bs_x with each stack's own plane step (zstep: the 51-plane fish at 6 um, not 2)
+            "aff_bs_xz": {"bspline": (6, 3, 3), "search": True, "zstep": True},
+            # 6th iteration: the search also pitches the fish (fish water 1 and 3)
+            "aff_bs_xzp": {"bspline": (6, 3, 3), "search": True, "zstep": True, "pitch": True}}
 REGIONS = [("area postrema", ["Area Postrema"]), ("vagal ganglia (nodose)", ["Ganglia - Vagal Ganglia"]),
            ("X vagus motor (DMNX, DVC)", ["X Vagus motorneuron cluster"]),
            ("noradrenergic, interfascicular + vagal", ["Noradrendergic neurons of the Interfascicular and Vagal areas"]),
@@ -73,26 +90,28 @@ def head_up(cond, k):
     return np.ascontiguousarray(V[:, :, ::-1].transpose(0, 2, 1)), V.shape[2]
 
 
-def cells_in_frame(P, nx):
-    """Raw pos_um (x, y, z) -> the head-up frame's physical (X, Y, Z) um, as tools/exp20_bigwarp.cells_in_moving."""
-    return np.stack([P[:, 1], (nx - 1) * VOX[0] - P[:, 0], P[:, 2]], 1)
+def cells_in_frame(P, nx, dz=None):
+    """Raw pos_um (x, y, z) -> the head-up frame's physical (X, Y, Z) um, as tools/exp20_bigwarp.cells_in_moving; pos_um's
+    z was made with VOX[2] per plane, rescaled to dz um per plane when given."""
+    return np.stack([P[:, 1], (nx - 1) * VOX[0] - P[:, 0], P[:, 2] * ((dz or VOX[2]) / VOX[2])], 1)
 
 
-def _sitk(arr):
+def _sitk(arr, dz=None):
     import SimpleITK as sitk
     lo, hi = np.percentile(arr, [1, 99.8])
     img = sitk.GetImageFromArray(np.clip((arr - lo) / max(hi - lo, 1e-9), 0, 1).astype(np.float32))   # (z, y, x) -> x, y, z
-    img.SetSpacing(VOX)
+    vox = (VOX[0], VOX[1], dz or VOX[2])
+    img.SetSpacing(vox)
     sm = sitk.SmoothingRecursiveGaussian(img, RES_UM / 2)
-    size = [int(round(sz * sp / RES_UM)) for sz, sp in zip(img.GetSize(), VOX)]
+    size = [int(round(sz * sp / RES_UM)) for sz, sp in zip(img.GetSize(), vox)]
     return sitk.Resample(sm, size, sitk.Transform(), sitk.sitkLinear, img.GetOrigin(), (RES_UM,) * 3, img.GetDirection(), 0.0)
 
 
-def register(fixed, moving, variant):
+def register(fixed, moving, variant, search=None):
     """A transform carrying FIXED-space points into MOVING space (SimpleITK's convention): fixed = fish k, moving = fish 1."""
     import SimpleITK as sitk
     init = sitk.CenteredTransformInitializer(fixed, moving, sitk.AffineTransform(3), sitk.CenteredTransformInitializerFilter.GEOMETRY)
-    if VARIANTS[variant].get("search"):
+    if VARIANTS[variant].get("search") if search is None else search:
         # an exhaustive search on a coarse grid: the shift head to tail +-300 um in 25-um steps, sideways and in depth
         # +-60 um in 30-um steps, a turn about the vertical of -0.1, 0, +0.1 rad; the best start for the affine
         e0 = sitk.CenteredTransformInitializer(fixed, moving, sitk.Euler3DTransform(), sitk.CenteredTransformInitializerFilter.GEOMETRY)
@@ -101,8 +120,11 @@ def register(fixed, moving, variant):
         Rs.SetMetricSamplingStrategy(Rs.RANDOM)
         Rs.SetMetricSamplingPercentage(0.1, seed=0)
         Rs.SetInterpolator(sitk.sitkLinear)
-        Rs.SetOptimizerAsExhaustive([0, 0, 1, 2, 12, 2])
-        Rs.SetOptimizerScales([1.0, 1.0, 0.1, 30.0, 25.0, 30.0])
+        # with the variant's `pitch` also a tilt about the left-right axis, -0.2 .. +0.2 rad in 0.1 steps (iteration 6:
+        # fish water 3 lies pitched, its brain diagonal through the depth, and the affine inflated it 1.5-2.7x instead)
+        pitch = 2 if VARIANTS[variant].get("pitch") else 0
+        Rs.SetOptimizerAsExhaustive([pitch, 0, 1, 2, 12, 2])
+        Rs.SetOptimizerScales([0.1, 1.0, 0.1, 30.0, 25.0, 30.0])
         Rs.SetInitialTransform(e0, inPlace=False)
         Rs.SetShrinkFactorsPerLevel([2])
         Rs.SetSmoothingSigmasPerLevel([1])
@@ -113,17 +135,20 @@ def register(fixed, moving, variant):
         init.SetCenter(b.GetCenter())
         init.SetMatrix(b.GetMatrix())
         init.SetTranslation(b.GetTranslation())
-    R = sitk.ImageRegistrationMethod()
-    R.SetMetricAsMattesMutualInformation(32)
-    R.SetMetricSamplingStrategy(R.RANDOM)
-    R.SetMetricSamplingPercentage(0.2, seed=0)
-    R.SetInterpolator(sitk.sitkLinear)
-    R.SetOptimizerAsRegularStepGradientDescent(1.0, 1e-4, 300, relaxationFactor=0.7)
-    R.SetOptimizerScalesFromPhysicalShift()
-    R.SetShrinkFactorsPerLevel([4, 2, 1])
-    R.SetSmoothingSigmasPerLevel([2, 1, 0])
-    R.SetInitialTransform(init, inPlace=False)
-    aff = R.Execute(fixed, moving)
+    def affine(start):
+        R = sitk.ImageRegistrationMethod()
+        R.SetMetricAsMattesMutualInformation(32)
+        R.SetMetricSamplingStrategy(R.RANDOM)
+        R.SetMetricSamplingPercentage(0.2, seed=0)
+        R.SetInterpolator(sitk.sitkLinear)
+        R.SetOptimizerAsRegularStepGradientDescent(1.0, 1e-4, 300, relaxationFactor=0.7)
+        R.SetOptimizerScalesFromPhysicalShift()
+        R.SetShrinkFactorsPerLevel([4, 2, 1])
+        R.SetSmoothingSigmasPerLevel([2, 1, 0])
+        R.SetInitialTransform(start, inPlace=False)
+        t_ = R.Execute(fixed, moving)
+        return t_, R.GetMetricValue()
+    aff, _ = affine(init)
     T = sitk.CompositeTransform(3)
     T.AddTransform(aff)
     bs = VARIANTS[variant]["bspline"]
@@ -194,6 +219,19 @@ def _dense_labels(S, shape):
     return L
 
 
+def ap_contrast(fv, lb):
+    """CEDRIC'S AREA-POSTREMA TEST FROM THE ANATOMY (2026-10-05: "the area postrema hotspot in green should fit the red
+    outline"): the fish's own anatomy inside the Z-Brain area postrema carried onto it, over a 12-um shell around it
+    (3 voxels of 4 um). Above 1 = the hotspot inside the outline; Z-Brain's own reference gives ~1.6 the same way.
+    Anatomy only, no gut response: never circular with slide 132. None when fewer than 3 AP voxels land in the fish."""
+    from scipy.ndimage import binary_dilation
+    ap = lb == 1
+    if ap.sum() < 3:
+        return None
+    sh = binary_dilation(ap, np.ones((3, 3, 3), bool), iterations=3) & ~ap & (fv > 0)
+    return float(fv[ap].mean() / max(fv[sh].mean(), 1e-9))
+
+
 def rank_corr(fv, zr, n=200000):
     """THE SCORE'S FIRST FACTOR (2nd iteration, 2026-10-05): the rank correlation of the fish's anatomy with the Z-Brain
     reference carried onto it through the whole chain, over the voxels Z-Brain reaches. A rank, not a Pearson
@@ -216,7 +254,7 @@ def rescore(variant):
         if os.path.exists(f):
             z = np.load(f)
             sc = json.load(open(os.path.join(out, f"{tag(c, k)}.json")))
-            sc.update(rho=rank_corr(z["fish"], z["zref"]))
+            sc.update(rho=rank_corr(z["fish"], z["zref"]), ap_contrast=ap_contrast(z["fish"], z["labels"]))
             sc["score"] = sc["rho"] * sc["inside"]
             json.dump(sc, open(os.path.join(out, f"{tag(c, k)}.json"), "w"), indent=1)
     s_ = collect(out)
@@ -328,34 +366,61 @@ def run(fish, variant):
     moving = _sitk(M1)
     Ainv = atlas_refine() if VARIANTS[variant].get("refine") else None
     import SimpleITK as sitk
-    sitk.ProcessObject.SetGlobalDefaultNumberOfThreads(int(os.environ.get("SITK_THREADS", "16")))   # several fish at once
+    sitk.ProcessObject.SetGlobalDefaultNumberOfThreads(THREADS)                    # reproducible; several fish at once
     for cond, k in fish:
         t0 = time.time()
         P = np.asarray(TR.load(f"gutbrain_{cond}_f{k}")["pos_um"], np.float64)
+        T, Q, nxk, dzk = None, None, nx1, None
         if (cond, k) == ("glucose", 1):
             Q, ncc = cells_in_frame(P, nx1), 1.0
-            fx_img, T = moving, None
+            fx_img = moving
         else:
             Mk, nxk = head_up(cond, k)
-            fixed = _sitk(Mk)
-            T, aff = register(fixed, moving, variant)
-            ncc = ncc_in_fish1(T, fixed, moving)
-            Q = np.array([T.TransformPoint(tuple(p)) for p in cells_in_frame(P, nxk)])       # fish k -> fish 1 frame
+            dzk = zstep(Mk.shape[0]) if VARIANTS[variant].get("zstep") else None
+            fixed = _sitk(Mk, dzk)
             fx_img = fixed
+        def chain(T):
+            """One registration scored end to end: cells to Z-Brain, inside, the check volumes, rho."""
+            Q_ = Q if T is None else np.array([T.TransformPoint(tuple(p)) for p in cells_in_frame(P, nxk, dzk)])  # -> fish 1
+            A_ = to_atlas(tps, Ainv, Q_)                                                   # fish 1 frame -> Z-Brain um
+            reg_ = label(A_, S, shape)
+            vol = check_volumes(T, fx_img, tps, F, L, Ainv)
+            ins, rho = float(reg_.any(1).mean()), rank_corr(vol[0], vol[1])
+            return {"A": A_, "reg": reg_, "vol": vol, "inside": ins, "rho": rho, "score": rho * ins}
+        if T is None and (cond, k) == ("glucose", 1):
+            best, starts = chain(None), {}
+        else:
+            # BOTH STARTS when the variant searches, the higher SCORE kept (iteration 3b, 2026-10-05: the searched start
+            # lost blood glucose 5, which the plain one had fitted, and the lower mutual information picked it anyway)
+            starts = {}
+            for st in ((True, False) if VARIANTS[variant].get("search") else (False,)):
+                try:
+                    T_, aff_ = register(fixed, moving, variant, search=st)
+                except RuntimeError as e:         # the searched start can leave too few samples overlapping
+                    print(f"[register] {tag(cond, k)}: the {'searched' if st else 'plain'} start failed "
+                          f"({str(e)[-80:].strip()})", flush=True)
+                    continue
+                r_ = chain(T_)
+                r_.update(T=T_, aff=aff_)
+                starts["searched" if st else "plain"] = r_
+            name_ = max(starts, key=lambda n: starts[n]["score"])
+            best = starts[name_]
+            T, aff = best["T"], best["aff"]
+            ncc = ncc_in_fish1(T, fixed, moving)
             np.save(os.path.join(out, f"{tag(cond, k)}_affine.npy"),                       # the affine, kept for reading
                     np.r_[aff.GetNthTransform(0).GetParameters() if hasattr(aff, "GetNthTransform") else aff.GetParameters()])
-        A = to_atlas(tps, Ainv, Q)                                                         # fish 1 frame -> Z-Brain um
-        reg = label(A, S, shape)
-        inside = float(reg.any(1).mean())
-        sc = {"ncc": ncc, "inside": inside, "score": ncc * inside, "cells": int(len(P)), "seconds": round(time.time() - t0)}
-        fv, zr, lb = check_volumes(T, fx_img, tps, F, L, Ainv)
+        A, reg, inside = best["A"], best["reg"], best["inside"]
+        fv, zr, lb = best["vol"]
+        sc = {"ncc": ncc, "inside": inside, "rho": best["rho"], "score": best["score"], "cells": int(len(P)),
+              "ap_contrast": ap_contrast(fv, lb),
+              "start": (name_ if starts else "landmarks"),
+              "score_by_start": {n: round(v["score"], 4) for n, v in starts.items()}, "seconds": round(time.time() - t0)}
         np.savez_compressed(os.path.join(out, f"{tag(cond, k)}_check.npz"), fish=fv, zref=zr, labels=lb)
-        sc.update(rho=rank_corr(fv, zr), score=rank_corr(fv, zr) * inside)
         json.dump(sc, open(os.path.join(out, f"{tag(cond, k)}.json"), "w"), indent=1)    # one file per fish: runs in parallel
         np.savez_compressed(os.path.join(out, f"{tag(cond, k)}.npz"), atlas_um=A.astype(np.float32), regions=reg,
                             names=np.array(names))
-        print(f"[register] {variant} {tag(cond, k)}: ncc {ncc:.3f}, inside {inside:.3f}, score {ncc * inside:.3f} "
-              f"({sc['seconds']} s)", flush=True)
+        print(f"[register] {variant} {tag(cond, k)}: rho {sc['rho']:.3f}, inside {inside:.3f}, score {sc['score']:.3f}, "
+              f"start {sc['start']} {sc['score_by_start']} ({sc['seconds']} s)", flush=True)
     scores = collect(out)
     rest = [v["score"] for f_, v in scores.items() if f_ != "glucose_f1"]
     print(f"[register] {variant}: the score, median over the {len(rest)} fish done: {np.median(rest):.3f}")
@@ -398,7 +463,13 @@ def report(variant):
         for lab, pats in REGIONS:
             m = reg[:, [j for j, n in enumerate(names) if any(p in n for p in pats)]].any(1)
             row[lab] = {"cells": int(m.sum()), "gut_responsive": int((m & resp).sum()) if resp is not None else None}
-        table[tag(cond, k)] = {"score": scores.get(tag(cond, k)), "regions": row,
+        # THE AREA-POSTREMA TEST (Cedric, 2026-10-05: "the area postrema hotspot in green should fit the red outline"),
+        # in numbers: the AP's gut-responsive share over the whole fish's -- a well-placed AP is enriched many-fold
+        # (fish 1, by hand: 83 of 93 AP cells against 2,538 of 190,346 brain-wide, ~67x). Reported, never in the score: the
+        # gut-responsive cells are what slide 132 measures, so choosing registrations by them would be circular.
+        ap_ = row["area postrema"]
+        enr = (ap_["gut_responsive"] / ap_["cells"]) / (resp.mean()) if resp is not None and ap_["cells"] else None
+        table[tag(cond, k)] = {"score": scores.get(tag(cond, k)), "regions": row, "ap_enrichment": enr,
                                "gut_responsive": int(resp.sum()) if resp is not None else None}
         a = ax_m.ravel()[i]
         a.imshow(top, cmap="gray", extent=ext, vmax=2.2 * np.percentile(top, 99.5))
@@ -413,7 +484,7 @@ def report(variant):
         a.set_aspect("equal")
         a.set_xlim(ext[0], ext[1]); a.set_ylim(ext[2], ext[3])
     fig_m.text(0.5, 0.005, "Z-Brain from above; blue the fish's cells (1 in 10), yellow its gut-responsive cells, red its cells "
-               "in the area postrema and the vagal ganglia; score = ncc x inside (registration only)", color="0.85",
+               "in the area postrema and the vagal ganglia; score = rho x inside (registration only)", color="0.85",
                fontsize=11, ha="center")
     fig_m.tight_layout(rect=(0, 0.02, 1, 1))
     fig_m.savefig(os.path.join(FIGS if variant == DECK else os.path.join(EXP, "png"), f"atlas_montage{'' if variant == DECK else '_' + variant}.png"),
@@ -445,6 +516,11 @@ def report(variant):
                 dpi=140, facecolor="black")
     plt.close(fig)
     json.dump(table, open(os.path.join(out, "regions_24.json"), "w"), indent=1)
+    for f_, t_ in table.items():
+        ap_, sc_ = t_["regions"]["area postrema"], t_["score"] or {}
+        e_ = t_["ap_enrichment"]
+        print(f"  {f_:18s} score {sc_.get('score', float('nan')):.2f}  AP {ap_['gut_responsive']}/{ap_['cells']} gut-responsive, "
+              f"enrichment {'--' if e_ is None else f'{e_:.1f}x'} over the whole fish's share")
     print(f"[report] {variant}: {len(done)} fish -> atlas_montage.png, atlas_regions_24.png, regions_24.json")
 
 
@@ -492,7 +568,8 @@ def check(variant):
         s_ = sc.get(tag(cond, k), {})
         fig.suptitle(f"{cond.replace('_', ' ')} fish {k}: green the fish's anatomy, magenta Z-Brain carried onto it (white "
                      f"where they agree) -- rho {s_.get('rho', float('nan')):.2f}, inside {s_.get('inside', float('nan')):.2f}, "
-                     f"score {s_.get('score', float('nan')):.2f}", color="white", fontsize=11)
+                     f"score {s_.get('score', float('nan')):.2f}, AP {s_.get('ap_contrast') or float('nan'):.2f} (red outline)",
+                     color="white", fontsize=11)
         fig.text(0.5, 0.01, "outlines: " + ", ".join(f"{nm}" for nm, _, _ in QC_LABELS) + " (red, orange, cyan, white)",
                  color="0.8", fontsize=9, ha="center")
         fig.tight_layout(rect=(0, 0.03, 1, 0.95))
