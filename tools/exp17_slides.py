@@ -1104,7 +1104,7 @@ def network_table(r, landed):
     n, res = r["name"], os.path.join(r["dir"], "results")
     b0 = str(r["row"].get("batch", "")).split(".")[0]
     arms = next((a for t, _, a, _ in BATCHES if t.split(":")[0] == f"batch {b0}"), ())
-    nows = [m for _, m in arms if m.endswith("_now") and m != n]
+    nows = [m for _, m in arms if m.endswith("_now") and m != n and ("noeph" in m) == ("noeph" in n)]   # 15.12 <-> 15.13
     # the batch's no-network twin: of its `_now` arms, the one sharing the longest name prefix (12: leaky or not)
     twin = max(nows, key=lambda m: len(os.path.commonprefix([m, n]))) if nows else None
     lines = [("full model", os.path.join(res, f"{n}_movie.npz")),
@@ -1334,6 +1334,18 @@ def g17_comment(n):
         return ""
     C, Pc = json.load(open(jc)), json.load(open(jp))["corr_with_base"]
     b, r = C["zap_e15_cur"], C.get(n)
+    if n.startswith("zap_g17_mesh"):          # the meshes (Cedric, 2026-10-04: "use template slide 25")
+        gd_ = os.path.join(GD, "log", "training", "zapbench")
+        m_ = bm_metrics(os.path.join(gd_, n, "results", f"{n}_movie.npz"))
+        jf_ = os.path.join(EXP, "data", "flow_meshes.json")
+        fl_ = json.load(open(jf_)).get(n) if os.path.exists(jf_) else None
+        if m_ is None:
+            return ""
+        s_ = (f"The multi-level mesh, {n[-1]} levels (GraphCast's nested construction on the neurons): brain-mean "
+              f"R$^2$ {m_['r2']:+.3f} against the base's {b['bm_r2']:+.3f}"
+              + (f"; its time-averaged flow {fl_['ex']:.2f} / {fl_['inh']:.2f} like the base's (excitatory / inhibitory, "
+                 "cosine)" if fl_ else "") + ".")
+        return "{\\scriptsize " + s_ + "\\par}\\vspace{6pt}\n"
     if r is None:
         return ""
     sim = ""
@@ -1395,10 +1407,15 @@ def slides_run(r, landed=None, inset=None):
     tr = [("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "0"),
           ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]
     ms = mse_summary(t)
-    num = (("\\includegraphics[width=\\linewidth]{" + inset + "}\\par\\vspace{4pt}\n" if inset else "")
-           + (g17_comment(n) if n.startswith("zap_g17_") else "")
-           + ("" if n.startswith("zap_g17_") else head(f"{tag}: {n.replace('_', chr(92) + '_')}")) +
-           ("" if n.startswith("zap_g17_") else "{\\scriptsize " + _tex(r["row"].get("what changed", "")) + "\\par}\\vspace{6pt}\n")   # batch 17: the inset and the comment say it (Cedric, 2026-10-03)
+    g17g = n.startswith("zap_g17_")           # a batch-17 graph slide (meshes too): inset + comment, as slide 25
+    if n.startswith("zap_g17_mesh") and os.path.exists(os.path.join(PRES, "figs", f"gcmesh_{n[-1]}_top.png")):
+        inset = f"figs/gcmesh_{n[-1]}_top.png"         # the mesh from above, head left, as the movie's two brains (Cedric)
+    what = _tex(r["row"].get("what changed", ""))
+    iw_ = "0.74\\linewidth" if inset and "gcmesh_" in inset else "\\linewidth"   # the mesh: the movie's brains' width
+    num = (("\\includegraphics[width=" + iw_ + "]{" + inset + "}\\par\\vspace{4pt}\n" if inset else "")
+           + (g17_comment(n) if g17g else "")
+           + ("" if g17g else head(f"{tag}: {n.replace('_', chr(92) + '_')}")) +
+           ("" if g17g else "{\\scriptsize " + what + "\\par}\\vspace{6pt}\n")   # batch 17: the inset and the comment say it (Cedric, 2026-10-03)
            + network_table(r, landed or {})           # first: the network test (Cedric, 2026-10-03)
            + (LAW_KNOWN_ODE if n in LAW_ON else "")   # the MSE and the free rollout's R2 no longer printed (Cedric, 2026-10-04)
            + head("training") + rows(tr + [("exploding neurons", _diverges(t))]))
@@ -1475,7 +1492,7 @@ BATCHES = (
     ("batch 14: modulation and conductance on the destriped traces, coherence mask", None,
      (("current", "zap_v14_cur"), ("conductance", "zap_v14_cond"), ("current + hash Omega", "zap_v14_cur_hash"), ("current + SIREN Omega", "zap_v14_cur_siren"), ("conductance + hash", "zap_v14_cond_hash"), ("conductance + SIREN", "zap_v14_cond_siren"), ("current + coarse hash", "zap_v14_cur_hashlo"), ("current + hash, seed 1", "zap_v14_cur_hash_s1"), ("trained with no network", "zap_v14_now")), ("zap_v14_cur_hash", "zap_v14_cur_hash_s1")),
     ("batch 15: batch 14 on the ephys stimulus (22 visual + 5 swim / turn), ephys-aware mask", "12_input_kymo_ephys",
-     (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now"), ("leak + MLP message, per sender", "zap_e15_lk_snd"), ("leak + MLP message, per edge", "zap_e15_lk_pair"), ("current + SIREN, no ephys", "zap_e15_cur_siren_noeph")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
+     (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now"), ("leak + MLP message, per sender", "zap_e15_lk_snd"), ("leak + MLP message, per edge", "zap_e15_lk_pair"), ("current + SIREN, no ephys", "zap_e15_cur_siren_noeph"), ("no ephys, trained with no network", "zap_e15_noeph_now"), ("current + SIREN, mesh 3 levels", "zap_e15_cur_siren_mesh3"), ("current + SIREN, mesh 4 levels", "zap_e15_cur_siren_mesh4"), ("current + SIREN, mesh 5 levels", "zap_e15_cur_siren_mesh5")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
     ("batch 16: batch 15 with the calcium indicator, tau_ca fixed, latent substeps", None,
      (("tau_ca learned", "zap_c16_learn"), ("tau_ca 1 s", "zap_c16_t1"), ("tau_ca 2 s", "zap_c16_t2"), ("tau_ca 3 s", "zap_c16_t3"), ("2 s, 5 substeps", "zap_c16_t2_s5"), ("2 s, 10 substeps", "zap_c16_t2_s10"), ("2 s + SIREN Omega", "zap_c16_t2_siren"), ("trained with no network", "zap_c16_t2_now")), ()),
     ("batch 17: batch 15.1 over different graphs", None,
@@ -1512,6 +1529,7 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
 
 
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren", "batch 16": "zap_c16_t2"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
+EXTRA_RUNS = {"batch 15": ("zap_e15_cur_siren_noeph",)}   # Cedric, 2026-10-04: 15.12, the networked no-ephys twin (15.13 hidden)
 HIDE_BATCHES_UPTO = 7     # batches whose own slides are commented out of all.tex (Cedric, 2026-10-02)
 HIDE_BATCHES = {"10", "12", "13"}     # single batches hidden (Cedric: 10 on 2026-10-02; 12 and 13 on 2026-10-03)
 HIDDEN_BATCHES: set = set()   # Cedric hid batch 4 while one arm had landed (2026-09-30); back with all 8 (2026-10-01)
@@ -2247,6 +2265,9 @@ def main():
                         deck += slides_run(landed[n17], landed, inset=f"figs/graph_example_{ix_[n17]}.png")
                 continue
             deck += slides_run(landed[base], landed)
+            for xr_ in EXTRA_RUNS.get(title.split(":")[0], ()):               # further arms' results slides (Cedric)
+                if xr_ in landed:
+                    deck += slides_run(landed[xr_], landed)
             deck += slides_ablation(landed[base], title.split(":")[0])        # W = 0 and left W = 0 (Cedric)
             deck += slides_variant(landed[base], title.split(":")[0])         # task.rollouts variants (Cedric, 2026-10-03)
     for make in EXTRA_SLIDES:                           # analysis slides (e.g. ablation, stimulus vs network)
@@ -2472,6 +2493,80 @@ def main():
             "{\\tiny\\color{gray} each cell: from above (the flow maps' place and scale on the next slide) and an oblique "
             "3-D view; streets gold, roads cyan, highways magenta\\par}", "tools/exp17_graph_examples.py",
             deck_title="batch 17 $\\cdot$ the graphs")))
+    jfm_ = os.path.join(EXP, "data", "flow_meshes.json")
+    if os.path.exists(os.path.join(PRES, "Movies", "flow_meshes.mp4")) and os.path.exists(jfm_):
+        FM_ = json.load(open(jfm_))                     # Cedric, 2026-10-04: the 3 meshes' flows against a previous one
+        deck.append(("11c_flow_meshes", frame_wide(
+            "the flow on the three multi-level meshes against the base graph's",
+            "\\vspace*{1.6\\baselineskip}\\centering\\playmovie[0.86\\textwidth]{Movies/flow_meshes}\\par\\vspace{6pt}"
+            "{\\tiny\\color{gray} each cell: excitatory flow above, inhibitory below, smoothed over 25 \\textmu m "
+            "(tools/exp17\\_wind.py, exp17\\_flow\\_montage.py meshes)\\par}", "tools/exp17_flow_montage.py meshes",
+            deck_title="batch 17 $\\cdot$ the flow on the meshes")))
+    if os.path.exists(os.path.join(PRES, "Movies", "flow_mesh4_rec.mp4")):     # Cedric, 2026-10-04
+        deck.append(("11c_flow_mesh4", frame_wide(
+            "the flow of the 4-level mesh over the recorded dF/F",
+            "\\vspace*{1.6\\baselineskip}\\centering\\playmovie[0.86\\textwidth]{Movies/flow_mesh4_rec}\\par\\vspace{4pt}"
+            "{\\tiny\\color{gray} the learned messages of 17.10 (the 4-level mesh) as wind, excitatory left, inhibitory right, "
+            "over the RECORDED dF/F (gridded, smoothed over 25 \\textmu m); tools/exp17\\_wind\\_consensus.py --median-on-recorded "
+            "(one run: its own flow)\\par}", "tools/exp17_flow_montage.py mesh4_rec",
+            deck_title="batch 17 $\\cdot$ the flow of the 4-level mesh")))
+    jw0_ = os.path.join(GD, "log", "training", "zapbench", "zap_e15_cur", "results", "zap_e15_cur_wind_fields_sigma0.npz")
+    h0_ = float(np.load(jw0_)["grid"][2]) if os.path.exists(jw0_) else float("nan")      # the wind grid's cell, um
+    for mv_, nm_, ttl_, cap_ in (("flow_meshes_sigma10", "11c_flow_meshes_s10", "the flow on the three meshes and the base, smoothed over 10 um",
+                                  "each cell: excitatory flow above, inhibitory below, smoothed over 10 \\textmu m (between "
+                                  "the 25-\\textmu m slides and the unsmoothed ones)"),
+                                 ("flow_mesh4_rec_sigma10", "11c_flow_mesh4_s10", "the flow of the 4-level mesh, smoothed over 10 um",
+                                  "17.10's learned messages as wind, excitatory left, inhibitory right, smoothed over 10 \\textmu m, "
+                                  "over the RECORDED dF/F (smoothed over 25 \\textmu m)"),
+                                 ("flow_meshes_sigma0", "11c_flow_meshes_s0", "the flow on the three meshes and the base, NOT smoothed",
+                                  "each cell: excitatory flow above, inhibitory below, NOT smoothed (the twin of the slide before: "
+                                  f"the same messages on {h0_:.1f}-\\textmu m cells, no 25-\\textmu m Gaussian)"),
+                                 ("flow_mesh4_rec_sigma0", "11c_flow_mesh4_s0", "the flow of the 4-level mesh, NOT smoothed",
+                                  "17.10's learned messages as wind, excitatory left, inhibitory right, NOT smoothed (the twin of "
+                                  "the slide before), over the RECORDED dF/F (smoothed over 25 \\textmu m)")):
+        if os.path.exists(os.path.join(PRES, "Movies", mv_ + ".mp4")):            # Cedric, 2026-10-04: twins, no smoothing
+            deck.append((nm_, frame_wide(ttl_, "\\vspace*{1.6\\baselineskip}\\centering\\playmovie[0.86\\textwidth]{Movies/" + mv_
+                                         + "}\\par\\vspace{4pt}{\\tiny\\color{gray} " + cap_ + "; tools/exp17\\_wind.py --sigma " + mv_.split("sigma")[1] + "\\par}",
+                                         "tools/exp17_flow_montage.py sigma0", deck_title="batch 17 $\\cdot$ " + ttl_)))
+    if os.path.exists(os.path.join(PRES, "Movies", "flow_views_zap_g17_mesh4.mp4")):      # Cedric, 2026-10-04: slide 41
+        deck.append(("11c_flow_views", frame_wide(
+            "the flow of the 4-level mesh from above and from the side",
+            "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.80\\textwidth]{Movies/flow_views_zap_g17_mesh4}\\par\\vspace{2pt}"
+            "{\\tiny\\color{gray} 17.10's learned messages as wind (smoothed over 25 \\textmu m), excitatory red, inhibitory "
+            "blue, over the RECORDED dF/F in grey; from above (head left) and from the side (head left: the same "
+            "arrows projected on the sagittal plane); tools/exp17\\_wind\\_views.py\\par}", "tools/exp17_wind_views.py zap_g17_mesh4",
+            deck_title="batch 17 $\\cdot$ the flow of the 4-level mesh, two views")))
+    if os.path.exists(os.path.join(PRES, "Movies", "flow_views_zap_g17_mesh4_combined.mp4")):   # Cedric, 2026-10-04: slide 42
+        deck.append(("11c_flow_views_combined", frame_wide(
+            "the flow of the 4-level mesh, excitatory and inhibitory together",
+            "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.84\\textwidth]{Movies/flow_views_zap_g17_mesh4_combined}\\par\\vspace{2pt}"
+            "{\\tiny\\color{gray} one map per view -- from above, oblique from 45 deg above, from the side: excitatory "
+            "particles red, inhibitory cyan (tone-mapped, mixed by weight: never white), on the RECORDED dF/F in grey; "
+            "tools/exp17\\_wind\\_views.py\\par}", "tools/exp17_wind_views.py zap_g17_mesh4",
+            deck_title="batch 17 $\\cdot$ the flow of the 4-level mesh, red and blue together")))
+    for mv_, nm_, ttl_ in (("flow_views_zap_g17_mesh4_sigma10", "11c_flow_views_s10",
+                            "the flow of the 4-level mesh from above and from the side, smoothed over 10 um"),
+                           ("flow_views_zap_g17_mesh4_combined_sigma10", "11c_flow_views_combined_s10",
+                            "the flow of the 4-level mesh, red and blue together, smoothed over 10 um")):
+        if os.path.exists(os.path.join(PRES, "Movies", mv_ + ".mp4")):              # Cedric, 2026-10-04: twins of 41, 42
+            deck.append((nm_, frame_wide(ttl_, "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[" + ("0.84" if "combined" in mv_ else "0.80")
+                                         + "\\textwidth]{Movies/" + mv_ + "}\\par\\vspace{2pt}{\\tiny\\color{gray} as the 25-\\textmu m slide, the wind "
+                                         "smoothed over 10 \\textmu m; excitatory red, inhibitory blue, the RECORDED dF/F in grey; "
+                                         "tools/exp17\\_wind\\_views.py --sigma 10\\par}", "tools/exp17_wind_views.py --sigma 10",
+                                         deck_title="batch 17 $\\cdot$ " + ttl_)))
+    for S_, nm_ in ((25, "11c_field_s25"), (10, "11c_field_s10")):          # Cedric, 2026-10-04: the field, not the flows
+        mv_ = f"Movies/field_zap_g17_mesh4_sigma{S_}"                           # ... as a movie, the flow slides' colours
+        f_ = f"figs/field_zap_g17_mesh4_sigma{S_}.png"
+        body_ = ("\\playmovie[0.72\\textwidth]{" + mv_ + "}" if os.path.exists(os.path.join(PRES, mv_ + ".mp4")) else
+                 "\\includegraphics[width=\\textwidth,height=0.74\\textheight,keepaspectratio]{" + f_ + "}")
+        if os.path.exists(os.path.join(PRES, f_)) or os.path.exists(os.path.join(PRES, mv_ + ".mp4")):
+            deck.append((nm_, frame_wide(
+                f"the field of the 4-level mesh, smoothed over {S_} um",
+                "\\vspace*{1.4\\baselineskip}\\centering" + body_ + "\\par\\vspace{2pt}{\\tiny\\color{gray} the field the "
+                "particles ride, frame by frame: the messages $m_{ji} = W_{ji}\\tanh z_j\\,\\Omega_i$ as arrows sender $\\to$ "
+                f"receiver, gridded, smoothed over {S_} \\textmu m; excitatory red, inhibitory cyan, length by the square root "
+                "of the strength (one scale over the movie), over the RECORDED dF/F in grey; tools/exp17\\_wind\\_fieldmovie.py\\par}",
+                "tools/exp17_wind_fieldmovie.py", deck_title=f"batch 17 $\\cdot$ the field of the 4-level mesh, {S_} \\textmu m")))
     if os.path.exists(os.path.join(PRES, "Movies", "flow_graphs.mp4")):
         deck.append(("11c_flow_graphs", frame_wide(
             "the flow (the learned messages as wind) on each graph",
@@ -2483,10 +2578,14 @@ def main():
     if os.path.exists(jw_) and os.path.exists(os.path.join(PRES, "Movies", "flow_summary.mp4")):
         Wd_ = json.load(open(jw_))
         su_, ag_ = Wd_["similarity_summary"], Wd_["agreement_with_the_others"]
-        right_fs = (head("does the flow depend on the graph?")
-                    + "{\\scriptsize the mean and the median, frame by frame, of the flow movies of 5 graphs (base, axes "
-                      "turned 45 deg, random directions, reaches 16 / 64 and 64 / 256 \\textmu m), each scaled by its own "
-                      "strength; below, the median over the RECORDED dF/F\\par}\\vspace{6pt}\n"
+        # Cedric, 2026-10-04: the explanation, the sinks block and the footnote cut; then his explanation of the movies
+        right_fs = (head("the flow movies")
+                    + "{\\scriptsize The flow movie draws the trained model's own messages between neurons as a weather-style "
+                      "wind map. At each moment it shows where the network is sending signal, in which direction, and how "
+                      "strongly. Each message is an arrow pointing from the sender toward the receiver; the arrows are summed "
+                      "and smoothed into a vector field, one for the positive (excitatory) messages, one for the negative "
+                      "(inhibitory), so they cannot cancel each other. Particles released in it drift with the field and "
+                      "leave fading trails, so the eye reads streamlines.\\par}\\vspace{6pt}\n"
                     + head("similarity of the flow movies") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
                       "& excitatory & inhibitory \\\\\n\\hline\n"
                     + f"same graph, another seed & {su_['ex']['seed_ref_movie']:.2f} & {su_['in']['seed_ref_movie']:.2f} \\\\\n"
@@ -2495,11 +2594,7 @@ def main():
                     + head("each graph against the others' mean") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
                       "& excitatory & inhibitory \\\\\n\\hline\n"
                     + "".join(f"{_tex(r_.replace('zap_', ''))} & {ag_[r_]['ex']:.2f} & {ag_[r_]['in']:.2f} \\\\\n" for r_ in Wd_["runs"])
-                    + "\\end{tabular}\\par}\\vspace{6pt}\n"
-                    + sing_block()
-                    + "{\\tiny\\color{gray} similarity: per frame, the cosine of the two vector fields over the brain, "
-                      "averaged over the 800 frames (1 = the same flow); a structure the data imposes would hold across "
-                      "graphs as it does across seeds\\par}\n")
+                    + "\\end{tabular}\\par}\\vspace{6pt}\n")
         deck.append(("11d_flow_summary", frame("the flow: mean and median over graphs", "\\playmovie[0.80\\linewidth]{Movies/flow_summary}",
                                                right_fs, "tools/exp17_wind_consensus.py, exp17_flow_montage.py",
                                                left_gap=True, deck_title="batch 17 $\\cdot$ the flow over graphs")))
@@ -2652,7 +2747,7 @@ def main():
     MOVE_AFTER = {"08_latent_calcium": "batch_16_levers", "11b_graph_examples": "batch_17_levers",
                   "11c_flow_graphs": "11b_graph_examples", "11d_flow_summary": "11c_flow_graphs",
                   "11f_graph_curves": "11d_flow_summary", "11e_param_all": "11f_graph_curves",
-                  "11h_mesh_levels": "zap_g17_random_movie", "11h_mesh3": "11h_mesh_levels", "11h_mesh4": "11h_mesh3", "11h_mesh5": "11h_mesh4", "zap_gc_cur40_movie": "02d_transfer",   # Cedric: the graphs open batch 17 "13_clusters_3d_dm": "zap_dm_ng_rl1lo_movie",
+                  "11h_mesh_levels": "zap_g17_random_movie", "11h_mesh3": "11h_mesh_levels", "11h_mesh4": "11h_mesh3", "11h_mesh5": "11h_mesh4", "zap_g17_mesh3_movie": "11h_mesh5", "zap_g17_mesh4_movie": "zap_g17_mesh3_movie", "zap_g17_mesh5_movie": "zap_g17_mesh4_movie", "11c_flow_meshes": "11b_graph_examples", "zap_gc_cur40_movie": "02d_transfer",   # Cedric: the graphs open batch 17 "13_clusters_3d_dm": "zap_dm_ng_rl1lo_movie",
                   "13_clusters_k4_montage_dm": "13_clusters_3d_dm", "13_clusters_k8_montage_dm": "13_clusters_k4_montage_dm",
                   "13_clusters_k16_montage_dm": "13_clusters_k8_montage_dm", "13_clusters_k32_montage_dm": "13_clusters_k16_montage_dm",
                   "13_edges_amp_dm": "13_clusters_k32_montage_dm",
@@ -2663,6 +2758,19 @@ def main():
                   "13_cluster_profile_e15": "13_clusters_k4_montage_e15", "13_clusters_k8_montage_e15": "13_cluster_profile_e15",
                   "13_clusters_k16_montage_e15": "13_clusters_k8_montage_e15", "13_clusters_k32_montage_e15": "13_clusters_k16_montage_e15",
                   "13_edges_amp_e15": "13_clusters_k32_montage_e15", "zap_dm_ng_now_movie": "zap_dm_ng_rl1lo_W0"}   # beside the W = 0 slide: the same argument
+    # Cedric, 2026-10-04: the meshes' flow slide and the graphs' free-rollout slide after the meshes' results; the
+    # learned-constants slide stays after the flow summary
+    for k_ in ("11c_flow_graphs", "11d_flow_summary", "11e_param_all", "11f_graph_curves", "11c_flow_meshes"):
+        MOVE_AFTER.pop(k_, None)
+    MOVE_AFTER.update({"11d_flow_summary": "11b_graph_examples", "11c_flow_graphs": "11d_flow_summary",   # 21 <-> 22
+                       "11e_param_all": "11c_flow_graphs", "11c_flow_meshes": "zap_g17_mesh5_movie",
+                       "11c_flow_mesh4": "11c_flow_meshes", "11c_flow_views": "11c_flow_mesh4",
+                       "11c_flow_views_combined": "11c_flow_views", "11c_field_s25": "11c_flow_views_combined",
+                       "11c_flow_meshes_s10": "11c_field_s25",
+                       "11c_flow_mesh4_s10": "11c_flow_meshes_s10", "11c_flow_views_s10": "11c_flow_mesh4_s10",
+                       "11c_flow_views_combined_s10": "11c_flow_views_s10", "11c_field_s10": "11c_flow_views_combined_s10",
+                       "11c_flow_meshes_s0": "11c_field_s10", "zap_e15_cur_siren_noeph_movie": "zap_e15_cur_siren_short_only", "11c_flow_mesh4_s0": "11c_flow_meshes_s0",
+                       "11f_graph_curves": "11c_flow_mesh4_s0"})
     for nm, after in MOVE_AFTER.items():
         item = next((x for x in deck if x[0] == nm), None)
         if item is not None and any(x[0] == after for x in deck):
@@ -2708,6 +2816,11 @@ def main():
     HIDDEN_SLIDES |= {name for name, _ in deck if name.startswith("13_") and name.endswith("_dm")}
     HIDDEN_SLIDES |= {"11_destripe_graph", "zap_ds_ng_base_curves"}    # Cedric, 2026-10-04: slides 10 and 12
     HIDDEN_SLIDES |= {"12_input_kymo", "zap_dm_ng_rl1lo_movie"}        # Cedric, 2026-10-04, "for now": then slides 11 and 12
+    HIDDEN_SLIDES |= {"zap_e15_cur_siren_noeph_curves"}               # its movie slide only, as 15.4
+    HIDDEN_SLIDES |= {"11d_flow_summary", "11c_flow_graphs", "11h_mesh5", "11c_flow_meshes", "11c_flow_views",
+                      "11c_flow_meshes_s0", "11c_flow_mesh4_s0"}        # Cedric, 2026-10-04: slides 21 22 35 39 41 45 46
+    HIDDEN_SLIDES |= {"11c_flow_mesh4", "11c_flow_meshes_s10", "11c_flow_mesh4_s10", "11c_flow_views_s10",
+                      "11h_mesh4", "zap_g17_mesh5_movie"}              # Cedric, 2026-10-04: slides 36 39 40 41, then 32 35
     for nm, r_ in CURVES_TODO.items():                  # the shown curves slides' figures, panel c the brain mean
         if nm not in HIDDEN_SLIDES:
             fp = os.path.join(PRES, "figs", f"{r_['name']}_curves_bm.png")
