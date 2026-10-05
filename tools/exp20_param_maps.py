@@ -29,6 +29,8 @@ def render(name):
     from plexus import trainer as T
     from plexus.tasks import trace_recording as TR
     c = M.constants(name)
+    if np.size(c["mask"]) != np.size(c["tau_s"]):          # a per-input mask [N, F] (batch 6): its cells = any input
+        c["mask"] = np.asarray(c["mask"]).reshape(np.size(c["tau_s"]), -1).any(1)
     rec = TR.load(T.load(name)["task"]["reference"]["trace_recording"])
     frame_s = float(np.median(np.diff(rec["t_s"])))
     c["tau_s"] = c["tau_s"] * frame_s / M.FRAME_S             # exp17's 0.914 s -> this recording's frame
