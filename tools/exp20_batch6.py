@@ -4,8 +4,11 @@ mask), each arm the same SIREN law with one thing changed.
 
     PYTHONPATH=src:tools python tools/exp20_batch6.py
 
-Per run, from its own result files: the brain-mean R2 of the free rollout of the whole session, the law and the same law
-with W = 0 at inference (trainer _brain_mean_metrics on <run>_movie.npz, <run>_W0_movie.npz); the gut response the free
+Per run, from its own result files, exp17's results print (Cedric, 2026-10-05: "R2 changed to r, the local activity
+added"; tools/exp17_slides.py bm_metrics, local_r, imported): the brain-mean r of the free rollout of the whole session
+(Pearson, learned against recorded brain-mean dF/F) and the local r (per cell, learned against recorded after each is
+regressed on its own brain mean; mean over the cells), the law and the same law with W = 0 at inference
+(<run>_movie.npz, <run>_W0_movie.npz; the R2 kept in the json for the md's earlier findings); the gut response the free
 rollout keeps -- the gut-responsive cells' evoked change, 0-20 s after a stimulated pulse minus the 10 s before, mean
 over every gut pulse, the law's over the recorded (and W = 0's), from <run>_freetrial.json.
 Writes data/batch6.json, presentation/figs/batch6_bars.png and batch6_traces.png.
@@ -34,13 +37,21 @@ def name(graph, mask):
     return "gb_b6_glucose_f1_" + "_".join(x for x in (graph, mask) if x)
 
 
-def bm(n, stem=None):
-    from plexus import trainer as T
-    p = os.path.join(RUNS, n, "results", f"{stem or n}_movie.npz")
-    if not os.path.exists(p):
-        return None
-    z = np.load(p)
-    return float(T._brain_mean_metrics(z["mean_obs_all"], z["mean_pred_all"])["brain_mean_r2"])
+def bm(n, stem=None, key="r2"):
+    """The brain-mean metric of a run's free rollout (exp17_slides.bm_metrics): key "r2", "r" or "rmse"."""
+    import exp17_slides as E17
+    m = E17.bm_metrics(os.path.join(RUNS, n, "results", f"{stem or n}_movie.npz"))
+    return None if m is None else float(m[key])
+
+
+def local(n, stem=None):
+    """The local r, the brain mean removed (exp17_slides.local_r): the mean over the cells, None without the movie npz."""
+    import exp17_slides as E17
+    rec = json.load(open(os.path.join(RUNS, n, "results", f"{n}_test.json"))).get("trace_recording")
+    if rec not in E17._REC:
+        E17._REC.clear()                       # one recording held at a time
+    m = E17.local_r(os.path.join(RUNS, n, "results", f"{stem or n}_movie.npz"), rec)
+    return None if m is None else m["mean"]
 
 
 def gut(n):
@@ -73,7 +84,9 @@ def main():
             if not os.path.exists(os.path.join(RUNS, n, "results", f"{n}_test.json")):
                 continue
             G = gut(n)
-            r = {"run": n, "graph": gl, "mask": ml, "colour": col, "brain_r2": bm(n), "brain_r2_W0": bm(n, f"{n}_W0")}
+            r = {"run": n, "graph": gl, "mask": ml, "colour": col, "brain_r2": bm(n), "brain_r2_W0": bm(n, f"{n}_W0"),
+                 "brain_r": bm(n, key="r"), "brain_r_W0": bm(n, f"{n}_W0", key="r"),
+                 "local_r": local(n), "local_r_W0": local(n, f"{n}_W0")}
             if G and "full" in G:
                 r.update({"gut_kept": G["full"]["law"] / G["full"]["rec"], "gut_rec": G["full"]["rec"],
                           "gut_kept_W0": (G["W0"]["law"] / G["full"]["rec"]) if "W0" in G else None,
@@ -82,8 +95,9 @@ def main():
     json.dump(rows, open(os.path.join(EXP, "data", "batch6.json"), "w"), indent=1, default=float)
     lab = [f"{r['graph']}\n{r['mask']}" for r in rows]
     x = np.arange(len(rows))
-    fig, ax = plt.subplots(2, 1, figsize=(16, 6.4), facecolor="black", sharex=True)
-    for a, (k, k0, ttl) in zip(ax, (("brain_r2", "brain_r2_W0", "brain-mean R$^2$, free rollout of the session"),
+    fig, ax = plt.subplots(3, 1, figsize=(16, 8.4), facecolor="black", sharex=True)
+    for a, (k, k0, ttl) in zip(ax, (("brain_r", "brain_r_W0", "brain-mean dF/F r, free rollout of the session"),
+                                    ("local_r", "local_r_W0", "local activity r, the brain mean removed (mean over the cells)"),
                                     ("gut_kept", "gut_kept_W0", "gut response kept (law / recorded, every gut pulse)"))):
         a.set_facecolor("black")
         for sp in a.spines.values():
@@ -99,7 +113,7 @@ def main():
         a.axhline(0, color="0.5", lw=0.6)
         a.set_title(ttl, color="white", fontsize=10, loc="left")
         a.legend(frameon=False, labelcolor="white", fontsize=8, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2)
-    ax[1].set_xticks(x, lab, fontsize=7, color="0.9")
+    ax[-1].set_xticks(x, lab, fontsize=7, color="0.9")
     for i in range(1, len(rows)):
         if rows[i]["graph"] != rows[i - 1]["graph"]:
             for a in ax:
@@ -135,7 +149,8 @@ def main():
     plt.close(fig)
     for r in rows:
         f = lambda v, fm="{:+.2f}": fm.format(v) if v is not None and np.isfinite(v) else "--"   # noqa: E731
-        print(f"{r['run']:38s} brain {f(r['brain_r2'])} (W0 {f(r['brain_r2_W0'])})  gut kept {f(r.get('gut_kept'), '{:.2f}')} "
+        print(f"{r['run']:38s} brain r {f(r['brain_r'])} (W0 {f(r['brain_r_W0'])})  local r {f(r['local_r'])} "
+              f"(W0 {f(r['local_r_W0'])})  gut kept {f(r.get('gut_kept'), '{:.2f}')} "
               f"(W0 {f(r.get('gut_kept_W0'), '{:.2f}')})")
 
 
