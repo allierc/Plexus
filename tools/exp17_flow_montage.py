@@ -65,6 +65,60 @@ def graphs():
     run(ins + ["-filter_complex", fc, "-map", "[v]", "-r", "25"], os.path.join(EXP, "presentation", "Movies", "flow_graphs.mp4"))
 
 
+# the brain-mean dF/F strip (recorded green, learned white, cursor) of the 4-level mesh's own wind movie (Cedric,
+# 2026-10-04: "one brain-mean dF/F green-white movie in 39 and 40, the 4 levels one"): its bottom 172 px
+STRIP_SRC = os.path.join(G, "zap_g17_mesh4", "results", "movie_wind.mp4")
+STRIP = "1600:172:0:468"
+MESHES = [("base 15.1: axes, 32 / 128 um", "zap_e15_cur"), ("mesh, 3 levels", "zap_g17_mesh3"),
+          ("mesh, 4 levels", "zap_g17_mesh4"), ("mesh, 5 levels", "zap_g17_mesh5")]
+
+
+def meshes(suffix=""):
+    """Cedric, 2026-10-04: the three multi-level meshes' flows beside the base graph's, the graphs movie's cells in
+    one row (each: excitatory above, inhibitory below)."""
+    ins, f = [], []
+    for i, (title, n) in enumerate(MESHES):
+        ins += ["-i", os.path.join(G, n, "results", f"movie_wind{suffix}.mp4")]
+        f.append(f"[{i}:v]split[a{i}][b{i}];[a{i}]crop={EX},scale=392:192[e{i}];[b{i}]crop={IN},scale=392:192[n{i}];"
+                 f"[e{i}][n{i}]vstack,pad=392:420:0:36:black[c{i}]")
+    lab = _labels((1568, 420), [((i * 392 + 8, 8), t) for i, (t, _) in enumerate(MESHES)], 18)
+    ins += ["-loop", "1", "-i", lab, "-i", STRIP_SRC]
+    fc = (";".join(f) + ";" + "".join(f"[c{i}]" for i in range(4)) + "hstack=inputs=4[g];"
+          "[g][4:v]overlay=0:0:shortest=1[gl];"
+          f"[5:v]crop={STRIP},scale=1568:170[st];[gl][st]vstack[v]")              # the 4-level mesh's brain mean
+    run(ins + ["-filter_complex", fc, "-map", "[v]", "-r", "25"],
+        os.path.join(EXP, "presentation", "Movies", f"flow_meshes{suffix}.mp4"))
+    if suffix:                                   # the similarity file belongs to the smoothed flows
+        return
+    # the time-averaged fields against the base's: cosine similarity inside the brain (1 = the same flow everywhere),
+    # with the base's own retraining (seed 1) and the random graph as the scale
+    import json
+    import numpy as np
+    ld = lambda n: np.load(os.path.join(G, n, "results", f"{n}_wind_fields.npz"))     # noqa: E731
+    b0 = ld("zap_e15_cur")
+    ins_ = b0["inside"]
+    doc = {}
+    for n in ("zap_g17_mesh3", "zap_g17_mesh4", "zap_g17_mesh5", "zap_g17_s1", "zap_g17_random"):
+        z = ld(n)
+        doc[n] = {}
+        for k in ("ex", "inh"):
+            a_, c_ = b0[k][:, ins_].ravel(), z[k][:, ins_].ravel()
+            doc[n][k] = float(a_ @ c_ / max(np.linalg.norm(a_) * np.linalg.norm(c_), 1e-12))
+    json.dump(doc, open(os.path.join(EXP, "data", "flow_meshes.json"), "w"), indent=1)
+    print("[flow_meshes] cosine with the base's time-mean flow:", json.dumps(doc))
+
+
+def mesh4_rec(tag="mesh4", suffix=""):
+    """Cedric, 2026-10-04: the 4-level mesh's flow over the RECORDED dF/F, its two maps side by side (excitatory |
+    inhibitory), from tools/exp17_wind_consensus.py zap_g17_mesh4 --tag mesh4 --median-on-recorded (one run: its flow)."""
+    src = os.path.join(EXP, "data", f"wind_consensus_{tag}", "results", "movie_wind_median_rec.mp4")
+    lab = _labels((1568, 420), [((8, 8), "excitatory"), ((792, 8), "inhibitory")], 22)
+    fc = (f"[0:v]split[a][b];[a]crop={EX}[e];[b]crop={IN}[n];[e][n]hstack,pad=1568:420:0:36:black[g];"
+          f"[g][1:v]overlay=0:0:shortest=1[gl];[2:v]crop={STRIP},scale=1568:170[st];[gl][st]vstack[v]")
+    run(["-i", src, "-loop", "1", "-i", lab, "-i", STRIP_SRC, "-filter_complex", fc, "-map", "[v]", "-r", "25"],
+        os.path.join(EXP, "presentation", "Movies", f"flow_mesh4_rec{suffix}.mp4"))
+
+
 def summary(tag="g17sel"):
     d = os.path.join(EXP, "png")
     ins = ["-i", os.path.join(d, f"wind_movie_consensus_mean_{tag}.mp4"), "-i", os.path.join(d, f"wind_movie_consensus_median_{tag}.mp4"),
@@ -83,5 +137,16 @@ def summary(tag="g17sel"):
 
 
 if __name__ == "__main__":
-    graphs()
-    summary()
+    if sys.argv[1:] == ["meshes"]:
+        meshes()
+    elif sys.argv[1:] == ["mesh4_rec"]:
+        mesh4_rec()
+    elif sys.argv[1:] == ["sigma0"]:                 # Cedric, 2026-10-04: the twins without smoothing
+        meshes("_sigma0")
+        mesh4_rec("mesh4s0", "_sigma0")
+    elif sys.argv[1:] == ["sigma10"]:                # ... and in between (10 um)
+        meshes("_sigma10")
+        mesh4_rec("mesh4s10", "_sigma10")
+    else:
+        graphs()
+        summary()

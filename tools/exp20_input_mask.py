@@ -15,7 +15,9 @@ No law, no learned quantity, no held-out frame (the recording's `split` == 0 onl
           (the held-out windows cut out and the rest joined)
   swim    the same with the swim power (the live channel(s); the strongest of them per cell)
 
-Each input keeps its own top `--top` fraction. Written to graphs_data/zebrafish/input_mask_<recording>.npz:
+Each input keeps its own top `--top` fraction. `--bio` (batch 6, closer to biology): the uv inputs enter the cells
+EXCITED by the training gut pulses and not by the control pulses, the swim none (written to input_mask_<recording>_bio.npz).
+Written to graphs_data/zebrafish/input_mask_<recording>.npz:
     mask           [N]     1 if ANY input enters the cell (the union; the array exp17's `input_mask` reads)
     mask_by_input  [N, 6]  per forcing column (uv, uv_x, uv_y share the uv mask; swim_l, swim_r the swim mask)
     score_uv, score_visual, score_swim [N], thresholds {input: value}, top
@@ -64,6 +66,12 @@ def main():
     ap.add_argument("--recording", default="gutbrain_glucose_f1")
     ap.add_argument("--top", type=float, default=0.10)
     ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--bio", action="store_true", help="the mask closer to biology (batch 6): see the docstring")
+    ap.add_argument("--anat", choices=["apvg", "dvc"], default=None,
+                    help="batch 6: uv into atlas regions (BigWarp, data/atlas/fish1_regions.npz): apvg = area postrema + "
+                         "vagal ganglia; dvc = those + the X vagus motor nucleus + the noradrenergic vagal area")
+    ap.add_argument("--paper", type=float, default=None,
+                    help="batch 6: uv into the paper's gut-responsive cells at mode + K sd (K = 3 the paper's); see the docstring")
     a = ap.parse_args()
     from plexus.paths import graphs_data_path
     z = np.load(graphs_data_path("zebrafish", f"{a.recording}_recording.npz"))
@@ -92,9 +100,57 @@ def main():
     scores = {"uv": t_uv, "visual": c_vis, "swim": c_swim}
     thr = {k: float(np.quantile(v, 1 - a.top)) for k, v in scores.items()}
     m = {k: (v > thr[k]) for k, v in scores.items()}
+    tag = ""
+    if a.bio:
+        # CLOSER TO BIOLOGY (Cedric, 2026-10-04; Chen 2026: the gut response is chemosensory -- the beam off the gut, fish
+        # water and caged L-glucose evoke ~nothing): the uv inputs enter the cells EXCITED by the training GUT pulses
+        # (signed t, sites but 1, top `top`) that the training CONTROL pulses (site 1, off the fish) do not excite
+        # (t_ctrl < 2); the grating its coherent cells as before; the swim none (motor output, not an input)
+        sites = {int(f): int(s_) for f, s_ in zip(tr[:, 0], tr[:, 2])}
+        def t_of(sel):
+            dd = torch.stack([X[f:f + ev].mean(0) - X[f - pre:f].mean(0) for f in sel])
+            return (dd.mean(0) / (dd.std(0) / np.sqrt(len(sel))).clamp(min=1e-9)).cpu().numpy()
+        gut_on = [f for f in on if sites[f] != 1]
+        ctl_on = [f for f in on if sites[f] == 1]
+        t_gut, t_ctl = t_of(gut_on), t_of(ctl_on)
+        thr["uv"] = float(np.quantile(t_gut, 1 - a.top))
+        m["uv"] = (t_gut > thr["uv"]) & (t_ctl < 2.0)
+        m["swim"] = np.zeros(N, bool)
+        scores.update({"uv": t_gut})
+        tag = "_bio"
+        print(f"[mask] bio: uv from {len(gut_on)} gut and {len(ctl_on)} control training pulses; "
+              f"{int(((t_gut > thr['uv']) & (t_ctl >= 2.0)).sum()):,} top-gut cells dropped as control-excited")
+    if a.anat is not None:
+        # THE ANATOMICAL ENTRY POINTS (Cedric, 2026-10-04): the cells fish 1's BigWarp registration to Z-Brain places in the
+        # gut's own entry regions (Chen 2026: the vagal sensory neurons of the nodose / vagal ganglia and the area
+        # postrema; `dvc` adds the X vagus motor nucleus and the noradrenergic vagal area, the dorsal vagal complex)
+        z = np.load(os.path.join(EXP, "data", "atlas", "fish1_regions.npz"), allow_pickle=True)
+        nm = [str(n) for n in z["names"]]
+        pats = ["Area Postrema", "Ganglia - Vagal Ganglia"] + (
+            ["X Vagus motorneuron cluster", "Noradrendergic neurons of the Interfascicular and Vagal areas"] if a.anat == "dvc" else [])
+        cols = [i for i, n in enumerate(nm) if any(p_ in n for p_ in pats)]
+        m["uv"] = z["regions"][:, cols].any(1)
+        m["swim"] = np.zeros(N, bool)
+        thr["uv"] = float("nan")
+        tag = f"_anat_{a.anat}"
+        print(f"[mask] anatomy ({a.anat}): {', '.join(nm[i] for i in cols)}: {int(m['uv'].sum()):,} uv cells")
+    if a.paper is not None:
+        # THE PAPER'S OWN SELECTION AS THE UV CELLS (Cedric, 2026-10-04: "the +2SD rule and the +3SD rule"): a cell
+        # takes the uv inputs when it is gut-responsive by the paper's rule at mode + K sd (tools/gutbrain_baselines.py,
+        # training frames: the gut + all-UV regression tracks the cell above the threshold, better than all-UV alone,
+        # and the cell changes more after the gut pulses than after the control pulses); no quota. The grating keeps
+        # its coherent cells; the swim none.
+        bz = np.load(os.path.join(EXP, "data", f"baselines_{a.recording}_cells.npz"))
+        bj = json.load(open(os.path.join(EXP, "data", f"baselines_{a.recording}.json")))["threshold"]
+        thr["uv"] = float(bj["mode"] + a.paper * bj["left_sd"])
+        m["uv"] = (bz["r_full"] > thr["uv"]) & (bz["r_full"] > bz["r_part"]) & (bz["evoked_gut"] > bz["evoked_ctrl"])
+        m["swim"] = np.zeros(N, bool)
+        scores.update({"uv": bz["r_full"]})
+        tag = f"_paper{a.paper:g}sd"
+        print(f"[mask] paper rule at mode + {a.paper:g} sd: r_full > {thr['uv']:.3f}: {int(m['uv'].sum()):,} uv cells")
     by = np.stack([m["uv"], m["uv"], m["uv"], m["visual"], m["swim"], m["swim"]], 1).astype(np.float32)
     union = by.max(1)
-    out = graphs_data_path("zebrafish", f"input_mask_{a.recording}.npz")
+    out = graphs_data_path("zebrafish", f"input_mask_{a.recording}{tag}.npz")
     np.savez(out, mask=union, mask_by_input=by, score_uv=t_uv, score_visual=c_vis, score_swim=c_swim,
              thresholds=json.dumps(thr), top=a.top, training_pulses=np.array(on))
     ov = {f"{i}&{j}": int((m[i] & m[j]).sum()) for i, j in (("uv", "visual"), ("uv", "swim"), ("visual", "swim"))}
@@ -116,11 +172,17 @@ def main():
         a_.scatter(P[::10, 0], P[::10, 1], s=0.3, c="0.3", lw=0)
         a_.scatter(P[m[k], 0], P[m[k], 1], s=0.6, c=col, lw=0)
         a_.set_aspect("equal"); a_.axis("off")
-        what = {"uv": "UV pulse: trial-locked |t| over the training pulses", "visual": "grating: coherence",
-                "swim": "swim power: coherence"}[k]
+        what = ({"uv": f"UV: atlas regions ({a.anat})", "visual": "grating: coherence",
+                 "swim": "swim: none (motor output)"} if a.anat is not None else
+                {"uv": f"UV: the paper's gut-responsive cells, mode + {a.paper:g} sd", "visual": "grating: coherence",
+                 "swim": "swim: none (motor output)"} if a.paper is not None else
+                {"uv": "UV on the gut: excited by the gut pulses, not by the control", "visual": "grating: coherence",
+                 "swim": "swim: none (motor output)"} if a.bio else
+                {"uv": "UV pulse: trial-locked |t| over the training pulses", "visual": "grating: coherence",
+                 "swim": "swim power: coherence"})[k]
         a_.set_title(f"{what} -- top {a.top:.0%} ({int(m[k].sum()):,} cells), head left", color="white", fontsize=11)
     os.makedirs(os.path.join(EXP, "png"), exist_ok=True)
-    png = os.path.join(EXP, "png", f"input_mask_{a.recording}.png")
+    png = os.path.join(EXP, "png", f"input_mask_{a.recording}{tag}.png")
     fig.savefig(png, dpi=130, facecolor="black", bbox_inches="tight")
     print(f"[mask] montage -> {png}")
 

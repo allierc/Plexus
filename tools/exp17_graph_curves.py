@@ -17,7 +17,9 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 sys.path.insert(0, os.path.join(ROOT, "src"))
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 G = os.path.join(os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData"), "log", "training", "zapbench")
-from exp17_param_compare import RUNS  # noqa: E402
+from exp17_param_compare import RUNS as _RUNS  # noqa: E402
+RUNS = list(_RUNS) + [("mesh, 3 levels", "zap_g17_mesh3"), ("mesh, 4 levels", "zap_g17_mesh4"),   # Cedric, 2026-10-04
+                      ("mesh, 5 levels", "zap_g17_mesh5")]
 
 
 def main():
@@ -36,7 +38,8 @@ def main():
         t = z["r2_t"] * 0.914 / 60
         if i == 0:
             axs[0].plot(t, z["mean_obs_all"], color="#2ca02c", lw=1.6, label="recorded")
-        axs[0].plot(t, z["mean_pred_all"], color=cols[i % len(cols)], lw=0.7, label=lab)
+        axs[0].plot(t, z["mean_pred_all"], color=cols[i % len(cols)], lw=0.7, label=lab,
+                    ls="--" if "mesh" in n else "-")             # the meshes dashed: the colours cycle past 9 runs
         tj = json.load(open(os.path.join(d, f"{n}_test.json")))
         ms = S.mse_summary(tj)
         bm = S.bm_metrics(os.path.join(d, f"{n}_movie.npz"))

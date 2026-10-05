@@ -70,11 +70,12 @@ def main():
     ap.add_argument("--no-render", action="store_true")
     ap.add_argument("--median-on-recorded", action="store_true",
                     help="render only the MEDIAN flow, over the RECORDED dF/F (gridded, inferno) instead of the learned")
+    ap.add_argument("--sigma", type=float, default=25.0, help="the wind's smoothing, um (0: none)")
     a = ap.parse_args()
     ex, inh, acts, preds, D0 = [], [], [], [], None
     allr = list(a.runs) + [r for r in a.ref if r not in a.runs]
     for r in allr:
-        D = W.fields(r, 160, a.device)
+        D = W.fields(r, 160, a.device, a.sigma)
         s = max(np.percentile(D["speed"]["ex"][:, D["inside"]], 99), np.percentile(D["speed"]["in"][:, D["inside"]], 99))
         ex.append(D["wind"]["ex"] / s)
         inh.append(D["wind"]["in"] / s)
@@ -125,7 +126,7 @@ def main():
     if a.no_render:
         return
     base = dict(act=np.mean(acts, 0), inside=ins, grid=D0["grid"], fr=D0["fr"], rec=D0["rec"], out=out,
-                pred=np.stack(preds, 0).mean(0)[:, None] * np.ones((1, 1), np.float32), P=D0["P"])
+                pred=np.stack(preds, 0).mean(0)[:, None] * np.ones((1, 1), np.float32), P=D0["P"], sigma=a.sigma)
     if a.median_on_recorded:                       # Cedric, 2026-10-03: the median flow on top of the recorded activity
         from scipy.ndimage import gaussian_filter
         from scipy.sparse import csr_matrix

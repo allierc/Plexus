@@ -1968,14 +1968,30 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
             from plexus.paths import graphs_data_path
             f = str(params["input_mask"])
             f = f if os.path.isabs(f) else graphs_data_path(f)
-            self.input_mask = torch.as_tensor(np.load(f)[str(params.get("input_mask_array", "mask"))],
-                                              dtype=torch.float32, device=self.device_ if hasattr(self, "device_") else "cpu")[:, None]
+            m_ = np.load(f)[str(params.get("input_mask_array", "mask"))]
+            # one value per element ([N] -> [N, 1]: every input enters a kept element), or per element AND input
+            # ([N, F], e.g. `input_mask_array: mask_by_input`: each input enters only its own elements; exp20 batch 6)
+            self.input_mask = torch.as_tensor(m_ if m_.ndim == 2 else m_[:, None], dtype=torch.float32,
+                                              device=self.device_ if hasattr(self, "device_") else "cpu")
         self.adapt = params.get("adaptation")
         self.adapt_blocks = {"adapt_gain": str(params.get("adapt_gain", "adapt_gain")),
                              "adapt_rate": str(params.get("adapt_rate", "adapt_rate"))} if self.adapt else {}
 
     def _act(self, v):
         return torch.tanh(v) if self.activation == "tanh" else (torch.relu(v) if self.activation == "relu" else v)
+
+    def _input_drive(self, nb, u):
+        """B_i . u, the forcing into each element, through the input mask: [N, 1] (every input enters a kept
+        element) or [N, F] (each input enters only its own elements: the per-input mask)."""
+        d = nb["input"] * u.reshape(1, -1)
+        if self.input_mask is None:
+            return d.sum(1, keepdim=True)
+        m = self.input_mask.to(d.device)
+        if m.shape[1] == 1:
+            return d.sum(1, keepdim=True) * m
+        if m.shape[1] != d.shape[1]:
+            raise ValueError(f"state_diffuse: the per-input mask has {m.shape[1]} columns, the forcing {d.shape[1]}")
+        return (d * m).sum(1, keepdim=True)
 
     def init_latent(self, H):
         """a = z at the rollout's start (the trainer calls this at `on_ready`, once `norm` is set)."""
@@ -2016,9 +2032,7 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
             v = v + rate * (-v + rest + agg) / self.substeps
         m_s, m_r, _ = G["m2g"]
         mi = torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype).index_add(0, m_r, v[m_s]) / 8.0
-        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
-        if self.input_mask is not None and self.forcing_dim:
-            drive = drive * self.input_mask.to(drive.device)
+        drive = self._input_drive(nb, u) if self.forcing_dim else 0.0
         if not self.adapt:
             dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive)
             return sd * dz
@@ -2521,9 +2535,7 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         z0 = (x[:, :1] - mu) / sd
         z = z0
         rate = self._rate(nb["tau"])
-        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
-        if self.input_mask is not None and self.forcing_dim:
-            drive = drive * self.input_mask.to(drive.device)
+        drive = self._input_drive(nb, u) if self.forcing_dim else 0.0
         ad0 = nb["adapt"] if self.adapt else None
         ad = ad0
         if self.adapt:
@@ -2671,9 +2683,7 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
         z = z0
         feats_d = []
         if self.forcing_dim:
-            drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True)
-            if self.input_mask is not None:
-                drive = drive * self.input_mask.to(drive.device)
+            drive = self._input_drive(nb, u)
             feats_d = [drive]
         for _ in range(self.substeps):
             agg = torch.zeros_like(z)
@@ -2755,9 +2765,7 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
         mu, sd, _ = self.norm
         z0 = (x[:, :1] - mu) / sd
         z = z0
-        drive = (nb["input"] * u.reshape(1, -1)).sum(1, keepdim=True) if self.forcing_dim else 0.0
-        if self.input_mask is not None and self.forcing_dim:
-            drive = drive * self.input_mask.to(drive.device)
+        drive = self._input_drive(nb, u) if self.forcing_dim else 0.0
         fz = self._frac(self._rate(nb["tau"]))
         om = self._omega(nb.get("_omega_fs")) if self.modulation != "none" else None   # once per tick
         for _ in range(self.substeps):
