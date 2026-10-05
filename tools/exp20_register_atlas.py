@@ -17,10 +17,11 @@ Each cell then gets the Z-Brain regions its atlas voxel lies in (MaskDatabase.ma
     PYTHONPATH=src:tools python tools/exp20_register_atlas.py check [--variant aff_bs]   # one figure per fish, for the eye
 
 THE SCORE (per fish; the gut response is never used, so the biology read off the atlas does not tune the registration):
-  ncc     normalised cross-correlation of fish k's anatomy, carried into fish 1's frame, with fish 1's, over fish 1's
-          brain (its anatomy above the 60th percentile), 1 = identical
+  rho     the rank correlation of the fish's anatomy with the Z-Brain reference carried onto it through the whole chain
+          (2nd iteration: ncc, fish k against fish 1, scored well-aligned L-glucose fish low -- their contrast differs)
   inside  the share of fish k's cells that land inside the Z-Brain brain (the union of the 294 masks)
-  score = ncc x inside, in 0..1; the variant's score = the median over the 23 fish (fish 1: Cedric's landmarks).
+  score = rho x inside, in 0..1; the variant's score = the median over the 23 fish (fish 1, Cedric's landmarks: 0.70).
+  ncc (fish k against fish 1, over fish 1's brain) is kept as a column.
 Writes data/atlas/reg/<variant>/<fish>.npz (atlas position per cell, regions, the score), .../scores.json, and with
 `report`: presentation/figs/atlas_<fish>.png (slide 132 for every fish), atlas_montage.png (the 24 fish from above),
 atlas_regions_24.png (the gut-responsive share per region and fish) and data/atlas/reg/<variant>/regions_24.json.
@@ -43,9 +44,15 @@ ZB = os.path.join(DATA, "atlas", "zbrain", "Additional_mat_files")
 VOX = (0.8125, 0.8125, 2.0)                 # x, y, z um (export_gutbrain_recording.VOXEL_UM, inferred)
 ZVOX = (0.798, 0.798, 2.0)
 RES_UM = 4.0
+DECK = "aff_bs_xr"                  # the variant the deck shows (the 3rd iteration, 2026-10-05)
 FISH = ([("glucose", k) for k in range(1, 7)] + [("glutamate", k) for k in range(1, 6)] + [("Lglucose", k) for k in range(1, 5)]
         + [("fish_water", k) for k in range(1, 5)] + [("blood_glucose", k) for k in range(1, 6)])
-VARIANTS = {"aff": {"bspline": None}, "aff_bs": {"bspline": (6, 3, 3)}}
+VARIANTS = {"aff": {"bspline": None}, "aff_bs": {"bspline": (6, 3, 3)},
+            # 2nd iteration (2026-10-05): the failures (L-glucose 2-4, fish water 3, glucose 5) start far off -- the
+            # L-glucose fields of view sit further back -- so first an exhaustive search of the shift (and a small turn)
+            "aff_bs_x": {"bspline": (6, 3, 3), "search": True},
+            # 3rd iteration (Cedric: "the side is wrong"): the atlas side refined by intensity on top of the landmarks
+            "aff_bs_xr": {"bspline": (6, 3, 3), "search": True, "refine": True}}
 REGIONS = [("area postrema", ["Area Postrema"]), ("vagal ganglia (nodose)", ["Ganglia - Vagal Ganglia"]),
            ("X vagus motor (DMNX, DVC)", ["X Vagus motorneuron cluster"]),
            ("noradrenergic, interfascicular + vagal", ["Noradrendergic neurons of the Interfascicular and Vagal areas"]),
@@ -85,6 +92,27 @@ def register(fixed, moving, variant):
     """A transform carrying FIXED-space points into MOVING space (SimpleITK's convention): fixed = fish k, moving = fish 1."""
     import SimpleITK as sitk
     init = sitk.CenteredTransformInitializer(fixed, moving, sitk.AffineTransform(3), sitk.CenteredTransformInitializerFilter.GEOMETRY)
+    if VARIANTS[variant].get("search"):
+        # an exhaustive search on a coarse grid: the shift head to tail +-300 um in 25-um steps, sideways and in depth
+        # +-60 um in 30-um steps, a turn about the vertical of -0.1, 0, +0.1 rad; the best start for the affine
+        e0 = sitk.CenteredTransformInitializer(fixed, moving, sitk.Euler3DTransform(), sitk.CenteredTransformInitializerFilter.GEOMETRY)
+        Rs = sitk.ImageRegistrationMethod()
+        Rs.SetMetricAsMattesMutualInformation(32)
+        Rs.SetMetricSamplingStrategy(Rs.RANDOM)
+        Rs.SetMetricSamplingPercentage(0.1, seed=0)
+        Rs.SetInterpolator(sitk.sitkLinear)
+        Rs.SetOptimizerAsExhaustive([0, 0, 1, 2, 12, 2])
+        Rs.SetOptimizerScales([1.0, 1.0, 0.1, 30.0, 25.0, 30.0])
+        Rs.SetInitialTransform(e0, inPlace=False)
+        Rs.SetShrinkFactorsPerLevel([2])
+        Rs.SetSmoothingSigmasPerLevel([1])
+        best = Rs.Execute(fixed, moving)
+        b = best.GetNthTransform(0) if hasattr(best, "GetNthTransform") else best
+        b = sitk.Euler3DTransform(b)
+        init = sitk.AffineTransform(3)
+        init.SetCenter(b.GetCenter())
+        init.SetMatrix(b.GetMatrix())
+        init.SetTranslation(b.GetTranslation())
     R = sitk.ImageRegistrationMethod()
     R.SetMetricAsMattesMutualInformation(32)
     R.SetMetricSamplingStrategy(R.RANDOM)
@@ -166,7 +194,100 @@ def _dense_labels(S, shape):
     return L
 
 
-def check_volumes(T, fixed, tps, F, L):
+def rank_corr(fv, zr, n=200000):
+    """THE SCORE'S FIRST FACTOR (2nd iteration, 2026-10-05): the rank correlation of the fish's anatomy with the Z-Brain
+    reference carried onto it through the whole chain, over the voxels Z-Brain reaches. A rank, not a Pearson
+    correlation, because the indicators differ (the L-glucose fish are dimmer, their spinal cord bright); the whole
+    chain, not fish k against fish 1, because the atlas is what the regions are read off. Fish 1 (Cedric's landmarks)
+    scores 0.82."""
+    from scipy.stats import spearmanr
+    idx = np.flatnonzero((zr > 0).ravel())
+    if len(idx) < 100:
+        return 0.0
+    idx = idx[:: max(1, len(idx) // n)]
+    return float(spearmanr(fv.ravel()[idx], zr.ravel()[idx]).correlation)
+
+
+def rescore(variant):
+    """The score again from the saved check volumes (no registration)."""
+    out = os.path.join(DATA, "atlas", "reg", variant)
+    for c, k in FISH:
+        f = os.path.join(out, f"{tag(c, k)}_check.npz")
+        if os.path.exists(f):
+            z = np.load(f)
+            sc = json.load(open(os.path.join(out, f"{tag(c, k)}.json")))
+            sc.update(rho=rank_corr(z["fish"], z["zref"]))
+            sc["score"] = sc["rho"] * sc["inside"]
+            json.dump(sc, open(os.path.join(out, f"{tag(c, k)}.json"), "w"), indent=1)
+    s_ = collect(out)
+    rest = [v["score"] for f_, v in s_.items() if f_ != "glucose_f1"]
+    print(f"[rescore] {variant}: median score over {len(rest)} fish {np.median(rest):.3f}")
+
+
+def atlas_refine(force=False):
+    """THE ATLAS SIDE, REFINED (Cedric, 2026-10-05: "xy is good, the side is wrong, the green always smaller"): the 30
+    landmarks sit on 4 depth planes, so the thin-plate spline's depth scale is the eye's guess (0.82). Fish 1's anatomy
+    is carried into the Z-Brain grid (the inverse spline, fitted from the fixed to the moving landmarks), and an affine
+    is fitted there by mutual information between it and the Z-Brain reference, started at the identity: R carries a
+    Z-Brain point to where fish 1's warped anatomy has that structure, so a cell the spline places at b belongs at
+    R^-1(b). Cached in data/atlas/reg/atlas_refine.npy (the 4 x 4 matrix of R^-1)."""
+    import SimpleITK as sitk
+    import tifffile
+    import exp20_bigwarp as BW
+    from scipy.ndimage import map_coordinates
+    path = os.path.join(DATA, "atlas", "reg", "atlas_refine.npy")
+    if os.path.exists(path) and not force:
+        return np.load(path)
+    mv, fx = BW.read_landmarks(os.path.join(BW.BW, "fish_1_landmarks.csv"))
+    inv = BW.tps_fit(fx, mv)                                                      # Z-Brain um -> fish 1 frame um
+    F = tifffile.imread(os.path.join(DATA, "atlas", "bigwarp", "zbrain_reference.tif")).astype(np.float32)   # (z, y, x)
+    ext = np.array([F.shape[2] * ZVOX[0], F.shape[1] * ZVOX[1], F.shape[0] * ZVOX[2]])
+    n = np.ceil(ext / RES_UM).astype(int)                                         # x, y, z voxels at RES_UM
+    zz, yy, xx = np.meshgrid(*[np.arange(v) for v in n[::-1]], indexing="ij")
+    a = np.stack([xx, yy, zz], -1).reshape(-1, 3) * RES_UM
+    zr = map_coordinates(F, np.stack([a[:, 2] / ZVOX[2], a[:, 1] / ZVOX[1], a[:, 0] / ZVOX[0]]), order=1).reshape(n[::-1])
+    M1, _ = head_up("glucose", 1)
+    q = BW.tps_apply(inv, a)
+    w = map_coordinates(M1, np.stack([q[:, 2] / VOX[2], q[:, 1] / VOX[1], q[:, 0] / VOX[0]]), order=1, cval=0).reshape(n[::-1])
+    def img(v):
+        lo, hi = np.percentile(v[v > 0], [1, 99.8]) if (v > 0).any() else (0, 1)
+        im = sitk.GetImageFromArray(np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1).astype(np.float32))
+        im.SetSpacing((RES_UM,) * 3)
+        return im
+    fixed, moving = img(zr), img(w)
+    init = sitk.AffineTransform(3)
+    init.SetCenter(tuple(ext / 2))
+    R = sitk.ImageRegistrationMethod()
+    R.SetMetricAsMattesMutualInformation(32)
+    R.SetMetricSamplingStrategy(R.RANDOM)
+    R.SetMetricSamplingPercentage(0.3, seed=0)
+    R.SetInterpolator(sitk.sitkLinear)
+    R.SetOptimizerAsRegularStepGradientDescent(0.5, 1e-4, 300, relaxationFactor=0.7)
+    R.SetOptimizerScalesFromPhysicalShift()
+    R.SetShrinkFactorsPerLevel([2, 1])
+    R.SetSmoothingSigmasPerLevel([1, 0])
+    R.SetInitialTransform(init, inPlace=False)
+    T = R.Execute(fixed, moving)
+    T = sitk.AffineTransform(T.GetNthTransform(0) if hasattr(T, "GetNthTransform") else T)
+    A = np.eye(4)
+    A[:3, :3] = np.array(T.GetMatrix()).reshape(3, 3)
+    c, t = np.array(T.GetCenter()), np.array(T.GetTranslation())
+    A[:3, 3] = t + c - A[:3, :3] @ c                                              # R(x) = A x + b
+    Ainv = np.linalg.inv(A)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    np.save(path, Ainv)
+    print(f"[refine] R^-1 diagonal {np.round(np.diag(Ainv)[:3], 3)}, shift {np.round(Ainv[:3, 3], 1)} um", flush=True)
+    return Ainv
+
+
+def to_atlas(tps, Ainv, q):
+    """Fish 1's frame -> Z-Brain: the landmark spline, then (if refined) R^-1."""
+    import exp20_bigwarp as BW
+    a = BW.tps_apply(tps, q)
+    return a if Ainv is None else a @ Ainv[:3, :3].T + Ainv[:3, 3]
+
+
+def check_volumes(T, fixed, tps, F, L, Ainv=None):
     """THE CHECK (Cedric, 2026-10-05: "slides to evaluate the registrations myself"): on fish k's own 4-um grid, its
     anatomy, the Z-Brain reference carried onto it through the whole chain (fish k -> fish 1 -> Z-Brain, sampled
     there), and a few Z-Brain regions carried the same way. No inversion needed: every fish-k voxel is sent forward."""
@@ -182,7 +303,7 @@ def check_volumes(T, fixed, tps, F, L):
         D = sitk.TransformToDisplacementField(T, sitk.sitkVectorFloat64, size, fixed.GetOrigin(), fixed.GetSpacing(),
                                               fixed.GetDirection())
         q = p + sitk.GetArrayFromImage(D).reshape(-1, 3)
-    a = BW.tps_apply(tps, q)                                                      # Z-Brain um (x, y, z)
+    a = to_atlas(tps, Ainv, q)                                                    # Z-Brain um (x, y, z)
     c = np.stack([a[:, 2] / ZVOX[2], a[:, 1] / ZVOX[1], a[:, 0] / ZVOX[0]])       # (z, y, x) atlas voxels
     shp = tuple(size[::-1])
     zref = map_coordinates(F, c, order=1, mode="constant", cval=0).reshape(shp).astype(np.float32)
@@ -205,6 +326,7 @@ def run(fish, variant):
     L = _dense_labels(S, shape)
     M1, nx1 = head_up("glucose", 1)
     moving = _sitk(M1)
+    Ainv = atlas_refine() if VARIANTS[variant].get("refine") else None
     import SimpleITK as sitk
     sitk.ProcessObject.SetGlobalDefaultNumberOfThreads(int(os.environ.get("SITK_THREADS", "16")))   # several fish at once
     for cond, k in fish:
@@ -222,13 +344,14 @@ def run(fish, variant):
             fx_img = fixed
             np.save(os.path.join(out, f"{tag(cond, k)}_affine.npy"),                       # the affine, kept for reading
                     np.r_[aff.GetNthTransform(0).GetParameters() if hasattr(aff, "GetNthTransform") else aff.GetParameters()])
-        A = BW.tps_apply(tps, Q)                                                           # fish 1 frame -> Z-Brain um
+        A = to_atlas(tps, Ainv, Q)                                                         # fish 1 frame -> Z-Brain um
         reg = label(A, S, shape)
         inside = float(reg.any(1).mean())
         sc = {"ncc": ncc, "inside": inside, "score": ncc * inside, "cells": int(len(P)), "seconds": round(time.time() - t0)}
-        json.dump(sc, open(os.path.join(out, f"{tag(cond, k)}.json"), "w"), indent=1)    # one file per fish: runs in parallel
-        fv, zr, lb = check_volumes(T, fx_img, tps, F, L)
+        fv, zr, lb = check_volumes(T, fx_img, tps, F, L, Ainv)
         np.savez_compressed(os.path.join(out, f"{tag(cond, k)}_check.npz"), fish=fv, zref=zr, labels=lb)
+        sc.update(rho=rank_corr(fv, zr), score=rank_corr(fv, zr) * inside)
+        json.dump(sc, open(os.path.join(out, f"{tag(cond, k)}.json"), "w"), indent=1)    # one file per fish: runs in parallel
         np.savez_compressed(os.path.join(out, f"{tag(cond, k)}.npz"), atlas_um=A.astype(np.float32), regions=reg,
                             names=np.array(names))
         print(f"[register] {variant} {tag(cond, k)}: ncc {ncc:.3f}, inside {inside:.3f}, score {ncc * inside:.3f} "
@@ -293,7 +416,8 @@ def report(variant):
                "in the area postrema and the vagal ganglia; score = ncc x inside (registration only)", color="0.85",
                fontsize=11, ha="center")
     fig_m.tight_layout(rect=(0, 0.02, 1, 1))
-    fig_m.savefig(os.path.join(FIGS, "atlas_montage.png"), dpi=110, facecolor="black")
+    fig_m.savefig(os.path.join(FIGS if variant == DECK else os.path.join(EXP, "png"), f"atlas_montage{'' if variant == DECK else '_' + variant}.png"),
+                  dpi=110, facecolor="black")
     plt.close(fig_m)
     # the gut-responsive share per region and fish (slide 132's bars, every fish at once)
     keys = [l for l, _ in REGIONS]
@@ -317,7 +441,8 @@ def report(variant):
     ax.set_title("every fish in Z-Brain: the gut-responsive share per region (in brackets the region's cells)",
                  color="white", fontsize=11)
     fig.tight_layout()
-    fig.savefig(os.path.join(FIGS, "atlas_regions_24.png"), dpi=140, facecolor="black")
+    fig.savefig(os.path.join(FIGS if variant == DECK else os.path.join(EXP, "png"), f"atlas_regions_24{'' if variant == DECK else '_' + variant}.png"),
+                dpi=140, facecolor="black")
     plt.close(fig)
     json.dump(table, open(os.path.join(out, "regions_24.json"), "w"), indent=1)
     print(f"[report] {variant}: {len(done)} fish -> atlas_montage.png, atlas_regions_24.png, regions_24.json")
@@ -366,12 +491,13 @@ def check(variant):
         ax[3].axis("off")
         s_ = sc.get(tag(cond, k), {})
         fig.suptitle(f"{cond.replace('_', ' ')} fish {k}: green the fish's anatomy, magenta Z-Brain carried onto it (white "
-                     f"where they agree) -- ncc {s_.get('ncc', float('nan')):.2f}, inside {s_.get('inside', float('nan')):.2f}, "
+                     f"where they agree) -- rho {s_.get('rho', float('nan')):.2f}, inside {s_.get('inside', float('nan')):.2f}, "
                      f"score {s_.get('score', float('nan')):.2f}", color="white", fontsize=11)
         fig.text(0.5, 0.01, "outlines: " + ", ".join(f"{nm}" for nm, _, _ in QC_LABELS) + " (red, orange, cyan, white)",
                  color="0.8", fontsize=9, ha="center")
         fig.tight_layout(rect=(0, 0.03, 1, 0.95))
-        fig.savefig(os.path.join(FIGS, f"atlas_check_{tag(cond, k)}.png"), dpi=110, facecolor="black")
+        fig.savefig(os.path.join(FIGS, f"atlas_check_{tag(cond, k)}.png") if variant == DECK else
+                    os.path.join(EXP, "png", f"atlas_check_{variant}_{tag(cond, k)}.png"), dpi=110, facecolor="black")
         plt.close(fig)
         print(f"[check] {tag(cond, k)}", flush=True)
 
@@ -396,9 +522,9 @@ def orient():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["orient", "run", "report", "check"])
+    ap.add_argument("what", choices=["orient", "run", "report", "check", "rescore"])
     ap.add_argument("--fish", nargs="*", default=None)
-    ap.add_argument("--variant", default="aff_bs", choices=list(VARIANTS))
+    ap.add_argument("--variant", default=DECK, choices=list(VARIANTS))
     a = ap.parse_args()
     if a.what == "orient":
         orient()
@@ -407,5 +533,7 @@ if __name__ == "__main__":
         run(fish, a.variant)
     elif a.what == "check":
         check(a.variant)
+    elif a.what == "rescore":
+        rescore(a.variant)
     else:
         report(a.variant)
