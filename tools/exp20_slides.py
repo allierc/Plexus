@@ -113,7 +113,7 @@ def arm_numbers():
         for b in ("1", "2", "3", "4"):
             for i, n in enumerate(BATCHES[b][1], 1):
                 _ARMS.setdefault(n, f"{b}.{i}")
-        for b in ("5", "6"):
+        for b in ("5", "6", "7"):
             for i, n in enumerate([n for n in runs if n.startswith(f"gb_b{b}_")], 1):
                 _ARMS[n] = f"{b}.{i}"
     return _ARMS
