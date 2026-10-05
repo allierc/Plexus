@@ -73,7 +73,7 @@ def main():
     fig.text(0.63, 0.005, "bars: red the gut's entry regions (area postrema, vagal ganglia), grey the others", color="0.8",
              fontsize=9)
     out = os.path.join(EXP, "presentation", "figs", "atlas_f1.png")
-    fig.savefig(out, dpi=150, facecolor="black")
+    fig.savefig(out, dpi=150, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     shutil.copy(out, os.path.join(EXP, "png", os.path.basename(out)))
     print("[atlas]", out)

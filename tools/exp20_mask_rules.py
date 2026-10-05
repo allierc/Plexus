@@ -73,7 +73,7 @@ def main(rec="gutbrain_glucose_f1"):
              "head left", color="0.75", fontsize=10, ha="center")
     fig.tight_layout(rect=(0, 0.04, 1, 1))
     out1 = os.path.join(EXP, "presentation", "figs", "mask_rules_f1.png")
-    fig.savefig(out1, dpi=150, facecolor="black")
+    fig.savefig(out1, dpi=150, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     # the traces: each rule's UV cells around the training gut and control pulses
     tt = (np.arange(-pre, post) + 0.5) * dt
@@ -105,7 +105,7 @@ def main(rec="gutbrain_glucose_f1"):
     ax[0].legend(frameon=False, labelcolor="white", fontsize=8)
     fig.tight_layout()
     out2 = os.path.join(EXP, "presentation", "figs", "mask_rules_traces_f1.png")
-    fig.savefig(out2, dpi=150, facecolor="black")
+    fig.savefig(out2, dpi=150, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     for f_ in (out1, out2):
         shutil.copy(f_, os.path.join(EXP, "png", os.path.basename(f_)))

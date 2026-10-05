@@ -488,7 +488,7 @@ def report(variant):
                fontsize=11, ha="center")
     fig_m.tight_layout(rect=(0, 0.02, 1, 1))
     fig_m.savefig(os.path.join(FIGS if variant == DECK else os.path.join(EXP, "png"), f"atlas_montage{'' if variant == DECK else '_' + variant}.png"),
-                  dpi=110, facecolor="black")
+                  dpi=110, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig_m)
     # the gut-responsive share per region and fish (slide 132's bars, every fish at once)
     keys = [l for l, _ in REGIONS]
@@ -513,7 +513,7 @@ def report(variant):
                  color="white", fontsize=11)
     fig.tight_layout()
     fig.savefig(os.path.join(FIGS if variant == DECK else os.path.join(EXP, "png"), f"atlas_regions_24{'' if variant == DECK else '_' + variant}.png"),
-                dpi=140, facecolor="black")
+                dpi=140, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     json.dump(table, open(os.path.join(out, "regions_24.json"), "w"), indent=1)
     for f_, t_ in table.items():
@@ -547,7 +547,11 @@ def check(variant):
         fv, zr, lb = z["fish"], z["zref"], z["labels"]
         nz = fv.shape[0]
         thirds = [(0, nz // 3, "dorsal third"), (nz // 3, 2 * nz // 3, "middle third"), (2 * nz // 3, nz, "ventral third")]
-        fig, ax = plt.subplots(1, 4, figsize=(16, 7.2), facecolor="black", gridspec_kw={"width_ratios": [1, 1, 1, 0.75]})
+        # ONE SCALE for the top and the side views (exp17's rule, 2026-10-05): each panel as wide as its view of the brain
+        # (x for the views from above, depth for the side), every panel the brain's head-to-tail height
+        nz_, ny_, nx_ = fv.shape
+        fig, ax = plt.subplots(1, 4, figsize=(16, 16 * ny_ / (3 * nx_ + nz_) + 0.9), facecolor="black",
+                               gridspec_kw={"width_ratios": [nx_, nx_, nx_, nz_], "wspace": 0.04})
         for a, (z0, z1, lab_) in zip(ax[:3], thirds):
             g, m = norm(fv[z0:z1].max(0), 40), norm(zr[z0:z1].max(0))
             a.imshow(np.stack([m, g, m], -1))
@@ -574,7 +578,8 @@ def check(variant):
                  color="0.8", fontsize=9, ha="center")
         fig.tight_layout(rect=(0, 0.03, 1, 0.95))
         fig.savefig(os.path.join(FIGS, f"atlas_check_{tag(cond, k)}.png") if variant == DECK else
-                    os.path.join(EXP, "png", f"atlas_check_{variant}_{tag(cond, k)}.png"), dpi=110, facecolor="black")
+                    os.path.join(EXP, "png", f"atlas_check_{variant}_{tag(cond, k)}.png"), dpi=110, facecolor="black",
+                    bbox_inches="tight", pad_inches=0.04)
         plt.close(fig)
         print(f"[check] {tag(cond, k)}", flush=True)
 
@@ -593,7 +598,7 @@ def orient():
         ax[r, c + 1].imshow(M.max(2).T, cmap="gray", vmax=np.percentile(M.max(2), 99.7), aspect=VOX[1] / VOX[2])
         ax[r, c].set_title(f"{cond} {k}", color="white", fontsize=9)
     fig.tight_layout()
-    fig.savefig(os.path.join(EXP, "png", "atlas_orient_24.png"), dpi=60, facecolor="black")
+    fig.savefig(os.path.join(EXP, "png", "atlas_orient_24.png"), dpi=60, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     print("[orient] png/atlas_orient_24.png")
 
 

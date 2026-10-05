@@ -119,7 +119,7 @@ def main():
             for a in ax:
                 a.axvline(i - 0.5, color="0.4", lw=0.8)
     fig.tight_layout()
-    fig.savefig(os.path.join(EXP, "presentation", "figs", "batch6_bars.png"), dpi=160, facecolor="black")
+    fig.savefig(os.path.join(EXP, "presentation", "figs", "batch6_bars.png"), dpi=160, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     # the gut response, one panel per mask rule: recorded, the neuron graph (solid), the 4-level mesh (dashed)
     fig, ax = plt.subplots(2, 3, figsize=(15, 6.4), facecolor="black", sharey=True)
@@ -145,7 +145,7 @@ def main():
     ax[0, 0].set_ylabel("mean dF/F, gut-responsive cells", color="0.9", fontsize=8)
     ax[1, 0].set_ylabel("mean dF/F, gut-responsive cells", color="0.9", fontsize=8)
     fig.tight_layout()
-    fig.savefig(os.path.join(EXP, "presentation", "figs", "batch6_traces.png"), dpi=160, facecolor="black")
+    fig.savefig(os.path.join(EXP, "presentation", "figs", "batch6_traces.png"), dpi=160, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     for r in rows:
         f = lambda v, fm="{:+.2f}": fm.format(v) if v is not None and np.isfinite(v) else "--"   # noqa: E731

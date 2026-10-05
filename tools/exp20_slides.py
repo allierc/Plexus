@@ -96,6 +96,38 @@ def head(s):
     return f"{{\\normalsize\\textbf{{{s}}}}}\\\\[4pt]\n"
 
 
+SEC_GAP = "\\vspace{\\baselineskip}\n"     # one blank line between a results column's sections (exp17's, Cedric 2026-10-05)
+CAPF = "\\fontsize{4.6}{5.5}\\selectfont"    # a caption under a plot, one size on every slide (exp17's, Cedric 2026-10-05)
+_ARMS = {}
+
+
+def arm_numbers():
+    """{run: "b.k"}, the md's numbering (Cedric, 2026-10-05: every batch slide titled by its batch.arm): batches 1-4 by
+    their arm lists (BATCHES; batch 4 the 24 fish, each its law then its no-W twin: 4.7 = glucose fish 4), batches 5
+    and 6 by their runs' order in the md's results table."""
+    if not _ARMS:
+        md = open(os.path.join(ROOT, "experiments", "exp20_gutbrain_graphcast.md")).read()
+        runs = re.findall(r"^\| \S+ \| `training/gutbrain/(\w+)` \|", md, re.M)
+        for b in ("1", "2", "3", "4"):
+            for i, n in enumerate(BATCHES[b][1], 1):
+                _ARMS.setdefault(n, f"{b}.{i}")
+        for b in ("5", "6"):
+            for i, n in enumerate([n for n in runs if n.startswith(f"gb_b{b}_")], 1):
+                _ARMS[n] = f"{b}.{i}"
+    return _ARMS
+
+
+def arm_range(names):
+    """'6.1--6.13' for a run of consecutive arms, '6.7, 6.9' otherwise."""
+    A = sorted({arm_numbers()[n] for n in names if n in arm_numbers()}, key=lambda a: tuple(int(x) for x in a.split(".")))
+    if not A:
+        return ""
+    b0, ks = A[0].split(".")[0], [int(a.split(".")[1]) for a in A]
+    if len(A) > 1 and len({a.split(".")[0] for a in A}) == 1 and ks == list(range(ks[0], ks[-1] + 1)):
+        return f"{A[0]}--{A[-1]}"
+    return ", ".join(A)
+
+
 def rows(pairs):
     body = "".join(f"{k} & {v} \\\\\n" for k, v in pairs)
     return ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}l@{}}\n" + body + "\\end{tabular}\\par}\n"
@@ -130,7 +162,9 @@ def slide_paper():
         ("", "a drifting grating (optomotor); fictive swimming"),
         ("controls", "UV off the fish; caged L-glucose; fish water")])
         + head("what they found (Fig. 1e, 2, 3)") + rows([
-            ("D-glucose", ", ".join(f"{k} {v}/{f1['N']}" for k, v in f1.items() if k != "N") + " fish"),
+            *((("D-glucose" if i == 0 else ""), ", ".join(f"{k} {v}/{f1['N']}" for k, v in part) + (" fish" if i else ","))
+              for i, part in enumerate((lambda it: (it[:(len(it) + 1) // 2], it[(len(it) + 1) // 2:]))(
+                  [(k, v) for k, v in f1.items() if k != "N"]))),     # two rows: one was wider than the column
             ("", "L-glucose and fish water: 0 fish (Fig. 2c,d)"),
             ("site", f"foregut {PAPER['fig2g']['foregut']:,} vs midgut {PAPER['fig2g']['midgut']:,} cells (Fig. 2g)"),
             ("integration", "hindbrain: gut + motor; midbrain: gut + visual + motor")])
@@ -193,11 +227,12 @@ def slide_deposit():
         ax.plot([], [], color=SITE_COLS[k], lw=4, label=f"site {k}: {SITE_NAME[k]}")
     ax.legend(frameon=False, fontsize=9, labelcolor="white", loc="lower right", handlelength=1.5)
     fig.tight_layout()
-    fig.savefig(os.path.join(PRES, "figs", "02_design.png"), dpi=200, facecolor="black")
+    fig.savefig(os.path.join(PRES, "figs", "02_design.png"), dpi=200, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     n_f = len(D)
     per = {c: [d for d in D if d["condition"] == c] for c in COND_ORDER}
-    rate = lambda ds: ", ".join(sorted({f"{d['volume_s']:.2f} s" for d in ds}))
+    rate = lambda ds: (lambda v: f"{v[0]:.2f} s" if len(v) == 1 else f"{v[0]:.2f}-{v[-1]:.2f} s")(    # noqa: E731
+        sorted({round(d["volume_s"], 2) for d in ds}))                  # a range: the row fits the column (2026-10-05)
     right = (head(f"{n_f} fish, one session each, all on disk") + rows(
         [(COND_LABEL[c], f"{len(per[c])} fish, {np.mean([d['minutes'] for d in per[c]]):.0f} min, "
                          f"{np.mean([len(d['pulses']) for d in per[c]]):.0f} pulses, volume {rate(per[c])}") for c in COND_ORDER])
@@ -250,7 +285,7 @@ def slide_anatomy():
         [Line2D([], [], marker="s", ls="", color=c, markersize=7, label=l) for l, c in org]
     fig.legend(handles=h, loc="lower center", ncol=5, frameon=False, fontsize=8, labelcolor="white")
     fig.tight_layout(rect=(0, 0.08, 1, 1))
-    fig.savefig(os.path.join(PRES, "figs", "02b_anatomy.png"), dpi=200, facecolor="black")
+    fig.savefig(os.path.join(PRES, "figs", "02b_anatomy.png"), dpi=200, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     D = json.load(open(os.path.join(DATA, "design.json")))
     from collections import defaultdict
@@ -455,7 +490,7 @@ def figure_graph(op, P, path, n_show=80, seed=0, box_um=300.0):
     fig.tight_layout(rect=(0, 0.08, 1, 0.84))               # both panels under one title line, tops aligned
     pa, pb = a.get_position(), b.get_position()
     b.set_position([pb.x0, pa.y0, pb.width, pa.height])
-    fig.savefig(path, dpi=200, facecolor="black")
+    fig.savefig(path, dpi=200, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
 
 
@@ -567,7 +602,7 @@ def figure_graph3d(op, P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed=
         fig.text(0.01, 0.012, note, color="#fd8d3c", fontsize=8)
         for k, x in zip(("short", "mid", "long"), (0.60, 0.72, 0.84)):
             fig.text(x, 0.10, k, color=COL[k], fontsize=11, weight="bold")
-        fig.savefig(out, dpi=150, facecolor="black")
+        fig.savefig(out, dpi=150, facecolor="black", bbox_inches="tight", pad_inches=0.04)
         plt.close(fig)
 
     compose(fa, path)
@@ -712,7 +747,7 @@ def slides_kymo(rec_name=REC1, n_rows=100, bio=""):
                   else f"{DECK_TITLE} $\\cdot$ the input cells of the {_tex(label)}")
         body = (f"% generated by tools/exp20_slides.py (input kymograph {key})\n\\begin{{frame}}[t]{{{dtitle}}}\n"
                 f"\\vspace*{{\\bandgap}}\n"
-                f"\\begin{{center}}\\includegraphics[width=0.98\\textwidth,height=0.80\\textheight,keepaspectratio]"
+                f"\\begin{{center}}\\includegraphics[width=0.98\\textwidth,height=0.78\\textheight,keepaspectratio]"
                 f"{{figs/{png}}}\\end{{center}}\n\\end{{frame}}\n")
         out.append((f"b6{bio}_kymo_{key}" if bio else f"06_kymo_{key}", body))
     return out
@@ -819,13 +854,16 @@ def control_table(name, now):
         lr = E17.local_r(f, rec) if rec else None
         if lr is not None:
             loc += f"{lab_} & {E17.qv(lr['mean'], big=big)} $\\pm$ {lr['sd']:.3f} \\\\\n"
-    out = (head("the network test: brain-mean dF/F, the whole session") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r"
-           "@{\\hspace{5pt}}r@{}}\n& r & RMSE \\\\\n\\hline\n" + body + "\\end{tabular}\\par}\\vspace{6pt}\n")
+    z_ = np.load(lines[0][1]) if os.path.exists(lines[0][1]) else None          # the session's length, for the head
+    mins = (f"{len(z_['mean_obs_all']) * r['test']['frame_s'] / 60:.0f} min" if z_ is not None and "mean_obs_all" in z_
+            and r["test"].get("frame_s") else "the whole session")
+    out = (head(f"the network test: brain-mean dF/F, {mins}") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r"
+           "@{\\hspace{5pt}}r@{}}\n& r & RMSE \\\\\n\\hline\n" + body + "\\end{tabular}\\par}" + SEC_GAP)
     if loc:
         out += (head("local activity, the brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
                 "& r per cell, mean $\\pm$ SD \\\\\n\\hline\n" + loc + "\\end{tabular}\\par}\\vspace{2pt}\n"
                 "{\\tiny\\color{gray} per cell: the correlation over the session of its learned and recorded traces, each "
-                "first regressed on its own brain mean -- what the shared brain-wide signal does not carry\\par}\\vspace{6pt}\n")
+                "first regressed on its own brain mean -- what the shared brain-wide signal does not carry\\par}" + SEC_GAP)
     return out
 
 
@@ -866,7 +904,7 @@ def figure_batch(b, names, path):
     ax[-1].set_xticks(x, [f"{i + 1}" for i in range(len(names))], fontsize=8)
     ax[-1].set_xlabel("arm (table, right)")
     fig.tight_layout()
-    fig.savefig(path, dpi=180, facecolor="black")
+    fig.savefig(path, dpi=180, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     return N
 
@@ -901,7 +939,7 @@ def run_deck(b, fish=""):
     return BATCH_DECK[b] if not fish else BATCH_DECK[b].replace("glucose fish 1 and 4", fish).replace("glucose fish 1-6", fish)
 
 
-def slides_run(name, b, now=None, fish=""):
+def slides_run(name, b, now=None, fish="", what_=None):
     """Two slides per shown run, exp17's (tools/exp17_slides.py slides_run): the movie with the network test, the MSE
     table, exp20's gut trials, the free rollout and the training; the curves with the per-trial MSE and the scale."""
     import shutil
@@ -910,9 +948,9 @@ def slides_run(name, b, now=None, fish=""):
         return []
     out, rw = [], md_rows()
     v, what = rw.get(name, ("", ""))
-    names = BATCHES[b][1] if b in BATCHES else []                     # batch 6's arms: no BATCHES entry
-    arm = names.index(name) + 1 if name in names else ""
-    tag = f"batch {b}, arm {arm}" if arm and b != "4" else f"batch {b}"      # batch 4: the fish names the run
+    tag = f"batch {arm_numbers().get(name, b)}"     # "batch 6.11", never "batch 6, arm 11" (Cedric, 2026-10-05)
+    if what_ is not None:
+        what = what_                              # a one-line description, so the column keeps the deck's one size
     dt = run_deck(b, fish)
     t, rep = r["test"], r["report"]
     N = numbers(r)
@@ -923,7 +961,8 @@ def slides_run(name, b, now=None, fish=""):
     stages = rep.get("stages") or []
     ft = r["freetrial"]["arms"]["full"] if r["freetrial"] else None
     pm = lambda a, sd: f"{a:+.3f} $\\pm$ {sd:.3f}" if sd is not None else f"{a:+.3f}"
-    num = (head(f"{tag}: {_tex(name)}") + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n"
+    num = (head(f"{tag}: " + _tex(name).replace("\\_", "\\_\\allowbreak{}"))      # a long run name may break at _
+           + "{\\scriptsize " + _tex(what) + "\\par}" + SEC_GAP
            + control_table(name, now)
            + head("training") + rows([
                ("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "--"),
@@ -1208,7 +1247,7 @@ def slide_params(name, b, fish=""):
         return ("", "")
     return (f"{name}_params", f"% generated by tools/exp20_slides.py (learned constants of {name})\n"
             f"\\begin{{frame}}[t]{{batch {b} $\\cdot$ {fish or SHOWN[b][0][0]} $\\cdot$ the learned constants of {_tex(name)}}}\n"
-            "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.80\\textheight,"
+            "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.78\\textheight,"
             f"keepaspectratio]{{figs/param_maps_{name}.png}}\\end{{center}}\n\\vfill\n\\end{{frame}}\n")
 
 
@@ -1247,7 +1286,7 @@ def slides_fish_compare(b="3"):
     if os.path.exists(os.path.join(PRES, "figs", "param_24_b3.png")):
         PARAM_FISH[:] = [("97_param_fish_all", f"% generated by tools/exp20_slides.py (six-fish constants)\n\\begin{{frame}}[t]"
                           f"{{batch {b} $\\cdot$ six glucose fish, one law: the learned constants}}\n\\vspace*{{\\bandgap}}\\vfill\n"
-                          "\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,keepaspectratio]"
+                          "\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                           "{figs/param_24_b3.png}\\end{center}\n\\vfill\n\\end{frame}\n")]
     rows_ = [x for x in rows_ if x is not None]
     panels = [x for x in panels if x is not None]
@@ -1278,11 +1317,11 @@ def slides_fish_compare(b="3"):
     ax[1, 0].set_ylabel("mean dF/F, gut-responsive cells", fontsize=8)
     ax[0, 0].legend(frameon=False, fontsize=8, labelcolor="white")
     fig.tight_layout()
-    fig.savefig(os.path.join(PRES, "figs", "96_fish_traces.png"), dpi=170, facecolor="black")
+    fig.savefig(os.path.join(PRES, "figs", "96_fish_traces.png"), dpi=170, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     out.append(("96_fish_traces", f"% generated by tools/exp20_slides.py (fish to fish traces)\n\\begin{{frame}}[t]{{batch {b} "
                 f"$\\cdot$ six glucose fish, one law: the response to a gut pulse, recorded and learned}}\n\\vspace*{{\\bandgap}}\\vfill\n"
-                "\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.80\\textheight,keepaspectratio]{figs/96_fish_traces.png}"
+                "\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.78\\textheight,keepaspectratio]{figs/96_fish_traces.png}"
                 "\\end{center}\n\\vfill\n\\end{frame}\n"))
     return out + PARAM_FISH
 
@@ -1344,6 +1383,9 @@ def site_region(rec, site):
 
 
 def frame_full(title, body, src, deck_title=None):
+    """exp17's frame_wide: a slide with no right column, never through \\fitcol; its captions (\\tiny or 5.5 pt) at
+    CAPF, one size on every slide (Cedric, 2026-10-05)."""
+    body = body.replace("\\fontsize{5.5}{6.5}\\selectfont", CAPF).replace("\\tiny", CAPF)
     return (f"% generated by tools/exp20_slides.py from {src} ({title})\n\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n"
             f"\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n")
 
@@ -1356,12 +1398,9 @@ def _small(t):
     return "{\\tiny " + t + "}"
 
 
-def frame_top(title, png, w, left, right, src, deck_title=None, size=None):
-    """A wide figure across the slide, two text columns under it (the batch-4 comparison slides); `size` a smaller font
-    still for the text, the heads then tiny."""
+def frame_top(title, png, w, left, right, src, deck_title=None):
+    """A wide figure across the slide, two text columns under it (the batch-4 comparison slides); the text at CAPF."""
     left, right = _small(left), _small(right)
-    if size:
-        left, right = (x.replace("\\tiny", size).replace("\\scriptsize\\textbf{", "\\tiny\\textbf{") for x in (left, right))
     body = (f"\\vspace*{{0.2\\baselineskip}}{{\\centering\\includegraphics[width={w}\\textwidth]{{{png}}}\\par}}\\vspace{{4pt}}\n"
             "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\n" + left + "\n\\end{column}\n"
             "\\begin{column}{0.49\\textwidth}\n" + right + "\n\\end{column}\n\\end{columns}")
@@ -1849,7 +1888,7 @@ def slides_summary():
            "a per-cell law (the no-network twin) loses the response and the brain mean", "differs")]
     tab = ("{\\fontsize{6.5}{7.8}\\selectfont\\begin{tabular}{@{}p{0.33\\textwidth}@{\\hspace{8pt}}p{0.45\\textwidth}@{\\hspace{8pt}}p{0.17\\textwidth}@{}}\n"
            "\\textbf{the paper} & \\textbf{this session (recordings; laws)} & \\textbf{verdict} \\\\\n\\hline\n"
-           + "".join(f"{a} & {b} & {c} \\\\[2pt]\n" for a, b, c in T_) + "\\end{tabular}\\par}")
+           + "".join(f"{a} & {b} & {c} \\\\\\noalign{{\\vskip 9pt}}\n" for a, b, c in T_) + "\\end{tabular}\\par}")   # p{} rows: \\[Xpt] is swallowed
     out.append(("99b_paper", frame_full("the paper against the session", "\\vspace*{0.6\\baselineskip}" + tab,
                                         "Chen 2026; data/compare24.json, integration.json",
                                         deck_title="summary $\\cdot$ Chen 2026 against the session")))
@@ -1896,7 +1935,7 @@ def slides_atlas24(variant=None):
     if os.path.exists(os.path.join(PRES, "figs", "atlas_montage.png")):
         out.append(("at_montage", "% generated by tools/exp20_slides.py (atlas montage)\n\\begin{frame}[t]{atlas $\\cdot$ every "
                     "fish in Z-Brain: fish $\\to$ fish 1 (SimpleITK) $\\to$ Z-Brain (Cedric's 30 BigWarp landmarks)}\n"
-                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.84\\textheight,"
+                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,"
                     "keepaspectratio]{figs/atlas_montage.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     if os.path.exists(os.path.join(PRES, "figs", "atlas_regions_24.png")):
         def tab(keys):
@@ -1935,7 +1974,7 @@ def slides_atlas24(variant=None):
                         f"{v.get('score', float('nan')):.2f} (rho {v.get('rho', float('nan')):.2f}, inside "
                         f"{v.get('inside', float('nan')):.2f}) $\\cdot$ AP {apc(v)}, AP gut {apx(RA.tag(c_, k_))}}}"
                         "\n\\vspace*{\\bandgap}\\vfill\n\\begin{center}"
-                        f"\\includegraphics[width=\\textwidth,height=0.84\\textheight,keepaspectratio]{{figs/{png}}}"
+                        f"\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]{{figs/{png}}}"
                         "\\end{center}\n\\vfill\n\\end{frame}\n"))
     return out
 
@@ -2060,7 +2099,7 @@ def slides_b6():
         J = json.load(open(mr))
         r_ = np.load(os.path.join(DATA, "baselines_gutbrain_glucose_f1_cells.npz"))["responsive"]
         g = lambda k: J[k]
-        body = ("\\vspace*{0.2\\baselineskip}\\vfill{\\centering\\includegraphics[width=\\textwidth,height=0.84\\textheight,"
+        body = ("\\vspace*{0.2\\baselineskip}\\vfill{\\centering\\includegraphics[width=\\textwidth,height=0.78\\textheight,"
                 "keepaspectratio]{figs/mask_rules_f1.png}\\par}\\vfill")      # the maps large (Cedric, 2026-10-04)
         out.append(("b6_mask_rules", frame_full("the gut-input cells, six rules", body, "tools/exp20_mask_rules.py",
                                                 deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the gut-input cells (the "
@@ -2090,12 +2129,11 @@ def slides_b6():
                    "with the batch 1-5 mask; batch 4's SIREN law, the mask or the graph alone changed\\par}")
         out.append(("b6_mask_traces", frame_top("what each rule's gut-input cells do", "figs/mask_rules_traces_f1.png", 0.64, left,
                                                 right, "tools/exp20_mask_rules.py", deck_title="batch 6 $\\cdot$ glucose "
-                                                "fish 1 $\\cdot$ the gut-input cells of each rule, around gut and control pulses",
-                                                size="\\fontsize{5}{6}\\selectfont")))   # Cedric, 2026-10-05: "smaller font"
+                                                "fish 1 $\\cdot$ the gut-input cells of each rule, around gut and control pulses")))
     if os.path.exists(os.path.join(PRES, "figs", "06_kymo_uv.png")):      # slide 8, again, for the discussion
         out.append(("b6_kymo_uv_old", "% generated by tools/exp20_slides.py (slide 8 again)\n\\begin{frame}[t]"
                     "{batch 6 $\\cdot$ discussion $\\cdot$ the gut-input cells of batches 1-5 (slide 8)}\n"
-                    "\\vspace*{\\bandgap}\n\\begin{center}\\includegraphics[width=0.98\\textwidth,height=0.80\\textheight,"
+                    "\\vspace*{\\bandgap}\n\\begin{center}\\includegraphics[width=0.98\\textwidth,height=0.78\\textheight,"
                     "keepaspectratio]{figs/06_kymo_uv.png}\\end{center}\n\\end{frame}\n"))
     out += slides_kymo(bio="_paper3sd")
     if os.path.exists(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1_anat_apvg.npz")):
@@ -2105,7 +2143,7 @@ def slides_b6():
     if os.path.exists(os.path.join(PRES, "figs", "atlas_f1.png")):          # fish 1 in Z-Brain (BigWarp, Cedric's landmarks)
         out.append(("b6_atlas", f"% generated by tools/exp20_slides.py (fish 1 in the atlas)\n\\begin{{frame}}[t]"
                     "{batch 6 $\\cdot$ glucose fish 1 in the Z-Brain atlas (BigWarp, 30 landmarks)}\n\\vspace*{\\bandgap}\\vfill\n"
-                    "\\begin{center}\\includegraphics[width=\\textwidth,height=0.84\\textheight,keepaspectratio]"
+                    "\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                     "{figs/atlas_f1.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     bj = os.path.join(DATA, "batch6.json")                  # THE RESULTS (tools/exp20_batch6.py)
     if os.path.exists(bj) and os.path.exists(os.path.join(PRES, "figs", "batch6_bars.png")):
@@ -2145,7 +2183,7 @@ def slides_b6():
                 "\\end{itemize}\\par}")
         out.append(("b6_results", "% generated by tools/exp20_slides.py (batch 6 bars)\n\\begin{frame}[t]{batch 6 $\\cdot$ "
                     "glucose fish 1 $\\cdot$ results: the graph and the gut-input cells, the network test}\n\\vspace*{\\bandgap}"
-                    "\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,keepaspectratio]"
+                    "\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                     "{figs/batch6_bars.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
         body = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.34\\textwidth}\n" + left
                 + "\n\\end{column}\n\\begin{column}{0.64\\textwidth}\n" + tab + "\n\\end{column}\n\\end{columns}")
@@ -2154,7 +2192,7 @@ def slides_b6():
     if os.path.exists(os.path.join(PRES, "figs", "batch6_traces.png")):
         out.append(("b6_traces", "% generated by tools/exp20_slides.py (batch 6 traces)\n\\begin{frame}[t]{batch 6 $\\cdot$ "
                     "glucose fish 1 $\\cdot$ the response to a gut pulse, per gut-input rule: neuron graph (solid), mesh (dashed)}\n"
-                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,"
+                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,"
                     "keepaspectratio]{figs/batch6_traces.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     out += slides_b6_arms()
     if os.path.exists(os.path.join(PRES, "Movies", "mask3d_f1.mp4")):
@@ -2164,8 +2202,10 @@ def slides_b6():
     return out
 
 
-B6_ARMS = [("gb_b6_glucose_f1_mesh4_anat_apvg", "atlas: area postrema + vagal ganglia, 4-level mesh"),
-           ("gb_b6_glucose_f1_mesh4_anat_dvc", "atlas: dorsal vagal complex, 4-level mesh")]
+B6_ARMS = [("gb_b6_glucose_f1_mesh4_anat_apvg", "atlas: area postrema + vagal ganglia, 4-level mesh",
+            "the atlas's area postrema + vagal ganglia (527 cells) as the gut-input cells, on the 4-level mesh"),
+           ("gb_b6_glucose_f1_mesh4_anat_dvc", "atlas: dorsal vagal complex, 4-level mesh",
+            "the atlas's dorsal vagal complex (2,037 cells) as the gut-input cells, on the 4-level mesh")]
 
 
 def slides_b6_arms():
@@ -2173,15 +2213,56 @@ def slides_b6_arms():
     per-fish template -- the free-rollout movie with the network test (brain-mean R2, the law and W = 0), the SIREN
     modulation, the learned constants, every pulse site; the W = 0 slide built but commented out, as batch 4's."""
     out = []
-    for name, lab in B6_ARMS:
+    for name, lab, what_ in B6_ARMS:
         if not landed(name):
             continue
         fish = f"glucose fish 1, {lab}"
-        o = [s for s in slides_run(name, "6", None, fish) if s[0].endswith("_movie")]
+        o = [s for s in slides_run(name, "6", None, fish, what_=what_) if s[0].endswith("_movie")]
         o += [slide_omega(name, fish, b="6"), slide_params(name, "6", fish), slide_sites_b4(name, None, fish, b="6")]
         o += slides_controls(name, None, "6", fish)
         out += [(f"b6arm_{st[3:] if st.startswith('b4_') else st}", bd) for st, bd in o if bd]
     return out
+
+
+_B6 = lambda *suf: [f"gb_b6_glucose_f1_{x}" for x in suf]                              # noqa: E731
+_B6_ALL = ["mesh3", "mesh4", "mesh5", "bio", "mesh4_bio", "paper2", "paper3", "mesh4_paper2", "mesh4_paper3", "anat_apvg",
+           "mesh4_anat_apvg", "anat_dvc", "mesh4_anat_dvc"]
+STEM_ARMS = {"b6_mesh_levels": _B6("mesh3", "mesh4", "mesh5"), "b6_mesh3": _B6("mesh3"), "b6_mesh4": _B6("mesh4"),
+             "b6_mesh5": _B6("mesh5"), "b6_kymo_uv_old": _B6("mesh3", "mesh4", "mesh5"),
+             "b6_paper3sd_kymo_uv": _B6("paper3", "mesh4_paper3"), "b6_anat_apvg_kymo_uv": _B6("anat_apvg", "mesh4_anat_apvg"),
+             "b6_atlas": _B6("anat_apvg", "mesh4_anat_apvg", "anat_dvc", "mesh4_anat_dvc"),
+             **{k: _B6(*_B6_ALL) for k in ("b6_mask_rules", "b6_mask_traces", "b6_results", "b6_results_table", "b6_traces",
+                                           "b6_mask3d")}}
+RUN_KIND = {"omega": "modulation", "params": "the learned constants", "sites": "network dynamics, every site",
+            "controls": "W = 0 at inference, and no W", "nonet_movie": "no W", "curves": "the prediction, step by step"}
+
+
+def retitle(stem, body):
+    """CEDRIC, 2026-10-05 (exp17's rule): every batch slide's title carries its batch.arm, the md's numbering -- a run's
+    results slide "batch 6.11 (<law>)", no run name (it stays in the column's head); an analysis slide of one run
+    "batch 6.11 $\\cdot$ modulation"; a batch-wide slide its arm range, "batch 6.1--6.13 $\\cdot$ ...". Never
+    "batch X, arm Y"."""
+    m_ = re.search(r"\\begin\{frame\}\[t\]\{(.*)\}\n", body)
+    if not m_:
+        return body
+    old, new = m_.group(1), None
+    A = arm_numbers()
+    run = next((n for n in sorted(A, key=len, reverse=True) if stem.startswith((f"b6arm_{n}_", f"b4_{n}_", f"{n}_"))), None)
+    if run:                                                     # a slide of one run
+        kind = stem.split(run + "_", 1)[1]
+        if kind == "movie":
+            rest = re.sub(r"^batch \d+ \$\\cdot\$ ", "", old).replace(" $\\cdot$ ", ", ")
+            law = f"the SIREN law, {rest}" if A[run].startswith("6.") else rest
+            new = f"batch {A[run]} ({law})"
+        else:
+            new = f"batch {A[run]} $\\cdot$ {RUN_KIND.get(kind, kind.replace('_', ' '))}"
+    elif stem in STEM_ARMS or stem.startswith(("b4_", "b5_")):  # a batch-wide slide
+        names = STEM_ARMS.get(stem) or [n for n in A if A[n].startswith("4." if stem.startswith("b4_") else "5.")]
+        rest = re.sub(r"^batch \d+ \$\\cdot\$ ", "", old).replace(" (slide 8)", "")
+        new = f"batch {arm_range(names)} $\\cdot$ {rest}" if arm_range(names) else None
+    if not new:
+        return body
+    return body.replace("\\begin{frame}[t]{" + old + "}", "\\begin{frame}[t]{" + new + "}", 1)
 
 
 def main():
@@ -2244,7 +2325,7 @@ def main():
         if not body:
             print(f"[slides] {stem}: no data yet, skipped")
             continue
-        open(os.path.join(PRES, "slides", f"{stem}.tex"), "w").write(no_stimuli_only(body))
+        open(os.path.join(PRES, "slides", f"{stem}.tex"), "w").write(retitle(stem, no_stimuli_only(body)))
         out.append(stem)
         print(f"[slides] {stem}")
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(
