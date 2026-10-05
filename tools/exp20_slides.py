@@ -1810,6 +1810,51 @@ def slides_summary():
     return out
 
 
+def slides_b5():
+    """BATCH 5 (the summary's new jobs, 2026-10-04/05): each arm against its batch-4 twin -- brain-mean R2 of the free
+    rollout and the gut response kept (tools/exp20_batch6.py's measures); fish 4's 41-min window as the movie."""
+    import shutil
+    import exp20_batch6 as B6
+    pairs = [("fish 4, a 41-min window", "gb_sx_f4_mask_siren", "gb_b5_glucose_f4_w41"),
+             ("fish 4, twice the updates", "gb_sx_f4_mask_siren", "gb_b5_glucose_f4_x2"),
+             ("glucose 1, seed 1", "gb_sx_f1_mask_siren", "gb_b5_glucose_f1_s1"),
+             ("glutamate 1, seed 1", "gb_b4_glutamate_f1", "gb_b5_glutamate_f1_s1"),
+             ("blood glucose 3, seed 1", "gb_b4_blood_glucose_f3", "gb_b5_blood_glucose_f3_s1"),
+             ("glucose 1, swim as input", "gb_sx_f1_mask_siren", "gb_b5_glucose_f1_swim"),
+             ("glucose 3, swim as input", "gb_sx_f3_mask_siren", "gb_b5_glucose_f3_swim")]
+
+    def m(n):
+        if not landed(n):
+            return None, None
+        G = B6.gut(n)
+        return B6.bm(n), (G["full"]["law"] / G["full"]["rec"]) if G and "full" in G else None
+    f = lambda v, fm="{:+.2f}": fm.format(v) if v is not None else "--"          # noqa: E731
+    rows_ = []
+    for lab, a, b in pairs:
+        (ba, ga), (bb, gb) = m(a), m(b)
+        rows_.append(f"{lab} & {f(ba)} & {f(ga, '{:.2f}')} & {f(bb) if bb is not None else 'training'} & "
+                     f"{f(gb, '{:.2f}') if bb is not None else ''} \\\\\n")
+    tab = ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{\\hspace{10pt}}r@{\\hspace{6pt}}r@{}}\n"
+           "& \\multicolumn{2}{c}{batch-4 twin} & \\multicolumn{2}{c}{this run} \\\\\n"
+           "arm & brain R$^2$ & gut kept & brain R$^2$ & gut kept \\\\\n\\hline\n" + "".join(rows_) + "\\end{tabular}\\par}\\vspace{6pt}\n"
+           "{\\tiny brain R$^2$: the brain-mean dF/F of the free rollout of the session; gut kept: the gut-responsive "
+           "cells' evoked change after every gut pulse, the law's over the recorded\\par}\\vspace{6pt}\n"
+           + head("what batch 5 says") + "{\\scriptsize the same law on 41 minutes of fish 4 fits as fish 1-3 do: the "
+           "long sessions fail by their length (100 min of slow drift), not by the fish. The seed moves both numbers by "
+           "0.05 at most: the fish-to-fish differences are real. The swim, the brain's own motor output, lifts the brain "
+           "mean by 0.07-0.10 and leaves the gut response.\\par}")
+    n = "gb_b5_glucose_f4_w41"
+    r = landed(n)
+    left = ""
+    if r and os.path.exists(os.path.join(r["dir"], "results", "movie.mp4")):
+        for ext in ("mp4", "png"):
+            shutil.copyfile(os.path.join(r["dir"], "results", f"movie.{ext}"), os.path.join(PRES, "Movies", f"{n}.{ext}"))
+        left = f"\\playmovie{{Movies/{n}}}"
+    return [("b5_summary", frame("batch 5: the follow-up jobs", left, tab, "tools/exp20_batch6.py measures",
+                                 left_gap=True, deck_title="batch 5 $\\cdot$ the summary's new jobs $\\cdot$ left: fish 4 "
+                                                           "on a 41-min window"))]
+
+
 def slides_b6():
     """BATCH 6 (Cedric, 2026-10-04, via exp17): exp17's multi-level mesh (graph: mesh, cell_ops.neuron_mesh_levels) on
     glucose fish 1 -- exp17's mesh slides twinned (tools/exp20_mesh_figures.py: the level panels, GraphCast Fig. 1e, g,
@@ -1916,6 +1961,37 @@ def slides_b6():
                     "{batch 6 $\\cdot$ glucose fish 1 in the Z-Brain atlas (BigWarp, 30 landmarks)}\n\\vspace*{\\bandgap}\\vfill\n"
                     "\\begin{center}\\includegraphics[width=\\textwidth,height=0.84\\textheight,keepaspectratio]"
                     "{figs/atlas_f1.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
+    bj = os.path.join(DATA, "batch6.json")                  # THE RESULTS (tools/exp20_batch6.py)
+    if os.path.exists(bj) and os.path.exists(os.path.join(PRES, "figs", "batch6_bars.png")):
+        B6 = json.load(open(bj))
+        f2 = lambda v, f="{:+.2f}": f.format(v) if v is not None else "--"         # noqa: E731
+        tab = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{}}\n"
+               "& & \\multicolumn{2}{c}{brain-mean R$^2$} & \\multicolumn{2}{c}{gut response kept} \\\\\n"
+               "graph & gut-input cells & law & W = 0 & law & W = 0 \\\\\n\\hline\n"
+               + "".join(f"{r['graph']} & {_tex(r['mask'])} & {f2(r['brain_r2'])} & {f2(r['brain_r2_W0'])} & "
+                         f"{f2(r.get('gut_kept'), '{:.2f}')} & {f2(r.get('gut_kept_W0'), '{:.2f}')} \\\\\n" for r in B6)
+               + "\\end{tabular}\\par}")
+        left = ("{\\scriptsize\\textbf{what batch 6 says}}\\\\[2pt]{\\tiny\\begin{itemize}\\setlength{\\itemsep}{1pt}\n"
+                "\\item every arm makes the gut response through the network: W = 0 keeps 0.00-0.02 of it\n"
+                "\\item the multi-level mesh keeps MORE of the gut response than the neuron graph (0.51-0.59 against 0.48 "
+                "with the batch 1-5 mask; more levels, more kept), for a little less brain-mean R$^2$ (0.64-0.67 against 0.72)\n"
+                "\\item truer gut-input cells cost gut response on the neuron graph (0.48 with 19,035 cells, 0.34 with the "
+                "paper's 2,538, 0.18 with the atlas's 527) but hardly brain-mean R$^2$ (0.70-0.76); the 4-level mesh "
+                "carries the signal from few entry cells better (0.51 with 2,538, 0.29 with 527)\n"
+                "\\end{itemize}\\par}")
+        out.append(("b6_results", "% generated by tools/exp20_slides.py (batch 6 bars)\n\\begin{frame}[t]{batch 6 $\\cdot$ "
+                    "glucose fish 1 $\\cdot$ results: the graph and the gut-input cells, the network test}\n\\vspace*{\\bandgap}"
+                    "\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,keepaspectratio]"
+                    "{figs/batch6_bars.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
+        body = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.44\\textwidth}\n" + left
+                + "\n\\end{column}\n\\begin{column}{0.54\\textwidth}\n" + tab + "\n\\end{column}\n\\end{columns}")
+        out.append(("b6_results_table", frame_full("batch 6, the numbers", body, "data/batch6.json",
+                                                   deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ results, the numbers")))
+    if os.path.exists(os.path.join(PRES, "figs", "batch6_traces.png")):
+        out.append(("b6_traces", "% generated by tools/exp20_slides.py (batch 6 traces)\n\\begin{frame}[t]{batch 6 $\\cdot$ "
+                    "glucose fish 1 $\\cdot$ the response to a gut pulse, per gut-input rule: neuron graph (solid), mesh (dashed)}\n"
+                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,"
+                    "keepaspectratio]{figs/batch6_traces.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     if os.path.exists(os.path.join(PRES, "Movies", "mask3d_f1.mp4")):
         body = "\\vspace*{1.0\\baselineskip}{\\centering\\playmovie[0.92\\textwidth]{Movies/mask3d_f1}\\par}"   # no caption (Cedric)
         out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_mask3d.py",
@@ -1965,6 +2041,10 @@ def main():
             deck += slides_b4_fish(c, k)
         except Exception as e:
             print(f"[slides] batch 4 {c} {k} FAILED: {e!r}")
+    try:
+        deck += slides_b5()                                # batch 5, then batch 6, at the deck's end
+    except Exception as e:
+        print(f"[slides] slides_b5 FAILED: {e!r}")
     try:
         deck += slides_b6()                                # batch 6 at the deck's end (Cedric, 2026-10-04)
     except Exception as e:
