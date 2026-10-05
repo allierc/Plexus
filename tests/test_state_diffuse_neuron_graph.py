@@ -310,3 +310,20 @@ def test_mesh_graph(tmp_path):
         setup(str(tmp_path), graph="mesh")                                        # levels needed
     with pytest.raises(ValueError):
         setup(str(tmp_path), mesh_levels=3)                                       # only with graph: mesh
+
+
+def test_rate_bounds(tmp_path):
+    """exp17 (Cedric, 2026-10-05: tau in [1, 100] s): `rate_min` and `rate_max` bound every learned rate to (rate_min,
+    rate_max) for any raw value; without them the law is unchanged."""
+    import torch
+    o = setup(str(tmp_path))[0]
+    lo, hi = 0.914 / 100, 0.914 / 1
+    b = setup(str(tmp_path), rate_min=lo, rate_max=hi)[0]
+    raw = torch.linspace(-30, 30, 2001)
+    r = b._rate(raw)
+    assert float(r.min()) > lo * 0.999 and float(r.max()) < hi * 1.001
+    assert torch.all(r[1:] >= r[:-1])                                          # still monotone in the raw value
+    assert torch.equal(o._rate(raw), torch.nn.functional.softplus(raw))       # no bounds: softplus, as before
+    import pytest
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), rate_min=1.0, rate_max=0.5)

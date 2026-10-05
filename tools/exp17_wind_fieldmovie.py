@@ -93,7 +93,7 @@ def main(run, sigma, device="cuda:0", step=3):
             u, vv = w[f, 0], w[f, 1]
             m = np.hypot(u, vv)
             r = np.sqrt(np.clip(m / ref, 0, 1))
-            L = 2.8 * r / np.maximum(m, 1e-12)
+            L = 5.6 * r / np.maximum(m, 1e-12)            # twice longer (Cedric, 2026-10-04)
             q.set_UVC(u * L, vv * L)
             q.set_facecolor(np.concatenate([np.tile(col, (len(r), 1)), np.clip(r, 0.0, 1.0)[:, None]], 1))
         t_txt.set_text(f"{names[int(cond[f])]}   t = {tm[f]:5.1f} min")

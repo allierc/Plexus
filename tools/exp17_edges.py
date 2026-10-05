@@ -39,11 +39,17 @@ def edges_of(name):
     C = get_contract("state_diffuse").implementations["neuron_graph"]
     o = C({"_at": op.get("at", "neuron"), "block": op["block"], "positions": op["positions"],
            "positions_file": op["positions_file"], "inputs": 1, "short_k": op.get("short_k", 6),
-           "mid_um": op.get("mid_um", 32.0), "long_um": op.get("long_um", 128.0)})
+           "mid_um": op.get("mid_um", 32.0), "long_um": op.get("long_um", 128.0),
+           # the graph's own options (a mesh, turned or random reaches): without them a mesh run would be drawn on
+           # the default axes graph (2026-10-05)
+           **{k: op[k] for k in ("graph", "mesh_levels", "mesh_bin_um", "reach_dirs", "reach_rotation_deg", "graph_seed")
+              if k in op}})
     fit = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location="cpu")["fitted"]
     W = {s: fit[f"state_diffuse.W_{s}"].float().numpy() for s in SETS if f"state_diffuse.W_{s}" in fit}
     E = {s: (o._E[s][0].cpu().numpy(), o._E[s][1].cpu().numpy()) for s in W}
     pos = np.asarray(np.load(o._pos_file[0])[o._pos_file[1]], np.float64)
+    if getattr(o, "graph_kind", "spatial") == "mesh":
+        return E, W, pos, {"short": "every neuron's level", "mid": "16 / 32 um levels", "long": "64 um and coarser"}
     return E, W, pos, {"short": f"{o.short_k} nearest", "mid": f"+-{o.reach['mid']:.0f} um",
                        "long": f"+-{o.reach['long']:.0f} um"}
 
@@ -197,34 +203,47 @@ def render_amplitude(name, pooled_top=9000, size=(1300, 800)):
                     img = img[int(0.18 * hh):int(0.88 * hh)]
                 panels[(s, sign, view)] = img
                 pl.close()
-    # four rows: W > 0 from above, from the side; W < 0 from above, from the side
-    fig = plt.figure(figsize=(16, 12.5), facecolor="black")
-    rows_ = [(1, "top", 0.245), (1, "side", 0.165), (-1, "top", 0.245), (-1, "side", 0.165)]   # + 4 gaps: ~0.95
-    y = 0.99
+    # Cedric, 2026-10-04: no blank inside the panels -- each view cropped to the union of what any of its panels draws
+    # (one crop per view, so every panel of a view keeps the same scale), the figure laid out from the crops' shapes
+    for view in ("top", "side"):
+        ks = [k for k in panels if k[2] == view]
+        ink = np.any(np.stack([panels[k].max(-1) > 14 for k in ks]), 0)
+        r_, c_ = np.where(ink.any(1))[0], np.where(ink.any(0))[0]
+        for k in ks:
+            panels[k] = panels[k][max(r_[0] - 4, 0):r_[-1] + 5, max(c_[0] - 4, 0):c_[-1] + 5]
+    sets_ = [s for s in SETS if s in W]
+    FW, CBW, LB, GP = 16.0, 0.7, 0.30, 0.10                          # inches: width, colour bars, label, gap
+    CW = (FW - CBW - 0.1) / len(sets_)
+    hv = {v: CW * panels[(sets_[0], 1, v)].shape[0] / panels[(sets_[0], 1, v)].shape[1] for v in ("top", "side")}
+    rows_ = [(1, "top"), (1, "side"), (-1, "top"), (-1, "side")]
+    FH = sum(LB + hv[v] + GP for _, v in rows_) + 0.35
+    fig = plt.figure(figsize=(FW, FH), facecolor="black")
+    y = FH
     lab = iter("abcdefghijkl")
     ybar = {}
-    for sign, view, h in rows_:
-        y -= h + 0.03
-        for j, s in enumerate([s for s in SETS if s in W]):
-            ax = fig.add_axes([0.003 + j / 3.15, y, 1 / 3.15 - 0.006, h])
+    for sign, view in rows_:
+        h = hv[view]
+        y -= LB + h + GP
+        for j, s in enumerate(sets_):
+            ax = fig.add_axes([(0.02 + j * CW) / FW, y / FH, (CW - 0.04) / FW, h / FH])
             ax.imshow(panels[(s, sign, view)])
             ax.axis("off")
-            fig.text(0.01 + j / 3.15, y + h + 0.004, f"{next(lab)}   {s} edges ({reach[s]}), W {'>' if sign > 0 else '<'} 0"
+            fig.text((0.04 + j * CW) / FW, (y + h + 0.03) / FH, f"{next(lab)}   {s} edges ({reach[s]}), W {'>' if sign > 0 else '<'} 0"
                      + (f": {counts[(s, sign)]:,}, from above" if view == "top" else ", from the side"),
-                     color="white", fontsize=11, va="bottom")
-        ybar.setdefault(sign, []).append((y, h))
+                     color="white", fontsize=12, va="bottom")
+        ybar.setdefault(sign, []).append((y / FH, h / FH))
     for sign, cmap in ((1, "Reds"), (-1, "Blues")):
         (y0, h0), (y1, h1) = ybar[sign]
-        cax = fig.add_axes([0.955, y1 + 0.02, 0.01, (y0 + h0) - y1 - 0.04])
+        cax = fig.add_axes([(FW - CBW + 0.15) / FW, y1 + 0.01, 0.12 / FW, (y0 + h0) - y1 - 0.02])
         sm = plt.cm.ScalarMappable(cmap=CM[cmap], norm=plt.Normalize(cut, vmax))
         cb = fig.colorbar(sm, cax=cax)
-        cb.ax.tick_params(colors="0.75", labelsize=8)
-        cb.set_label("|W|", color="0.75", fontsize=9)
+        cb.ax.tick_params(colors="0.75", labelsize=9)
+        cb.set_label("|W|", color="0.75", fontsize=10)
     fig.text(0.01, 0.01, f"one cut for the three sets: |W| >= {cut:.3g} (the {pooled_top:,} largest |W| of all "
              f"{len(allw):,} edges); one colour range {cut:.3g} .. {vmax:.3g}; grey: the neurons; head left",
-             color="0.6", fontsize=9)
+             color="0.6", fontsize=10)
     path = os.path.join(EXP, "presentation", "figs", f"edges_amp_{name}.png")
-    fig.savefig(path, dpi=130, facecolor="black")
+    fig.savefig(path, dpi=130, facecolor="black", bbox_inches="tight", pad_inches=0.03)
     plt.close(fig)
     shutil.copy(path, os.path.join(EXP, "png", os.path.basename(path)))
     print(f"[edges] {path}: cut {cut:.3g}; counts " + ", ".join(f"{s}{'+' if g > 0 else '-'} {c}" for (s, g), c in counts.items()))

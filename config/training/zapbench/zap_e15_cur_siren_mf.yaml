@@ -1,20 +1,13 @@
-name: zap_e15_cur_siren_mesh3
-model: config/zapbench/zap_e15_cur_siren_mesh3.yaml
+name: zap_e15_cur_siren_mf
+model: config/zapbench/zap_e15_cur_siren_mf.yaml
 learnable:
-- param: W_short
+- param: W_mean
   op: state_diffuse
   lr: 0.0009
   prior:
     l1: 7.5e-05
     l2: 7.5e-07
-  title: one weight per short edge (the finest level, every neuron's Delaunay neighbours)
-- param: W_mid
-  op: state_diffuse
-  lr: 0.0009
-  prior:
-    l1: 7.5e-05
-    l2: 7.5e-07
-  title: one weight per middle edge (the 16- and 32-um levels)
+  title: each neuron's gain on the brain mean of tanh(z)
 - block: tau
   of: neuron
   lr: 0.0018
@@ -53,16 +46,9 @@ task:
   - name: nominal
   - name: W0
     zero:
-    - W_short
-    - W_mid
+    - W_mean
   - name: no_stimulus
     drive: 'off'
-  - name: no_short
-    zero:
-    - W_short
-  - name: no_mid
-    zero:
-    - W_mid
 training:
   optimizer: adam
   lr: 0.0018

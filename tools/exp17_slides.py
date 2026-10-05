@@ -1085,7 +1085,8 @@ def bm_metrics(npz):
     o, p_ = np.asarray(z["mean_obs_all"], float), np.asarray(z["mean_pred_all"], float)
     ok = np.isfinite(o) & np.isfinite(p_)
     o, p_ = o[ok], p_[ok]
-    return {"r2": 1 - ((p_ - o) ** 2).sum() / ((o - o.mean()) ** 2).sum(), "rmse": float(np.sqrt(((p_ - o) ** 2).mean()))}
+    return {"r2": 1 - ((p_ - o) ** 2).sum() / ((o - o.mean()) ** 2).sum(), "rmse": float(np.sqrt(((p_ - o) ** 2).mean())),
+            "r": float(np.corrcoef(o, p_)[0, 1])}      # Pearson r: the tables' metric, as the local one (Cedric, 2026-10-05)
 
 
 def _per_neuron_r2(npz):
@@ -1104,27 +1105,30 @@ def network_table(r, landed):
     n, res = r["name"], os.path.join(r["dir"], "results")
     b0 = str(r["row"].get("batch", "")).split(".")[0]
     arms = next((a for t, _, a, _ in BATCHES if t.split(":")[0] == f"batch {b0}"), ())
-    nows = [m for _, m in arms if m.endswith("_now") and m != n and ("noeph" in m) == ("noeph" in n)]   # 15.12 <-> 15.13
+    nows = ([] if n.endswith("_now") else       # a no-W run is its own twin: no row for it (2026-10-05)
+            [m for _, m in arms if m.endswith("_now") and m != n and ("noeph" in m) == ("noeph" in n)])   # 15.12 <-> 15.13
     # the batch's no-network twin: of its `_now` arms, the one sharing the longest name prefix (12: leaky or not)
     twin = max(nows, key=lambda m: len(os.path.commonprefix([m, n]))) if nows else None
     lines = [("full model", os.path.join(res, f"{n}_movie.npz")),
              ("W = 0 at inference", os.path.join(res, f"{n}_W0_movie.npz")),
              ("no stimulus", os.path.join(res, f"{n}_no_stimulus_movie.npz")),
-             ("trained with no network", os.path.join(landed[twin]["dir"], "results", f"{twin}_movie.npz")
+             ("no W", os.path.join(landed[twin]["dir"], "results", f"{twin}_movie.npz")
               if twin in landed else None)]
     body = ""
     for lab, f in lines:
         m = bm_metrics(f) if f else None
         if m is None:
-            if lab in ("full model", "trained with no network"):
+            if lab == "full model" or (lab == "no W" and twin):
                 st = ("--" if lab == "full model" else "running" if twin and os.path.exists(os.path.join(
                     ROOT, "config", "training", "zapbench", f"{twin}.yaml")) else "not trained")
                 body += f"{lab} & \\multicolumn{{2}}{{l}}{{{st}}} \\\\\n"
             continue
-        body += f"{lab} & {m['r2']:+.3f} & {m['rmse']:.4f} \\\\\n"
+        big_ = lab == "full model"
+        body += (f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{lab}}}}}" if big_ else lab) + f" & {qv(m['r'], big=big_)} & {m['rmse']:.4f} \\\\\n"
     return (head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
-            "& R$^2$ & RMSE \\\\\n\\hline\n" + body
-            + "\\end{tabular}\\par}\\vspace{6pt}\n")
+            "& r & RMSE \\\\\n\\hline\n" + body
+            + "\\end{tabular}\\par}" + SEC_GAP
+            + local_table([(lab, f) for lab, f in lines if f], r["test"].get("trace_recording", "zapbench")))
 
 
 # THE LAW ON A RESULTS SLIDE (Cedric, 2026-10-04: "slide 14 rewrite the known-ODE equation + Omega"), from
@@ -1140,6 +1144,7 @@ LAW_KNOWN_ODE = ("{\\normalsize\\textbf{the law: the known ODE, + $\\Omega$}}\\\
                  "SIREN of its position $p_i$ and the time $t$, its last layer at 0 ($\\Omega_i = 1$ untrained); learned "
                  "from batch 14 on, $\\Omega_i = 1$ in this run. 4 Euler substeps per frame (0.914 s).\\par}\\vspace{6pt}\n")
 CURVES_TODO = {}                    # {slide name: run} curves figures to redraw once the deck knows the slide is shown
+PANEL_A_ONLY = {"zap_b8_lin"}       # curves slides cut to panel a, the forecast error per step (Cedric, 2026-10-04)
 
 
 def curves_bm(r, path):
@@ -1154,7 +1159,8 @@ def curves_bm(r, path):
     if not os.path.exists(zp) or "mean_obs_all" not in np.load(zp):
         return False
     src = [f for f in (zp, hp, tp) if os.path.exists(f)]
-    if os.path.exists(path) and os.path.getmtime(path) > max(os.path.getmtime(f) for f in src):
+    if (os.path.exists(path) and os.path.getmtime(path) > max(os.path.getmtime(f) for f in src)
+            and r["name"] not in PANEL_A_ONLY):        # a cut figure is redrawn whole first
         return True
     z, t = np.load(zp), r["test"]
     ref = yaml.safe_load(open(os.path.join(r["dir"], "config.yaml")))["task"]["reference"]["trace_recording"]
@@ -1164,6 +1170,73 @@ def curves_bm(r, path):
     TR.render_curves(t, path, t["names"], gates, history=hist,
                      brain_mean=(np.asarray(z["r2_t"]) * t["frame_s"] / 60, z["mean_obs_all"], z["mean_pred_all"]))
     return True
+
+
+SEC_GAP = "\\vspace{\\baselineskip}\n"           # one blank line between a results column's sections (Cedric, 2026-10-05)
+
+
+def qv(v, fmt="{:+.3f}", big=False):
+    """A value coloured by quality (Cedric, 2026-10-05): green > 0.8, orange > 0.4, red otherwise; `big`: the full
+    model's row, larger and bold."""
+    col = "{rgb}{0.30,0.85,0.30}" if v > 0.8 else ("{rgb}{1.0,0.62,0.10}" if v > 0.4 else "{rgb}{1.0,0.30,0.25}")
+    t = f"\\textcolor[{col.split('}{')[0][1:]}]{{{col.split('}{')[1][:-1]}}}{{{fmt.format(v)}}}"
+    return f"{{\\normalsize\\textbf{{{t}}}}}" if big else t
+
+
+def local_r(npz, rec_name):
+    """THE LOCAL METRIC (Cedric, 2026-10-05: "computed per neuron, print mean +- SD"): per neuron, the correlation over the
+    free rollout's movie frames between its learned and its recorded trace, each first regressed on its OWN brain mean
+    (the learned trace on the learned brain mean, the recorded on the recorded) -- the part of a neuron's activity the
+    shared brain-wide signal does not carry. {mean, sd, n} over the neurons whose recorded residual moves; cached in
+    <npz>.local_r.json. None without the npz."""
+    if not os.path.exists(npz):
+        return None
+    cj = npz + ".local_r.json"
+    if os.path.exists(cj) and os.path.getmtime(cj) > os.path.getmtime(npz):
+        c_ = json.load(open(cj))
+        if c_.get("v") == 2:
+            return c_
+    from plexus.tasks import trace_recording as TR
+    if rec_name not in _REC:
+        _REC[rec_name] = TR.load(rec_name)
+    z = np.load(npz)
+    fr = z["frames"]
+    P = z["pred"].astype(np.float64)
+    X = _REC[rec_name]["dff"][fr].astype(np.float64)
+    fin = np.isfinite(P).all(0)                 # a silenced (exploding) neuron's trace is NaN: left out of both brain
+    P, X = P[:, fin], X[:, fin]                 # means, or it poisons every neuron's regression (2026-10-05)
+
+    def resid(A):
+        A = A - A.mean(0)
+        b = A.mean(1)
+        b = b - b.mean()
+        beta = (A * b[:, None]).sum(0) / max(float((b * b).sum()), 1e-30)
+        return A - b[:, None] * beta[None]
+    Rp, Rx = resid(P), resid(X)
+    sp, sx = Rp.std(0), Rx.std(0)
+    ok = (sx > 1e-9) & (sp > 1e-9) & np.isfinite(sp)
+    r = (Rp[:, ok] * Rx[:, ok]).mean(0) / (sp[ok] * sx[ok])
+    out = {"mean": float(r.mean()), "sd": float(r.std()), "n": int(ok.sum()), "n_left_out_nonfinite": int((~fin).sum()),
+           "v": 2}
+    json.dump(out, open(cj, "w"))
+    return out
+
+
+def local_table(lines, rec_name):
+    """The local metric's section under a network-test table: one row per (label, npz)."""
+    body = ""
+    for lab, f in lines:
+        m = local_r(f, rec_name) if f else None
+        if m is not None:
+            big_ = lab == "full model"
+            body += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{lab}}}}}" if big_ else lab) + f" & {qv(m['mean'], big=big_)} $\\pm$ "
+                     f"{m['sd']:.3f} \\\\\n")
+    if not body:
+        return ""
+    return (head("local activity, the brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
+            "& r per neuron, mean $\\pm$ SD \\\\\n\\hline\n" + body + "\\end{tabular}\\par}\\vspace{2pt}\n"
+            "{\\tiny\\color{gray} per neuron: the correlation over the 2 h of its learned and recorded traces, each first "
+            "regressed on its own brain mean -- what the shared brain-wide signal does not carry\\par}" + SEC_GAP)
 
 
 def bm_rows(m, label=""):
@@ -1252,6 +1325,25 @@ VARIANT_TITLE = {"lead_left_quarter": "leaders given", "no_short": "no streets",
                  "no_long": "no highways", "short_only": "streets only"}
 
 
+VARIANT_SLIDES_MESH = {"no_short": "without the finest level (M2, every neuron): every short edge's W = 0, the 16 / 32 um levels kept",
+                       "no_mid": "without the 16 and 32 um levels (M0 and M1): every mid edge's W = 0, the finest level kept",
+                       "no_M0": "without the coarsest level (M0, 32 um cubes): its edges' W = 0, M1 and M2 kept",
+                       "no_M1": "without the middle level (M1, 16 um cubes): its edges' W = 0, M0 and M2 kept"}
+VARIANT_TITLE.update({"no_M0": "no M0 (32 um)", "no_M1": "no M1 (16 um)"})
+VARIANT_TITLE_MESH = {**VARIANT_TITLE, "no_short": "no M2 (every neuron)", "no_mid": "M2 only"}
+
+
+def _cut_note(res_, n, v):
+    """The conclusion of a mesh run's finest-level cut (Cedric, 2026-10-05), its numbers read from the rollouts."""
+    if not ("_mesh" in n and v == "no_short"):
+        return ""
+    f_, c_, z_ = (bm_metrics(os.path.join(res_, f"{n}{x}_movie.npz")) for x in ("", "_no_short", "_W0"))
+    if None in (f_, c_, z_):
+        return ""
+    return ("{\\scriptsize The finest level carries most of it: without M2 the model is barely better than $W = 0$ "
+            f"(brain-mean r {c_['r']:+.3f} against {z_['r']:+.3f}; the full model {f_['r']:+.3f}).\\par}}\\vspace{{6pt}}\n")
+
+
 def slides_variant(r, tag):
     """One slide per rollout variant of `task.rollouts` with a comparison movie (Cedric, 2026-10-03: "regions where the
     neuron activity is given ... measured neurons as leaders or hypothesised input neurons"): the full model LEFT,
@@ -1259,7 +1351,9 @@ def slides_variant(r, tag):
     n, out = r["name"], []
     b0 = tag.split()[-1]
     dt = f"batch {b0} ({_tex(BATCH_LAW.get(b0, ''))}) $\\cdot$ {_tex(n)}"
-    for v, what in VARIANT_SLIDES.items():
+    vs_ = VARIANT_SLIDES_MESH if "_mesh" in n else VARIANT_SLIDES          # a mesh: its levels, not streets / roads
+    VT_ = VARIANT_TITLE_MESH if "_mesh" in n else VARIANT_TITLE
+    for v, what in vs_.items():
         mv = os.path.join(r["dir"], "results", f"movie_{v}_cmp.mp4")
         zp = os.path.join(r["dir"], "results", f"{n}_{v}_movie.npz")
         if not (os.path.exists(mv) and os.path.exists(zp)):
@@ -1270,24 +1364,29 @@ def slides_variant(r, tag):
         t = r["test"].get("rollouts", {}).get(v, {})
         if "clamp" not in t.get("spec", {"clamp": 1}):              # an ablation: the network test's columns
             res_ = os.path.join(r["dir"], "results")
-            lines_ = [("full model", f"{n}_movie.npz"), (VARIANT_TITLE[v], f"{n}_{v}_movie.npz"),
-                      ("W = 0 (all three)", f"{n}_W0_movie.npz")]
+            lines_ = [("full model", f"{n}_movie.npz"), (VT_[v], f"{n}_{v}_movie.npz"),
+                      ("W = 0 (every edge)", f"{n}_W0_movie.npz")]
             body_ = ""
             for lab_, f_ in lines_:
                 m_ = bm_metrics(os.path.join(res_, f_))
                 if m_ is not None:
-                    body_ += f"{lab_} & {m_['r2']:+.3f} & {m_['rmse']:.4f} \\\\\n"
+                    big_ = lab_ == "full model"
+                    body_ += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{lab_}}}}}" if big_ else lab_) + f" & {qv(m_['r'], big=big_)} & "
+                              f"{m_['rmse']:.4f} \\\\\n")
             ne_ = {s_: int(r["test"].get("edges", {}).get(s_, 0)) for s_ in ("short", "mid", "long")}
             right = (head(f"{tag}: {_tex(n)}") + "{\\scriptsize " + what + "\\par}\\vspace{6pt}\n"
                      + rows([("zeroed", ", ".join(_tex(z_) for z_ in t["spec"]["zero"])), ("stimulus", "on, as in the full model")])
-                     + head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
-                       "& R$^2$ & RMSE \\\\\n\\hline\n" + body_
-                     + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                     + SEC_GAP + head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                       "& r & RMSE \\\\\n\\hline\n" + body_
+                     + "\\end{tabular}\\par}" + SEC_GAP
+                     + _cut_note(res_, n, v)
+                     + local_table([(lab_, os.path.join(res_, f_)) for lab_, f_ in lines_],
+                                   r["test"].get("trace_recording", "zapbench"))
                      + "{\\tiny\\color{gray} the trained model, its named edge weights set to 0 at inference only (not "
                        "retrained); brain mean over every neuron and every free frame\\par}\n")
-            out.append((f"{n}_{v}", frame(f"{tag}: {VARIANT_TITLE[v]}", f"\\playmovie{{Movies/{n}_{v}}}", right,
+            out.append((f"{n}_{v}", frame(f"{tag}: {VT_[v]}", f"\\playmovie{{Movies/{n}_{v}}}", right,
                                           "trainer task.rollouts, tools/exp17_ablation.py", left_gap=True,
-                                          deck_title=f"batch {b0} $\\cdot$ {_tex(n)} $\\cdot$ {VARIANT_TITLE[v]}")))
+                                          deck_title=f"batch {b0} $\\cdot$ {_tex(n)} $\\cdot$ {VT_[v]}")))
             continue
         free_ = ~za["clamped"].astype(bool)
         rec = REC_CACHE(r)
@@ -1397,9 +1496,12 @@ def slides_run(r, landed=None, inset=None):
     import shutil
     n, t, rep = r["name"], r["test"], r["report"]
     bt = r["row"].get("batch", "")
-    tag = (f"batch {bt.split('.')[0]}, arm {bt.split('.')[1]}" if "." in bt else f"batch {bt}" if bt else str(r["v"]))
+    tag = f"batch {bt}" if bt else str(r["v"])   # "batch 15.4", not "batch 15, arm 4" (Cedric, 2026-10-05)
     b0 = bt.split(".")[0] if "." in bt else ""
-    dt = (f"batch {b0} ({_tex(BATCH_LAW.get(b0, ''))}) $\\cdot$ arm {bt.split('.')[1]} $\\cdot$ {_tex(n)}" if "." in bt
+    law_ = BATCH_LAW.get(b0, "")
+    if "noeph" in n:                             # Cedric, 2026-10-05: the no-ephys arms say so in their title
+        law_ = law_.replace("destriped + ephys", "destriped, no ephys")
+    dt = (f"batch {bt} ({_tex(law_)}) $\\cdot$ {_tex(n)}" if "." in bt
           else f"{DECK_TITLE} $\\cdot$ {_tex(bt)}" if bt else DECK_TITLE)    # Cedric: the batch and its law in the title
     mv = os.path.join(r["dir"], "results", "movie.mp4")
     out = []
@@ -1408,14 +1510,18 @@ def slides_run(r, landed=None, inset=None):
           ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"), ("weights", f"{rep.get('n_params', 0):,}")]
     ms = mse_summary(t)
     g17g = n.startswith("zap_g17_")           # a batch-17 graph slide (meshes too): inset + comment, as slide 25
-    if n.startswith("zap_g17_mesh") and os.path.exists(os.path.join(PRES, "figs", f"gcmesh_{n[-1]}_top.png")):
+    if "_mesh" in n and os.path.exists(os.path.join(PRES, "figs", f"gcmesh_{n[-1]}_top.png")):   # batch 17 and 15.14-16
         inset = f"figs/gcmesh_{n[-1]}_top.png"         # the mesh from above, head left, as the movie's two brains (Cedric)
     what = _tex(r["row"].get("what changed", ""))
+    if n.endswith("_now"):                       # Cedric, 2026-10-05: a twin trained with no W says only that
+        what = "no W"
+    elif n.startswith("zap_e15_cur_siren_mesh"):   # one line, so the column keeps the deck's type size (2026-10-05)
+        what = f"15.4 (SIREN $\\Omega$, ephys, 20 \\% mask) on the multi-level mesh, {n[-1]} levels"
     iw_ = "0.74\\linewidth" if inset and "gcmesh_" in inset else "\\linewidth"   # the mesh: the movie's brains' width
     num = (("\\includegraphics[width=" + iw_ + "]{" + inset + "}\\par\\vspace{4pt}\n" if inset else "")
            + (g17_comment(n) if g17g else "")
            + ("" if g17g else head(f"{tag}: {n.replace('_', chr(92) + '_')}")) +
-           ("" if g17g else "{\\scriptsize " + what + "\\par}\\vspace{6pt}\n")   # batch 17: the inset and the comment say it (Cedric, 2026-10-03)
+           ("" if g17g else "{\\scriptsize " + what + "\\par}" + SEC_GAP)   # batch 17: the inset and the comment say it (Cedric, 2026-10-03)
            + network_table(r, landed or {})           # first: the network test (Cedric, 2026-10-03)
            + (LAW_KNOWN_ODE if n in LAW_ON else "")   # the MSE and the free rollout's R2 no longer printed (Cedric, 2026-10-04)
            + head("training") + rows(tr + [("exploding neurons", _diverges(t))]))
@@ -1429,8 +1535,28 @@ def slides_run(r, landed=None, inset=None):
         # Cedric, 2026-10-04: panel c the brain-mean dF/F the R2 beside it is computed on, not the per-neuron R2; no
         # MSE printed. The figure is redrawn from the run's saved results once the deck knows the slide is shown
         CURVES_TODO[f"{n}_curves"] = r
+        held_ = r["test"].get("split") == "zapbench"
         right = (head(f"{tag}: {n.replace('_', chr(92) + '_')}")
-                 + bm_rows(bm_metrics(os.path.join(r["dir"], "results", f"{n}_movie.npz")), "free rollout"))
+                 + bm_rows(bm_metrics(os.path.join(r["dir"], "results", f"{n}_movie.npz")), "free rollout")
+                 + head("panel a: how each curve is computed")       # Cedric, 2026-10-04: the legend, simply
+                 + "{\\scriptsize Each curve is a forecast error: from many start frames, predict $h$ frames ahead "
+                   "(0.914 s each), then the mean squared difference with the recording, over the neurons and the start "
+                   "frames (" + ("ZAPBench's held-out test windows" if held_ else "every frame") + ").\\par}\\vspace{3pt}\n"
+                 + "{\\scriptsize\\begin{tabular}{@{}p{0.27\\linewidth}@{\\hspace{4pt}}p{0.69\\linewidth}@{}}\n"
+                   "\\textbf{white}, thick & the learned law: run from the last frames and the known stimulus, $h$ steps "
+                   "on its own \\\\\\noalign{\\vskip 9pt}\n"
+                   "\\textbf{grey dashed} & mean baseline: each neuron's average over its last $W$ frames, held flat; "
+                   "$W$ (1 to 6) the best for each $h$ \\\\\\noalign{\\vskip 9pt}\n"
+                   "\\textbf{grey dotted} & persistence: the last frame held flat ($W = 1$) \\\\\\noalign{\\vskip 9pt}\n"
+                   "\\textbf{red} & stimulus lookup: each neuron's average at the same stimulus moment elsewhere in the "
+                   "recording (same condition, same stimulus, same time since it changed); it ignores the past, so it "
+                   "does not grow with $h$ \\\\\\noalign{\\vskip 9pt}\n"
+                   "\\textbf{blue dash-dot} & ZAPBench's best published model (U-Net, 4 frames of context)"
+                 + (": its published error on these test windows" if held_ else
+                    ": its published skill applied to this run's mean baseline") + " \\\\\\noalign{\\vskip 9pt}\n"
+                   "\\textbf{dark dotted}, flat & noise floor: the recording's own noise, the frame-to-frame change "
+                   "$\\langle (x_{t+h} - x_t)^2 \\rangle$ at $h$ = 1, 2, 3 extrapolated to $h = 0$, halved \\\\\n"
+                   "\\end{tabular}\\par}\n")
         out.append((f"{n}_curves", frame(f"{tag}: the prediction against the mean baseline, step by step",
                                          f"\\panel{{figs/{n}_curves_bm.png}}", right, f"log/training/zapbench/{n}", left_gap=True, deck_title=dt)))
     return out
@@ -1492,7 +1618,7 @@ BATCHES = (
     ("batch 14: modulation and conductance on the destriped traces, coherence mask", None,
      (("current", "zap_v14_cur"), ("conductance", "zap_v14_cond"), ("current + hash Omega", "zap_v14_cur_hash"), ("current + SIREN Omega", "zap_v14_cur_siren"), ("conductance + hash", "zap_v14_cond_hash"), ("conductance + SIREN", "zap_v14_cond_siren"), ("current + coarse hash", "zap_v14_cur_hashlo"), ("current + hash, seed 1", "zap_v14_cur_hash_s1"), ("trained with no network", "zap_v14_now")), ("zap_v14_cur_hash", "zap_v14_cur_hash_s1")),
     ("batch 15: batch 14 on the ephys stimulus (22 visual + 5 swim / turn), ephys-aware mask", "12_input_kymo_ephys",
-     (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now"), ("leak + MLP message, per sender", "zap_e15_lk_snd"), ("leak + MLP message, per edge", "zap_e15_lk_pair"), ("current + SIREN, no ephys", "zap_e15_cur_siren_noeph"), ("no ephys, trained with no network", "zap_e15_noeph_now"), ("current + SIREN, mesh 3 levels", "zap_e15_cur_siren_mesh3"), ("current + SIREN, mesh 4 levels", "zap_e15_cur_siren_mesh4"), ("current + SIREN, mesh 5 levels", "zap_e15_cur_siren_mesh5")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
+     (("current", "zap_e15_cur"), ("conductance", "zap_e15_cond"), ("current + hash Omega", "zap_e15_cur_hash"), ("current + SIREN Omega", "zap_e15_cur_siren"), ("conductance + hash", "zap_e15_cond_hash"), ("conductance + SIREN", "zap_e15_cond_siren"), ("current + coarse hash", "zap_e15_cur_hashlo"), ("current + hash, seed 1", "zap_e15_cur_hash_s1"), ("trained with no network", "zap_e15_now"), ("leak + MLP message, per sender", "zap_e15_lk_snd"), ("leak + MLP message, per edge", "zap_e15_lk_pair"), ("current + SIREN, no ephys", "zap_e15_cur_siren_noeph"), ("no ephys, trained with no network", "zap_e15_noeph_now"), ("current + SIREN, mesh 3 levels", "zap_e15_cur_siren_mesh3"), ("current + SIREN, mesh 4 levels", "zap_e15_cur_siren_mesh4"), ("current + SIREN, mesh 5 levels", "zap_e15_cur_siren_mesh5"), ("mean-field control (no graph)", "zap_e15_cur_siren_mf"), ("tau bounded to [1, 100] s", "zap_e15_cur_siren_tau")), ("zap_e15_cur_hash", "zap_e15_cur_hash_s1")),
     ("batch 16: batch 15 with the calcium indicator, tau_ca fixed, latent substeps", None,
      (("tau_ca learned", "zap_c16_learn"), ("tau_ca 1 s", "zap_c16_t1"), ("tau_ca 2 s", "zap_c16_t2"), ("tau_ca 3 s", "zap_c16_t3"), ("2 s, 5 substeps", "zap_c16_t2_s5"), ("2 s, 10 substeps", "zap_c16_t2_s10"), ("2 s + SIREN Omega", "zap_c16_t2_siren"), ("trained with no network", "zap_c16_t2_now")), ()),
     ("batch 17: batch 15.1 over different graphs", None,
@@ -1529,7 +1655,9 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
 
 
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren", "batch 16": "zap_c16_t2"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
-EXTRA_RUNS = {"batch 15": ("zap_e15_cur_siren_noeph",)}   # Cedric, 2026-10-04: 15.12, the networked no-ephys twin (15.13 hidden)
+EXTRA_RUNS = {"batch 15": ("zap_e15_cur_siren_noeph", "zap_e15_noeph_now", "zap_e15_cur_siren_mesh3",   # Cedric, 2026-10-05:
+                          "zap_e15_cur_siren_mesh4", "zap_e15_cur_siren_mesh5",            # 15.12-15.17, each its results slide
+                          "zap_e15_cur_siren_mf", "zap_e15_cur_siren_tau")}
 HIDE_BATCHES_UPTO = 7     # batches whose own slides are commented out of all.tex (Cedric, 2026-10-02)
 HIDE_BATCHES = {"10", "12", "13"}     # single batches hidden (Cedric: 10 on 2026-10-02; 12 and 13 on 2026-10-03)
 HIDDEN_BATCHES: set = set()   # Cedric hid batch 4 while one arm had landed (2026-09-30); back with all 8 (2026-10-01)
@@ -1805,9 +1933,24 @@ def slide_batch(title, arms, landed, band=()):
 
 
 # ============================================================================== the models, side by side
+def frame_narrow(title, img, right, src, deck_title=None, left=0.74, height=0.78):
+    """Cedric, 2026-10-05: a figure the slide's full height in a wide left column and a narrow right column -- the right
+    column through \\fitcol like every results slide, so its print has the deck's one size (slide 10's)."""
+    return (f"% generated by tools/exp17_slides.py from {src} ({title})\n"
+            f"\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n\\vspace*{{\\bandgap}}\n"
+            f"\\begin{{columns}}[T,onlytextwidth]\n\\begin{{column}}{{{left}\\textwidth}}\n\\centering"
+            f"\\includegraphics[width=\\linewidth,height={height}\\textheight,keepaspectratio]{{{img}}}\n"
+            f"\\end{{column}}\n\\begin{{column}}{{{0.98 - left:.2f}\\textwidth}}\n\\vspace*{{2\\baselineskip}}\n"
+            f"\\fitcol{{%\n{right}}}\n\\end{{column}}\n\\end{{columns}}\n\\end{{frame}}\n")
+
+CAPF = "\\fontsize{4.6}{5.5}\\selectfont"     # the caption under a plot, one size on every slide (Cedric, 2026-10-05)
+
+
 def frame_wide(title, body, src, deck_title=None):
     """A slide with no columns: `body` over the whole text width (the comparison table). It never goes through
-    \\fitcol, so its size does not set the deck's one column type size."""
+    \\fitcol, so its size does not set the deck's one column type size. Its captions (\\tiny or 5.5 pt) are set at
+    CAPF, one size on every slide (Cedric, 2026-10-05)."""
+    body = body.replace("\\fontsize{5.5}{6.5}\\selectfont", CAPF).replace("\\tiny", CAPF)
     return (f"% generated by tools/exp17_slides.py from {src} ({title})\n"
             f"\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n")
 
@@ -2174,7 +2317,9 @@ def main():
     st = figure_neuron_graph(P, os.path.join(PRES, "figs", "07_neuron_graph.png"),
                              mp4=os.path.join(PRES, "Movies", "07_neuron_graph.mp4"))      # turning (Cedric, 2026-10-04)
     right_ng = (head("the laws on the neuron graph (no mesh), M substeps per frame") + rows([
-        ("known ODE", r"$z_i \mathrel{+}= \frac{1}{M}(-z_i + V_i + m_i + B_i \cdot u)/\tau_i$"),
+        # Cedric, 2026-10-05: the known ODE larger, green, a blank line after it
+        (r"{\normalsize\textbf{known ODE}}", r"{\large\textcolor[rgb]{0.30,0.85,0.30}{$z_i \mathrel{+}= \frac{1}{M}(-z_i + V_i + m_i "
+         r"+ B_i \cdot u)/\tau_i$}} \\[8pt]"),
         ("current", r"$m_i = \sum_{s} \sum_{j \in \mathcal{N}_s(i)} W^{s}_{ji} \tanh(z_j)$"),
         ("conductance", r"$m_i = \sum_{s,j} (W^{s}_{ji})^2\, \mathrm{relu}(z_j)\,(E_j - z_i)$"),
         ("GNN-MLP", r"$z_i \mathrel{+}= \frac{1}{M} f_\theta(z_i, a_i, m_i, B_i \cdot u)$"),
@@ -2268,6 +2413,8 @@ def main():
             for xr_ in EXTRA_RUNS.get(title.split(":")[0], ()):               # further arms' results slides (Cedric)
                 if xr_ in landed:
                     deck += slides_run(landed[xr_], landed)
+                    if "_mesh" in xr_:                                         # its edge-set / level cuts (Cedric)
+                        deck += slides_variant(landed[xr_], title.split(":")[0])
             deck += slides_ablation(landed[base], title.split(":")[0])        # W = 0 and left W = 0 (Cedric)
             deck += slides_variant(landed[base], title.split(":")[0])         # task.rollouts variants (Cedric, 2026-10-03)
     for make in EXTRA_SLIDES:                           # analysis slides (e.g. ablation, stimulus vs network)
@@ -2275,7 +2422,8 @@ def main():
     # Cedric, 2026-10-02: the pooled slides and the overview deleted from the deck (slides_pool, slide_overview kept)
     # Cedric, 2026-10-02: a shown run's neuron clusters and its edge weights in 3-D (exp17_clusters.py, exp17_edges.py
     # --amplitude), right after its movie; batch 11's (now commented out) and, 2026-10-03, batch 15's best run's
-    for run_, suf_, b_ in (("zap_dm_ng_rl1lo", "dm", "11"), ("zap_e15_cur_siren", "e15", "15")):
+    for run_, suf_, b_ in (("zap_dm_ng_rl1lo", "dm", "11"), ("zap_e15_cur_siren", "e15", "15"),
+                           ("zap_e15_cur_siren_mesh3", "e15m3", "15")):       # Cedric, 2026-10-05: 15.14's twin of 16
         rt_ = _tex(run_)
         for stem_, title_ in (("clusters_3d", "neuron clusters"), ("clusters_k4_montage", "4 clusters, one panel each"),
                               ("clusters_k8_montage", "8 clusters, one panel each"),
@@ -2294,23 +2442,25 @@ def main():
         if os.path.exists(ja_):
             A_ = json.load(open(ja_))
             c_ = A_["counts"]
-            share = {k: c_[k + "+"] / max(c_[k + "+"] + c_[k + "-"], 1) for k in ("short", "mid", "long")}
+            sk_ = [k for k in ("short", "mid", "long") if k + "+" in c_]
+            share = {k: c_[k + "+"] / max(c_[k + "+"] + c_[k + "-"], 1) for k in sk_}
+            lbl_ = ({"short": "short (finest)", "mid": "mid (16, 32 \\textmu m)",
+                     "long": "long ($\\geq$ 64 \\textmu m)"} if "_mesh" in run_ else
+                    {"short": "short (6 nearest)", "mid": "mid ($\\pm$32 \\textmu m)", "long": "long ($\\pm$128 \\textmu m)"})
             right_amp = (head("strongest edges: one |W| cut for all three sets") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
                          "edge set & W $>$ 0 & W $<$ 0 & W $>$ 0 share \\\\\n\\hline\n"
-                         + "".join(f"{lab} & {c_[k + '+']:,} & {c_[k + '-']:,} & {100 * share[k]:.0f} \\% \\\\\n" for lab, k in (
-                             ("short (6 nearest)", "short"), ("mid ($\\pm$32 \\textmu m)", "mid"),
-                             ("long ($\\pm$128 \\textmu m)", "long")))
+                         + "".join(f"{lbl_[k]} & {c_[k + '+']:,} & {c_[k + '-']:,} & {100 * share[k]:.0f} \\% \\\\\n" for k in sk_)
                          + "\\end{tabular}\\par}\\vspace{6pt}\n"
                          + ("{\\scriptsize Short edges hold most of the strong excitatory weights. The negative weights "
                             "sit mostly on the mid and long edges, so with distance the strongest edges shift from "
                             "mostly excitatory toward a more even mix.\\par}\\vspace{6pt}\n"
-                            if share["short"] > share["mid"] > share["long"] else "")
+                            if len(sk_) == 3 and share["short"] > share["mid"] > share["long"] else "")
                          + f"{{\\tiny\\color{{gray}} the {A_['pooled_top']:,} largest |W| of all {A_['n_edges']:,} edges, "
                            f"$|W| \\geq$ {A_['cut']:.3g}; one colour range for every panel; rows: W $>$ 0 from above and "
                            "from the side, W $<$ 0 from above and from the side\\par}\n")
-            deck.append((f"13_edges_amp_{suf_}", frame("edge weights on one scale", f"\\panel{{figs/edges_amp_{run_}.png}}",
-                                                      right_amp, "tools/exp17_edges.py --amplitude",
-                                                      deck_title=f"batch {b_} $\\cdot$ {rt_} $\\cdot$ edge weights")))
+            deck.append((f"13_edges_amp_{suf_}", frame_narrow("edge weights on one scale", f"figs/edges_amp_{run_}.png",
+                                                             right_amp, "tools/exp17_edges.py --amplitude", left=0.69,
+                                                             deck_title=f"batch {b_} $\\cdot$ {rt_} $\\cdot$ edge weights")))
     # Cedric, 2026-10-03: the learned constants on the brain, batch 15's best run (tools/exp17_param_maps.py)
     jm_ = os.path.join(EXP, "data", "param_maps_zap_e15_cur_siren.json")
     if os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "param_maps_zap_e15_cur_siren.png")):
@@ -2318,20 +2468,20 @@ def main():
 
         def r3(k_, f_="{:.3g}"):
             return f"{f_.format(S_[k_]['median'])} ({f_.format(S_[k_]['p2'])} .. {f_.format(S_[k_]['p98'])})"
-        right_pm = (head("the learned constants on the brain")
-                    + "{\\scriptsize every neuron coloured by its own learned value; median (2nd .. 98th percentile)\\par}\\vspace{4pt}\n"
-                    + rows([("$\\tau$, s", r3("tau_s")), ("rest $V$, dF/F", r3("V")), ("W in, summed", r3("W_in")),
-                            ("$|B|$, input neurons", r3("B_norm"))])
-                    + rows([("$\\tau$ under one frame", f"{100 * S_['frac_tau_below_frame']:.1f} \\% of neurons"),
-                            ("W in $<$ 0", f"{100 * S_['frac_W_in_negative']:.1f} \\% of neurons"),
-                            ("input neurons", f"{S_['n_masked']:,} of {S_['n']:,}")])
+        right_pm = (head("the learned constants")
+                    + "{\\scriptsize each neuron coloured by its own learned value, from above and from the side; median "
+                      "(2nd .. 98th percentile)\\par}\\vspace{4pt}\n"
+                    + rows([("$\\tau$, s", r3("tau_s")), ("rest $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
+                            ("$\\tau <$ 1 frame", f"{100 * S_['frac_tau_below_frame']:.1f} \\%"),
+                            ("W in $<$ 0", f"{100 * S_['frac_W_in_negative']:.1f} \\%"),
+                            ("inputs", f"{S_['n_masked']:,} of {S_['n']:,}")])
                     + "{\\tiny\\color{gray} $\\tau$ = 0.914 s / softplus($\\tau_{raw}$); $V$ in dF/F; W the signed sum over "
-                      "the three edge sets into the neuron (the messages are then scaled by $\\Omega$, mean 3.2); $B$ is "
-                      "used only inside the input mask\\par}\n")
-        deck.append(("13_param_maps_e15", frame("the learned constants on the brain",
-                                               "\\vspace*{0.11\\textheight}\\panel{figs/param_maps_zap_e15_cur_siren.png}", right_pm,
-                                               "tools/exp17_param_maps.py",
-                                               deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ tau, V, W, B")))
+                      "the three edge sets into the neuron (the messages then scaled by $\\Omega$, mean 3.2); $B$ used only "
+                      "inside the input mask\\par}\n")
+        deck.append(("13_param_maps_e15", frame_narrow("the learned constants on the brain",
+                                                      "figs/param_maps_zap_e15_cur_siren.png", right_pm,
+                                                      "tools/exp17_param_maps.py", left=0.76,
+                                                      deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ tau, V, W, B")))
     # Cedric, 2026-10-03: what batch 15's 8 clusters are, and how far to trust them (tools/exp17_cluster_profile.py)
     KP_ = 4                                           # Cedric, 2026-10-03: the profile for 4 clusters (was 8)
     jp_ = os.path.join(EXP, "data", f"cluster_profile_zap_e15_cur_siren_k{KP_}.json")
@@ -2379,7 +2529,11 @@ def main():
     # (tools/exp17_modulation.py), right after its movie
     om_ = os.path.join(GD, "log", "training", "zapbench", "zap_e15_cur_siren", "results")
     if os.path.exists(os.path.join(om_, "movie_omega.mp4")):
-        shutil.copy(os.path.join(om_, "movie_omega.mp4"), os.path.join(PRES, "Movies", "zap_e15_cur_siren_omega.mp4"))
+        # Cedric, 2026-10-04: x4 faster -- every 4th frame kept, the same 25 fps (the 2 h in a quarter of the time)
+        from plexus.tasks import trace_recording as TR_
+        subprocess.run([TR_._ffmpeg(), "-y", "-loglevel", "error", "-i", os.path.join(om_, "movie_omega.mp4"), "-vf",
+                        "setpts=PTS/4", "-r", "25", "-an", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                        os.path.join(PRES, "Movies", "zap_e15_cur_siren_omega.mp4")], check=True)
         shutil.copy(os.path.join(om_, "movie_omega.png"), os.path.join(PRES, "Movies", "zap_e15_cur_siren_omega.png"))
         O_ = np.load(os.path.join(om_, "zap_e15_cur_siren_omega.npz"))["omega"].astype(np.float32)
         mt_ = O_.mean(1)
@@ -2458,7 +2612,7 @@ def main():
         shutil.copy(src_.replace(".mp4", ".png"), os.path.join(PRES, "Movies", "zap_ca_ng_nol1.png"))
         t6_ = rc_["test"]
         ms6_ = mse_summary(t6_)
-        right_ca = (head("batch 6, arm 3: zap\\_ca\\_ng\\_nol1")
+        right_ca = (head("batch 6.3: zap\\_ca\\_ng\\_nol1")
                     + "{\\scriptsize the neuron-graph known ODE on a LATENT activity $v$, read through a learned indicator: "
                       "$c \\mathrel{+}= k\\,(v - c)$; ZAPBench traces, all frames (in sample)\\par}\\vspace{6pt}\n"
                     + network_table(rc_, landed)
@@ -2510,6 +2664,79 @@ def main():
             "over the RECORDED dF/F (gridded, smoothed over 25 \\textmu m); tools/exp17\\_wind\\_consensus.py --median-on-recorded "
             "(one run: its own flow)\\par}", "tools/exp17_flow_montage.py mesh4_rec",
             deck_title="batch 17 $\\cdot$ the flow of the 4-level mesh")))
+    jdr_ = os.path.join(EXP, "data", "dots_residual_zap_e15_cur_siren.json")        # Cedric, 2026-10-04: slide 14
+    if os.path.exists(jdr_):
+        DR_ = json.load(open(jdr_))
+        bi_, bo_ = DR_["brain_mean_in_block"], DR_["brain_mean_other"]
+        deck.append(("13_dots_residual_e15", frame_wide(
+            "what the law misses during the dots",
+            "\\vspace*{1.0\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.64\\textheight,keepaspectratio]"
+            "{figs/dots_residual_zap_e15_cur_siren.png}\\par\\vspace{2pt}"
+            "{\\fontsize{5.5}{6.5}\\selectfont The model misses the dots response where it happens. The two maps are "
+            f"anti-correlated across neurons (r = {DR_['r_residual_vs_recorded_response']:.2f}): where neurons rise during dots, "
+            "the model stays too low. The response is spread over the whole brain, front to back and strongest dorsally, not "
+            "confined to the midbrain visual lobes (tectum). That points more to a brain-wide state change than to missing "
+            "visual input.\\par}",   # Cedric, 2026-10-04: his wording, smaller
+            "tools/exp17_dots_residual.py zap_e15_cur_siren", deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ the dots")))
+    jtr_ = os.path.join(EXP, "data", "traces_zap_e15_cur_siren_mesh3.json")           # Cedric, 2026-10-05
+    if os.path.exists(jtr_):
+        TQ_ = json.load(open(jtr_))
+        jte_ = os.path.join(EXP, "data", "terms_zap_e15_cur_siren_mesh3.json")
+        TE_ = json.load(open(jte_))["medians"] if os.path.exists(jte_) else None
+        side_ = ""
+        if TE_:
+            side_ = (head("the law, per neuron")
+                     + "{\\scriptsize $z_i \\leftarrow z_i + f_i\\,\\big((V_i - z_i) + \\Omega_i(t)\\,m_i(t) + B_i\\cdot u(t)\\big)$"
+                       "\\par}\\vspace{4pt}\n"
+                     + "{\\scriptsize $z$ the neuron's dF/F normalised by the recording's mean and SD; $f_i$ the step fraction "
+                       "its time constant $\\tau_i$ sets; $m_i = \\sum_j W_{ji}\\tanh z_j$ its senders' message; $B_i\\cdot u$ "
+                       "the stimulus (0 outside the input mask).\\par}\\vspace{4pt}\n"
+                     + "{\\scriptsize \\textbf{leak pull} $V_i - z_i$: how far the neuron is from its own rest $V_i$; it pulls "
+                       "it back. $V_i$ is constant, so it moves exactly as much as the neuron itself.\\par}" + SEC_GAP
+                     + head("how much each term moves")
+                     + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
+                       "neurons & $\\Omega m$ & $B\\cdot u$ & $V - z$ \\\\\n\\hline\n"
+                     + "".join(f"{lab_} ({TE_[g_]['n']:,}) & {TE_[g_]['network']:.3f} & {TE_[g_]['stimulus']:.3f} & "
+                               f"{TE_[g_]['leak']:.3f} \\\\\n" for lab_, g_ in (("all", "all"), ("input", "input"),
+                                                                               ("non-input", "non_input")))
+                     + "\\end{tabular}\\par}\\vspace{2pt}\n"
+                     + "{\\tiny\\color{gray} per neuron, the SD over the 2 h of each term (normalised units), the median over "
+                       "the neurons; 15.14's free rollout\\par}\n")
+            side_ = "\\vspace*{2\\baselineskip}\\fitcol{%\n" + side_ + "}"
+        body_tr = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.73\\textwidth}\n"
+                   "\\centering\\includegraphics[width=\\linewidth,height=0.72\\textheight,keepaspectratio]"
+                   "{figs/traces_zap_e15_cur_siren_mesh3.png}\\par\\vspace{2pt}"
+                   "{\\fontsize{4.6}{5.5}\\selectfont " + f"{TQ_['K']} neurons chosen from the recording alone, blind to the "
+                   f"model: the neurons that move split into {TQ_['K']} regions by position, in each the neuron most typical of "
+                   "its region (the most correlated with the region's mean trace), numbered head to tail. Their free-rollout "
+                   f"traces over the 2 h, 15.14 (the 3-level mesh + SIREN): Pearson r median {TQ_['r_median']:+.2f}, from "
+                   f"{TQ_['r_min']:+.2f} to {TQ_['r_max']:+.2f}.\\par}}\n\\end{{column}}\n\\begin{{column}}{{0.24\\textwidth}}\n"
+                   + side_ + "\n\\end{column}\n\\end{columns}")
+        deck.append(("13_traces_e15m3", frame_wide("a few neurons, recorded against learned", body_tr,
+                                                   "tools/exp17_traces.py, exp17_terms.py zap_e15_cur_siren_mesh3",
+                                                   deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren\\_mesh3 $\\cdot$ traces")))
+    jms_ = os.path.join(EXP, "data", "messages_zap_e15_cur_siren_mesh3.json")         # Cedric, 2026-10-05
+    if os.path.exists(jms_):
+        MS_ = json.load(open(jms_))["neurons"]
+        desc_ = "; ".join(f"{q_['number']} (r {q_['r']:+.2f}): "
+                          f"mean |term| leak {q_['mean_abs']['leak']:.3f}, network {q_['mean_abs']['network']:.3f}, stimulus "
+                          f"{q_['mean_abs']['stimulus']:.3f}" for q_ in MS_)
+        for nm_, f_, ttl_, cap_ in (
+                ("13_messages_abc_e15m3", "abc", "three typical neurons: rollout, the update's terms, the total message",
+                 "three neurons typical of the table on the traces slide (tools/exp17\\_terms.py: in each group the neuron "
+                 "whose three term SDs are the closest to the group's medians; two non-input, front and back, one input). "
+                 "a recorded (green) and learned (white) dF/F; b the three terms of the neuron's update, in normalised "
+                 "units: the leak pull V - z, the network $\\Omega$m, the stimulus B$\\cdot$u; c the total incoming "
+                 "message. " + desc_ + "."),
+                ("13_messages_d_e15m3", "d", "three typical neurons: each sender's message",
+                 "each sender's message $\\Omega_i W_{ji}\\tanh z_j$ along the free rollout, the strongest first, one "
+                 "scale per neuron (its largest in the title); orange W $>$ 0, blue W $<$ 0; the sender's edge set and "
+                 "distance at the right.")):
+            deck.append((nm_, frame_wide(
+                ttl_, "\\vspace*{1.0\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.70\\textheight,"
+                f"keepaspectratio]{{figs/messages_zap_e15_cur_siren_mesh3_{f_}.png}}\\par\\vspace{{2pt}}"
+                "{\\fontsize{4.6}{5.5}\\selectfont " + cap_ + "\\par}", "tools/exp17_messages.py zap_e15_cur_siren_mesh3 terms",
+                deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren\\_mesh3 $\\cdot$ messages")))
     jw0_ = os.path.join(GD, "log", "training", "zapbench", "zap_e15_cur", "results", "zap_e15_cur_wind_fields_sigma0.npz")
     h0_ = float(np.load(jw0_)["grid"][2]) if os.path.exists(jw0_) else float("nan")      # the wind grid's cell, um
     for mv_, nm_, ttl_, cap_ in (("flow_meshes_sigma10", "11c_flow_meshes_s10", "the flow on the three meshes and the base, smoothed over 10 um",
@@ -2618,13 +2845,21 @@ def main():
     jgc_ = os.path.join(EXP, "data", "graph_curves.json")
     if os.path.exists(jgc_):
         GC_ = json.load(open(jgc_))
-        right_gc = (head("the graphs, side by side") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
-                    "& \\multicolumn{2}{c}{brain mean} \\\\\n& R$^2$ & RMSE \\\\\n\\hline\n"
-                    + "".join(f"{_tex(v_['label'].split(':')[0])} & {v_['bm_r2']:+.3f} & {v_['bm_rmse']:.4f} \\\\\n"
-                              for v_ in GC_.values())
-                    + (("no network (15.9) & " + "{:+.3f} & {:.4f}".format(
-                        *[bm_metrics(os.path.join(landed["zap_e15_now"]["dir"], "results", "zap_e15_now_movie.npz"))[k_]
-                          for k_ in ("r2", "rmse")]) + " \\\\\n") if "zap_e15_now" in landed else "")
+        def bmr_(n_):                                   # the brain-mean Pearson r of a graph run
+            return bm_metrics(os.path.join(GD, "log", "training", "zapbench", n_, "results", f"{n_}_movie.npz"))["r"]
+
+        def lr_(n_):                                    # the local metric of a graph run (Cedric, 2026-10-05)
+            m_ = local_r(os.path.join(GD, "log", "training", "zapbench", n_, "results", f"{n_}_movie.npz"),
+                         "zapbench_destripe_ephys")
+            return f"{qv(m_['mean'])} $\\pm$ {m_['sd']:.2f}" if m_ else "--"
+        right_gc = (head("the graphs, side by side") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
+                    "& \\multicolumn{2}{c}{brain mean} & local \\\\\n& r & RMSE & r \\\\\n\\hline\n"
+                    + "".join(f"{_tex(v_['label'].split(':')[0])} & {qv(bmr_(k_))} & {v_['bm_rmse']:.4f} & {lr_(k_)} \\\\\n"
+                              for k_, v_ in GC_.items())
+                    + (("no W (15.9) & " + "{} & {:.4f}".format(
+                        *[(qv(v_) if k_ == "r" else v_) for k_, v_ in bm_metrics(os.path.join(
+                            landed["zap_e15_now"]["dir"], "results", "zap_e15_now_movie.npz")).items() if k_ in ("r", "rmse")][::-1])
+                        + f" & {lr_('zap_e15_now')} \\\\\n") if "zap_e15_now" in landed else "")
                     + "\\end{tabular}\\par}\\vspace{6pt}\n"
                     + "{\\scriptsize Every graph, the random one included, runs free about as well as the base; with no "
                       "network the brain-mean R$^2$ is clearly worse: the network matters, not where its edges go.\\par}\n")
@@ -2687,6 +2922,67 @@ def main():
                                           deck_title="multi-level GNN on fish 2 $\\cdot$ summary and outlook")))
     except (KeyError, FileNotFoundError) as e_:
         print(f"[summary] not made: {e_}")
+    # Cedric, 2026-10-05: the big picture, coarse and specific -- his text, every number read from the results
+    try:
+        def B_(n, v=""):
+            return bm_metrics(os.path.join(landed[n]["dir"], "results", f"{n}{v}_movie.npz"))["r2"]
+        GC2_ = json.load(open(os.path.join(EXP, "data", "graph_curves.json")))
+        SIM_ = json.load(open(os.path.join(EXP, "data", "wind_consensus_g17sel.json")))["similarity_summary"]["ex"]
+        DOT_ = json.load(open(os.path.join(EXP, "data", "dots_residual_zap_e15_cur_siren.json")))
+        g17_ = [v["bm_r2"] for k, v in GC2_.items() if "mesh" not in k]
+        msh_ = [B_(f"zap_e15_cur_siren_mesh{L_}") for L_ in (3, 4, 5)]
+        e154, e159, e151 = B_("zap_e15_cur_siren"), B_("zap_e15_now"), B_("zap_e15_cur")
+        e1512, e1513 = B_("zap_e15_cur_siren_noeph"), B_("zap_e15_noeph_now")
+        best_ = max(msh_ + [e154])
+        from plexus.paths import graphs_data_path as gdp_
+        N_NEURONS_DS = int(np.load(gdp_("zebrafish/zapbench_destripe_recording.npz"))["pos_um"].shape[0])
+        f_ = "{\\fontsize{5.8}{6.9}\\selectfont "
+        h_ = lambda t: "{\\fontsize{7.5}{9}\\selectfont\\textbf{" + t + "}}\\par\\vspace{2pt}"     # noqa: E731
+        it_ = lambda xs: ("\\begin{itemize}\\setlength\\itemsep{0.5pt}\\setlength\\parskip{0pt}\n"
+                          + "".join(f"\\item {x}\n" for x in xs) + "\\end{itemize}")                    # noqa: E731
+        left_b = (h_("Big picture") + f_ + "A simple, interpretable law (each neuron a leaky unit, coupled to others through "
+                  "learned weights on a graph) learned from the ZAPBench zebrafish recording can run free for the whole 2 h. "
+                  "Starting from one recorded frame and given only the stimulus, it follows the brain-wide activity, with "
+                  f"brain-mean R$^2$ up to {best_:+.2f}. The coupling between neurons is necessary, but which wiring it uses is "
+                  "not pinned down.\\par}\\vspace{5pt}"
+                  + h_("Coarse") + f_ + it_([
+                      "\\textbf{The law:} the GraphCast-style mesh model of the early batches gave way to a known ODE "
+                      f"directly on the {N_NEURONS_DS:,} neurons. Each neuron has its own time constant $\\tau$, rest $V$ and "
+                      "stimulus weights $B$, and is coupled by weights $W$ on short, mid and long edges.",
+                      "\\textbf{Training:} destriped traces, all frames, curriculum to 50 steps ahead.",
+                      "\\textbf{The test:} the brain-mean dF/F R$^2$ of a 2 h free rollout, checked against twins trained "
+                      "with no network and against $W = 0$.",
+                      "\\textbf{What works:} coupling between neurons, and a SIREN modulation $\\Omega$ that rescales each "
+                      "neuron's input over time.",
+                      "\\textbf{What makes little difference:} the graph's layout (a random graph does as well), the ephys "
+                      "channels, and the calcium indicator, MLP messages or conductance synapses.",
+                      "\\textbf{What it misses:} the slow brain-wide rise during the dots block."]) + "\\par}")
+        right_b = (h_("Specific") + f_ + it_([
+                      f"\\textbf{{Network test:}} 15.4 reaches {e154:+.3f} against {e159:+.3f} for its twin trained with no "
+                      f"network. $W = 0$ at inference drops it to {B_('zap_e15_cur_siren', '_W0'):+.2f}.",
+                      f"\\textbf{{$\\Omega$:}} it adds about {e154 - e151:+.2f} (15.1 {e151:+.3f} $\\to$ 15.4 {e154:+.3f}). "
+                      "Part of that may be fitting time, because $\\Omega$ reads absolute time.",
+                      f"\\textbf{{Graphs without $\\Omega$ (batch 17):}} all score {min(g17_):+.2f} to {max(g17_):+.2f}, the "
+                      f"random graph {GC2_['zap_g17_random']['bm_r2']:+.3f}, the multi-level meshes "
+                      f"{max(GC2_[k]['bm_r2'] for k in GC2_ if 'mesh' in k):+.2f}. Retraining the same graph with another seed "
+                      f"gives the same flow (cosine {SIM_['seed_ref_time_mean']:.2f}); a different graph gives a different one "
+                      f"(about {SIM_['movie_mean_offdiag']:.2f}).",
+                      f"\\textbf{{Meshes with $\\Omega$:}} 3 levels {msh_[0]:+.3f}, the best of exp17; 4 levels {msh_[1]:+.3f}; "
+                      f"5 levels {msh_[2]:+.3f}.",
+                      f"\\textbf{{Ephys:}} with the network, removing it costs only {e154 - e1512:.3f} ({e154:+.3f} $\\to$ "
+                      f"{e1512:+.3f}). Without the network it is worth {e159 - e1513:+.2f}. It is fictive motor output fed back "
+                      "as input.",
+                      "\\textbf{Dots:} the law's error during dots anti-correlates with the recorded dots response "
+                      f"(r = {DOT_['r_residual_vs_recorded_response']:.2f}). The response is spread over the whole brain, so a "
+                      "brain-wide internal state is more likely than missing visual input."]) + "\\par}")
+        deck.append(("99a_big_picture", frame_wide(
+            "the big picture",
+            "\\vspace*{0.6\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.48\\textwidth}\n" + left_b
+            + "\n\\end{column}\n\\begin{column}{0.48\\textwidth}\n" + right_b + "\n\\end{column}\n\\end{columns}",
+            "the landed runs' results (Cedric, 2026-10-05)",
+            deck_title="multi-level GNN on fish 2 $\\cdot$ the big picture")))
+    except (KeyError, FileNotFoundError) as e_:
+        print(f"[big picture] not made: {e_}")
     # Cedric, 2026-10-04: the MULTI-LEVEL MESHES of batch 17 (graph: mesh) -- GraphCast's construction on the neurons, no
     # encoder / decoder (cell_ops.neuron_mesh_levels); tools/exp17_mesh_figures.py makes the turntables (slide 3's
     # renderer), the level panels (GraphCast Fig. 1e, g) and data/gcmesh_<L>.json, read here
@@ -2740,7 +3036,7 @@ def main():
         deck.append((f"11h_mesh{L_}", frame(f"the multi-level mesh, {L_} levels", f"\\playmovie{{Movies/gcmesh_{L_}}}",
                                            right_m, f"data/gcmesh_{L_}.json (tools/exp17_mesh_figures.py)", left_gap=True,
                                            deck_title=f"batch 17 $\\cdot$ the multi-level mesh, {L_} levels")))
-    MOVE_TO_END = ("08b_calcium_result", "02b_models", "99_summary")      # Cedric, 2026-10-03: the models table closes the deck       # Cedric, 2026-10-03: the latent-calcium slide now opens batch 16   # Cedric, 2026-10-02 / 10-03: calcium closes the deck
+    MOVE_TO_END = ("08b_calcium_result", "02b_models", "99a_big_picture", "99_summary")      # Cedric, 2026-10-03: the models table closes the deck       # Cedric, 2026-10-03: the latent-calcium slide now opens batch 16   # Cedric, 2026-10-02 / 10-03: calcium closes the deck
     deck = [x for x in deck if x[0] not in MOVE_TO_END] + [x for x in deck if x[0] in MOVE_TO_END]
     # Cedric, 2026-10-02: one slide of GraphCast results right after the GraphCast slides -- the best GraphCast run's
     # movie (batch 4's curriculum to 40), shown although batch 4's own slides are hidden
@@ -2769,7 +3065,20 @@ def main():
                        "11c_flow_meshes_s10": "11c_field_s25",
                        "11c_flow_mesh4_s10": "11c_flow_meshes_s10", "11c_flow_views_s10": "11c_flow_mesh4_s10",
                        "11c_flow_views_combined_s10": "11c_flow_views_s10", "11c_field_s10": "11c_flow_views_combined_s10",
-                       "11c_flow_meshes_s0": "11c_field_s10", "zap_e15_cur_siren_noeph_movie": "zap_e15_cur_siren_short_only", "11c_flow_mesh4_s0": "11c_flow_meshes_s0",
+                       "11c_flow_meshes_s0": "11c_field_s10", "zap_e15_cur_siren_noeph_movie": "zap_e15_cur_siren_short_only", "zap_e15_noeph_now_movie": "zap_e15_cur_siren_noeph_movie",
+                       "zap_e15_cur_siren_mesh3_movie": "zap_e15_noeph_now_movie",
+                       "13_traces_e15m3": "zap_e15_cur_siren_mesh3_movie",
+                       "13_messages_abc_e15m3": "13_traces_e15m3", "13_messages_d_e15m3": "13_messages_abc_e15m3",
+                       "13_edges_amp_e15m3": "13_messages_d_e15m3",
+                       "zap_e15_cur_siren_mesh3_no_short": "13_edges_amp_e15m3",
+                       "zap_e15_cur_siren_mesh3_no_mid": "zap_e15_cur_siren_mesh3_no_short",
+                       "zap_e15_cur_siren_mesh3_no_M0": "zap_e15_cur_siren_mesh3_no_mid",
+                       "zap_e15_cur_siren_mesh3_no_M1": "zap_e15_cur_siren_mesh3_no_M0",
+                       "zap_e15_cur_siren_mesh4_movie": "zap_e15_cur_siren_mesh3_no_M1",
+                       "zap_e15_cur_siren_mesh5_movie": "zap_e15_cur_siren_mesh4_movie",
+                       "zap_e15_cur_siren_mf_movie": "zap_e15_cur_siren_mesh5_movie",
+                       "zap_e15_cur_siren_tau_movie": "zap_e15_cur_siren_mf_movie",
+                       "13_dots_residual_e15": "zap_e15_cur_siren_omega", "11c_flow_mesh4_s0": "11c_flow_meshes_s0",
                        "11f_graph_curves": "11c_flow_mesh4_s0"})
     for nm, after in MOVE_AFTER.items():
         item = next((x for x in deck if x[0] == nm), None)
@@ -2816,7 +3125,7 @@ def main():
     HIDDEN_SLIDES |= {name for name, _ in deck if name.startswith("13_") and name.endswith("_dm")}
     HIDDEN_SLIDES |= {"11_destripe_graph", "zap_ds_ng_base_curves"}    # Cedric, 2026-10-04: slides 10 and 12
     HIDDEN_SLIDES |= {"12_input_kymo", "zap_dm_ng_rl1lo_movie"}        # Cedric, 2026-10-04, "for now": then slides 11 and 12
-    HIDDEN_SLIDES |= {"zap_e15_cur_siren_noeph_curves"}               # its movie slide only, as 15.4
+    HIDDEN_SLIDES |= {f"{n_}_curves" for n_ in EXTRA_RUNS["batch 15"]}  # their movie slides only, as 15.4
     HIDDEN_SLIDES |= {"11d_flow_summary", "11c_flow_graphs", "11h_mesh5", "11c_flow_meshes", "11c_flow_views",
                       "11c_flow_meshes_s0", "11c_flow_mesh4_s0"}        # Cedric, 2026-10-04: slides 21 22 35 39 41 45 46
     HIDDEN_SLIDES |= {"11c_flow_mesh4", "11c_flow_meshes_s10", "11c_flow_mesh4_s10", "11c_flow_views_s10",
@@ -2826,6 +3135,11 @@ def main():
             fp = os.path.join(PRES, "figs", f"{r_['name']}_curves_bm.png")
             if not curves_bm(r_, fp):
                 shutil.copy(os.path.join(r_["dir"], "results", f"{r_['name']}_test.png"), fp)
+            if r_["name"] in PANEL_A_ONLY:              # Cedric, 2026-10-04: slide 8 limited to panel a
+                from PIL import Image
+                im_ = Image.open(fp)
+                W_, H_ = im_.size                       # render_curves: panel a's axes at [0.06, 0.55, 0.40, 0.38]
+                im_.crop((0, 0, int(0.48 * W_), int(0.52 * H_))).save(fp)
     pages, shown = {}, 0
     for name, _ in deck:
         if name in HIDDEN_SLIDES:
@@ -2836,8 +3150,34 @@ def main():
             pages.setdefault(b, []).append(shown + 1)
     pages = {b: (f"{min(v)}-{max(v)}" if len(v) > 1 else str(v[0])) for b, v in pages.items()}
     pass                                                # the overview: deleted from the deck (Cedric, 2026-10-02)
+    # Cedric, 2026-10-05: every batch slide's title carries its batch.arm (the md's numbering), the run name dropped
+    arm_of = {n_: str(r_["row"].get("batch", "")) for n_, r_ in landed.items() if "." in str(r_["row"].get("batch", ""))}
+    tex_of = {_tex(n_): a_ for n_, a_ in arm_of.items()}
+
+    def arms_range(b_, only=None):
+        ks = sorted((a_ for n_, a_ in arm_of.items() if a_.split(".")[0] == b_ and (only is None or only in n_)),
+                    key=lambda a_: int(a_.split(".")[1]))
+        return f"{ks[0]}--{ks[-1].split('.')[0]}.{ks[-1].split('.')[1]}" if len(ks) > 1 else (ks[0] if ks else b_)
+
+    def retitle(body):
+        m_ = re.search(r"\\begin\{frame\}\[t\]\{(.*)\}\n", body)
+        if not m_:
+            return body
+        t_ = m_.group(1)
+        m1 = re.match(r"batch (\d+) \$\\cdot\$ (zap\S+) \$\\cdot\$ (.*)$", t_)          # an analysis slide of one run
+        m2 = re.match(r"(batch \d+\.\d+ \(.*\)) \$\\cdot\$ zap\S+$", t_)                 # a run's results slide
+        m3 = re.match(r"batch (\d+) \$\\cdot\$ (.*)$", t_)                                # a batch-wide slide
+        if m1 and m1.group(2) in tex_of:
+            new = f"batch {tex_of[m1.group(2)]} $\\cdot$ {m1.group(3)}"
+        elif m2:
+            new = m2.group(1)
+        elif m3:
+            new = f"batch {arms_range(m3.group(1), 'mesh' if 'mesh' in m3.group(2) else None)} $\\cdot$ {m3.group(2)}"
+        else:
+            return body
+        return body.replace("\\begin{frame}[t]{" + t_ + "}", "\\begin{frame}[t]{" + new + "}", 1)
     for name, body in deck:
-        open(os.path.join(PRES, "slides", name + ".tex"), "w").write(body)
+        open(os.path.join(PRES, "slides", name + ".tex"), "w").write(retitle(body))
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(
         "".join(("% " if n in HIDDEN_SLIDES else "") + f"\\input{{slides/{n}}}\n" for n, _ in deck))
     stats = {"mesh": MO["stats"], "nn_median_um": float(np.median(nn)), "extent_um": ext.tolist(), "movie": mv}

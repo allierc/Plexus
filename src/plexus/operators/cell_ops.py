@@ -2206,6 +2206,7 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
                    "integrator": "euler (default: z += rate (target - z) / M, stable for rate < 2M) or exponential "
                                  "(z += (1 - exp(-rate / M)) (target - z), stable at any rate)",
                    "rate_max": "a smooth cap on every learned rate, rate_max tanh(rate / rate_max); absent = none",
+                   "rate_min": "a floor on every learned rate (a ceiling on the time constant); absent = none",
                    "synapse": "current (W phi(z_j), default) or conductance (W^2 relu(z_j) (E_j - z_i), E per sender)",
                    "reversal": "the elements' reversal block E_j (conductance), in the normalised units of z",
                    "w_init": "every edge weight's start (0; a conductance needs > 0: W^2 has no gradient at 0)",
@@ -2286,6 +2287,13 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         self.rate_max = float(params["rate_max"]) if params.get("rate_max") is not None else None
         if self.rate_max is not None and self.rate_max <= 0:
             raise ValueError("state_diffuse[neuron_graph] `rate_max:` must be positive")
+        # `rate_min` (exp17, Cedric 2026-10-05: "tau in [1, 100] s"): a floor on every learned rate, so a ceiling on the
+        # time constant -- the literature's longest persistence is ~100 s (Miri 2011, Seung 1996, Kawashima 2016), and a
+        # leak far slower than the curriculum's horizon is not identified by the data. With `rate_max`, the rate runs
+        # smoothly over (rate_min, rate_max): rate_min + (rate_max - rate_min) tanh(softplus(raw) / (rate_max - rate_min)).
+        self.rate_min = float(params["rate_min"]) if params.get("rate_min") is not None else None
+        if self.rate_min is not None and (self.rate_min <= 0 or (self.rate_max is not None and self.rate_min >= self.rate_max)):
+            raise ValueError("state_diffuse[neuron_graph] `rate_min:` must be positive and below `rate_max`")
         # THE CONDUCTANCE SYNAPSE (exp17 batch 14, Cedric 2026-10-02; connectome-gnn's flyvis_ode): the message from j to
         # i is W^2 relu(z_j) (E_j - z_i) -- a non-negative conductance times a driving force toward the SENDER's reversal
         # E_j (zebrafish has no cell types to give the sign: E_j is learned per neuron, its sign the synapse's)
@@ -2327,10 +2335,14 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
             self._build_modulation(self._mod_params, device)
 
     def _rate(self, raw):
-        """A learned rate per frame: softplus of its raw value, smoothly capped at `rate_max` when one is set."""
+        """A learned rate per frame: softplus of its raw value, smoothly capped at `rate_max` when one is set, and shifted
+        up by `rate_min` when one is set (the rate then runs over (rate_min, rate_max))."""
         import torch.nn.functional as Fnn
         r = Fnn.softplus(raw)
-        return r if self.rate_max is None else self.rate_max * torch.tanh(r / self.rate_max)
+        lo = getattr(self, "rate_min", None) or 0.0
+        if self.rate_max is not None:
+            r = (self.rate_max - lo) * torch.tanh(r / (self.rate_max - lo))
+        return r + lo if lo else r
 
     def _frac(self, rate):
         """The fraction of the way to the target in one substep: rate / M (Euler, as before) or 1 - exp(-rate / M)."""
@@ -2722,7 +2734,7 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
     """
     MECHANISM_TAGS = ["known_ode", "leaky_integrator", "proxy_connectome", "gnn"]
     PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraphMLP.PARAM_ROLES.items() if k != "theta_f"},
-                   **{k: StateDiffuseNeuronGraph.PARAM_ROLES[k] for k in ("tau", "rest", "integrator", "rate_max", "modulation",
+                   **{k: StateDiffuseNeuronGraph.PARAM_ROLES[k] for k in ("tau", "rest", "integrator", "rate_max", "rate_min", "modulation",
                                                                          "mod_levels", "mod_features", "mod_log2_table",
                                                                          "mod_res_space", "mod_res_time", "mod_hidden",
                                                                          "mod_layers", "siren_omega", "omega_table",
@@ -2777,6 +2789,57 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
                     w = getattr(self, f"W_{s}")[:, None]
                     ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
                     agg = agg.index_add(0, rcv, w * ge)
+            if om is not None:
+                agg = om * agg
+            z = z + fz * (-z + nb["rest"] + agg + drive)
+        return sd * (z - z0)
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_meanfield",
+                   title="A set's scalar through the known ODE with the graph replaced by one shared signal: each element's "
+                         "learned gain on the mean of every element",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}\big(-z_i+V_i+\Omega_i\,a_i\,\overline{\tanh z}+B_i\cdot u\big)
+/\tau_i$$""")
+class StateDiffuseNeuronGraphMeanField(StateDiffuseNeuronGraph):
+    """THE MEAN-FIELD CONTROL (exp17 batch 15, Cedric 2026-10-05: "a shared brain-mean feedback signal, with no graph at
+    all, might explain the network just as well"). The known ODE on the neuron graph with its message replaced by ONE
+    signal every element hears -- the mean over all elements of tanh(z_j) -- times the element's own learned gain a_i:
+
+        m_i = a_i * mean_j tanh(z_j)            (`W_mean`, one weight per element; no edges, no graph)
+        z_i <- z_i + frac(r_i) (-z_i + V_i + Omega_i m_i + B_i . u),   per substep
+
+    Everything else is the known ODE's (leak, rest, stimulus weights and mask, integrator, the modulation Omega). With
+    every a_i = 0 this law IS the known ODE with W = 0. If it matches the graph law's brain-mean R2, the graph's coupling
+    is a shared brain-wide signal and the data do not identify a wiring; if it falls toward the no-network twin, the
+    coupling carries structure the mean does not."""
+    MECHANISM_TAGS = ["known_ode", "leaky_integrator", "mean_field"]
+    EDGE_SETS = ()
+    PARAM_ROLES = {**{k: v for k, v in StateDiffuseNeuronGraph.PARAM_ROLES.items()
+                      if k not in ("short_k", "mid_um", "long_um", "W_short", "W_mid", "W_long", "synapse", "reversal",
+                                   "adaptation", "adapt_gain", "adapt_rate", "activation")},
+                   "W_mean": "each element's gain on the mean over all elements of tanh(z)"}
+
+    def __init__(self, params, device="cpu"):
+        bad = [k for k in ("short_k", "mid_um", "long_um", "graph", "mesh_levels", "synapse", "adaptation", "activation")
+               if k in params]
+        if bad:
+            raise ValueError(f"state_diffuse[neuron_graph_meanfield]: {bad} are options of a graph law; this one has no edges")
+        StateDiffuseNeuronGraph.__init__(self, {**params, "short_k": 0, "mid_um": 0.0, "long_um": 0.0}, device)
+        self.W_mean = torch.full((self.n_elements,), float(params.get("w_init", 0.0)), device=device)
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        if x.shape[0] != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph_meanfield]: {x.shape[0]} elements, built on {self.n_elements}")
+        if x.shape[1] != 1:
+            raise ValueError(f"state_diffuse[neuron_graph_meanfield] writes a 1-wide block, `{self.block}` is {x.shape[1]} wide")
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        drive = self._input_drive(nb, u) if self.forcing_dim else 0.0
+        fz = self._frac(self._rate(nb["tau"]))
+        om = self._omega(nb.get("_omega_fs")) if self.modulation != "none" else None   # once per tick
+        for _ in range(self.substeps):
+            agg = self.W_mean[:, None] * torch.tanh(z).mean()                   # the one shared signal, per-element gain
             if om is not None:
                 agg = om * agg
             z = z + fz * (-z + nb["rest"] + agg + drive)
