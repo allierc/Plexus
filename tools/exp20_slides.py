@@ -38,6 +38,8 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
 HIDDEN = {"04_fig3d", "90_overview", "b6_mask_rules"}   # b6_mask_rules: Cedric, 2026-10-04 "delete slide 127"
+HIDDEN |= {"b6_kymo_uv_old", "b6_mask_traces", "b6_results"}   # Cedric, 2026-10-05: slide 10 replaced by the visual
+#   cells, slide 13 by the arms' input cells counted (slide_arms_cells), "delete slide 15" (the bars; the table stays)
 HIDDEN |= {"05_law", "06_baselines", "06_kymo_uv", "06_kymo_visual", "06_kymo_swim", "99a_summary", "99b_paper",
            "99c_next", "b5_summary"}       # Cedric, 2026-10-05: "put slide 6 to 14 included to comments" (the 61-page deck)
 HIDDEN_BATCHES = {"1", "2", "3", "4"}  # Cedric, 2026-10-04: "comment batch 1 2 and 3 slides"; 2026-10-05: "put in
@@ -2037,6 +2039,48 @@ def slides_b5():
                                                            "on a 41-min window"))]
 
 
+def slide_arms_cells():
+    """THE BATCH-6 ARMS ON FISH 1 AND THEIR INPUT CELLS (Cedric, 2026-10-05: "a focus on the batch-6 arms; add the number
+    of gut-input cells before / after the control threshold, of visual input cells with the 10 % and the 3-sigma rule,
+    the intersection of gut and visual input cells"), from data/input_cells_f1.json (tools/exp20_input_cells.py)."""
+    jp = os.path.join(DATA, "input_cells_f1.json")
+    if not os.path.exists(jp):
+        return []
+    J = json.load(open(jp))
+    A = arm_numbers()
+    V = J["visual"]
+    n_ = lambda v: f"{v:,}" if v is not None else "--"                                      # noqa: E731
+    pc = lambda a, b: f"{a:,} ({100 * a / b:.0f} \\%)" if b else "--"                    # noqa: E731
+    run_ = lambda n: (f"{A[n]} " if n in A else "") + _tex(n.replace("gb_b6_glucose_f1_", "").replace(   # noqa: E731
+        "gb_sx_f1_mask_siren", "gb_sx_f1_mask_siren"))
+    body_rows = "".join(
+        f"{_tex(r['rule'])} & {run_(r['neuron_graph'])} & {run_(r['mesh4'])} & {n_(r['gut_before'])} & "
+        f"{n_(r['gut_after']) if r['gut_after'] is not None else 'not applied'} & {pc(r['and_visual_10'], r['gut_used'])} & "
+        f"{pc(r['and_visual_3sd'], r['gut_used'])} \\\\\n" for r in J["rules"])
+    tab = ("\\resizebox{\\textwidth}{!}{\\begin{tabular}{@{}l@{\\hspace{8pt}}l@{\\hspace{8pt}}l@{\\hspace{10pt}}r"
+           "@{\\hspace{6pt}}r@{\\hspace{10pt}}r@{\\hspace{6pt}}r@{}}\n"
+           "& & & \\multicolumn{2}{c}{gut-input cells} & \\multicolumn{2}{c}{of them, also visual} \\\\\n"
+           "UV rule & neuron graph & 4-level mesh & before & after the control & 10 \\% rule & 3 SD rule \\\\\n\\hline\n"
+           + body_rows + "\\end{tabular}}")
+    th = V["paper 3 SD threshold"]
+    cap = ("{\\tiny \\textbf{visual input cells} of fish 1 (" + f"{J['cells']:,}" + " cells): the 10 \\% rule, the top "
+           "10 \\% by coherence with the grating speed -- every arm's grating cells -- " + f"{V['10 %']:,}" + "; the paper's "
+           "rule on the grating, each cell's regression on the grating speed (the paper's 5-s kernel) correlating above "
+           f"mode + 3 SD of the left half-Gaussian (r > {th['r']:.2f}; mode {th['mode']:+.3f}, SD {th['left_sd']:.3f}), "
+           f"{V['paper 3 SD']:,}; {V['both']:,} in both. "
+           "\\textbf{gut-input cells}, before / after the control threshold -- 10 \\% rule: the top 10 \\% by t after "
+           "the training gut pulses / minus the cells the control pulses also excite (t $\\geq$ 2); the paper's rule: "
+           "the gut + all-UV regression above mode + K SD and above all-UV alone / and a larger change after the gut "
+           "pulses than after the control pulses; batches 1-5 and the atlas sets: no control threshold. Training frames "
+           "only. \\textbf{Chen 2026}: ``many gut-responsive neurons also responded to swimming and visual stimuli, with "
+           "brainstem areas primarily integrating gut and motor signals and midbrain regions integrating jointly gut, "
+           "visual, and motor signals''.\\par}")
+    body = "\\vspace*{1.2\\baselineskip}" + tab + "\\par\\vspace{14pt}" + cap
+    return [("b6_arms_cells", frame_full("the batch-6 arms and their input cells", body, "data/input_cells_f1.json",
+                                         deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the arms and their input "
+                                                    "cells: gut, visual, both"))]
+
+
 def slides_b6():
     """BATCH 6 (Cedric, 2026-10-04, via exp17): exp17's multi-level mesh (graph: mesh, cell_ops.neuron_mesh_levels) on
     glucose fish 1 -- exp17's mesh slides twinned (tools/exp20_mesh_figures.py: the level panels, GraphCast Fig. 1e, g,
@@ -2130,6 +2174,11 @@ def slides_b6():
         out.append(("b6_mask_traces", frame_top("what each rule's gut-input cells do", "figs/mask_rules_traces_f1.png", 0.64, left,
                                                 right, "tools/exp20_mask_rules.py", deck_title="batch 6 $\\cdot$ glucose "
                                                 "fish 1 $\\cdot$ the gut-input cells of each rule, around gut and control pulses")))
+    if os.path.exists(os.path.join(PRES, "figs", "06_kymo_visual.png")):  # Cedric, 2026-10-05: slide 10 the visual cells
+        out.append(("b6_kymo_visual", "% generated by tools/exp20_slides.py (the visual input cells)\n\\begin{frame}[t]"
+                    "{batch 6 $\\cdot$ discussion $\\cdot$ the visual input cells (the grating's; 10 \\% rule, every arm)}\n"
+                    "\\vspace*{\\bandgap}\n\\begin{center}\\includegraphics[width=0.98\\textwidth,height=0.78\\textheight,"
+                    "keepaspectratio]{figs/06_kymo_visual.png}\\end{center}\n\\end{frame}\n"))
     if os.path.exists(os.path.join(PRES, "figs", "06_kymo_uv.png")):      # slide 8, again, for the discussion
         out.append(("b6_kymo_uv_old", "% generated by tools/exp20_slides.py (slide 8 again)\n\\begin{frame}[t]"
                     "{batch 6 $\\cdot$ discussion $\\cdot$ the gut-input cells of batches 1-5 (slide 8)}\n"
@@ -2140,9 +2189,10 @@ def slides_b6():
         out += slides_kymo(bio="_anat_apvg")
     # the rules' traces after the three kymograph slides (Cedric, 2026-10-05: "move slide 10 after slide 13")
     out = [x for x in out if x[0] != "b6_mask_traces"] + [x for x in out if x[0] == "b6_mask_traces"]
+    out += slide_arms_cells()
     if os.path.exists(os.path.join(PRES, "figs", "atlas_f1.png")):          # fish 1 in Z-Brain (BigWarp, Cedric's landmarks)
         out.append(("b6_atlas", f"% generated by tools/exp20_slides.py (fish 1 in the atlas)\n\\begin{{frame}}[t]"
-                    "{batch 6 $\\cdot$ glucose fish 1 in the Z-Brain atlas (BigWarp, 30 landmarks)}\n\\vspace*{\\bandgap}\\vfill\n"
+                    "{batch 6 $\\cdot$ glucose fish 1's gut- and visual-input cells in Z-Brain}\n\\vspace*{\\bandgap}\\vfill\n"
                     "\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                     "{figs/atlas_f1.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     bj = os.path.join(DATA, "batch6.json")                  # THE RESULTS (tools/exp20_batch6.py)
@@ -2228,9 +2278,10 @@ _B6 = lambda *suf: [f"gb_b6_glucose_f1_{x}" for x in suf]                       
 _B6_ALL = ["mesh3", "mesh4", "mesh5", "bio", "mesh4_bio", "paper2", "paper3", "mesh4_paper2", "mesh4_paper3", "anat_apvg",
            "mesh4_anat_apvg", "anat_dvc", "mesh4_anat_dvc"]
 STEM_ARMS = {"b6_mesh_levels": _B6("mesh3", "mesh4", "mesh5"), "b6_mesh3": _B6("mesh3"), "b6_mesh4": _B6("mesh4"),
-             "b6_mesh5": _B6("mesh5"), "b6_kymo_uv_old": _B6("mesh3", "mesh4", "mesh5"),
+             "b6_mesh5": _B6("mesh5"), "b6_kymo_uv_old": _B6("mesh3", "mesh4", "mesh5"), "b6_kymo_visual": _B6(*_B6_ALL),
+             "b6_arms_cells": _B6(*_B6_ALL),
              "b6_paper3sd_kymo_uv": _B6("paper3", "mesh4_paper3"), "b6_anat_apvg_kymo_uv": _B6("anat_apvg", "mesh4_anat_apvg"),
-             "b6_atlas": _B6("anat_apvg", "mesh4_anat_apvg", "anat_dvc", "mesh4_anat_dvc"),
+             "b6_atlas": _B6(*_B6_ALL),
              **{k: _B6(*_B6_ALL) for k in ("b6_mask_rules", "b6_mask_traces", "b6_results", "b6_results_table", "b6_traces",
                                            "b6_mask3d")}}
 RUN_KIND = {"omega": "modulation", "params": "the learned constants", "sites": "network dynamics, every site",
