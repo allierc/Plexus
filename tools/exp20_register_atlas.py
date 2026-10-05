@@ -14,6 +14,7 @@ Each cell then gets the Z-Brain regions its atlas voxel lies in (MaskDatabase.ma
     PYTHONPATH=src:tools python tools/exp20_register_atlas.py orient                 # the 24 volumes head up: check first
     PYTHONPATH=src:tools python tools/exp20_register_atlas.py run [--fish glucose_f2 ...] [--variant aff_bs]
     PYTHONPATH=src:tools python tools/exp20_register_atlas.py report [--variant aff_bs]
+    PYTHONPATH=src:tools python tools/exp20_register_atlas.py check [--variant aff_bs]   # one figure per fish, for the eye
 
 THE SCORE (per fish; the gut response is never used, so the biology read off the atlas does not tune the registration):
   ncc     normalised cross-correlation of fish k's anatomy, carried into fish 1's frame, with fish 1's, over fish 1's
@@ -148,6 +149,47 @@ def label(A, S, shape):
     return reg
 
 
+QC_LABELS = [("area postrema", "Area Postrema", "#ff4040"), ("vagal ganglia", "Ganglia - Vagal Ganglia", "#ffa726"),
+             ("tectum", "Tectum Stratum Periventriculare", "#4dd0e1"), ("cerebellum", "Rhombencephalon - Cerebellum", "#ffffff")]
+
+
+def _dense_labels(S, shape):
+    """A few Z-Brain regions as one label volume (z, y, x) on the atlas grid: 1.. len(QC_LABELS), 0 elsewhere."""
+    H, W, Z = shape
+    names = _atlas.names
+    L = np.zeros((Z, H, W), np.uint8)
+    for i, (_, pat, _) in enumerate(QC_LABELS, 1):
+        j = next(j for j, n in enumerate(names) if pat in n)
+        lin = S[:, j].nonzero()[0] if hasattr(S, "nonzero") else None
+        lin = S.tocsc()[:, j].nonzero()[0]
+        L[lin // (H * W), lin % H, (lin // H) % W] = i
+    return L
+
+
+def check_volumes(T, fixed, tps, F, L):
+    """THE CHECK (Cedric, 2026-10-05: "slides to evaluate the registrations myself"): on fish k's own 4-um grid, its
+    anatomy, the Z-Brain reference carried onto it through the whole chain (fish k -> fish 1 -> Z-Brain, sampled
+    there), and a few Z-Brain regions carried the same way. No inversion needed: every fish-k voxel is sent forward."""
+    import SimpleITK as sitk
+    import exp20_bigwarp as BW
+    from scipy.ndimage import map_coordinates
+    size, org, sp = fixed.GetSize(), np.array(fixed.GetOrigin()), np.array(fixed.GetSpacing())
+    zz, yy, xx = np.meshgrid(*[np.arange(n) for n in size[::-1]], indexing="ij")
+    p = np.stack([xx, yy, zz], -1).reshape(-1, 3) * sp + org                       # physical x, y, z per voxel
+    if T is None:
+        q = p
+    else:
+        D = sitk.TransformToDisplacementField(T, sitk.sitkVectorFloat64, size, fixed.GetOrigin(), fixed.GetSpacing(),
+                                              fixed.GetDirection())
+        q = p + sitk.GetArrayFromImage(D).reshape(-1, 3)
+    a = BW.tps_apply(tps, q)                                                      # Z-Brain um (x, y, z)
+    c = np.stack([a[:, 2] / ZVOX[2], a[:, 1] / ZVOX[1], a[:, 0] / ZVOX[0]])       # (z, y, x) atlas voxels
+    shp = tuple(size[::-1])
+    zref = map_coordinates(F, c, order=1, mode="constant", cval=0).reshape(shp).astype(np.float32)
+    lab = map_coordinates(L, c, order=0, mode="constant", cval=0).reshape(shp).astype(np.uint8)
+    return sitk.GetArrayFromImage(fixed).astype(np.float32), zref, lab
+
+
 def run(fish, variant):
     import SimpleITK as sitk
     import exp20_bigwarp as BW
@@ -157,6 +199,10 @@ def run(fish, variant):
     mv, fx = BW.read_landmarks(os.path.join(BW.BW, "fish_1_landmarks.csv"))
     tps = BW.tps_fit(mv, fx)
     S, names, shape = _atlas()
+    _atlas.names = names
+    import tifffile
+    F = tifffile.imread(os.path.join(DATA, "atlas", "bigwarp", "zbrain_reference.tif")).astype(np.float32)
+    L = _dense_labels(S, shape)
     M1, nx1 = head_up("glucose", 1)
     moving = _sitk(M1)
     import SimpleITK as sitk
@@ -166,17 +212,23 @@ def run(fish, variant):
         P = np.asarray(TR.load(f"gutbrain_{cond}_f{k}")["pos_um"], np.float64)
         if (cond, k) == ("glucose", 1):
             Q, ncc = cells_in_frame(P, nx1), 1.0
+            fx_img, T = moving, None
         else:
             Mk, nxk = head_up(cond, k)
             fixed = _sitk(Mk)
             T, aff = register(fixed, moving, variant)
             ncc = ncc_in_fish1(T, fixed, moving)
             Q = np.array([T.TransformPoint(tuple(p)) for p in cells_in_frame(P, nxk)])       # fish k -> fish 1 frame
+            fx_img = fixed
+            np.save(os.path.join(out, f"{tag(cond, k)}_affine.npy"),                       # the affine, kept for reading
+                    np.r_[aff.GetNthTransform(0).GetParameters() if hasattr(aff, "GetNthTransform") else aff.GetParameters()])
         A = BW.tps_apply(tps, Q)                                                           # fish 1 frame -> Z-Brain um
         reg = label(A, S, shape)
         inside = float(reg.any(1).mean())
         sc = {"ncc": ncc, "inside": inside, "score": ncc * inside, "cells": int(len(P)), "seconds": round(time.time() - t0)}
         json.dump(sc, open(os.path.join(out, f"{tag(cond, k)}.json"), "w"), indent=1)    # one file per fish: runs in parallel
+        fv, zr, lb = check_volumes(T, fx_img, tps, F, L)
+        np.savez_compressed(os.path.join(out, f"{tag(cond, k)}_check.npz"), fish=fv, zref=zr, labels=lb)
         np.savez_compressed(os.path.join(out, f"{tag(cond, k)}.npz"), atlas_um=A.astype(np.float32), regions=reg,
                             names=np.array(names))
         print(f"[register] {variant} {tag(cond, k)}: ncc {ncc:.3f}, inside {inside:.3f}, score {ncc * inside:.3f} "
@@ -271,6 +323,59 @@ def report(variant):
     print(f"[report] {variant}: {len(done)} fish -> atlas_montage.png, atlas_regions_24.png, regions_24.json")
 
 
+def check(variant):
+    """One figure per fish for the eye: green its anatomy, magenta the Z-Brain reference carried onto it (white where they
+    agree), four Z-Brain regions outlined -- from above in three depth slabs (dorsal, middle, ventral thirds) and from
+    the side. Writes presentation/figs/atlas_check_<fish>.png."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    out = os.path.join(DATA, "atlas", "reg", variant)
+    sc = collect(out)
+    def norm(v, lo_pct=0.0):          # the fish's anatomy sits on a bright background: its 40th percentile made black
+        pos = v[v > 0]
+        if not pos.size:
+            return np.zeros_like(v)
+        lo, hi = np.percentile(pos, lo_pct), np.percentile(pos, 99.5)
+        return np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1)
+    for cond, k in FISH:
+        f = os.path.join(out, f"{tag(cond, k)}_check.npz")
+        if not os.path.exists(f):
+            continue
+        z = np.load(f)
+        fv, zr, lb = z["fish"], z["zref"], z["labels"]
+        nz = fv.shape[0]
+        thirds = [(0, nz // 3, "dorsal third"), (nz // 3, 2 * nz // 3, "middle third"), (2 * nz // 3, nz, "ventral third")]
+        fig, ax = plt.subplots(1, 4, figsize=(16, 7.2), facecolor="black", gridspec_kw={"width_ratios": [1, 1, 1, 0.75]})
+        for a, (z0, z1, lab_) in zip(ax[:3], thirds):
+            g, m = norm(fv[z0:z1].max(0), 40), norm(zr[z0:z1].max(0))
+            a.imshow(np.stack([m, g, m], -1))
+            for i, (nm, _, col) in enumerate(QC_LABELS, 1):
+                msk = (lb[z0:z1] == i).any(0)
+                if msk.any():
+                    a.contour(msk, levels=[0.5], colors=[col], linewidths=0.9)
+            a.set_title(f"from above, {lab_}", color="white", fontsize=10)
+            a.axis("off")
+        g, m = norm(fv.max(2).T, 40), norm(zr.max(2).T)                                  # side: rows head to tail, cols depth
+        ax[3].imshow(np.stack([m, g, m], -1), aspect=1.0)
+        for i, (nm, _, col) in enumerate(QC_LABELS, 1):
+            msk = (lb == i).any(2).T
+            if msk.any():
+                ax[3].contour(msk, levels=[0.5], colors=[col], linewidths=0.9)
+        ax[3].set_title("from the side", color="white", fontsize=10)
+        ax[3].axis("off")
+        s_ = sc.get(tag(cond, k), {})
+        fig.suptitle(f"{cond.replace('_', ' ')} fish {k}: green the fish's anatomy, magenta Z-Brain carried onto it (white "
+                     f"where they agree) -- ncc {s_.get('ncc', float('nan')):.2f}, inside {s_.get('inside', float('nan')):.2f}, "
+                     f"score {s_.get('score', float('nan')):.2f}", color="white", fontsize=11)
+        fig.text(0.5, 0.01, "outlines: " + ", ".join(f"{nm}" for nm, _, _ in QC_LABELS) + " (red, orange, cyan, white)",
+                 color="0.8", fontsize=9, ha="center")
+        fig.tight_layout(rect=(0, 0.03, 1, 0.95))
+        fig.savefig(os.path.join(FIGS, f"atlas_check_{tag(cond, k)}.png"), dpi=110, facecolor="black")
+        plt.close(fig)
+        print(f"[check] {tag(cond, k)}", flush=True)
+
+
 def orient():
     import matplotlib
     matplotlib.use("Agg")
@@ -291,7 +396,7 @@ def orient():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["orient", "run", "report"])
+    ap.add_argument("what", choices=["orient", "run", "report", "check"])
     ap.add_argument("--fish", nargs="*", default=None)
     ap.add_argument("--variant", default="aff_bs", choices=list(VARIANTS))
     a = ap.parse_args()
@@ -300,5 +405,7 @@ if __name__ == "__main__":
     elif a.what == "run":
         fish = [f for f in FISH if a.fish is None or tag(*f) in a.fish]
         run(fish, a.variant)
+    elif a.what == "check":
+        check(a.variant)
     else:
         report(a.variant)
