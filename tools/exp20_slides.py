@@ -2411,6 +2411,17 @@ def slides_b7():
              "1991; Davison \\& Hinkley 1997). Resampling time blocks rather than single frames is the moving block "
              "bootstrap for correlated time series (K\\\"unsch 1989). Pairing, the same resamples for both laws, is "
              "how machine-learning papers compare two models on one test set (Koehn 2004; Berg-Kirkpatrick et al.\\ 2012).")
+    # THE GUT RESPONSE KEPT per law (exp17, 2026-10-06: "the clearest network signal, worth its own row"): the
+    # gut-responsive cells' change after every gut pulse in the free rollout, the law's over the recorded
+    import exp20_summary as SU
+    GUT = {}
+    for arm, _, ks in B7_ARMS:
+        g_, w0_, mf_, nw_ = ks
+        gr = g_run[arm]
+        GUT[g_] = SU.gut_kept(gr, f"_{B7_CKPT}")
+        GUT[mf_] = SU.gut_kept(gr.replace("mesh3", "mf"), "")
+        GUT[nw_] = SU.gut_kept(gr.replace("mesh3", "now"), "")
+        GUT[w0_] = SU.gut_kept(gr, f"_{B7_CKPT}", arm="W0")
     for suf in ("", "_raw"):
         jp = os.path.join(DATA, f"meanfield_stats{suf}.json")
         if not os.path.exists(jp):
@@ -2430,8 +2441,10 @@ def slides_b7():
             for k in ks:
                 b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
                 big = k.endswith("graph")
+                gk = GUT.get(k)
                 rows_ += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{k}}}}}" if big else k)
-                          + f" & {qv(b_['estimate'], big=big)} & {qv(l_['estimate'], big=big)} $\\pm$ {l_['sd_over_neurons']:.2f} \\\\\n")
+                          + f" & {qv(b_['estimate'], big=big)} & {qv(l_['estimate'], big=big)} $\\pm$ {l_['sd_over_neurons']:.2f}"
+                          + f" & {(chr(123) + chr(92) + 'normalsize' + chr(92) + 'textbf{' + f'{gk:.2f}' + '}}') if big and gk is not None else (f'{gk:.2f}' if gk is not None else '--')} \\\\\n")
         tests_ = ""
         verdict = []
         for arm, _, ks in B7_ARMS:
@@ -2447,6 +2460,9 @@ def slides_b7():
             verdict.append(f"arm {arm} {L_[mf_]['local_r']['estimate']:+.2f} against the graph's "
                            f"{L_[g_]['local_r']['estimate']:+.2f} ({pq(p_)})")
         sig = [T_[(ks[0], ks[2])]["local_r"] for _, _, ks in B7_ARMS]
+        gut_s = (" Only the graph makes the gut response: kept " + ", ".join(
+            f"{GUT[ks[0]]:.2f} against the mean field's {GUT[ks[2]]:.2f}" for _, _, ks in B7_ARMS
+            if GUT.get(ks[0]) is not None and GUT.get(ks[2]) is not None) + ".")
         if all(t["p"] >= 0.05 for t in sig):
             concl = ("On fish 1, one brain-wide signal does as well as the graph: the mean field's " + ml + " is "
                      + "; ".join(verdict) + ". The learned coupling is not distinguished from a shared signal here, unlike "
@@ -2457,8 +2473,9 @@ def slides_b7():
         else:
             concl = ("The arms disagree: the mean field's " + ml + " is " + "; ".join(verdict) + "; a shared brain-wide "
                      "signal explains most of what the graph does here.")
+        concl += gut_s
         right = (head(f"the mean-field control, {mins:.0f}-min free rollout") + "{\\scriptsize\\raggedright "
-                 "\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n& brain-mean r & " + ml + f", {kept}, mean $\\pm$ SD \\\\\n"
+                 "\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{\\hspace{6pt}}r@{}}\n& brain-mean r & " + ml + f", {kept}, mean $\\pm$ SD & gut kept \\\\\n"
                  "\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{3pt}\n"
                  "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$ on the 3-level mesh, " + f"{n_edges:,}"
                  + " edge weights, at its horizon-40 checkpoint (update " + f"{it_:,}" + " of 49,000, still training); mean "

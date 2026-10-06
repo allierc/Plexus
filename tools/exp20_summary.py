@@ -67,17 +67,19 @@ COMPARE = [
 EV_S = 20.0
 
 
-def gut_kept(run, stem):
+def gut_kept(run, stem, arm="full"):
+    """The gut response kept by `arm` ("full", or "W0": the same law with W = 0) over the RECORDED response."""
     p = os.path.join(RUNS, run, "results", f"{run}{stem}_freetrial.json")
     if not os.path.exists(p):
         return None
     ft = json.load(open(p))
     pre, ev = ft["window"][0], int(round(EV_S / 1.117))
-    P = [q for q in ft["arms"]["full"].get("pulses", []) if q["site"] != 1]
-    if not P:
+    P = [q for q in ft["arms"].get(arm, {}).get("pulses", []) if q["site"] != 1]
+    R = [q for q in ft["arms"]["full"].get("pulses", []) if q["site"] != 1]
+    if not P or not R:
         return None
-    e = lambda key: float(np.mean([np.mean(q[key][pre:pre + ev]) - np.mean(q[key][:pre]) for q in P]))   # noqa: E731
-    return e("trace_free") / e("trace_rec")
+    e = lambda Q, key: float(np.mean([np.mean(q[key][pre:pre + ev]) - np.mean(q[key][:pre]) for q in Q]))   # noqa: E731
+    return e(P, "trace_free") / e(R, "trace_rec")
 
 
 def main():
