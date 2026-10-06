@@ -2390,7 +2390,7 @@ def slides_b7():
     """BATCH 7 -- exp17's slides 17-18 on two exp20 arms (Cedric via exp17, 2026-10-05): the mean-field control and its
     significance test. Per arm, four laws on the same free rollout: the 3-level-mesh graph (at its horizon-40
     checkpoint), the same with W = 0 at inference, the mean-field twin (m_i = a_i <tanh z>, Omega kept) and the no-W twin
-    (m_i = 0, no Omega); numbers and p values from tools/exp17_meanfield_stats.py (data/meanfield_stats[_raw].json)."""
+    (m_i = 0: Omega scales only the message, nothing to act on); numbers and p values from tools/exp17_meanfield_stats.py (data/meanfield_stats[_raw].json)."""
     import torch
     from exp17_slides import qv                        # exp17's quality colours: green > 0.8, orange > 0.4, red below
     out = []
@@ -2462,8 +2462,8 @@ def slides_b7():
                  "\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{3pt}\n"
                  "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$ on the 3-level mesh, " + f"{n_edges:,}"
                  + " edge weights, at its horizon-40 checkpoint (update " + f"{it_:,}" + " of 49,000, still training); mean "
-                 "field: $m_i = a_i\\,\\langle\\tanh z\\rangle$, " + f"{n_gains:,}" + " gains, one per cell; no W: $m_i = 0$, "
-                 "and no SIREN $\\Omega$. The rest is the SIREN law of batch 6. Arm A: " + B7_ARMS[0][1] + " as the gut-input "
+                 "field: $m_i = a_i\\,\\langle\\tanh z\\rangle$, " + f"{n_gains:,}" + " gains, one per cell; no W: $m_i = 0$ "
+                 "($\\Omega$ scales only $m_i$: it has nothing to act on without W). The rest is the SIREN law of batch 6. Arm A: " + B7_ARMS[0][1] + " as the gut-input "
                  "cells; arm B: " + B7_ARMS[1][1] + ".\\par}" + SEC_GAP
                  + head("conclusion") + "{\\scriptsize\\raggedright " + concl + "\\par}" + SEC_GAP
                  + head("the test")
@@ -2488,6 +2488,98 @@ def slides_b7():
             deck_title="batch 7 $\\cdot$ glucose fish 1 $\\cdot$ the mean-field control" + (", brain mean kept" if suf else
                                                                                        ": is the coupling network dynamics?"),
             left=0.52, height=0.62, img_top="0.06\\textheight", caption=cap)))
+    return out
+
+
+def slides_summary_b6():
+    """THE SUM-UP FROM BATCH 6 ON (Cedric, 2026-10-06: "one-to-one comparisons that allow conclusions; what jobs would
+    complete the comparison"), from data/summary_b6.json (tools/exp20_summary.py): two tables of runs differing by one
+    thing, each difference judged against twice the seed-to-seed difference, then the conclusions and the next jobs."""
+    jp = os.path.join(DATA, "summary_b6.json")
+    if not os.path.exists(jp):
+        return []
+    J = json.load(open(jp))
+    tol = J["tolerance"]
+    keys = (("brain_r", "brain-mean r", "{:+.2f}"), ("local_r", "per-neuron r", "{:+.2f}"), ("gut_kept", "gut kept", "{:.2f}"))
+    arrow = {"up": "$\\uparrow$", "down": "$\\downarrow$", "=": "$=$", "": ""}
+
+    def cell(r, k, f):
+        a, b, d = r["a_val"][k], r["b_val"][k], r["delta"][k]
+        if d is None:
+            return "--"
+        v = r["verdict"][k]
+        col = {"up": "{rgb}{0.30,0.85,0.30}", "down": "{rgb}{1.0,0.30,0.25}"}.get(v)
+        dd = f"{d:+.2f} {arrow[v]}"
+        return f"{f.format(a)} $\\to$ {f.format(b)} " + (f"\\textcolor[{col.split('}{')[0][1:]}]{{{col.split('}{')[1][:-1]}}}{{{dd}}}"
+                                                        if col else dd)
+
+    def table(groups):
+        rows = ""
+        for g in groups:
+            rs = [r for r in J["rows"] if r["group"] == g]
+            if not rs:
+                continue
+            rows += f"\\multicolumn{{5}}{{@{{}}l}}{{\\rule{{0pt}}{{2.6ex}}\\textbf{{{g}}}}} \\\\\n"
+            for r in rs:
+                rows += (f"{r['a']} $\\to$ {r['b']} & {_tex(r['what'].replace('->', 'to'))} & "
+                         + " & ".join(cell(r, k, f) for k, _, f in keys) + " \\\\\n")
+        return ("\\resizebox{\\textwidth}{!}{\\begin{tabular}{@{}l@{\\hspace{8pt}}l@{\\hspace{10pt}}l@{\\hspace{10pt}}l"
+                "@{\\hspace{10pt}}l@{}}\nruns & what changes & brain-mean r & per-neuron r & gut kept \\\\\n\\hline\n"
+                + rows + "\\end{tabular}}")
+    cap = ("{\\tiny Glucose fish 1, every run on its own free rollout of the whole session: brain-mean r, the learned "
+           "brain-mean dF/F against the recorded; per-neuron r, each cell's learned against recorded trace after each is "
+           "regressed on its own brain mean, the mean over the cells; gut kept, the gut-responsive cells' change after every "
+           "gut pulse, the law's over the recorded. A $\\to$ B: two runs that differ by one thing; $=$ within twice the "
+           f"seed-to-seed difference (4.1 against 5.5, the one seed pair: brain-mean r {tol['brain_r'] / 2:.3f}, per-neuron r "
+           f"{tol['local_r'] / 2:.3f}, gut kept {tol['gut_kept'] / 2:.3f}), else $\\uparrow$ / $\\downarrow$. 7.1 and 7.4 at "
+           "their horizon-40 checkpoint (still training). These are whole-session numbers; the mean-field test of slides "
+           "26-27 leaves the first 1.7 min out, where the graph's brain-wide lead over the mean field mostly lies.\\par}")
+    out = []
+    for i, (groups, ttl) in enumerate(((("the graph",), "the graph"), (("the gut-input cells", "the network", "the noise"),
+                                                                         "gut-input cells, network, noise"))):
+        body = "\\vspace*{0.6\\baselineskip}" + table(groups) + "\\par\\vspace{8pt}" + cap
+        out.append((f"b67_summary_{i + 1}", frame_full(f"sum-up from batch 6: {ttl}", body, "data/summary_b6.json",
+                                                      deck_title=f"summary $\\cdot$ batches 6-7, one change at a time: {ttl}")))
+    R = {(r["a"], r["b"]): r for r in J["rows"]}
+    d = lambda a, b, k: R[(a, b)]["delta"][k] if (a, b) in R and R[(a, b)]["delta"][k] is not None else float("nan")   # noqa: E731
+    concl = ("\\begin{itemize}\\setlength{\\itemsep}{3pt}\n"
+             "\\item \\textbf{The mesh carries the gut response further, at the same brain mean.} Neuron graph to 4-level "
+             f"mesh: gut kept {d('4.1', '6.2', 'gut_kept'):+.2f} (batches 1-5's cells), {d('6.4', '6.5', 'gut_kept'):+.2f}, "
+             f"{d('6.6', '6.8', 'gut_kept'):+.2f}, {d('6.7', '6.9', 'gut_kept'):+.2f}, {d('6.10', '6.11', 'gut_kept'):+.2f} "
+             "for the other rules; the brain-mean r within the seed spread every time. 3-level to 4-level (atlas sets): "
+             f"{d('7.1', '6.11', 'gut_kept'):+.2f} and {d('7.4', '6.13', 'gut_kept'):+.2f}, the 3-level graphs not yet "
+             "finished.\n"
+             "\\item \\textbf{Truer gut-input cells cost gut response, not the brain mean.} From batches 1-5's 19,035 cells "
+             f"to the paper's 2,538: {d('4.1', '6.7', 'gut_kept'):+.2f}; to the atlas's 527: {d('4.1', '6.10', 'gut_kept'):+.2f} "
+             f"(on the mesh {d('6.2', '6.11', 'gut_kept'):+.2f}); brain-mean r unchanged. Few entry cells must reach a "
+             "brain-wide response through the network alone.\n"
+             "\\item \\textbf{The gut response needs the graph; a shared signal does not make it.} Mean field to graph: "
+             f"gut kept {d('7.2', '7.1', 'gut_kept'):+.2f} and {d('7.5', '7.4', 'gut_kept'):+.2f}; no W to mean field: "
+             f"{d('7.3', '7.2', 'gut_kept'):+.2f} and {d('7.6', '7.5', 'gut_kept'):+.2f}. The mean field lifts the "
+             f"brain-mean r over no W ({d('7.3', '7.2', 'brain_r'):+.2f}) but leaves the gut response at 0.01.\n"
+             "\\item \\textbf{The noise is barely known.} One seed pair (4.1, 5.5): per-neuron r moved "
+             f"{tol['local_r'] / 2:.3f} between seeds, so most per-neuron r differences here are within it.\n"
+             "\\end{itemize}")
+    jobs = ("\\begin{itemize}\\setlength{\\itemsep}{3pt}\n"
+            "\\item \\textbf{seeds}: a second seed of the 4-level mesh (6.2) and of both atlas arms (6.11, 6.13) -- the noise "
+            "floor of the mesh laws, the yardstick of every row\n"
+            "\\item \\textbf{the 4-level mesh's own twins}: its mean-field and no-W twins (batch 8, on the new nominal)\n"
+            "\\item \\textbf{the 3-level graphs at their end} (7.1, 7.4 land today): the 3- against 4-level rows final\n"
+            "\\item \\textbf{the grid}: the 3- and 5-level meshes with the paper's 3 SD and the atlas sets\n"
+            "\\item \\textbf{the visual input}: the paper's 3 SD visual cells (47,746) in place of the 10 \\% rule, on an atlas arm\n"
+            "\\item \\textbf{the swim as an input} on an atlas arm (batch 5: brain-mean $+0.07$-$0.10$ on the neuron graph)\n"
+            "\\item \\textbf{other fish}: the atlas arms on glucose 2, 3 and 5 (registered; their area postrema 12-26$\\times$ "
+            "gut-enriched)\n"
+            "\\item \\textbf{held out} (Cedric via exp17): the free-rollout metrics on the held-out windows only, and the "
+            "nominal without SIREN (it reads absolute time)\n"
+            "\\end{itemize}")
+    body = ("\\vspace*{0.6\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.55\\textwidth}\n"
+            "{\\fontsize{6}{7.2}\\selectfont\\textbf{what the comparisons say}\\par\\vspace{3pt}" + concl + "\\par}\n\\end{column}\n"
+            "\\begin{column}{0.42\\textwidth}\n{\\fontsize{6}{7.2}\\selectfont\\textbf{jobs that would complete them}\\par\\vspace{3pt}" + jobs
+            + "\\par}\n\\end{column}\n\\end{columns}")
+    out.append(("b67_summary_3", frame_full("sum-up from batch 6: conclusions and next jobs", body, "data/summary_b6.json",
+                                            deck_title="summary $\\cdot$ batches 6-7: what the comparisons say, and the "
+                                                       "jobs that would complete them")))
     return out
 
 
@@ -2545,6 +2637,10 @@ def main():
         deck += slides_b7()                                # batch 7: exp17's mean-field control, after batch 6
     except Exception as e:
         print(f"[slides] slides_b7 FAILED: {e!r}")
+    try:
+        deck += slides_summary_b6()                        # the sum-up of batches 6-7, one change at a time
+    except Exception as e:
+        print(f"[slides] slides_summary_b6 FAILED: {e!r}")
     try:
         deck += slides_atlas24()                           # every fish in Z-Brain, after batch 6
     except Exception as e:
