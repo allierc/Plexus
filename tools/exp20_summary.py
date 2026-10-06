@@ -14,7 +14,7 @@ on its own free rollout of the whole session:
 
 A comparison is two runs that differ by ONE thing. Its verdict per metric: "=" when the difference is within twice the
 seed-to-seed difference (4.1 against 5.5, the same spec trained with seed 1: the one seed pair on fish 1), else up or
-down. The two batch-7 graphs are scored at their horizon-40 checkpoint (still training on 2026-10-06).
+down. The two batch-7 graphs at their end (49,000 updates, landed 2026-10-06).
 Writes data/summary_b6.json.
 """
 import json
@@ -34,8 +34,8 @@ LAWS = {"4.1": ("gb_sx_f1_mask_siren", ""), "5.5": ("gb_b5_glucose_f1_s1", ""),
                                        ("6.5", "mesh4_bio"), ("6.6", "paper2"), ("6.7", "paper3"), ("6.8", "mesh4_paper2"),
                                        ("6.9", "mesh4_paper3"), ("6.10", "anat_apvg"), ("6.11", "mesh4_anat_apvg"),
                                        ("6.12", "anat_dvc"), ("6.13", "mesh4_anat_dvc"))},
-        "7.1": ("gb_b7_glucose_f1_mesh3_anat_apvg", "_stage_40"), "7.2": ("gb_b7_glucose_f1_mf_anat_apvg", ""),
-        "7.3": ("gb_b7_glucose_f1_now_anat_apvg", ""), "7.4": ("gb_b7_glucose_f1_mesh3_anat_dvc", "_stage_40"),
+        "7.1": ("gb_b7_glucose_f1_mesh3_anat_apvg", ""), "7.2": ("gb_b7_glucose_f1_mf_anat_apvg", ""),
+        "7.3": ("gb_b7_glucose_f1_now_anat_apvg", ""), "7.4": ("gb_b7_glucose_f1_mesh3_anat_dvc", ""),
         "7.5": ("gb_b7_glucose_f1_mf_anat_dvc", ""), "7.6": ("gb_b7_glucose_f1_now_anat_dvc", "")}
 # (group, A, B, what changes from A to B)
 COMPARE = [

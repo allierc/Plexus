@@ -2333,7 +2333,7 @@ def frame_narrow(title, img, right, src, deck_title=None, left=0.74, height=0.78
 B7_ARMS = (("A", "the atlas's area postrema + vagal ganglia (527 cells)", ("7.1 graph", "7.1, W = 0", "7.2 mean field", "7.3 no W")),
            ("B", "the atlas's area postrema + vagal ganglia + DVC (2,037 cells)",
             ("7.4 graph", "7.4, W = 0", "7.5 mean field", "7.6 no W")))
-B7_CKPT = "stage_40"            # the two graphs scored at their horizon-40 checkpoint, still training (Cedric, 2026-10-06)
+B7_CKPT = None    # the graphs' checkpoint: None = their end (landed 2026-10-06 11:46); "stage_40" scored them while training
 
 
 def figure_meanfield(suf, path):
@@ -2397,7 +2397,8 @@ def slides_b7():
     g_run = {"A": "gb_b7_glucose_f1_mesh3_anat_apvg", "B": "gb_b7_glucose_f1_mesh3_anat_dvc"}
     mf_run = "gb_b7_glucose_f1_mf_anat_apvg"
     try:
-        ckg = torch.load(os.path.join(RUNS, g_run["A"], "models", f"{B7_CKPT}.pt"), map_location="cpu", weights_only=False)
+        ckg = torch.load(os.path.join(RUNS, g_run["A"], "models", f"{B7_CKPT or 'best'}.pt"), map_location="cpu",
+                         weights_only=False)
         n_edges = sum(v.numel() for k, v in ckg["fitted"].items() if k.startswith("state_diffuse.W_"))
         it_ = int(ckg.get("it") or 0)
         n_gains = torch.load(os.path.join(RUNS, mf_run, "models", "best.pt"), map_location="cpu",
@@ -2418,10 +2419,10 @@ def slides_b7():
     for arm, _, ks in B7_ARMS:
         g_, w0_, mf_, nw_ = ks
         gr = g_run[arm]
-        GUT[g_] = SU.gut_kept(gr, f"_{B7_CKPT}")
+        GUT[g_] = SU.gut_kept(gr, f"_{B7_CKPT}" if B7_CKPT else "")
         GUT[mf_] = SU.gut_kept(gr.replace("mesh3", "mf"), "")
         GUT[nw_] = SU.gut_kept(gr.replace("mesh3", "now"), "")
-        GUT[w0_] = SU.gut_kept(gr, f"_{B7_CKPT}", arm="W0")
+        GUT[w0_] = SU.gut_kept(gr, f"_{B7_CKPT}" if B7_CKPT else "", arm="W0")
     for suf in ("", "_raw"):
         jp = os.path.join(DATA, f"meanfield_stats{suf}.json")
         if not os.path.exists(jp):
@@ -2478,8 +2479,9 @@ def slides_b7():
                  "\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{\\hspace{6pt}}r@{}}\n& brain-mean r & " + ml + f", {kept}, mean $\\pm$ SD & gut kept \\\\\n"
                  "\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{3pt}\n"
                  "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$ on the 3-level mesh, " + f"{n_edges:,}"
-                 + " edge weights, at its horizon-40 checkpoint (update " + f"{it_:,}" + " of 49,000, still training); mean "
-                 "field: $m_i = a_i\\,\\langle\\tanh z\\rangle$, " + f"{n_gains:,}" + " gains, one per cell; no W: $m_i = 0$ "
+                 + (" edge weights, at its horizon-40 checkpoint (update " + f"{it_:,}" + " of 49,000, still training); mean "
+                    if B7_CKPT else f" edge weights, {it_:,} updates; mean ")
+                 + "field: $m_i = a_i\\,\\langle\\tanh z\\rangle$, " + f"{n_gains:,}" + " gains, one per cell; no W: $m_i = 0$ "
                  "($\\Omega$ scales only $m_i$: it has nothing to act on without W). The rest is the SIREN law of batch 6. Arm A: " + B7_ARMS[0][1] + " as the gut-input "
                  "cells; arm B: " + B7_ARMS[1][1] + ".\\par}" + SEC_GAP
                  + head("conclusion") + "{\\scriptsize\\raggedright " + concl + "\\par}" + SEC_GAP
@@ -2501,7 +2503,7 @@ def slides_b7():
                   "``population coupling''.\\\\[3pt]") + TEXT_)
         out.append((f"b7_meanfield{suf}", frame_narrow(
             "the mean-field control" + (", brain mean kept" if suf else ""), f"figs/{png}", right,
-            f"tools/exp17_meanfield_stats.py (data/meanfield_stats{suf}.json); models/{B7_CKPT}.pt",
+            f"tools/exp17_meanfield_stats.py (data/meanfield_stats{suf}.json); models/{B7_CKPT or 'best'}.pt",
             deck_title="batch 7 $\\cdot$ glucose fish 1 $\\cdot$ the mean-field control" + (", brain mean kept" if suf else
                                                                                        ": is the coupling network dynamics?"),
             left=0.52, height=0.62, img_top="0.06\\textheight", caption=cap)))
@@ -2548,8 +2550,8 @@ def slides_summary_b6():
            "regressed on its own brain mean, the mean over the cells; gut kept, the gut-responsive cells' change after every "
            "gut pulse, the law's over the recorded. A $\\to$ B: two runs that differ by one thing; $=$ within twice the "
            f"seed-to-seed difference (4.1 against 5.5, the one seed pair: brain-mean r {tol['brain_r'] / 2:.3f}, per-neuron r "
-           f"{tol['local_r'] / 2:.3f}, gut kept {tol['gut_kept'] / 2:.3f}), else $\\uparrow$ / $\\downarrow$. 7.1 and 7.4 at "
-           "their horizon-40 checkpoint (still training). These are whole-session numbers; the mean-field test of slides "
+           f"{tol['local_r'] / 2:.3f}, gut kept {tol['gut_kept'] / 2:.3f}), else $\\uparrow$ / $\\downarrow$. These are "
+           "whole-session numbers; the mean-field test of slides "
            "26-27 leaves the first 1.7 min out, where the graph's brain-wide lead over the mean field mostly lies.\\par}")
     out = []
     for i, (groups, ttl) in enumerate(((("the graph",), "the graph"), (("the gut-input cells", "the network", "the noise"),
@@ -2564,8 +2566,7 @@ def slides_summary_b6():
              f"mesh: gut kept {d('4.1', '6.2', 'gut_kept'):+.2f} (batches 1-5's cells), {d('6.4', '6.5', 'gut_kept'):+.2f}, "
              f"{d('6.6', '6.8', 'gut_kept'):+.2f}, {d('6.7', '6.9', 'gut_kept'):+.2f}, {d('6.10', '6.11', 'gut_kept'):+.2f} "
              "for the other rules; the brain-mean r within the seed spread every time. 3-level to 4-level (atlas sets): "
-             f"{d('7.1', '6.11', 'gut_kept'):+.2f} and {d('7.4', '6.13', 'gut_kept'):+.2f}, the 3-level graphs not yet "
-             "finished.\n"
+             f"{d('7.1', '6.11', 'gut_kept'):+.2f} and {d('7.4', '6.13', 'gut_kept'):+.2f}.\n"
              "\\item \\textbf{Truer gut-input cells cost gut response, not the brain mean.} From batches 1-5's 19,035 cells "
              f"to the paper's 2,538: {d('4.1', '6.7', 'gut_kept'):+.2f}; to the atlas's 527: {d('4.1', '6.10', 'gut_kept'):+.2f} "
              f"(on the mesh {d('6.2', '6.11', 'gut_kept'):+.2f}); brain-mean r unchanged. Few entry cells must reach a "
@@ -2581,7 +2582,6 @@ def slides_summary_b6():
             "\\item \\textbf{seeds}: a second seed of the 4-level mesh (6.2) and of both atlas arms (6.11, 6.13) -- the noise "
             "floor of the mesh laws, the yardstick of every row\n"
             "\\item \\textbf{the 4-level mesh's own twins}: its mean-field and no-W twins (batch 8, on the new nominal)\n"
-            "\\item \\textbf{the 3-level graphs at their end} (7.1, 7.4 land today): the 3- against 4-level rows final\n"
             "\\item \\textbf{the grid}: the 3- and 5-level meshes with the paper's 3 SD and the atlas sets\n"
             "\\item \\textbf{the visual input}: the paper's 3 SD visual cells (47,746) in place of the 10 \\% rule, on an atlas arm\n"
             "\\item \\textbf{the swim as an input} on an atlas arm (batch 5: brain-mean $+0.07$-$0.10$ on the neuron graph)\n"
