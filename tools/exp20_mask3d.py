@@ -39,7 +39,7 @@ def main(rec="gutbrain_glucose_f1", n_frames=200, fps=25):
             ("batch 6, the paper's rule, 2 SD", ld("_paper2sd"), (("uv", 0), ("visual", 3))),
             ("batch 6, the paper's rule, 3 SD", ld("_paper3sd"), (("uv", 0), ("visual", 3))),
             ("batch 6, atlas: area postrema + vagal ganglia", ld("_anat_apvg"), (("uv", 0), ("visual", 3))),
-            ("batch 6, atlas: + DVC", ld("_anat_dvc"), (("uv", 0), ("visual", 3)))]
+            ("batch 6, atlas: area postrema + vagal ganglia + dorsal vagal complex", ld("_anat_dvc"), (("uv", 0), ("visual", 3)))]
     rr = 1.75 * float(np.ptp(P, 0).max())
     az0, el = np.deg2rad(-60.0), np.deg2rad(32.0)
     tmp = tempfile.mkdtemp(prefix="mask3d_")

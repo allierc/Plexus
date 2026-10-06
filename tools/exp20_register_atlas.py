@@ -71,9 +71,9 @@ VARIANTS = {"aff": {"bspline": None}, "aff_bs": {"bspline": (6, 3, 3)},
             # 6th iteration: the search also pitches the fish (fish water 1 and 3)
             "aff_bs_xzp": {"bspline": (6, 3, 3), "search": True, "zstep": True, "pitch": True}}
 REGIONS = [("area postrema", ["Area Postrema"]), ("vagal ganglia (nodose)", ["Ganglia - Vagal Ganglia"]),
-           ("X vagus motor (DMNX, DVC)", ["X Vagus motorneuron cluster"]),
+           ("X vagus motor nucleus (dorsal vagal complex)", ["X Vagus motorneuron cluster"]),
            ("noradrenergic, interfascicular + vagal", ["Noradrendergic neurons of the Interfascicular and Vagal areas"]),
-           ("rhombomere 1 (PBN within)", ["Rhombomere 1"]), ("rhombomere 7 (caudal medulla)", ["Rhombomere 7"]),
+           ("rhombomere 1 (parabrachial nucleus within)", ["Rhombomere 1"]), ("rhombomere 7 (caudal medulla)", ["Rhombomere 7"]),
            ("tectum (SPV)", ["Tectum Stratum Periventriculare"]), ("hypothalamus (any)", ["Hypothalamus"]),
            ("cerebellum", ["Rhombencephalon - Cerebellum"])]
 
@@ -480,7 +480,7 @@ def report(variant):
         sc = scores.get(tag(cond, k), {})
         ap = row["area postrema"]
         a.set_title(f"{cond.replace('_', ' ')} {k}: score {sc.get('score', float('nan')):.2f}\n"
-                    f"AP {ap['gut_responsive']} of {ap['cells']} gut-responsive", color="white", fontsize=9)
+                    f"area postrema: {ap['gut_responsive']} of {ap['cells']} gut-responsive", color="white", fontsize=9)
         a.set_aspect("equal")
         a.set_xlim(ext[0], ext[1]); a.set_ylim(ext[2], ext[3])
     fig_m.text(0.5, 0.005, "Z-Brain from above; blue the fish's cells (1 in 10), yellow its gut-responsive cells, red its cells "
@@ -572,7 +572,7 @@ def check(variant):
         s_ = sc.get(tag(cond, k), {})
         fig.suptitle(f"{cond.replace('_', ' ')} fish {k}: green the fish's anatomy, magenta Z-Brain carried onto it (white "
                      f"where they agree) -- rho {s_.get('rho', float('nan')):.2f}, inside {s_.get('inside', float('nan')):.2f}, "
-                     f"score {s_.get('score', float('nan')):.2f}, AP {s_.get('ap_contrast') or float('nan'):.2f} (red outline)",
+                     f"score {s_.get('score', float('nan')):.2f}, area-postrema contrast {s_.get('ap_contrast') or float('nan'):.2f} (red outline)",
                      color="white", fontsize=11)
         fig.text(0.5, 0.01, "outlines: " + ", ".join(f"{nm}" for nm, _, _ in QC_LABELS) + " (red, orange, cyan, white)",
                  color="0.8", fontsize=9, ha="center")

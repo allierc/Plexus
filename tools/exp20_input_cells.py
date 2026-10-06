@@ -39,8 +39,8 @@ RULES = [("batches 1-5", "", "gb_sx_f1_mask_siren", "gb_b6_glucose_f1_mesh4"),
          ("batch 6, 10 %", "_bio", "gb_b6_glucose_f1_bio", "gb_b6_glucose_f1_mesh4_bio"),
          ("batch 6, 2 SD", "_paper2sd", "gb_b6_glucose_f1_paper2", "gb_b6_glucose_f1_mesh4_paper2"),
          ("batch 6, 3 SD", "_paper3sd", "gb_b6_glucose_f1_paper3", "gb_b6_glucose_f1_mesh4_paper3"),
-         ("atlas: AP + vagal ganglia", "_anat_apvg", "gb_b6_glucose_f1_anat_apvg", "gb_b6_glucose_f1_mesh4_anat_apvg"),
-         ("atlas: + DVC", "_anat_dvc", "gb_b6_glucose_f1_anat_dvc", "gb_b6_glucose_f1_mesh4_anat_dvc")]
+         ("atlas: area postrema + vagal ganglia", "_anat_apvg", "gb_b6_glucose_f1_anat_apvg", "gb_b6_glucose_f1_mesh4_anat_apvg"),
+         ("atlas: area postrema + vagal ganglia + dorsal vagal complex", "_anat_dvc", "gb_b6_glucose_f1_anat_dvc", "gb_b6_glucose_f1_mesh4_anat_dvc")]
 
 
 def main():

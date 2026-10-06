@@ -45,11 +45,11 @@ def main():
     ex, ey, ez = F.shape[2] * ZVOX[0], F.shape[1] * ZVOX[1], F.shape[0] * ZVOX[2]
     gut_layers = [(~(apvg | dvc | gut3), "0.55", 0.35, f"fish 1's other cells ({int((~(apvg | dvc | gut3)).sum()):,}, 1 in 6)", 6),
                   (apvg, "#ff4040", 2.6, f"area postrema + vagal ganglia ({int(apvg.sum()):,}, atlas)", 1),
-                  (dvc & ~apvg, "#ffa726", 1.8, f"+ dorsal vagal complex ({int(dvc.sum()):,} together, atlas)", 1),
+                  (dvc & ~apvg, "#e040fb", 1.8, f"dorsal vagal complex ({int((dvc & ~apvg).sum()):,}, atlas)", 1),
                   (gut3, "#ffeb3b", 1.4, f"gut-responsive, the paper's rule 3 SD ({int(gut3.sum()):,})", 1)]
     vis_layers = [(~(vis3 | vis10), "0.55", 0.35, f"fish 1's other cells ({int((~(vis3 | vis10)).sum()):,}, 1 in 6)", 6),
                   (vis3, "#1e88e5", 0.6, f"the paper's rule on the grating, 3 SD ({int(vis3.sum()):,})", 1),
-                  (vis10, "#81d4fa", 0.6, f"10 % rule, coherence with the grating ({int(vis10.sum()):,})", 1)]
+                  (vis10, "#66bb6a", 0.6, f"10 % rule, coherence with the grating ({int(vis10.sum()):,})", 1)]
     # one scale, no blank inside a panel (exp17's rule): each view cropped to the cells' own extent + 25 um, every panel
     # as wide as its view (x from above, depth from the side), all the same head-to-tail height; a gap between groups
     lo, hi = np.percentile(A, 0.05, 0) - 25, np.percentile(A, 99.95, 0) + 25

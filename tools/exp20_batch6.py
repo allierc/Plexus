@@ -25,8 +25,8 @@ os.environ.setdefault("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphDat
 EXP = os.path.join(ROOT, "experiments", "exp20_gutbrain_graphcast")
 RUNS = os.path.join(os.environ["GNN_OUTPUT_ROOT"], "log", "training", "gutbrain")
 MASKS = [("batches 1-5", "", "#9e9e9e"), ("10 % gut-not-control", "bio", "#ff8a65"), ("paper, 2 SD", "paper2", "#ffd54f"),
-         ("paper, 3 SD", "paper3", "#fff176"), ("atlas: AP + vagal ganglia", "anat_apvg", "#ef5350"),
-         ("atlas: DVC", "anat_dvc", "#ab47bc")]
+         ("paper, 3 SD", "paper3", "#fff176"), ("atlas: area postrema + vagal ganglia", "anat_apvg", "#ef5350"),
+         ("atlas: area postrema + vagal ganglia + dorsal vagal complex", "anat_dvc", "#ab47bc")]
 GRAPHS = [("neuron graph", ""), ("mesh 3", "mesh3"), ("mesh 4", "mesh4"), ("mesh 5", "mesh5")]
 EV_S = 20.0
 
