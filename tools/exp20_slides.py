@@ -2281,7 +2281,7 @@ STEM_ARMS = {"b6_mesh_levels": _B6("mesh3", "mesh4", "mesh5"), "b6_mesh3": _B6("
              "b6_mesh5": _B6("mesh5"), "b6_kymo_uv_old": _B6("mesh3", "mesh4", "mesh5"), "b6_kymo_visual": _B6(*_B6_ALL),
              "b6_arms_cells": _B6(*_B6_ALL),
              **{k: [f"gb_b7_glucose_f1_{x}_anat_{y}" for y in ("apvg", "dvc") for x in ("mesh3", "mf", "now")]
-                for k in ("b7_meanfield", "b7_meanfield_raw")},
+                for k in ("b7_meanfield", "b7_meanfield_raw", "b7_gut")},
              "b6_paper3sd_kymo_uv": _B6("paper3", "mesh4_paper3"), "b6_anat_apvg_kymo_uv": _B6("anat_apvg", "mesh4_anat_apvg"),
              "b6_atlas": _B6(*_B6_ALL),
              **{k: _B6(*_B6_ALL) for k in ("b6_mask_rules", "b6_mask_traces", "b6_results", "b6_results_table", "b6_traces",
@@ -2507,7 +2507,45 @@ def slides_b7():
             deck_title="batch 7 $\\cdot$ glucose fish 1 $\\cdot$ the mean-field control" + (", brain mean kept" if suf else
                                                                                        ": is the coupling network dynamics?"),
             left=0.52, height=0.62, img_top="0.06\\textheight", caption=cap)))
+    out += slide_gut_meanfield()
     return out
+
+
+def slide_gut_meanfield():
+    """THE GUT RESPONSE, THE GRAPH AGAINST ONE BRAIN-WIDE SIGNAL (Cedric, 2026-10-06: "after slides 26-27, show the
+    difference in gut response between brain-wide and not brain-wide"), tools/exp20_gut_meanfield.py: the
+    gut-responsive cells' mean dF/F around the gut pulses per law, and every cell's evoked change from above."""
+    zp = os.path.join(DATA, "gut_meanfield_b7.npz")
+    if not (os.path.exists(zp) and os.path.exists(os.path.join(PRES, "figs", "gut_meanfield_b7.png"))):
+        return []
+    z = np.load(zp)
+    resp, n_p = z["responsive"], int(z["n_pulses"])
+    er = z["rec_evoked"]
+    kept = lambda k: float(np.nanmean(z[f"{k}|evoked"][resp]) / er[resp].mean())            # noqa: E731
+    mr = lambda k: float(np.corrcoef(np.nan_to_num(z[f"{k}|evoked"]), er)[0, 1])          # noqa: E731
+    ST = json.load(open(os.path.join(DATA, "meanfield_stats.json")))
+    share = resp.mean() * n_p * 20.0 / (ST["rollout_min"] * 60)                              # cell-time of the gut response
+    cap = ("{\\tiny \\textbf{Top}: the " + f"{int(resp.sum()):,}" + " gut-responsive cells' mean dF/F around the "
+           + f"{n_p}" + " gut pulses (mean $\\pm$ SEM over the pulses), in each law's free rollout of the whole session. "
+           "\\textbf{Bottom}: every cell's evoked change, 0-20 s after a gut pulse minus the "
+           "10 s before, mean over the pulses, from above, head left. The graph keeps "
+           + f"{kept('A graph'):.2f} (arm A) and {kept('B graph'):.2f} (arm B)" + " of the recorded evoked change; the mean "
+           "field " + f"{kept('A mean field'):.2f} and {kept('B mean field'):.2f}" + ", no W " + f"{kept('A no W'):.2f} and "
+           f"{kept('B no W'):.2f}" + ", the graph with W = 0, " + f"{kept('A graph, W = 0'):.2f} and {kept('B graph, W = 0'):.2f}"
+           + ". The map's correlation with the recorded one over every cell: graph " + f"{mr('A graph'):+.2f} / {mr('B graph'):+.2f}"
+           + ", mean field " + f"{mr('A mean field'):+.2f} / {mr('B mean field'):+.2f}" + ", no W " + f"{mr('A no W'):+.2f} / "
+           f"{mr('B no W'):+.2f}" + ". \\textbf{Why slides 26-27 do not see it}: the gut response is "
+           + f"{100 * resp.mean():.1f}" + " \\% of the cells for the 20 s after " + f"{n_p}" + " pulses, "
+           + f"{100 * share:.1f}" + " \\% of the cell-time of the " + f"{ST['rollout_min']:.0f}" + "-min session -- too little to "
+           "move a whole-brain average. One brain-wide signal, heard by every cell through its own gain, reproduces the "
+           "shared fluctuations those averages are made of; it cannot carry a signal from the few entry cells to particular "
+           "cells, which the gut response needs.\\par}")
+    body = ("\\vspace*{0.2\\baselineskip}{\\centering\\includegraphics[width=\\textwidth,height=0.66\\textheight,"
+            "keepaspectratio]{figs/gut_meanfield_b7.png}\\par}\\vspace{4pt}" + cap)
+    return [("b7_gut", frame_full("the gut response, the graph against one brain-wide signal", body,
+                                  "data/gut_meanfield_b7.npz (tools/exp20_gut_meanfield.py)",
+                                  deck_title="batch 7 $\\cdot$ glucose fish 1 $\\cdot$ the gut response: the graph against "
+                                             "one brain-wide signal"))]
 
 
 def slides_summary_b6():
