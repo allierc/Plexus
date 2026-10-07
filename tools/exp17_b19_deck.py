@@ -803,25 +803,18 @@ def write_slides():
                           "two small groups of neurons at the front of the hindbrain, one each side of the midline. "
                           "They take turns being active, every 10-20 s, and the active side biases the fish's next "
                           "swim toward that side: a left / right turn selector.\\par}\\vspace{6pt}\n"
-                        + head("the ARTR, from the activity")
-                        + "{\\scriptsize\\raggedright No EM map: the " + f"{AR_['candidates']:,}" + " neurons of "
-                          "rhombomeres 1-3, dF/F band-passed to " + f"{lo_s:g}-{hi_s:g}" + " s, each block's first "
-                          "minute dropped. The " + f"{AR_['k_side']}" + " left and " + f"{AR_['k_side']}" + " right cells "
-                          "that best follow left $-$ right, refined 6 times; selected once on the dark block (red / blue) "
-                          "and once, independently, on the rotation block (yellow). Grey: as many random cells, same "
-                          "rhombomeres.\\par}\\vspace{6pt}\n"
+                        + head("the cells")                          # Cedric, 2026-10-07: the twin of the next slide
+                        + "{\\scriptsize\\raggedright A small, strict set, found from the activity alone: in rhombomeres "
+                          "1-3 only, the " + f"{AR_['k_side']}" + " cells per side whose slow activity (" + f"{lo_s:g}-{hi_s:g}"
+                        + " s) best follows left $-$ right, picked once on the dark block and once on the rotation block. "
+                          "Red the left side, blue the right.\\par}\\vspace{6pt}\n"
                         + head("what it shows")
-                        + "{\\scriptsize\\raggedright Rotation: the cells picked on the dark alternate on the held-out "
-                          "rotation block, r " + f"{sd_['per_block']['rotation']['slow_r']:+.2f}" + " (random "
-                        + f"{sd_['per_block']['rotation']['ctrl_slow_r_median']:+.2f}" + "). Dark: no self-sustained "
-                          "rhythm. The rotation cells' alternation decays after the switch: r "
-                        + ", ".join(f"{v['r']:+.2f} at {w.replace(' s', '')} s" for w, v in dw_)
-                        + ", left $-$ right amplitude " + f"{dw_[0][1]['lr_amplitude']:.4f}" + " $\\to$ "
-                        + f"{dw_[-1][1]['lr_amplitude']:.4f}" + " dF/F; the dark selection's own r is fitted on a "
-                          "difference of " + f"{sd_['dark_windows'][list(sd_['dark_windows'])[-1]]['lr_amplitude']:.4f}"
-                        + " dF/F. Other blocks: the two halves less coupled than random cells in every one. The cells: "
-                          "rhombomeres 1-2, median " + f"{sd_['median_abs_x_from_midline_um']:.0f}" + " \\textmu m from the "
-                          "midline.\\par}")
+                        + "{\\scriptsize\\raggedright During rotation the two sides take turns, one per 30-s rotation "
+                          "direction (cells picked on the dark: r " + f"{sd_['per_block']['rotation']['slow_r']:+.2f}"
+                        + " between the sides on the rotation frames, random cells " + f"{sd_['per_block']['rotation']['ctrl_slow_r_median']:+.2f}"
+                        + "). In the dark they stop within minutes: r " + ", ".join(f"{v['r']:+.2f} at {w.replace(' s', '')} s"
+                                                                                   for w, v in dw_)
+                        + " after the switch. The movie: each cell lit by its own dF/F.\\par}")
                 deck.insert(at_, ("00j_artr", S.frame_wide("the ARTR", (col2_("artr.png", tR2_).replace(
                                   "\\includegraphics[width=\\linewidth,height=\\colheight,keepaspectratio]{figs/artr.png}",
                                   "\\playmovie[\\linewidth]{Movies/artr}")    # Cedric, 2026-10-07: a movie, not the projection
@@ -832,25 +825,25 @@ def write_slides():
             if os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "figs", "phase_rotation.png")):
                 PH_ = json.load(open(jp_))
                 pr2_ = PH_["per_region"]
-                tP_ = (head("half a cycle apart")
-                       + "{\\scriptsize\\raggedright The rotation block: the grating turns one way for 30 s, then the "
-                         "other (orange, period " + f"{PH_['period_s']:g}" + " s). Each neuron fitted by a sine of that "
-                         "period; its phase against the stimulus's. Two neurons oscillate in antiphase when their phases "
-                         "differ by half a cycle: red (in phase with the stimulus) against blue. Kept: the "
-                       + f"{PH_['significant']:,}" + " neurons whose fit beats the same fit at off periods (99.9th "
-                         "percentile).\\par}\\vspace{6pt}\n"
+                ac_ = np.load(os.path.join(EXP, "data", "artr_cells.npz"))
+                pz_ = np.load(os.path.join(EXP, "data", "phase_rotation.npz"))
+                inL_ = int((pz_["sig"][ac_["rotation_left"]] & (np.cos(pz_["dphi"][ac_["rotation_left"]]) < 0)).sum())
+                inR_ = int((pz_["sig"][ac_["rotation_right"]] & (np.cos(pz_["dphi"][ac_["rotation_right"]]) > 0)).sum())
+                tP_ = (head("the cells")                         # Cedric, 2026-10-07: the twin of the ARTR slide
+                       + "{\\scriptsize\\raggedright No region, no cap: every neuron of the brain whose dF/F follows "
+                         "the rotation's " + f"{PH_['period_s']:g}" + "-s period (a sine fit that beats the same fit at "
+                         "other periods), " + f"{PH_['significant']:,}" + " of them, coloured by phase. Red and blue are "
+                         "half a cycle apart (" + f"{PH_['red_blue_phase_gap_deg']:.0f}" + "$^\\circ$).\\par}\\vspace{6pt}\n"
                        + head("what it shows")
-                       + "{\\scriptsize\\raggedright Two populations, " + f"{PH_['red_blue_phase_gap_deg']:.0f}"
-                       + "$^\\circ$ apart: red " + f"{PH_['red']:,}" + ", blue " + f"{PH_['blue']:,}" + ". The split is "
-                         "by side: the right hemisphere is mostly red (" + f"{PH_['red_left_right'][1]:,}" + " red, "
-                       + f"{PH_['blue_left_right'][1]:,}" + " blue), the left mixed (" + f"{PH_['red_left_right'][0]:,}"
-                       + " red, " + f"{PH_['blue_left_right'][0]:,}" + " blue), sharpest in the anterior hindbrain "
-                         "(rhombomere 2: left " + f"{pr2_['rhombomere 2']['left_red_blue'][0]}" + " red / "
-                       + f"{pr2_['rhombomere 2']['left_red_blue'][1]}" + " blue, right "
-                       + f"{pr2_['rhombomere 2']['right_red_blue'][0]}" + " / " + f"{pr2_['rhombomere 2']['right_red_blue'][1]}"
-                       + ") -- the ARTR's place. The two groups alternate with the stimulus and merge again in the dark. "
-                         "The movie: each neuron lit by its own dF/F at the frame."
-                         "\\par}")
+                       + "{\\scriptsize\\raggedright The ARTR's alternation, brain-wide: red mostly left ("
+                       + f"{PH_['red_left_right'][0]:,}" + " left, " + f"{PH_['red_left_right'][1]:,}" + " right), blue "
+                         "mostly right (" + f"{PH_['blue_left_right'][0]:,}" + " left, " + f"{PH_['blue_left_right'][1]:,}"
+                       + " right). The two groups merge again in the dark.\\par}\\vspace{6pt}\n"
+                       + head("why many more cells")
+                       + "{\\scriptsize\\raggedright The ARTR slide keeps 100 cells per side in rhombomeres 1-3; this one "
+                         "keeps every oscillating neuron, most of them visual cells (tectum, pretectum, cerebellum, "
+                         "hindbrain) following the rotating grating. The ARTR is inside: of its 100 left cells picked on "
+                         "rotation " + f"{inL_}" + " are red here, of its 100 right " + f"{inR_}" + " blue.\\par}")
                 deck.insert(at_, ("00j_phase", S.frame_wide("half a cycle apart", (col2_("phase_rotation.png", tP_).replace(
                                   "\\includegraphics[width=\\linewidth,height=\\colheight,keepaspectratio]{figs/phase_rotation.png}",
                                   "\\playmovie[\\linewidth]{Movies/phase_rotation}")   # Cedric, 2026-10-07: a movie
