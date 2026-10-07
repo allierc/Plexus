@@ -740,14 +740,22 @@ def write_slides():
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
             # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
-            for b_, lr_, what_ in (
+            for b_, lr_, what_ in (                  # Cedric, 2026-10-07: one raster per block, in the recording's order
                     ("gain", False, "Forward grating; the feedback gain (how far the scene moves per swim) switches low / "
                      "high every 30 s. The 30-s alternation shows as vertical bands in most regions."),
                     ("dots", False, "Random dots; three 20-s episodes of all dots moving right (orange). The slow rise and "
                      "fall over the block dominates; the episodes leave short marks in the tectum and the tegmentum."),
+                    ("flash", False, "The whole field turns light, then dark, every 30 s (orange)."),
+                    ("taxis", False, "The left or the right half of the field lit, the other dark, 20 s each (orange): the "
+                     "stimulus of phototaxis, turning toward the light."),
                     ("turning", True, "Grating forward, left, right, back: 30 s moving, 30 s still (orange, the stimulus "
-                     "features). Each region split by Z-Brain's midline, left hemisphere above the dashed line, right below.")):
-                f_ = f"atlas_regions_block_{b_}{'_lr' if lr_ else ''}.png"
+                     "features). Each region split by Z-Brain's midline, left hemisphere above the dashed line, right below."),
+                    ("position", False, "A 1-s forward pulse of the grating, then a 3, 6 or 9-s delay, then 30 s forward "
+                     "(orange)."),
+                    ("open loop", False, "Forward grating for 15 min; the fish's swims no longer move the scene."),
+                    ("rotation", False, "The grating rotates one way for 30 s, then the other (orange)."),
+                    ("dark", False, "Nothing shown: spontaneous activity.")):
+                f_ = f"atlas_regions_block_{b_.replace(' ', '_')}{'_lr' if lr_ else ''}.png"
                 if os.path.exists(os.path.join(PRES, "figs", f_)):
                     tB_ = (head(f"the {b_} block")
                            + "{\\scriptsize\\raggedright " + what_ + "\\par}\\vspace{6pt}\n"
@@ -755,8 +763,8 @@ def write_slides():
                            + "{\\scriptsize\\raggedright Only the block's frames, every one; each neuron's dF/F z-scored "
                              "within the block; rows by region as on the atlas slide, within a region by the correlation "
                              "with the brain mean (green, top).\\par}")
-                    deck.insert(at_, (f"00j_block_{b_}", S.frame_wide(f"the {b_} block", col2_(f_, tB_), "tools/exp17_atlas.py "
-                                      f"summary --block {b_}{' --lr' if lr_ else ''}",
+                    deck.insert(at_, (f"00j_block_{b_.replace(' ', '_')}", S.frame_wide(f"the {b_} block", col2_(f_, tB_), "tools/exp17_atlas.py "
+                                      f"summary --block '{b_}'{' --lr' if lr_ else ''}",
                                       deck_title=f"in the Z-Brain atlas $\\cdot$ the {b_} block")))
                     at_ += 1
             jl_ = os.path.join(EXP, "data", "lateral.json")
@@ -790,7 +798,12 @@ def write_slides():
                 sd_, sr_ = AR_["by_selection"]["dark"], AR_["by_selection"]["rotation"]
                 dw_ = list(sr_["dark_windows"].items())
                 lo_s, hi_s = AR_["band_s"]
-                tR2_ = (head("the ARTR, from the activity")
+                tR2_ = (head("what the ARTR is")                 # Cedric, 2026-10-07: "what ARTR means, in plain English"
+                        + "{\\scriptsize\\raggedright The anterior rhombencephalic turning region (Dunn et al. 2016): "
+                          "two small groups of neurons at the front of the hindbrain, one each side of the midline. "
+                          "They take turns being active, every 10-20 s, and the active side biases the fish's next "
+                          "swim toward that side: a left / right turn selector.\\par}\\vspace{6pt}\n"
+                        + head("the ARTR, from the activity")
                         + "{\\scriptsize\\raggedright No EM map: the " + f"{AR_['candidates']:,}" + " neurons of "
                           "rhombomeres 1-3, dF/F band-passed to " + f"{lo_s:g}-{hi_s:g}" + " s, each block's first "
                           "minute dropped. The " + f"{AR_['k_side']}" + " left and " + f"{AR_['k_side']}" + " right cells "
@@ -809,8 +822,37 @@ def write_slides():
                         + " dF/F. Other blocks: the two halves less coupled than random cells in every one. The cells: "
                           "rhombomeres 1-2, median " + f"{sd_['median_abs_x_from_midline_um']:.0f}" + " \\textmu m from the "
                           "midline.\\par}")
-                deck.insert(at_, ("00j_artr", S.frame_wide("the ARTR", col2_("artr.png", tR2_), "tools/exp17_artr.py",
+                deck.insert(at_, ("00j_artr", S.frame_wide("the ARTR", (col2_("artr.png", tR2_).replace(
+                                  "\\includegraphics[width=\\linewidth,height=\\colheight,keepaspectratio]{figs/artr.png}",
+                                  "\\playmovie[\\linewidth]{Movies/artr}")    # Cedric, 2026-10-07: a movie, not the projection
+                                  if os.path.exists(os.path.join(PRES, "Movies", "artr.mp4")) else col2_("artr.png", tR2_)), "tools/exp17_artr.py",
                                   deck_title="in the Z-Brain atlas $\\cdot$ the ARTR, from the activity")))
+                at_ += 1
+            jp_ = os.path.join(EXP, "data", "phase_rotation.json")    # Cedric, 2026-10-07: the antiphase map on the fish
+            if os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "figs", "phase_rotation.png")):
+                PH_ = json.load(open(jp_))
+                pr2_ = PH_["per_region"]
+                tP_ = (head("half a cycle apart")
+                       + "{\\scriptsize\\raggedright The rotation block: the grating turns one way for 30 s, then the "
+                         "other (orange, period " + f"{PH_['period_s']:g}" + " s). Each neuron fitted by a sine of that "
+                         "period; its phase against the stimulus's. Two neurons oscillate in antiphase when their phases "
+                         "differ by half a cycle: red (in phase with the stimulus) against blue. Kept: the "
+                       + f"{PH_['significant']:,}" + " neurons whose fit beats the same fit at off periods (99.9th "
+                         "percentile).\\par}\\vspace{6pt}\n"
+                       + head("what it shows")
+                       + "{\\scriptsize\\raggedright Two populations, " + f"{PH_['red_blue_phase_gap_deg']:.0f}"
+                       + "$^\\circ$ apart: red " + f"{PH_['red']:,}" + ", blue " + f"{PH_['blue']:,}" + ". The split is "
+                         "by side: the right hemisphere is mostly red (" + f"{PH_['red_left_right'][1]:,}" + " red, "
+                       + f"{PH_['blue_left_right'][1]:,}" + " blue), the left mixed (" + f"{PH_['red_left_right'][0]:,}"
+                       + " red, " + f"{PH_['blue_left_right'][0]:,}" + " blue), sharpest in the anterior hindbrain "
+                         "(rhombomere 2: left " + f"{pr2_['rhombomere 2']['left_red_blue'][0]}" + " red / "
+                       + f"{pr2_['rhombomere 2']['left_red_blue'][1]}" + " blue, right "
+                       + f"{pr2_['rhombomere 2']['right_red_blue'][0]}" + " / " + f"{pr2_['rhombomere 2']['right_red_blue'][1]}"
+                       + ") -- the ARTR's place. The two groups alternate with the stimulus and merge again in the dark."
+                         "\\par}")
+                deck.insert(at_, ("00j_phase", S.frame_wide("half a cycle apart", col2_("phase_rotation.png", tP_),
+                                  "tools/exp17_phase.py",
+                                  deck_title="in the Z-Brain atlas $\\cdot$ the rotation block, in antiphase")))
                 at_ += 1
             if os.path.exists(os.path.join(PRES, "figs", "atlas_raster.png")):
                 tR_ = (head("the raster, by region")
@@ -1033,16 +1075,21 @@ def write_slides():
         if "00k_atlas_regions_iso" in nm2_:
             it2_ = deck.pop(nm2_.index("00k_atlas_regions_iso"))
             deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1, it2_)
-        for k_, nb_ in enumerate(("00j_block_gain", "00j_block_dots", "00j_block_turning", "00j_lateral", "00j_artr")):
-            if nb_ in [n for n, _ in deck]:                  # the block twins follow the atlas slide
+        pos3_ = [n for n, _ in deck].index("00j_atlas_regions") + 1
+        for k_, nb_ in enumerate(("00j_block_gain", "00j_block_dots", "00j_block_flash", "00j_block_taxis",
+                                    "00j_block_turning", "00j_block_position", "00j_block_open_loop", "00j_block_rotation",
+                                    "00j_block_dark", "00j_lateral", "00j_artr", "00j_phase")):
+            if nb_ in [n for n, _ in deck]:                  # the block twins follow the atlas slide, in this order
                 it3_ = deck.pop([n for n, _ in deck].index(nb_))
-                deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1 + k_, it3_)
+                deck.insert(pos3_, it3_)
+                pos3_ += 1
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-07: the lead / lag slide after the input neurons
     if "00e_brain_mean_lag" in nm_ and "05_input_neurons" in nm_:
         it_ = deck.pop(nm_.index("00e_brain_mean_lag"))
         deck.insert([n for n, _ in deck].index("05_input_neurons") + 1, it_)
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
              "00i_classic_circuits", "00d_brain_mean_spread", "06_model"}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
+    deck = [(n, b) for n, b in deck if n != "00j_lateral"]   # Cedric, 2026-10-07: "delete slide 7" (left against right)
     deck = [(n, b) for n, b in deck if n != "00l_atlas_raster"]   # Cedric, 2026-10-07: "delete slide 5" (the mean traces)                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
     deck = [(n, b) for n, b in deck if n not in ("00g_classic_regressors", "00h_classic_reliability", "00i_classic_circuits")]  # Cedric, 2026-10-07: "slide 3 in comments", then "slide 13 in comments"
     open(os.path.join(SL, "all.tex"), "w").write("".join(("% " if n in hide_ else "") + f"\\input{{slides_b19/{n}}}\n"

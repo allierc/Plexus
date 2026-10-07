@@ -21,8 +21,8 @@ left against right, also in darkness. So:
      the selection block is circular, every other one held out. CONTROL: as many random candidates per side, from
      the same rhombomeres in the same proportion, 50 draws. CHECK: the two selections' overlap against chance.
 
-    PYTHONPATH=src:tools python tools/exp17_artr.py
--> presentation/figs/artr.png, data/artr.json
+    PYTHONPATH=src:tools python tools/exp17_artr.py [--movie]
+-> presentation/figs/artr.png, data/artr.json, data/artr_cells.npz [, presentation/Movies/artr.mp4]
 """
 import json
 import os
@@ -137,67 +137,114 @@ def main():
                                                              for lr_, k_ in (("left", kL_), ("right", kR_))})
     print(json.dumps(doc, indent=1))
 
-    # the figure: where they are (from above, from the side), L/R r per block, the traces over open loop -> rotation -> dark
-    plt.style.use("dark_background")
-    fig = plt.figure(figsize=(15, 8.4), facecolor="black")
-    xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
-    ins = za["inside"]
-    a = fig.add_axes([0.02, 0.50, 0.40, 0.44])
-    a.scatter(xd[ins], yd[ins], s=0.08, color="0.25", lw=0, rasterized=True)
-    a.scatter(xd[L], yd[L], s=4, color="#ff4a4a", lw=0, label=f"selected on dark, left ({len(L)})")
-    a.scatter(xd[R], yd[R], s=4, color="#4a7bff", lw=0, label=f"selected on dark, right ({len(R)})")
-    L2, R2 = cand[sel["rotation"][0]], cand[sel["rotation"][1]]
-    a.scatter(xd[np.r_[L2, R2]], yd[np.r_[L2, R2]], s=14, facecolors="none", edgecolors="#ffd24a", lw=0.5,
-              label="selected on rotation")
-    a.set_aspect("equal")
-    a.axis("off")
-    a.legend(fontsize=9, frameon=False, loc="lower left", markerscale=3)
-    a.text(0, 1.02, "from above, head left", transform=a.transAxes, fontsize=10)
-    a2 = fig.add_axes([0.02, 0.27, 0.40, 0.20])
-    a2.scatter(xd[ins], -A[ins, 2], s=0.08, color="0.25", lw=0, rasterized=True)
-    a2.scatter(xd[L], -A[L, 2], s=4, color="#ff4a4a", lw=0)
-    a2.scatter(xd[R], -A[R, 2], s=4, color="#4a7bff", lw=0)
-    a2.set_aspect("equal")
-    a2.axis("off")
-    a2.text(0, 1.02, "from the side", transform=a2.transAxes, fontsize=10)
-    a3 = fig.add_axes([0.50, 0.58, 0.47, 0.34])
-    pb = doc["by_selection"]["dark"]["per_block"]
-    pr_ = doc["by_selection"]["rotation"]["per_block"]
-    ks = list(pb)
-    xs = np.arange(len(ks))
-    a3.bar(xs - 0.2, [pb[k]["slow_r"] for k in ks], 0.38, color="#ff4a4a", label=f"selected on dark, {CUT_S:g}-{HI_S:g} s")
-    a3.bar(xs + 0.2, [pb[k]["full_r"] for k in ks], 0.38, color="#ffb0b0", label="selected on dark, full band")
-    a3.scatter(xs - 0.2, [pr_[k]["slow_r"] for k in ks], marker="D", s=26, color="#ffd24a", zorder=3,
-               label=f"selected on rotation, {CUT_S:g}-{HI_S:g} s")
-    for k_, b_ in enumerate(ks):
-        if b_ in ("dark", "rotation"):
-            a3.text(k_, -0.98, "selection" if b_ == "dark" else "selection (yellow)", ha="center", fontsize=7, color="0.7")
-    a3.errorbar(xs, [pb[k]["ctrl_slow_r_median"] for k in ks],
-                yerr=[[pb[k]["ctrl_slow_r_median"] - pb[k]["ctrl_slow_r_p5"] for k in ks],
-                      [pb[k]["ctrl_slow_r_p95"] - pb[k]["ctrl_slow_r_median"] for k in ks]],
-                fmt="o", color="0.75", ms=4, label="random hindbrain cells, slow (5-95 %)")
-    a3.axhline(0, color="0.5", lw=0.6)
-    a3.set_xticks(xs)
-    a3.set_xticklabels(ks, rotation=30, ha="right", fontsize=8.5)
-    a3.set_ylim(-1, 1)
-    a3.set_ylabel("left mean vs right mean, r", fontsize=10)
-    a3.legend(fontsize=8, frameon=False, loc="lower left")
-    a4 = fig.add_axes([0.50, 0.08, 0.47, 0.32])
+    # the figure: where they are (from above, from the side), L/R r per block, the traces over open loop -> rotation -> dark.
+    # The cells: both selections, red left, blue right. As a MOVIE (Cedric, 2026-10-07: "a movie instead of the
+    # projection"): each cell lit by its own band-passed activity at the frame, a white bar sweeping the traces;
+    # one movie frame per recorded frame at FPS (about 27x real time). The poster (artr.png) shows the cells unlit by time.
+    cL = cand[keepL | sel["rotation"][0]]
+    cR = cand[keepR | sel["rotation"][1]]
+    cells = np.r_[cL, cR]
+    base = np.array([[1.0, 0.25, 0.25]] * len(cL) + [[0.29, 0.48, 1.0]] * len(cR))
     f0, f1 = blocks["open loop"][0] - int(round(SKIP_S / DT)), blocks["dark"][1]
-    t = (np.arange(f0, f1) - f0) * DT / 60
-    a4.plot(t, zs(S[f0:f1, keepL]).mean(1), color="#ff4a4a", lw=0.9, label="ARTR left")
-    a4.plot(t, zs(S[f0:f1, keepR]).mean(1), color="#4a7bff", lw=0.9, label="ARTR right")
-    for b in ("rotation", "dark"):
-        a4.axvline((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60, color="0.6", ls="--", lw=0.7)
-        a4.text((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60 + 0.2, 1.02, b, transform=a4.get_xaxis_transform(), fontsize=9)
-    a4.text(0.2, 1.02, "open loop", transform=a4.get_xaxis_transform(), fontsize=9)
-    a4.axvspan((d0 - f0) * DT / 60, (d1 - f0) * DT / 60, color="0.3", alpha=0.35, lw=0)
-    a4.set_xlabel("time from the open-loop onset, min (shaded: the frames the red cells were selected on)", fontsize=9)
-    a4.set_ylabel(f"dF/F {CUT_S:g}-{HI_S:g} s, z", fontsize=10)
-    a4.legend(fontsize=8, frameon=False, loc="upper left")
+    Zc = zs(S[f0:f1][:, np.searchsorted(cand, cells)])   # each cell's band activity over the window, z
+    stim = np.asarray(z["stimulus"][f0:f1, 19], np.float32)
+
+    def build():
+        plt.style.use("dark_background")
+        fig = plt.figure(figsize=(15, 8.4), facecolor="black")
+        xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
+        ins = za["inside"]
+        scs = []
+        for rect, Y, ttl in (([0.02, 0.50, 0.40, 0.44], yd, "from above, head left"),
+                             ([0.02, 0.22, 0.40, 0.25], A[:, 2], "from the side")):   # dorsal up (Cedric, 2026-10-07)
+            a = fig.add_axes(rect)
+            a.scatter(xd[ins], Y[ins], s=0.08, color="0.25", lw=0, rasterized=True)
+            scs.append(a.scatter(xd[cells], Y[cells], s=7, c=base, lw=0))
+            a.set_aspect("equal")
+            a.axis("off")
+            a.text(0, 1.02, ttl, transform=a.transAxes, fontsize=10)
+        fig.text(0.03, 0.17, f"ARTR left ({len(cL)}), red; right ({len(cR)}), blue -- selected on dark or on rotation",
+                 fontsize=9, color="0.85")
+        a3 = fig.add_axes([0.50, 0.58, 0.47, 0.34])
+        pb = doc["by_selection"]["dark"]["per_block"]
+        pr_ = doc["by_selection"]["rotation"]["per_block"]
+        ks = list(pb)
+        xs = np.arange(len(ks))
+        a3.bar(xs - 0.2, [pb[k]["slow_r"] for k in ks], 0.38, color="#ff4a4a", label=f"selected on dark, {CUT_S:g}-{HI_S:g} s")
+        a3.bar(xs + 0.2, [pb[k]["full_r"] for k in ks], 0.38, color="#ffb0b0", label="selected on dark, full band")
+        a3.scatter(xs - 0.2, [pr_[k]["slow_r"] for k in ks], marker="D", s=26, color="#ffd24a", zorder=3,
+                   label=f"selected on rotation, {CUT_S:g}-{HI_S:g} s")
+        for k_, b_ in enumerate(ks):
+            if b_ in ("dark", "rotation"):
+                a3.text(k_, -0.98, "selection" if b_ == "dark" else "selection (yellow)", ha="center", fontsize=7, color="0.7")
+        a3.errorbar(xs, [pb[k]["ctrl_slow_r_median"] for k in ks],
+                    yerr=[[pb[k]["ctrl_slow_r_median"] - pb[k]["ctrl_slow_r_p5"] for k in ks],
+                          [pb[k]["ctrl_slow_r_p95"] - pb[k]["ctrl_slow_r_median"] for k in ks]],
+                    fmt="o", color="0.75", ms=4, label="random hindbrain cells, slow (5-95 %)")
+        a3.axhline(0, color="0.5", lw=0.6)
+        a3.set_xticks(xs)
+        a3.set_xticklabels(ks, rotation=30, ha="right", fontsize=8.5)
+        a3.set_ylim(-1, 1)
+        a3.set_ylabel("left mean vs right mean, r", fontsize=10)
+        a3.legend(fontsize=8, frameon=False, loc="lower left")
+        a4 = fig.add_axes([0.50, 0.08, 0.47, 0.32])
+        t = (np.arange(f0, f1) - f0) * DT / 60
+        a4.plot(t, zs(S[f0:f1, keepL]).mean(1), color="#ff4a4a", lw=0.9, label="ARTR left")
+        a4.plot(t, zs(S[f0:f1, keepR]).mean(1), color="#4a7bff", lw=0.9, label="ARTR right")
+        a4.plot(t, 2.6 + 0.3 * stim, color="orange", lw=0.8, label="rotation direction")
+        for b in ("rotation", "dark"):
+            a4.axvline((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60, color="0.6", ls="--", lw=0.7)
+            a4.text((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60 + 0.2, 1.02, b,
+                    transform=a4.get_xaxis_transform(), fontsize=9)
+        a4.text(0.2, 1.02, "open loop", transform=a4.get_xaxis_transform(), fontsize=9)
+        a4.axvspan((d0 - f0) * DT / 60, (d1 - f0) * DT / 60, color="0.3", alpha=0.35, lw=0)
+        a4.set_xlabel("time from the open-loop onset, min (shaded: the frames the red cells were selected on)", fontsize=9)
+        a4.set_ylabel(f"dF/F {CUT_S:g}-{HI_S:g} s, z", fontsize=10)
+        a4.legend(fontsize=8, frameon=False, loc="lower left", ncol=3)
+        bar = a4.axvline(0.0, color="white", lw=1.4)
+        bar.set_visible(False)
+        return fig, scs, bar
+    fig, scs, bar = build()
     fig.savefig(os.path.join(EXP, "presentation", "figs", "artr.png"), dpi=130, facecolor="black")
     plt.close(fig)
+    if "--movie" in sys.argv:
+        movie(build, scs_rgb=base, Zc=Zc, n=f1 - f0)
 
+
+def movie(build, scs_rgb, Zc, n, fps=30, workers=12, dpi=100):
+    """The ARTR as a movie: one frame per recorded frame, each cell's colour scaled by its band activity (z 2.5 = full,
+    below 0 = dim). -> presentation/Movies/artr.mp4 (+ .png, the first frame)."""
+    import multiprocessing as mp
+    import shutil
+    import subprocess
+    import tempfile
+    import matplotlib.pyplot as plt
+    from plexus.tasks.trace_recording import _ffmpeg
+    tmp = tempfile.mkdtemp(prefix="artr_movie_")
+
+    def run(ids):
+        fig, scs, bar = build()
+        bar.set_visible(True)
+        for i in ids:
+            g = np.clip((Zc[i] + 0.5) / 3.0, 0.08, 1.0)[:, None]
+            for sc in scs:
+                sc.set_facecolors(np.c_[scs_rgb * g, np.ones(len(g))])
+            bar.set_xdata([i * DT / 60] * 2)
+            fig.savefig(os.path.join(tmp, f"{i:05d}.png"), dpi=dpi, facecolor="black")
+        plt.close(fig)
+    ctx = mp.get_context("fork")
+    ps = [ctx.Process(target=run, args=(list(range(w, n, workers)),)) for w in range(workers)]
+    for p_ in ps:
+        p_.start()
+    for p_ in ps:
+        p_.join()
+    stem = os.path.join(EXP, "presentation", "Movies", "artr")
+    subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
+                    "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", stem + ".mp4"],
+                   check=True)
+    shutil.copy(os.path.join(tmp, "00000.png"), stem + ".png")
+    shutil.rmtree(tmp)
+    print(f"[artr] wrote {stem}.mp4, {n} frames at {fps} fps")
 
 if __name__ == "__main__":
     main()
