@@ -784,6 +784,34 @@ def write_slides():
                 deck.insert(at_, ("00j_lateral", S.frame_wide("a lateral chess board?", col2_("lateral.png", tL_),
                                   "tools/exp17_lateral.py", deck_title="in the Z-Brain atlas $\\cdot$ left against right")))
                 at_ += 1
+            ja2_ = os.path.join(EXP, "data", "artr.json")             # Cedric, 2026-10-07: the ARTR from the activity alone
+            if os.path.exists(ja2_) and os.path.exists(os.path.join(PRES, "figs", "artr.png")):
+                AR_ = json.load(open(ja2_))
+                sd_, sr_ = AR_["by_selection"]["dark"], AR_["by_selection"]["rotation"]
+                dw_ = list(sr_["dark_windows"].items())
+                lo_s, hi_s = AR_["band_s"]
+                tR2_ = (head("the ARTR, from the activity")
+                        + "{\\scriptsize\\raggedright No EM map: the " + f"{AR_['candidates']:,}" + " neurons of "
+                          "rhombomeres 1-3, dF/F band-passed to " + f"{lo_s:g}-{hi_s:g}" + " s, each block's first "
+                          "minute dropped. The " + f"{AR_['k_side']}" + " left and " + f"{AR_['k_side']}" + " right cells "
+                          "that best follow left $-$ right, refined 6 times; selected once on the dark block (red / blue) "
+                          "and once, independently, on the rotation block (yellow). Grey: as many random cells, same "
+                          "rhombomeres.\\par}\\vspace{6pt}\n"
+                        + head("what it shows")
+                        + "{\\scriptsize\\raggedright Rotation: the cells picked on the dark alternate on the held-out "
+                          "rotation block, r " + f"{sd_['per_block']['rotation']['slow_r']:+.2f}" + " (random "
+                        + f"{sd_['per_block']['rotation']['ctrl_slow_r_median']:+.2f}" + "). Dark: no self-sustained "
+                          "rhythm. The rotation cells' alternation decays after the switch: r "
+                        + ", ".join(f"{v['r']:+.2f} at {w.replace(' s', '')} s" for w, v in dw_)
+                        + ", left $-$ right amplitude " + f"{dw_[0][1]['lr_amplitude']:.4f}" + " $\\to$ "
+                        + f"{dw_[-1][1]['lr_amplitude']:.4f}" + " dF/F; the dark selection's own r is fitted on a "
+                          "difference of " + f"{sd_['dark_windows'][list(sd_['dark_windows'])[-1]]['lr_amplitude']:.4f}"
+                        + " dF/F. Other blocks: the two halves less coupled than random cells in every one. The cells: "
+                          "rhombomeres 1-2, median " + f"{sd_['median_abs_x_from_midline_um']:.0f}" + " \\textmu m from the "
+                          "midline.\\par}")
+                deck.insert(at_, ("00j_artr", S.frame_wide("the ARTR", col2_("artr.png", tR2_), "tools/exp17_artr.py",
+                                  deck_title="in the Z-Brain atlas $\\cdot$ the ARTR, from the activity")))
+                at_ += 1
             if os.path.exists(os.path.join(PRES, "figs", "atlas_raster.png")):
                 tR_ = (head("the raster, by region")
                        + "{\\scriptsize\\raggedright Every neuron in one of the atlas regions, its dF/F z-scored over "
@@ -1005,7 +1033,7 @@ def write_slides():
         if "00k_atlas_regions_iso" in nm2_:
             it2_ = deck.pop(nm2_.index("00k_atlas_regions_iso"))
             deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1, it2_)
-        for k_, nb_ in enumerate(("00j_block_gain", "00j_block_dots", "00j_block_turning", "00j_lateral")):
+        for k_, nb_ in enumerate(("00j_block_gain", "00j_block_dots", "00j_block_turning", "00j_lateral", "00j_artr")):
             if nb_ in [n for n, _ in deck]:                  # the block twins follow the atlas slide
                 it3_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1 + k_, it3_)
