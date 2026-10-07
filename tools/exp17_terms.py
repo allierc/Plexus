@@ -9,8 +9,10 @@ pull V - z. The medians over all, input and non-input neurons, and the REPRESENT
 whose three SDs are closest (in log) to the group's medians -- two non-input neurons (the front and the back half of the
 brain; they are 80 % of it) and one input neuron.
 
-    PYTHONPATH=src:tools python tools/exp17_terms.py zap_e15_cur_siren_mesh3
-Writes data/terms_<run>.json.
+    PYTHONPATH=src:tools python tools/exp17_terms.py zap_e15_cur_siren_mesh3 [--sets 5]
+Writes data/terms_<run>.json. With --sets N (Cedric, 2026-10-05: "other locations x5"): also data/terms_<run>_s<k>.json,
+the same three picks made inside set k's regions only (tools/exp17_traces.py --sets: each neuron belongs to its nearest
+region centre), the medians still the whole brain's, the whole brain's own three left out (they would repeat).
 """
 import json
 import os
@@ -25,7 +27,7 @@ EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 G = os.path.join(os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData"), "log", "training", "zapbench")
 
 
-def main(run, device="cuda:0"):
+def main(run, device="cuda:0", n_sets=0):
     from plexus import trainer as T
     from plexus.tasks import trace_recording as TR
     from exp17_ablation import neuron_graph_op, _brain_view
@@ -64,22 +66,37 @@ def main(run, device="cuda:0"):
     P = _brain_view(np.asarray(rec["pos_um"], np.float64))
     xmid = float(np.median(P[:, 0]))
 
-    def closest(m, keys):
+    def closest(m, keys, med_):
         d = sum((np.log(S[k][m] + 1e-6) - np.log(med_[k] + 1e-6)) ** 2 for k in keys)
         return int(np.where(m)[0][np.argmin(d)])
-    picks = []
-    med_ = med["non_input"]
-    for half, sel in (("front", P[:, 0] < xmid), ("back", P[:, 0] >= xmid)):
-        i = closest(groups["non_input"] & sel, ("network", "leak"))
-        picks.append({"label": f"non-input, {half} half", "index": i})
-    med_ = med["input"]
-    picks.append({"label": "input", "index": closest(groups["input"], ("network", "stimulus", "leak"))})
-    for p_ in picks:
-        p_.update({k: float(S[k][p_["index"]]) for k in S})
-    doc = {"run": run, "medians": med, "picks": picks}
+
+    def picks_in(region):
+        picks = []
+        for half, sel in (("front", P[:, 0] < xmid), ("back", P[:, 0] >= xmid)):
+            i = closest(groups["non_input"] & sel & region, ("network", "leak"), med["non_input"])
+            picks.append({"label": f"non-input, {half} half", "index": i})
+        picks.append({"label": "input", "index": closest(groups["input"] & region, ("network", "stimulus", "leak"),
+                                                         med["input"])})
+        for p_ in picks:
+            p_.update({k: float(S[k][p_["index"]]) for k in S})
+        return picks
+    doc = {"run": run, "medians": med, "picks": picks_in(np.ones(len(P), bool))}
     json.dump(doc, open(os.path.join(EXP, "data", f"terms_{run}.json"), "w"), indent=1)
     print(json.dumps(doc, indent=1))
+    if n_sets:
+        TS = [json.load(open(os.path.join(EXP, "data", f"traces_{run}_s{k}.json"))) for k in range(1, n_sets + 1)]
+        C = np.concatenate([np.asarray(t["region_centres_view_um"]) for t in TS])
+        owner = np.concatenate([np.full(len(t["region_centres_view_um"]), k) for k, t in enumerate(TS, 1)])
+        near = np.empty(len(P), int)
+        for a in range(0, len(P), 20000):                                    # each neuron's nearest region centre
+            near[a:a + 20000] = np.argmin(((P[a:a + 20000, None] - C[None]) ** 2).sum(-1), 1)
+        for k in range(1, n_sets + 1):
+            reg_ = owner[near] == k
+            reg_[[p_["index"] for p_ in doc["picks"]]] = False          # new neurons only: not the whole brain's three
+            d_ = {"run": run, "set": k, "medians": med, "picks": picks_in(reg_)}
+            json.dump(d_, open(os.path.join(EXP, "data", f"terms_{run}_s{k}.json"), "w"), indent=1)
+            print(f"[terms] set {k}:", [(p_["label"], p_["index"]) for p_ in d_["picks"]])
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], n_sets=int(sys.argv[sys.argv.index("--sets") + 1]) if "--sets" in sys.argv else 0)

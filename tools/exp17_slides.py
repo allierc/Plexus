@@ -164,14 +164,16 @@ def _brain_frames(ks):
     d = _BM
     panels, frames, cond_all, vmax = d["panels"], d["frames"], d["cond_all"], d["vmax"]
     n = len(panels)
-    fig = plt.figure(figsize=(d["fig_w"], 6.6), facecolor="black")
+    tall_ = any(p.get("band") is not None for p in panels)        # Cedric, 2026-10-07: slide 2's fish larger
+    fig = plt.figure(figsize=(d["fig_w"], 9.0 if tall_ else 6.6), facecolor="black")
     tm = np.arange(T_FRAMES) * FRAME_S / 60                          # minutes since the recording's first frame
     cut = np.flatnonzero(np.diff(cond_all)) + 1
     blocks = list(zip(np.r_[0, cut], np.r_[cut, T_FRAMES] - 1))
-    sc, cur = [], []
+    sc, cur, side_sc = [], [], []
     for j, p in enumerate(panels):
         x0, w = j / n, 1.0 / n
-        ax = fig.add_axes([x0 + 0.01, 0.31, w - 0.02, 0.56])           # the labels sit above, never on the brain
+        two_ = p.get("band") is not None                               # Cedric, 2026-10-07: the brain mean alone above
+        ax = fig.add_axes([x0 + 0.01, 0.53 if two_ else 0.31, w - 0.02, 0.40 if two_ else 0.56])   # the band strip
         ax.set_facecolor("black")
         ax.axis("off")
         P, o = p["P"], p["order"]
@@ -182,31 +184,64 @@ def _brain_frames(ks):
         ax.set_xlim(lo[0] - pad, hi[0] + pad)
         ax.set_ylim(lo[1] - pad, hi[1] + pad)
         ax.set_aspect("equal")                                         # the box shrinks to the brain, centred
-        ax.plot([hi[0] - 100, hi[0]], [lo[1] - 0.4 * pad] * 2, color="white", lw=1.5)
-        ax.text(hi[0] - 50, lo[1] + 0.4 * pad, "100 µm", color="0.7", fontsize=8, ha="center", va="bottom")
-        fig.text(x0 + 0.02, 0.975, p["label"], color="white", fontsize=11, va="top")
-        m = fig.add_axes([x0 + 0.05 * w, 0.075, 0.90 * w, 0.14])
-        m.set_facecolor("black")
-        for k_, sp in m.spines.items():
-            sp.set_visible(k_ in ("left", "bottom"))
-            sp.set_color("0.5")
-        for i_, (a_, b_) in enumerate(blocks):
-            m.axvspan(tm[a_], tm[b_], color=("0.30" if i_ % 2 else "0.18"), alpha=0.6, lw=0, zorder=0)
-            m.text((tm[a_] + tm[b_]) / 2, 1.02, NAMES[cond_all[a_]], color="0.75", fontsize=7, ha="center", va="bottom",
-                   transform=m.get_xaxis_transform())
-        m.plot(tm, p["mean"], color="#2ca02c", lw=0.6, zorder=2)
-        lo_, hi_ = np.nanpercentile(p["mean"], [0.5, 99.5])
-        m.set_ylim(lo_ - 0.1 * (hi_ - lo_), hi_ + 0.1 * (hi_ - lo_))
-        m.set_xlim(tm[0], tm[-1])
-        m.tick_params(colors="0.6", labelsize=7, length=2)
-        cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=4))
-        fig.text(x0 + 0.05 * w, 0.255, "brain-mean dF/F over the whole recording; time, min", color="0.7", fontsize=8,
-                 va="bottom")
-    t_txt = fig.text(0.02, 0.925, "", color="0.7", fontsize=10, va="top")
+        if not two_:                      # with a side view the bar goes under it (Cedric, 2026-10-07)
+            ax.plot([hi[0] - 100, hi[0]], [lo[1] - 0.4 * pad] * 2, color="white", lw=1.5)
+            ax.text(hi[0] - 50, lo[1] + 0.4 * pad, "100 µm", color="0.7", fontsize=8, ha="center", va="bottom")
+        fig.text(x0 + 0.02, 0.975, p.get("short", p["label"]), color="white", fontsize=16, va="top")   # Cedric, 2026-10-07
+        if two_:                          # Cedric, 2026-10-07: the side view under the top view, tail up and head down
+            axs_ = fig.add_axes([x0 + 0.01, 0.32, w - 0.02, 0.20])
+            axs_.set_facecolor("black")
+            axs_.axis("off")
+            zz_ = P[:, 2] * p.get("side_flip", 1.0)
+            os_ = np.argsort(P[:, 1])
+            side_sc.append((axs_.scatter(P[os_, 0], zz_[os_], c=np.zeros(len(os_)), s=0.35, cmap="inferno", vmin=0,
+                                         vmax=vmax, linewidths=0), os_))
+            zl_, zh_ = np.percentile(zz_, [0.2, 99.8])
+            axs_.set_xlim(lo[0] - pad, hi[0] + pad)
+            yb_ = zl_ - 0.16 * (zh_ - zl_)                     # the 100-um bar below the side view
+            axs_.plot([hi[0] - 100, hi[0]], [yb_, yb_], color="white", lw=1.5)
+            axs_.text(hi[0] - 104, yb_, "100 µm", color="0.7", fontsize=9, ha="right", va="center")
+            axs_.set_ylim(yb_ - 0.06 * (zh_ - zl_), zh_ + 0.05 * (zh_ - zl_))
+            axs_.set_aspect("equal", adjustable="box")     # both limits kept: the whole side, never cropped
+        else:
+            side_sc.append(None)
+        strips = ([("mean", [x0 + 0.05 * w, 0.175, 0.90 * w, 0.085]), ("band", [x0 + 0.05 * w, 0.045, 0.90 * w, 0.095])]
+                  if two_ else [("one", [x0 + 0.05 * w, 0.075, 0.90 * w, 0.14])])
+        for k2_, (kind_, rect_) in enumerate(strips):
+            m = fig.add_axes(rect_)
+            m.set_facecolor("black")
+            for k_, sp in m.spines.items():
+                sp.set_visible(k_ in ("left", "bottom"))
+                sp.set_color("0.5")
+            for i_, (a_, b_) in enumerate(blocks):
+                m.axvspan(tm[a_], tm[b_], color=("0.30" if i_ % 2 else "0.18"), alpha=0.6, lw=0, zorder=0)
+                if k2_ == 0:
+                    m.text((tm[a_] + tm[b_]) / 2, 1.02, NAMES[cond_all[a_]], color="0.75", fontsize=7, ha="center",
+                           va="bottom", transform=m.get_xaxis_transform())
+            if kind_ == "band":           # the range of the neurons' activity (Cedric, 2026-10-06): per frame, the
+                m.fill_between(tm, p["band"][0], p["band"][1], color="white", alpha=0.22, lw=0, zorder=1)  # 2.5-97.5th pct
+            m.plot(tm, p["mean"], color="#2ca02c", lw=0.6, zorder=2)
+            lo_, hi_ = np.nanpercentile(p["band"] if kind_ == "band" else p["mean"], [0.5, 99.5])
+            m.set_ylim(lo_ - 0.1 * (hi_ - lo_), hi_ + 0.1 * (hi_ - lo_))
+            m.set_xlim(tm[0], tm[-1])
+            m.tick_params(colors="0.6", labelsize=7, length=2)
+            if kind_ == "mean":
+                m.set_xticklabels([])
+            cur.append(m.axvline(tm[0], color="#ff7f0e", lw=0.9, zorder=4))
+        if two_:
+            fig.text(x0 + 0.05 * w, 0.282, "brain-mean dF/F over the whole recording", color="0.7", fontsize=9, va="bottom")
+            fig.text(x0 + 0.05 * w, 0.143, "the same with the band 95 % of the neurons; time, min", color="0.7", fontsize=9,
+                     va="bottom")
+        else:
+            fig.text(x0 + 0.05 * w, 0.255, "brain-mean dF/F over the whole recording; time, min", color="0.7",
+                     fontsize=8, va="bottom")
+    t_txt = fig.text(0.02, 0.935, "", color="0.7", fontsize=11, va="top")
     for k in ks:
         f = int(frames[k])
-        for s_, p in zip(sc, panels):
+        for s_, ss_, p in zip(sc, side_sc, panels):
             s_.set_array(np.asarray(p["X"][k], np.float32)[p["order"]])
+            if ss_ is not None:
+                ss_[0].set_array(np.asarray(p["X"][k], np.float32)[ss_[1]])
         t_txt.set_text(f"condition: {NAMES[cond_all[f]]}   t = {tm[f]:5.1f} min (frame {f:,} of {T_FRAMES:,})")
         for c_ in cur:
             c_.set_xdata([tm[f]] * 2)
@@ -214,12 +249,18 @@ def _brain_frames(ks):
     plt.close(fig)
 
 
+def band95(X, chunk=500):
+    """Per frame, the 2.5th and 97.5th percentiles of every neuron's dF/F: the band 95 % of the neurons fall in. [2, T]"""
+    return np.concatenate([np.percentile(np.asarray(X[a:a + chunk], np.float32), [2.5, 97.5], axis=1)
+                           for a in range(0, X.shape[0], chunk)], axis=1)
+
+
 def zapbench_panel(frames, P=None):
     """ZAPBench's release traces as a movie_brains panel: every frame read once for the brain mean, `frames` kept."""
     X = traces(0, T_FRAMES)
     P = centroids() if P is None else P
-    return {"P": brain_view(P), "X": np.ascontiguousarray(X[frames]), "mean": X.mean(1),
-            "label": f"ZAPBench release, {P.shape[0]:,} neurons, dF/F"}
+    return {"P": brain_view(P), "X": np.ascontiguousarray(X[frames]), "mean": X.mean(1), "band": band95(X),
+            "label": f"ZAPBench release, {P.shape[0]:,} neurons, dF/F", "short": "ZAPBench"}
 
 
 def destripe_panel(frames):
@@ -228,8 +269,9 @@ def destripe_panel(frames):
     from plexus.paths import graphs_data_path
     z = np.load(graphs_data_path("zebrafish", "zapbench_destripe_recording.npz"))
     X = z["dff"]
-    return {"P": brain_view(z["pos_um"]), "X": np.ascontiguousarray(X[frames]), "mean": X.mean(1),
-            "label": f"destriped (zap-inr), {X.shape[1]:,} neurons, mapped to ZAPBench's dF/F scale"}
+    return {"P": brain_view(z["pos_um"]), "X": np.ascontiguousarray(X[frames]), "mean": X.mean(1), "band": band95(X),
+            "label": f"destriped (zap-inr), {X.shape[1]:,} neurons, mapped to ZAPBench's dF/F scale",
+            "short": "destriped (zap-inr)"}
 
 
 def movie_data(out_stem, frames=None):
@@ -474,12 +516,14 @@ def step_centre(P, M) -> np.ndarray:
     return C[int(top_[np.argmin(np.linalg.norm(C[top_] - np.median(P, 0), axis=1))])]
 
 
-def draw_process(b, P, M, c0, w2, kind="graphcast", scale=1.0, reach=None, nsize=None):
+def draw_process(b, P, M, c0, w2, kind="graphcast", scale=1.0, reach=None, nsize=None, upto=None, cols=None, arcs=True):
     """The '2 process' panel of figure_step (and, alone and large, of figure_multimesh_gnn): a window 2 w2 um wide,
     one fine cube deep, seen from above -- the neurons in it as grey dots, the finest mesh's edges as straight blue
     lines, the coarser levels' edges as arcs in their own colour (they run along the fine lattice lines, so straight
     they would hide under it) and their nodes as dots. `scale` multiplies the line widths and dot sizes; `reach` (um,
-    default w2) the half-width within which mesh nodes are drawn, the view widened to it."""
+    default w2) the half-width within which mesh nodes are drawn, the view widened to it; `upto` the last level drawn
+    (-1: the neurons alone; None: every level) -- the build-up movie of slide 4 (Cedric, 2026-10-05); `cols` the levels'
+    colours (default LEVEL_COLS), `arcs` False draws the coarse levels straight (exp17's second deck, 2026-10-06)."""
     from matplotlib.collections import LineCollection
     from matplotlib.path import Path
     from matplotlib.patches import PathPatch
@@ -495,8 +539,9 @@ def draw_process(b, P, M, c0, w2, kind="graphcast", scale=1.0, reach=None, nsize
         b.scatter(P[::2][slab(P[::2]), 0], P[::2][slab(P[::2]), 1], s=1.5 * scale, c="0.3", linewidths=0, zorder=1)
     else:                                           # every neuron of the slab, at a readable size (Cedric, 2026-10-02)
         b.scatter(P[slab(P), 0], P[slab(P), 1], s=nsize, c="0.6", linewidths=0, zorder=1)
-    cols = LEVEL_COLS
-    for k in range(min(4, len(M["nodes_per_level"]))):
+    cols = cols or LEVEL_COLS
+    n_lv = min(4, len(M["nodes_per_level"])) if upto is None else min(4, len(M["nodes_per_level"]), upto + 1)
+    for k in range(n_lv):
         sel = (lev == k) & in2[mm_s] & in2[mm_r] & (mm_s < mm_r)
         if k == 0:
             if kind == "graphcast":
@@ -508,6 +553,10 @@ def draw_process(b, P, M, c0, w2, kind="graphcast", scale=1.0, reach=None, nsize
                                                 colors=np.where(wv[:, None] > 0, [[0.9, 0.3, 0.3, 0.8]], [[0.3, 0.5, 1.0, 0.8]]),
                                                 linewidths=0.3 + 1.2 * np.minimum(np.abs(wv), 2)))
             continue
+        if not arcs:                                # straight, over the finer lines they run along
+            b.add_collection(LineCollection(np.stack([C[mm_s[sel], :2], C[mm_r[sel], :2]], 1), colors=cols[k],
+                                            linewidths=(0.8 + 0.7 * k) * scale, alpha=0.95, zorder=2 + k))
+            continue
         for a_, b_ in zip(C[mm_s[sel], :2], C[mm_r[sel], :2]):
             d = b_ - a_
             nrm = np.array([-d[1], d[0]]) / max(np.linalg.norm(d), 1e-9)
@@ -515,7 +564,7 @@ def draw_process(b, P, M, c0, w2, kind="graphcast", scale=1.0, reach=None, nsize
             b.add_patch(PathPatch(Path([a_, ctrl, b_], [Path.MOVETO, Path.CURVE3, Path.CURVE3]), facecolor="none",
                                   edgecolor=cols[k], lw=(0.8 + 0.7 * k) * scale, alpha=0.95))
     lvl_nodes = M["level_nodes"]
-    for k in range(1, min(4, len(lvl_nodes))):
+    for k in range(1, min(4, len(lvl_nodes), n_lv)):
         nk = lvl_nodes[k][in2[lvl_nodes[k]]]
         b.scatter(C[nk, 0], C[nk, 1], s=(8 + 8 * k) * scale ** 2, c=cols[k], linewidths=0, zorder=4)
 
@@ -523,11 +572,24 @@ def draw_process(b, P, M, c0, w2, kind="graphcast", scale=1.0, reach=None, nsize
 LEVEL_COLS = ["#9ecae1", "#6baed6", "#fd8d3c", "#e6550d"]   # the multi-mesh levels 0-3 (16, 32, 64, 128 um edges)
 
 
-def figure_transfer(P, M, path, t=2600):
+def scale_bar(ax, um, fontsize=10, lw=3.0):
+    """A white scale bar `um` micrometres long in the lower left of a data-in-um axes (Cedric, 2026-10-05: "add a
+    scale bar"), its length written above it."""
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    xa, ya = x0 + 0.03 * (x1 - x0), y0 + 0.025 * (y1 - y0)
+    ax.plot([xa, xa + um], [ya, ya], color="white", lw=lw, solid_capstyle="butt", zorder=20)
+    ax.text(xa + um / 2, ya + 0.012 * (y1 - y0), f"{um:g} µm", color="white", fontsize=fontsize, ha="center",
+            va="bottom", zorder=20, bbox=dict(facecolor="black", edgecolor="none", alpha=0.75, pad=1.5))
+
+
+def figure_transfer(P, M, path, t=2600, upto=None, stage=None):
     """NEURONS TO THE MESH AND BACK (Cedric, 2026-10-02: "explain better neuron to grid, grid to neuron"): two panels
     on the same window of real neurons (a slab one fine cube deep, from above), larger than the one-step figure's --
     a: grid2mesh, every neuron's edges to the cube corners within sqrt(3)/2 L0 (one neuron's drawn thick); b: mesh2grid,
-    every neuron's edges from the 8 corners of its cube (the same neuron's thick). Dots: neurons by dF/F at frame t."""
+    every neuron's edges from the 8 corners of its cube (the same neuron's thick). Dots: neurons by dF/F at frame t.
+    `upto` the build-up movie's stage (Cedric, 2026-10-06, as slide 4): 0 the neurons, 1 + the fine grid and its nodes,
+    2 + every neuron's edges, 3 (None) + the circled neuron's own; `stage` a line naming it."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -544,10 +606,13 @@ def figure_transfer(P, M, path, t=2600):
     one = int(ids[np.argmin(np.linalg.norm(P[ids] - (c0 + [0.35 * L, 0.3 * L, 0]), axis=1))])
     vmax = float(np.percentile(X, 97))
     fig = plt.figure(figsize=(12.0, 6.6), facecolor="black")
+    n_a, n_b = int((g_s == one).sum()), int((m_r == one).sum())    # Cedric, 2026-10-06: "3 left, 4 right?" -- by design
     for j, (title, sub) in enumerate((
-            ("a   neurons -> mesh (grid2mesh)", f"each neuron sends to the cube corners within {math.sqrt(3) / 2 * L:.1f} µm"),
-            ("b   mesh -> neurons (mesh2grid)", "each neuron receives from the 8 corners of its cube"))):
-        ax = fig.add_axes([0.02 + 0.49 * j, 0.06, 0.46, 0.78])
+            ("a   neurons -> mesh (grid2mesh)", f"each neuron sends to the cube corners within {math.sqrt(3) / 2 * L:.1f} µm\n"
+             f"(the circled one: {n_a})"),
+            ("b   mesh -> neurons (mesh2grid)", f"each neuron receives from the 8 corners of its cube\n(the circled one: {n_b}; "
+             "from above they stack in pairs: 4 points)"))):
+        ax = fig.add_axes([0.02 + 0.49 * j, 0.10, 0.46, 0.74])
         ax.set_facecolor("black")
         ax.axis("off")
         ax.set_xlim(c0[0] - w, c0[0] + w)
@@ -563,13 +628,25 @@ def figure_transfer(P, M, path, t=2600):
             sel, k1, col = sp[m_r] & sm[m_s], m_r == one, "#e0445c"
             seg_all = np.stack([C[m_s[sel], :2], P[m_r[sel], :2]], 1)
             seg_one = np.stack([C[m_s[k1], :2], P[m_r[k1], :2]], 1)
-        ax.add_collection(LineCollection(seg_all, colors=col, linewidths=0.6, alpha=0.45))
-        ax.add_collection(LineCollection(seg_one, colors=col, linewidths=3.0))
+        # the fine grid, level 0 of the multi-mesh, drawn as on slide 4 (Cedric, 2026-10-06: "coherent with slide 4")
+        st_ = 3 if upto is None else upto
+        if st_ >= 1:
+            mm_s, mm_r, lev = M["mm"]
+            g0 = (lev == 0) & sm[mm_s] & sm[mm_r] & (mm_s < mm_r)
+            ax.add_collection(LineCollection(np.stack([C[mm_s[g0], :2], C[mm_r[g0], :2]], 1), colors=LEVEL_COLS[0],
+                                             linewidths=1.4, alpha=0.7, zorder=0))
+            ax.scatter(C[sm, 0], C[sm, 1], s=140, c="#fd8d3c", marker="s", linewidths=0, zorder=4)
+        if st_ >= 2:
+            ax.add_collection(LineCollection(seg_all, colors=col, linewidths=0.6, alpha=0.45))
+        if st_ >= 3:
+            ax.add_collection(LineCollection(seg_one, colors=col, linewidths=3.0))
+            ax.scatter([P[one, 0]], [P[one, 1]], s=320, facecolors="none", edgecolors="white", linewidths=2, zorder=5)
         ax.scatter(P[sp, 0], P[sp, 1], s=60, c=X[sp], cmap="inferno", vmin=0, vmax=vmax, linewidths=0, zorder=3)
-        ax.scatter(C[sm, 0], C[sm, 1], s=140, c="#fd8d3c", marker="s", linewidths=0, zorder=4)
-        ax.scatter([P[one, 0]], [P[one, 1]], s=320, facecolors="none", edgecolors="white", linewidths=2, zorder=5)
-    fig.text(0.99, 0.01, f"a {2 * w:.0f}-µm window, one cube ({L:.0f} µm) deep, from above; dots: neurons coloured by "
-             "dF/F; orange squares: level-0 mesh nodes (cube corners); circled: one neuron and its own edges",
+        scale_bar(ax, 10, fontsize=11)                  # Cedric, 2026-10-05
+    if stage:
+        fig.text(0.5, 0.045, stage, color="white", fontsize=12, ha="center", va="bottom")
+    fig.text(0.99, 0.01, f"a {2 * w:.0f}-µm window, one cube ({L:.0f} µm) deep, from above; dots: ZAPBench neurons by dF/F; orange: "
+             "level-0 nodes (cube corners); light blue: the level-0 grid; circled: one neuron and its own edges",
              color="0.55", fontsize=8.5, ha="right")
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
@@ -577,9 +654,11 @@ def figure_transfer(P, M, path, t=2600):
             "g2m_one": int((g_s == one).sum()), "m2g_one": int((m_r == one).sum())}
 
 
-def figure_multimesh_gnn(P, M, path, half_cubes=8.0):
+def figure_multimesh_gnn(P, M, path, half_cubes=8.0, upto=None, stage=None, cols=None, arcs=True):
     """THE '2 PROCESS' PANEL ALONE (Cedric, 2026-10-02: isolated from the one-step figure, large): the multi-mesh GNN
-    in a window 2 x `half_cubes` fine cubes wide, one cube deep, seen from above, with a legend of the levels."""
+    in a window 2 x `half_cubes` fine cubes wide, one cube deep, seen from above, with a legend of the levels. `upto`
+    the last level drawn (-1 the neurons alone), its legend lines dimmed past it; `stage` a line naming the step (the
+    build-up movie, Cedric 2026-10-05)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -593,23 +672,87 @@ def figure_multimesh_gnn(P, M, path, half_cubes=8.0):
     ax.set_aspect("equal")
     # the nodes ON the window's edge drawn too (reach a quarter cube past it): the 128-um edges from the centre node
     # end exactly there, and a strict cut hid every one of them
-    draw_process(ax, P, M, c0, w2, "graphcast", scale=2.0, reach=w2 + 0.25 * L, nsize=22.0)
+    draw_process(ax, P, M, c0, w2, "graphcast", scale=2.0, reach=w2 + 0.25 * L, nsize=22.0, upto=upto, cols=cols, arcs=arcs)
+    scale_bar(ax, 50, fontsize=11)
     fig.text(0.03, 0.975, f"the multi-mesh GNN: a {2 * w2:.0f}-µm window, one {L:.0f}-µm cube deep, from above",
              color="white", fontsize=12, va="top")
-    fig.text(0.03, 0.94, "grey dots: the neurons in the slab; all edges are ONE graph, every level used in every layer",
-             color="0.7", fontsize=9.5, va="top")
+    fig.text(0.03, 0.94, stage or "grey dots: the ZAPBench neurons in the slab (their soma centres); all edges are ONE "
+             "graph, every level used in every layer", color="white" if stage else "0.7", fontsize=9.5 + 1.5 * bool(stage),
+             va="top")
     n_lev = min(4, len(M["nodes_per_level"]))
     for k in range(n_lev):
         x, y = 0.03 + 0.48 * (k % 2), 0.085 - 0.035 * (k // 2)
+        c_ = (cols or LEVEL_COLS)[k] if upto is None or k <= upto else "0.25"
         fig.lines.append(matplotlib.lines.Line2D([x, x + 0.05], [y, y], transform=fig.transFigure,
-                                                 color=LEVEL_COLS[k], lw=1.5 + 1.4 * k))
+                                                 color=c_, lw=1.5 + 1.4 * k))
         fig.text(x + 0.065, y, f"level {k}: {L * 2 ** k:.0f}-µm edges, {M['edges_per_level'][k]:,} in the brain",
-                 color=LEVEL_COLS[k], fontsize=10, va="center")
-    fig.text(0.03, 0.015, "levels 1-3 drawn as arcs (they run along the fine lattice lines), their nodes as dots",
+                 color=c_, fontsize=10, va="center")
+    fig.text(0.03, 0.015, ("levels 1-3 drawn as arcs (they run along the fine lattice lines), their nodes as dots" if arcs else
+                           "the coarser levels drawn straight and wider, over the finer lines they run along; their nodes as dots"),
              color="0.55", fontsize=8.5, va="bottom")
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
     return {"window_um": 2 * w2, "L0": L}
+
+
+def _concat_movie(frames, stem, hold_s, last_s, poster="last"):
+    """Hold each PNG `hold_s` s (the last `last_s` s) into <stem>.mp4; the last PNG becomes the poster <stem>.png, or
+    the first with poster="first" (the still shown before the movie starts: exp17's second deck, 2026-10-06)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        lst = "".join(f"file '{f}'\nduration {last_s if i == len(frames) - 1 else hold_s}\n" for i, f in enumerate(frames))
+        open(os.path.join(td, "list.txt"), "w").write(lst + f"file '{frames[-1]}'\n")    # concat: the last file twice
+        subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", os.path.join(td, "list.txt"),
+                        "-vf", "fps=10,scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                        stem + ".mp4"], check=True)
+    shutil.copy(frames[0] if poster == "first" else frames[-1], stem + ".png")
+
+
+def movie_transfer_build(P, M, stem, hold_s=1.5, last_s=3.0):
+    """SLIDE 5 BUILT UP, as slide 4 (Cedric, 2026-10-06): figure_transfer at its 4 stages -- the neurons, + the fine grid
+    and its nodes, + every neuron's edges to / from the corners, + one neuron's own; <stem>.mp4 and its poster."""
+    import tempfile
+    if not os.path.exists(FFMPEG):
+        return False
+    L = M["L0"]
+    stages = ["1  the neurons: every ZAPBench neuron of the slab, coloured by its dF/F",
+              f"2  + the fine grid: level 0, {L:.0f}-µm cubes, their corners the mesh nodes",
+              "3  + the edges: a, each neuron to the corners within reach; b, each neuron from its cube's 8 corners",
+              "4  + one neuron (circled) and its own edges"]
+    with tempfile.TemporaryDirectory() as td:
+        fs = []
+        for i, txt in enumerate(stages):
+            fs.append(os.path.join(td, f"s{i}.png"))
+            figure_transfer(P, M, fs[-1], upto=i, stage=txt)
+        _concat_movie(fs, stem, hold_s, last_s)
+    return True
+
+
+def movie_multimesh_build(P, M, stem, hold_s=1.5, last_s=3.0, cols=None, arcs=True, poster="last"):
+    """SLIDE 4 BUILT UP (Cedric, 2026-10-05: "a small animation starting with neurons, fine mesh, middle mesh and large
+    mesh"): figure_multimesh_gnn drawn 1 + levels times -- the neurons alone, then each level added in turn -- each
+    held `hold_s` s, the whole graph `last_s` s; <stem>.mp4 and its poster <stem>.png (the whole graph). False without
+    ffmpeg."""
+    import tempfile
+    if not os.path.exists(FFMPEG):
+        return False
+    L = M["L0"]
+    n_lev = min(4, len(M["nodes_per_level"]))
+    size = lambda k: "fine" if k == 0 else ("large" if k == n_lev - 1 else "middle")      # noqa: E731
+    stages = [(-1, "1  the neurons: every ZAPBench neuron of the slab, at its soma centre")] + [
+        (k, f"{k + 2}  + the {size(k)} mesh: level {k}, {L * 2 ** k:.0f}-µm edges") for k in range(n_lev)]
+    with tempfile.TemporaryDirectory() as td:
+        lst = []
+        for i, (k, txt) in enumerate(stages):
+            f = os.path.join(td, f"s{i}.png")
+            figure_multimesh_gnn(P, M, f, upto=k, stage=txt, cols=cols, arcs=arcs)
+            lst.append(f"file '{f}'\nduration {last_s if i == len(stages) - 1 else hold_s}\n")
+        open(os.path.join(td, "list.txt"), "w").write("".join(lst) + f"file '{f}'\n")    # concat: the last file twice
+        subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", os.path.join(td, "list.txt"),
+                        "-vf", "fps=10,scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                        stem + ".mp4"], check=True)
+        shutil.copy(os.path.join(td, "s0.png") if poster == "first" else f, stem + ".png")
+    return True
 
 
 def figure_step(P, M, path, t=2600, kind="graphcast"):
@@ -992,10 +1135,39 @@ def slides_input_neurons(rec):
     out = {"12_input_method": s1, "12_input_map": s2, "12_input_kymo": s3}
     re_ = rec + "_ephys"                       # its twin with the ephys features (Cedric, 2026-10-02)
     if os.path.exists(os.path.join(fd, f"input_neurons_{re_}_mix_kymo_full.png")):   # batch 15's 20 % mask
-        out["12_input_kymo_ephys"] = kymo_slide(re_, "batch 15's 20 \\%: the 10 \\% most coherent with one of the 13 "
-                                                     "changing visual features and the 10 \\% most coherent with one of "
-                                                     "the 5 ephys features (swim / turn power left and right, bout "
-                                                     "fraction); 50 of each shown", "mix")
+        # Cedric, 2026-10-06: three columns -- the kymograph, the big picture with its one equation, the specifics
+        j_ = json.load(open(os.path.join(fd, f"input_neurons_{re_}_numbers.json")))
+        k_ = ", ".join(f"{_tex(k)} {v}" for k, v in sorted(j_["kymo_100_per_best_feature"].items(), key=lambda kv: -kv[1]))
+        bp_ = j_["band_periods_s"]
+        big_ = (head("which neurons the stimulus enters")
+                + "{\\scriptsize\\raggedright Those whose recorded dF/F follows a stimulus feature. For neuron $i$ and "
+                  "feature $k$, the coherence at frequency $f$:\\par}\\vspace{4pt}\n"
+                + "{\\normalsize $C_{ik}(f) = \\dfrac{|\\langle X_i(f)\\,U_k^{*}(f)\\rangle|^2}"
+                  "{\\langle |X_i(f)|^2\\rangle\\,\\langle |U_k(f)|^2\\rangle}$\\par}\\vspace{4pt}\n"
+                + "{\\scriptsize\\raggedright $X_i$, $U_k$: the Fourier transforms of the neuron's trace and of the feature "
+                  "over one window; $\\langle\\cdot\\rangle$ the average over the windows (Welch). 0: unrelated, 1: "
+                  "locked at that frequency. Each neuron keeps its best feature's coherence at the stimulus's strongest "
+                  "frequencies; the most coherent neurons get stimulus weights $B_i$, all the others $B_i = 0$. No learned "
+                  "quantity enters.\\par}")
+        sel_ = j_["own_best_band_coherence"]; r_ = j_["own_best_abs_r"]
+        spec_ = (head("the specifics") + "{\\scriptsize\\raggedright "
+                 "\\textbf{Windows:} 256 frames (234 s), Hann, half overlap.\\\\[2pt]"
+                 f"\\textbf{{Band:}} the stimulus's 6 strongest periods, {min(bp_):.1f} to {max(bp_):.0f} s.\\\\[2pt]"
+                 f"\\textbf{{Mask:}} {j_['selected']:,} of {j_['neurons']:,} neurons ({100 * j_['selected'] / j_['neurons']:.0f} \\%): "
+                 "10 \\% by one of the 13 changing visual features, 10 \\% by one of the 5 ephys features.\\\\[2pt]"
+                 f"\\textbf{{Selected vs others:}} coherence {sel_['selected']:.2f} vs {sel_['random_unselected_100']:.2f}; "
+                 f"$|r|$ at zero lag {r_['selected']:.2f} vs {r_['random_unselected_100']:.2f}.\\\\[2pt]"
+                 "\\textbf{Frames:} all, for the in-sample batches; training frames only for a held-out run "
+                 "(2026-10-06), and visual features only once ephys left the input.\\\\[2pt]"
+                 "\\textbf{The 100 shown}, by best feature: " + k_ + "\\par}")
+        out["12_input_kymo_ephys"] = frame_wide(
+            "the stimulus and the input neurons over the whole recording",
+            "\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.54\\textwidth}\n\\centering"
+            f"\\includegraphics[width=\\linewidth,height=0.78\\textheight,keepaspectratio]{{figs/input_neurons_{re_}_mix_kymo_full.png}}\n"
+            "\\end{column}\n\\begin{column}{0.22\\textwidth}\n\\fitcol{%\n" + big_ + "}\n\\end{column}\n"
+            "\\begin{column}{0.20\\textwidth}\n\\fitcol{%\n" + spec_ + "}\n\\end{column}\n\\end{columns}",
+            "tools/exp17_input_neurons.py, exp17_stim_coherence.py",
+            deck_title=f"{DECK_TITLE} $\\cdot$ the input neurons: 22 features-stimuli + ephys")
     elif os.path.exists(os.path.join(fd, f"input_neurons_{re_}_varying_kymo_full.png")):
         out["12_input_kymo_ephys"] = kymo_slide(re_, "the 10 \\% of neurons most coherent with one of the 13 changing visual "
                                                      "features or the 5 ephys features")
@@ -1233,8 +1405,8 @@ def local_table(lines, rec_name):
                      f"{m['sd']:.3f} \\\\\n")
     if not body:
         return ""
-    return (head("local activity, the brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
-            "& r per neuron, mean $\\pm$ SD \\\\\n\\hline\n" + body + "\\end{tabular}\\par}\\vspace{2pt}\n"
+    return (head("per-neuron r, brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
+            "& mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + body + "\\end{tabular}\\par}\\vspace{2pt}\n"
             "{\\tiny\\color{gray} per neuron: the correlation over the 2 h of its learned and recorded traces, each first "
             "regressed on its own brain mean -- what the shared brain-wide signal does not carry\\par}" + SEC_GAP)
 
@@ -1501,6 +1673,8 @@ def slides_run(r, landed=None, inset=None):
     law_ = BATCH_LAW.get(b0, "")
     if "noeph" in n:                             # Cedric, 2026-10-05: the no-ephys arms say so in their title
         law_ = law_.replace("destriped + ephys", "destriped, no ephys")
+    if bt == "17.9":                             # Cedric, 2026-10-05: 17.9 is the mesh, not a neuron-graph topology
+        law_ = law_.replace("neuron graph topologies, ", "")
     dt = (f"batch {bt} ({_tex(law_)}) $\\cdot$ {_tex(n)}" if "." in bt
           else f"{DECK_TITLE} $\\cdot$ {_tex(bt)}" if bt else DECK_TITLE)    # Cedric: the batch and its law in the title
     mv = os.path.join(r["dir"], "results", "movie.mp4")
@@ -1657,8 +1831,35 @@ BATCH_VARIES = {"1": "stimulus, history, embedding, loss, curriculum, mesh level
 SHOW_RUN = {"batch 4": "zap_gc_cur40", "batch 5": "zap_ng_wide", "batch 6": "zap_ca_ng_nol1", "batch 7": "zap_zs_ng_base", "batch 8": "zap_b8_lin", "batch 9": "zap_ds_ng_base", "batch 10": "zap_mk_ng_base", "batch 11": "zap_dm_ng_rl1lo", "batch 12": "zap_gm12_snd_nol1", "batch 13": "zap_r13_ex_lin", "batch 14": "zap_v14_cur_siren", "batch 15": "zap_e15_cur_siren", "batch 16": "zap_c16_t2"}   # the run whose movie and curves a batch shows, when not its first arm (the card's)
 EXTRA_RUNS = {"batch 15": ("zap_e15_cur_siren_noeph", "zap_e15_noeph_now", "zap_e15_cur_siren_mesh3",   # Cedric, 2026-10-05:
                           "zap_e15_cur_siren_mesh4", "zap_e15_cur_siren_mesh5",            # 15.12-15.17, each its results slide
-                          "zap_e15_cur_siren_mf", "zap_e15_cur_siren_tau")}
+                          "zap_e15_cur_siren_mf", "zap_e15_cur_siren_tau"), "batch 18": ("zap_b18_ca_h50_x25",)}
 HIDE_BATCHES_UPTO = 7     # batches whose own slides are commented out of all.tex (Cedric, 2026-10-02)
+# Cedric, 2026-10-06: the one-to-one comparisons from batch 15 (99b_one_to_one) -- (change, from arm, to arm, reading)
+ARM_RUN = {"15.1": "zap_e15_cur", "15.4": "zap_e15_cur_siren", "15.9": "zap_e15_now", "15.12": "zap_e15_cur_siren_noeph",
+           "15.13": "zap_e15_noeph_now", "15.14": "zap_e15_cur_siren_mesh3", "15.16": "zap_e15_cur_siren_mesh5",
+           "15.17": "zap_e15_cur_siren_mf", "15.18": "zap_e15_cur_siren_tau", "16.7": "zap_c16_t2_siren", "17.7": "zap_g17_random",
+           "17.8": "zap_g17_s1", "17.9": "zap_g17_mesh3", "17.12": "zap_g17_mesh3_tau", "17.13": "zap_g17_mf",
+           "17.14": "zap_g17_mesh3_dale_d1em3", "17.16": "zap_g17_mesh3_dale_d1em2", "18.1": "zap_b18_si_h50_x25",
+           "18.7": "zap_b18_ca_h50_x25"}
+ONE_TO_ONE = (("SIREN $\\Omega$, neuron graph", "15.1", "15.4", "helps: the largest lever"),
+              ("SIREN $\\Omega$, 3-level mesh", "17.9", "15.14", "helps: the largest lever"),
+              ("no W (trained without a network)", "15.1", "15.9", "the network is needed"),
+              ("mean field instead of the graph, SIREN", "15.4", "15.17", "not a mean field (slide 17)"),
+              ("mean field instead of the graph, mesh", "17.9", "17.13", "mean field = no network"),
+              ("random graph instead of the neuron graph", "15.1", "17.7", "layout matters little"),
+              ("3-level mesh instead of the neuron graph", "15.1", "17.9", "equal"),
+              ("3-level mesh instead of the neuron graph, SIREN", "15.4", "15.14", "equal"),
+              ("5-level mesh instead of 3, SIREN", "15.14", "15.16", "equal"),
+              ("no ephys, SIREN", "15.4", "15.12", "a small cost"),
+              ("no ephys, no W", "15.9", "15.13", "a small cost"),
+              ("$\\tau$ in [1, 100] s, neuron graph + SIREN", "15.4", "15.18", "helps per-neuron r"),
+              ("$\\tau$ in [1, 100] s, mesh, no SIREN", "17.9", "17.12", "no effect"),
+              ("Dale prior $10^{-3}$, mesh", "17.9", "17.14", "holds, small cost"),
+              ("Dale prior $10^{-2}$, mesh", "17.9", "17.16", "holds, larger cost"),
+              ("calcium indicator, SIREN", "15.4", "16.7", "long better, per-neuron worse"),
+              ("calcium indicator, x2.5", "18.1", "18.7", "long better, per-neuron worse"),
+              ("x2.5 updates, SIREN", "15.4", "18.1", "helps the long range"),
+              ("x2.5 updates, calcium", "16.7", "18.7", "helps the long range"),
+              ("training seed 1 (the spread)", "15.1", "17.8", "the seed spread"))
 HIDE_BATCHES = {"10", "12", "13"}     # single batches hidden (Cedric: 10 on 2026-10-02; 12 and 13 on 2026-10-03)
 HIDDEN_BATCHES: set = set()   # Cedric hid batch 4 while one arm had landed (2026-09-30); back with all 8 (2026-10-01)
 
@@ -1933,14 +2134,15 @@ def slide_batch(title, arms, landed, band=()):
 
 
 # ============================================================================== the models, side by side
-def frame_narrow(title, img, right, src, deck_title=None, left=0.74, height=0.78):
+def frame_narrow(title, img, right, src, deck_title=None, left=0.74, height=0.78, img_top="0pt", caption=""):
     """Cedric, 2026-10-05: a figure the slide's full height in a wide left column and a narrow right column -- the right
     column through \\fitcol like every results slide, so its print has the deck's one size (slide 10's)."""
     return (f"% generated by tools/exp17_slides.py from {src} ({title})\n"
             f"\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n\\vspace*{{\\bandgap}}\n"
-            f"\\begin{{columns}}[T,onlytextwidth]\n\\begin{{column}}{{{left}\\textwidth}}\n\\centering"
+            f"\\begin{{columns}}[T,onlytextwidth]\n\\begin{{column}}{{{left}\\textwidth}}\n\\centering\\vspace*{{{img_top}}}"
             f"\\includegraphics[width=\\linewidth,height={height}\\textheight,keepaspectratio]{{{img}}}\n"
-            f"\\end{{column}}\n\\begin{{column}}{{{0.98 - left:.2f}\\textwidth}}\n\\vspace*{{2\\baselineskip}}\n"
+            + (f"\\par\\vspace{{6pt}}{{{CAPF}\\raggedright {caption}\\par}}\n" if caption else "")   # under the plot, CAPF
+            + f"\\end{{column}}\n\\begin{{column}}{{{0.98 - left:.2f}\\textwidth}}\n\\vspace*{{2\\baselineskip}}\n"
             f"\\fitcol{{%\n{right}}}\n\\end{{column}}\n\\end{{columns}}\n\\end{{frame}}\n")
 
 CAPF = "\\fontsize{4.6}{5.5}\\selectfont"     # the caption under a plot, one size on every slide (Cedric, 2026-10-05)
@@ -2023,7 +2225,7 @@ def slide_models(landed, MO, st, st_ds, n_ds_neurons=None):
     ca = S["zap_ca_ng_base"]["ca"]
     lv = int(gc["mesh_levels"])
     mesh = (f"multi-mesh, {lv} levels, {gc['mesh_spacing']:.0f}-{gc['mesh_spacing'] * 2 ** (lv - 1):.0f} \\textmu m "
-            f"edges ({MO['stats']['mm_edges']:,})")
+            f"edges (2 $\\times$ {MO['stats']['mm_edges'] // 2:,})")   # both ways (Cedric, 2026-10-05)
     n_ng = sum(v["edges"] for v in st.values())
     n_ds = sum(v["edges"] for v in st_ds.values()) if st_ds else None
     w = S["zap_ng_base"]["priors"].get("W_short", {})
@@ -2214,7 +2416,7 @@ def main():
         ("mesh nodes", f"{st['mesh_nodes']:,} lattice vertices, {MO['L0']:.0f} \\textmu m apart"),
         ("multi-mesh", f"{MESH_LEVELS} nested levels, edges " + ", ".join(f"{MO['L0'] * 2 ** k:.0f}" for k in range(MESH_LEVELS))
          + " \\textmu m"),
-        ("", f"{st['mm_edges']:,} directed edges, ONE graph"),
+        ("", f"2 $\\times$ {st['mm_edges'] // 2:,} edges (both ways), ONE graph"),   # Cedric, 2026-10-05
         ("", "mirror-symmetric about the midline"),
         ("grid2mesh", f"each neuron to the corners within {math.sqrt(3) / 2 * MO['L0']:.1f} \\textmu m ({st['g2m_edges']:,})"),
         ("mesh2grid", f"each neuron from its cube's 8 corners ({st['m2g_edges']:,})")]))
@@ -2225,6 +2427,8 @@ def main():
                "\\playmovie{Movies/02_graphcast_turn}", right2, "the law's own mesh (state_diffuse[graphcast].mesh)")
     # ---- the '2 process' panel of the one-step figure alone and large (Cedric, 2026-10-02)
     mg = figure_multimesh_gnn(P, MO, os.path.join(PRES, "figs", "02c_multimesh_gnn.png"))
+    # Cedric, 2026-10-05: slide 4 as a small build-up movie -- the neurons, then the fine, middle and large levels
+    mv_build = movie_multimesh_build(P, MO, os.path.join(PRES, "Movies", "02c_multimesh_build"))
     right2c = (head("the multi-mesh GNN") + rows([
         ("window", f"{mg['window_um']:.0f} \\textmu m square, one {mg['L0']:.0f}-\\textmu m cube deep, from above"),
         ("nodes", f"{st['mesh_nodes']:,} lattice vertices, {mg['L0']:.0f} \\textmu m apart"),
@@ -2240,7 +2444,8 @@ def main():
             ("MLP law", "one state per node, one weight per edge (batch 2)"),
             ("known ODE", "a leaky ODE per node, one weight per edge (batch 3)")]))
     s2c = frame("The multi-mesh GNN: the fine lattice and the long edges of the coarser levels",
-                "\\panel{figs/02c_multimesh_gnn.png}", right2c, "the law's own mesh (state_diffuse[graphcast].mesh)")
+                "\\playmovie{Movies/02c_multimesh_build}" if mv_build else "\\panel{figs/02c_multimesh_gnn.png}", right2c,
+                "the law's own mesh (state_diffuse[graphcast].mesh)")
     tf = figure_transfer(P, MO, os.path.join(PRES, "figs", "02d_transfer.png"))
     gc_ = yaml.safe_load(open(os.path.join(ROOT, "config", "zapbench", "zap_gc_base.yaml")))
     gco = next(o for o in gc_["operators"] if o.get("op") == "state_diffuse")
@@ -2262,7 +2467,9 @@ def main():
         f"$v_i$: dF/F $t{{-}}5..t$, position, embedding $a_i$ ({gco.get('embedding_dim', 8)}), stimulus. "
         r"Learned: the MLPs $\phi_g, \phi_m, \phi_e, \psi, \chi, \phi'_e, \psi', \chi', \delta$ and $a_i$\par}"
         "\n")                                   # the mesh MLP law and mesh known ODE: no longer used (Cedric)
-    s2d = frame("Neurons to the mesh and back: the encoder's and the decoder's edges", "\\panel{figs/02d_transfer.png}",
+    mv_tf = movie_transfer_build(P, MO, os.path.join(PRES, "Movies", "02d_transfer_build"))     # Cedric, 2026-10-06
+    s2d = frame("Neurons to the mesh and back: the encoder's and the decoder's edges",
+                "\\playmovie{Movies/02d_transfer_build}" if mv_tf else "\\panel{figs/02d_transfer.png}",
                 right2d, "the law's own mesh (state_diffuse[graphcast].mesh)", left_gap=True,
                 deck_title=f"{DECK_TITLE} - GraphCast-GNN on multi-grid")
     figure_step(P, MO, os.path.join(PRES, "figs", "02a_one_step.png"))
@@ -2316,13 +2523,15 @@ def main():
                  "state_diffuse[model: known_ode]", left_gap=True, deck_title="multi-level GNN-known\\_ODE")
     st = figure_neuron_graph(P, os.path.join(PRES, "figs", "07_neuron_graph.png"),
                              mp4=os.path.join(PRES, "Movies", "07_neuron_graph.mp4"))      # turning (Cedric, 2026-10-04)
-    right_ng = (head("the laws on the neuron graph (no mesh), M substeps per frame") + rows([
-        # Cedric, 2026-10-05: the known ODE larger, green, a blank line after it
-        (r"{\normalsize\textbf{known ODE}}", r"{\large\textcolor[rgb]{0.30,0.85,0.30}{$z_i \mathrel{+}= \frac{1}{M}(-z_i + V_i + m_i "
+    # Cedric, 2026-10-05: no "(no mesh), M substeps per frame" in the head, no 1/M in the equations
+    right_ng = (head("the laws on the neuron graph") + rows([
+        # Cedric, 2026-10-05: the known ODE larger, green, a blank line before and after it
+        ("", ""),
+        (r"{\normalsize\textbf{known ODE}}", r"{\large\textcolor[rgb]{0.30,0.85,0.30}{$z_i \mathrel{+}= (-z_i + V_i + m_i "
          r"+ B_i \cdot u)/\tau_i$}} \\[8pt]"),
         ("current", r"$m_i = \sum_{s} \sum_{j \in \mathcal{N}_s(i)} W^{s}_{ji} \tanh(z_j)$"),
         ("conductance", r"$m_i = \sum_{s,j} (W^{s}_{ji})^2\, \mathrm{relu}(z_j)\,(E_j - z_i)$"),
-        ("GNN-MLP", r"$z_i \mathrel{+}= \frac{1}{M} f_\theta(z_i, a_i, m_i, B_i \cdot u)$"),
+        ("GNN-MLP", r"$z_i \mathrel{+}= f_\theta(z_i, a_i, m_i, B_i \cdot u)$"),
         ("sender", r"$m_i = \sum_{s,j} W^{s}_{ji}\, g_\phi(a_j, z_j)^2$"),
         ("pair", r"$m_i = \sum_{s,j} W^{s}_{ji}\, g_\phi(a_i, a_j, z_i, z_j)^2$")])
         + "{\\scriptsize $E_j$: a learned reversal per sending neuron; $a_i$: a learned 2-number embedding per "
@@ -2423,7 +2632,8 @@ def main():
     # Cedric, 2026-10-02: a shown run's neuron clusters and its edge weights in 3-D (exp17_clusters.py, exp17_edges.py
     # --amplitude), right after its movie; batch 11's (now commented out) and, 2026-10-03, batch 15's best run's
     for run_, suf_, b_ in (("zap_dm_ng_rl1lo", "dm", "11"), ("zap_e15_cur_siren", "e15", "15"),
-                           ("zap_e15_cur_siren_mesh3", "e15m3", "15")):       # Cedric, 2026-10-05: 15.14's twin of 16
+                           ("zap_e15_cur_siren_mesh3", "e15m3", "15"),        # Cedric, 2026-10-05: 15.14's twin of 16
+                           ("zap_g17_mesh3", "g17m3", "17")):                 # Cedric, 2026-10-05: 15.14's twin on 17.9
         rt_ = _tex(run_)
         for stem_, title_ in (("clusters_3d", "neuron clusters"), ("clusters_k4_montage", "4 clusters, one panel each"),
                               ("clusters_k8_montage", "8 clusters, one panel each"),
@@ -2455,33 +2665,42 @@ def main():
                             "sit mostly on the mid and long edges, so with distance the strongest edges shift from "
                             "mostly excitatory toward a more even mix.\\par}\\vspace{6pt}\n"
                             if len(sk_) == 3 and share["short"] > share["mid"] > share["long"] else "")
-                         + f"{{\\tiny\\color{{gray}} the {A_['pooled_top']:,} largest |W| of all {A_['n_edges']:,} edges, "
+                         + f"{{\\tiny\\color{{gray}} the {A_['pooled_top']:,} largest |W| of all "
+                           + (f"2 $\\times$ {A_['n_edges'] // 2:,}" if "_mesh" in run_ else f"{A_['n_edges']:,}")   # both ways
+                           + " edges, "
                            f"$|W| \\geq$ {A_['cut']:.3g}; one colour range for every panel; rows: W $>$ 0 from above and "
                            "from the side, W $<$ 0 from above and from the side\\par}\n")
             deck.append((f"13_edges_amp_{suf_}", frame_narrow("edge weights on one scale", f"figs/edges_amp_{run_}.png",
                                                              right_amp, "tools/exp17_edges.py --amplitude", left=0.69,
                                                              deck_title=f"batch {b_} $\\cdot$ {rt_} $\\cdot$ edge weights")))
-    # Cedric, 2026-10-03: the learned constants on the brain, batch 15's best run (tools/exp17_param_maps.py)
-    jm_ = os.path.join(EXP, "data", "param_maps_zap_e15_cur_siren.json")
-    if os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "param_maps_zap_e15_cur_siren.png")):
+    # Cedric, 2026-10-03: the learned constants on the brain, batch 15's best run (tools/exp17_param_maps.py); 2026-10-06:
+    # 15.18 (15.4 with tau bounded to [1, 100] s), the tau map's colour bar the bound
+    PM_RUN = "zap_e15_cur_siren_tau"
+    jm_ = os.path.join(EXP, "data", f"param_maps_{PM_RUN}.json")
+    if os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", f"param_maps_{PM_RUN}.png")):
         S_ = json.load(open(jm_))
 
         def r3(k_, f_="{:.3g}"):
             return f"{f_.format(S_[k_]['median'])} ({f_.format(S_[k_]['p2'])} .. {f_.format(S_[k_]['p98'])})"
+        tb_ = S_.get("tau_bounds")
         right_pm = (head("the learned constants")
                     + "{\\scriptsize each neuron coloured by its own learned value, from above and from the side; median "
                       "(2nd .. 98th percentile)\\par}\\vspace{4pt}\n"
-                    + rows([("$\\tau$, s", r3("tau_s")), ("rest $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
-                            ("$\\tau <$ 1 frame", f"{100 * S_['frac_tau_below_frame']:.1f} \\%"),
-                            ("W in $<$ 0", f"{100 * S_['frac_W_in_negative']:.1f} \\%"),
-                            ("inputs", f"{S_['n_masked']:,} of {S_['n']:,}")])
-                    + "{\\tiny\\color{gray} $\\tau$ = 0.914 s / softplus($\\tau_{raw}$); $V$ in dF/F; W the signed sum over "
-                      "the three edge sets into the neuron (the messages then scaled by $\\Omega$, mean 3.2); $B$ used only "
-                      "inside the input mask\\par}\n")
+                    + rows([("$\\tau$, s", r3("tau_s"))]
+                           + ([(f"$\\tau$ at {tb_[0]:.0f} s", f"{100 * S_['frac_tau_at_floor']:.1f} \\%"),
+                               (f"$\\tau$ at {tb_[1]:.0f} s", f"{100 * S_['frac_tau_at_ceiling']:.1f} \\%")] if tb_ else [])
+                           + [("rest $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
+                              ("W in $<$ 0", f"{100 * S_['frac_W_in_negative']:.1f} \\%"),
+                              ("inputs", f"{S_['n_masked']:,} of {S_['n']:,}")])
+                    + "{\\tiny\\color{gray} " + (f"$\\tau$ bounded to [{tb_[0]:.0f}, {tb_[1]:.0f}] s (a tanh squashing of "
+                                                    "softplus($\\tau_{raw}$)); the colour bar of a spans exactly the bound"
+                                                    if tb_ else "$\\tau$ = 0.914 s / softplus($\\tau_{raw}$)")
+                    + "; $V$ in dF/F; W the signed sum over the three edge sets into the neuron (the messages then scaled by "
+                      "$\\Omega$); $B$ used only inside the input mask\\par}\n")
         deck.append(("13_param_maps_e15", frame_narrow("the learned constants on the brain",
-                                                      "figs/param_maps_zap_e15_cur_siren.png", right_pm,
-                                                      "tools/exp17_param_maps.py", left=0.76,
-                                                      deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ tau, V, W, B")))
+                                                      f"figs/param_maps_{PM_RUN}.png", right_pm,
+                                                      f"tools/exp17_param_maps.py {PM_RUN}", left=0.76,
+                                                      deck_title=f"batch 15 $\\cdot$ {_tex(PM_RUN)} $\\cdot$ tau, V, W, B")))
     # Cedric, 2026-10-03: what batch 15's 8 clusters are, and how far to trust them (tools/exp17_cluster_profile.py)
     KP_ = 4                                           # Cedric, 2026-10-03: the profile for 4 clusters (was 8)
     jp_ = os.path.join(EXP, "data", f"cluster_profile_zap_e15_cur_siren_k{KP_}.json")
@@ -2678,65 +2897,86 @@ def main():
             "confined to the midbrain visual lobes (tectum). That points more to a brain-wide state change than to missing "
             "visual input.\\par}",   # Cedric, 2026-10-04: his wording, smaller
             "tools/exp17_dots_residual.py zap_e15_cur_siren", deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren $\\cdot$ the dots")))
-    jtr_ = os.path.join(EXP, "data", "traces_zap_e15_cur_siren_mesh3.json")           # Cedric, 2026-10-05
-    if os.path.exists(jtr_):
-        TQ_ = json.load(open(jtr_))
-        jte_ = os.path.join(EXP, "data", "terms_zap_e15_cur_siren_mesh3.json")
-        TE_ = json.load(open(jte_))["medians"] if os.path.exists(jte_) else None
-        side_ = ""
-        if TE_:
-            side_ = (head("the law, per neuron")
-                     + "{\\scriptsize $z_i \\leftarrow z_i + f_i\\,\\big((V_i - z_i) + \\Omega_i(t)\\,m_i(t) + B_i\\cdot u(t)\\big)$"
-                       "\\par}\\vspace{4pt}\n"
-                     + "{\\scriptsize $z$ the neuron's dF/F normalised by the recording's mean and SD; $f_i$ the step fraction "
-                       "its time constant $\\tau_i$ sets; $m_i = \\sum_j W_{ji}\\tanh z_j$ its senders' message; $B_i\\cdot u$ "
-                       "the stimulus (0 outside the input mask).\\par}\\vspace{4pt}\n"
-                     + "{\\scriptsize \\textbf{leak pull} $V_i - z_i$: how far the neuron is from its own rest $V_i$; it pulls "
-                       "it back. $V_i$ is constant, so it moves exactly as much as the neuron itself.\\par}" + SEC_GAP
-                     + head("how much each term moves")
-                     + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
-                       "neurons & $\\Omega m$ & $B\\cdot u$ & $V - z$ \\\\\n\\hline\n"
-                     + "".join(f"{lab_} ({TE_[g_]['n']:,}) & {TE_[g_]['network']:.3f} & {TE_[g_]['stimulus']:.3f} & "
-                               f"{TE_[g_]['leak']:.3f} \\\\\n" for lab_, g_ in (("all", "all"), ("input", "input"),
-                                                                               ("non-input", "non_input")))
-                     + "\\end{tabular}\\par}\\vspace{2pt}\n"
-                     + "{\\tiny\\color{gray} per neuron, the SD over the 2 h of each term (normalised units), the median over "
-                       "the neurons; 15.14's free rollout\\par}\n")
-            side_ = "\\vspace*{2\\baselineskip}\\fitcol{%\n" + side_ + "}"
-        body_tr = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.73\\textwidth}\n"
-                   "\\centering\\includegraphics[width=\\linewidth,height=0.72\\textheight,keepaspectratio]"
-                   "{figs/traces_zap_e15_cur_siren_mesh3.png}\\par\\vspace{2pt}"
-                   "{\\fontsize{4.6}{5.5}\\selectfont " + f"{TQ_['K']} neurons chosen from the recording alone, blind to the "
-                   f"model: the neurons that move split into {TQ_['K']} regions by position, in each the neuron most typical of "
-                   "its region (the most correlated with the region's mean trace), numbered head to tail. Their free-rollout "
-                   f"traces over the 2 h, 15.14 (the 3-level mesh + SIREN): Pearson r median {TQ_['r_median']:+.2f}, from "
-                   f"{TQ_['r_min']:+.2f} to {TQ_['r_max']:+.2f}.\\par}}\n\\end{{column}}\n\\begin{{column}}{{0.24\\textwidth}}\n"
-                   + side_ + "\n\\end{column}\n\\end{columns}")
-        deck.append(("13_traces_e15m3", frame_wide("a few neurons, recorded against learned", body_tr,
-                                                   "tools/exp17_traces.py, exp17_terms.py zap_e15_cur_siren_mesh3",
-                                                   deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren\\_mesh3 $\\cdot$ traces")))
-    jms_ = os.path.join(EXP, "data", "messages_zap_e15_cur_siren_mesh3.json")         # Cedric, 2026-10-05
-    if os.path.exists(jms_):
-        MS_ = json.load(open(jms_))["neurons"]
-        desc_ = "; ".join(f"{q_['number']} (r {q_['r']:+.2f}): "
-                          f"mean |term| leak {q_['mean_abs']['leak']:.3f}, network {q_['mean_abs']['network']:.3f}, stimulus "
-                          f"{q_['mean_abs']['stimulus']:.3f}" for q_ in MS_)
-        for nm_, f_, ttl_, cap_ in (
-                ("13_messages_abc_e15m3", "abc", "three typical neurons: rollout, the update's terms, the total message",
-                 "three neurons typical of the table on the traces slide (tools/exp17\\_terms.py: in each group the neuron "
-                 "whose three term SDs are the closest to the group's medians; two non-input, front and back, one input). "
-                 "a recorded (green) and learned (white) dF/F; b the three terms of the neuron's update, in normalised "
-                 "units: the leak pull V - z, the network $\\Omega$m, the stimulus B$\\cdot$u; c the total incoming "
-                 "message. " + desc_ + "."),
-                ("13_messages_d_e15m3", "d", "three typical neurons: each sender's message",
-                 "each sender's message $\\Omega_i W_{ji}\\tanh z_j$ along the free rollout, the strongest first, one "
-                 "scale per neuron (its largest in the title); orange W $>$ 0, blue W $<$ 0; the sender's edge set and "
-                 "distance at the right.")):
-            deck.append((nm_, frame_wide(
-                ttl_, "\\vspace*{1.0\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.70\\textheight,"
-                f"keepaspectratio]{{figs/messages_zap_e15_cur_siren_mesh3_{f_}.png}}\\par\\vspace{{2pt}}"
-                "{\\fontsize{4.6}{5.5}\\selectfont " + cap_ + "\\par}", "tools/exp17_messages.py zap_e15_cur_siren_mesh3 terms",
-                deck_title="batch 15 $\\cdot$ zap\\_e15\\_cur\\_siren\\_mesh3 $\\cdot$ messages")))
+    # Cedric, 2026-10-05: 15.14's traces and messages, then their twins on 17.9 (the 3-level mesh, no SIREN, so no
+    # Omega_i(t): the senders' message enters the update as it is)
+    # Cedric, 2026-10-05: 17.9's three slides again at 5 other sets of locations ("I want to see more examples";
+    # tools/exp17_traces.py / exp17_terms.py --sets 5, exp17_messages.py terms_s<k>)
+    for run_, suf_, b_, what_, om_, set_ in (
+            (("zap_e15_cur_siren_mesh3", "e15m3", "15", "15.14 (the 3-level mesh + SIREN)", True, ""),
+             ("zap_g17_mesh3", "g17m3", "17", "17.9 (the 3-level mesh, no SIREN)", False, ""))
+            + tuple(("zap_g17_mesh3", f"g17m3_s{k_}", "17", "17.9 (the 3-level mesh, no SIREN)", False, f"_s{k_}")
+                    for k_ in range(1, 6))):
+        rt_, ab_ = _tex(run_), what_.split()[0]
+        loc_ = f", locations set {set_[2:]} of 5" if set_ else ""
+        jtr_ = os.path.join(EXP, "data", f"traces_{run_}{set_}.json")
+        if os.path.exists(jtr_):
+            TQ_ = json.load(open(jtr_))
+            jte_ = os.path.join(EXP, "data", f"terms_{run_}.json")
+            TE_ = json.load(open(jte_))["medians"] if os.path.exists(jte_) else None
+            side_ = ""
+            if TE_:
+                side_ = (head("the law, per neuron")
+                         + "{\\scriptsize $z_i \\leftarrow z_i + f_i\\,\\big((V_i - z_i) + " + ("\\Omega_i(t)\\," if om_ else "")
+                         + "m_i(t) + B_i\\cdot u(t)\\big)$"
+                           "\\par}\\vspace{4pt}\n"
+                         + "{\\scriptsize $z$ the neuron's dF/F normalised by the recording's mean and SD; $f_i$ the step fraction "
+                           "its time constant $\\tau_i$ sets; $m_i = \\sum_j W_{ji}\\tanh z_j$ its senders' message; $B_i\\cdot u$ "
+                           "the stimulus (0 outside the input mask).\\par}\\vspace{4pt}\n"
+                         + "{\\scriptsize \\textbf{leak pull} $V_i - z_i$: how far the neuron is from its own rest $V_i$; it pulls "
+                           "it back. $V_i$ is constant, so it moves exactly as much as the neuron itself.\\par}" + SEC_GAP
+                         + head("how much each term moves")
+                         + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
+                           "neurons & $" + ("\\Omega " if om_ else "") + "m$ & $B\\cdot u$ & $V - z$ \\\\\n\\hline\n"
+                         + "".join(f"{lab_} ({TE_[g_]['n']:,}) & {TE_[g_]['network']:.3f} & {TE_[g_]['stimulus']:.3f} & "
+                                   f"{TE_[g_]['leak']:.3f} \\\\\n" for lab_, g_ in (("all", "all"), ("input", "input"),
+                                                                                   ("non-input", "non_input")))
+                         + "\\end{tabular}\\par}\\vspace{2pt}\n"
+                         + "{\\tiny\\color{gray} per neuron, the SD over the 2 h of each term (normalised units), the median over "
+                           "the neurons; " + ab_ + "'s free rollout\\par}\n")
+                side_ = "\\vspace*{2\\baselineskip}\\fitcol{%\n" + side_ + "}"
+            body_tr = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.73\\textwidth}\n"
+                       "\\centering\\includegraphics[width=\\linewidth,height=0.72\\textheight,keepaspectratio]"
+                       "{figs/traces_" + run_ + set_ + ".png}\\par\\vspace{2pt}"
+                       "{\\fontsize{4.6}{5.5}\\selectfont " + (f"{TQ_['K']} neurons chosen from the recording alone, blind to the "
+                       f"model: the neurons that move split into {TQ_['K']} regions by position, in each the neuron most typical of "
+                       "its region (the most correlated with the region's mean trace), numbered head to tail. Their free-rollout "
+                       if not set_ else
+                       f"Set {TQ_['set']} of {TQ_['n_sets']}: {TQ_['K']} more neurons, at other locations, from the recording alone. "
+                       f"The neurons that move split into {TQ_['K'] * TQ_['n_sets']} regions by position, ranked head to tail and "
+                       f"dealt in turn to {TQ_['n_sets']} sets, so each set's {TQ_['K']} regions span the brain; in each the most "
+                       "typical neuron (the most correlated with its region's mean trace), numbered head to tail. Their free-rollout ")
+                       + f"traces over the 2 h, {what_}: Pearson r median {TQ_['r_median']:+.2f}, from "
+                       f"{TQ_['r_min']:+.2f} to {TQ_['r_max']:+.2f}."
+                       + ("" if suf_ == "e15m3" or set_ else " The same 12 neurons as 15.14's traces slide (picked from the recording).")
+                       + "\\par}\n\\end{column}\n\\begin{column}{0.24\\textwidth}\n"
+                       + side_ + "\n\\end{column}\n\\end{columns}")
+            deck.append((f"13_traces_{suf_}", frame_wide("a few neurons, recorded against learned", body_tr,
+                                                       f"tools/exp17_traces.py, exp17_terms.py {run_}" + (" --sets 5" if set_ else ""),
+                                                       deck_title=f"batch {b_} $\\cdot$ {rt_} $\\cdot$ traces" + loc_)))
+        jms_ = os.path.join(EXP, "data", f"messages_{run_}{set_}.json")         # Cedric, 2026-10-05
+        if os.path.exists(jms_):
+            MS_ = json.load(open(jms_))["neurons"]
+            desc_ = "; ".join(f"{q_['number']} (r {q_['r']:+.2f}): "
+                              f"mean |term| leak {q_['mean_abs']['leak']:.3f}, network {q_['mean_abs']['network']:.3f}, stimulus "
+                              f"{q_['mean_abs']['stimulus']:.3f}" for q_ in MS_)
+            for nm_, f_, ttl_, cap_ in (
+                    (f"13_messages_abc_{suf_}", "abc", "three typical neurons: rollout, the update's terms, the total message",
+                     "three neurons typical of the table on the traces slide (tools/exp17\\_terms.py: in each group the neuron "
+                     "whose three term SDs are the closest to the group's medians; two non-input, front and back, one input). "
+                     "a recorded (green) and learned (white) dF/F; b the three terms of the neuron's update, in normalised "
+                     "units: the leak pull V - z, the network " + ("$\\Omega$" if om_ else "") + "m, the stimulus B$\\cdot$u; c the total incoming "
+                     "message. " + desc_ + "."
+                     # Cedric, 2026-10-05: a twin's three come from its own term SDs, so not 15.14's neurons
+                     + ("" if suf_ == "e15m3" else f" {ab_}'s own three, from its own term SDs: not the three of 15.14." if not set_
+                        else f" Set {set_[2:]}'s three: the same rule inside set {set_[2:]}'s regions only, the first messages "
+                             "slide's three left out.")),
+                    (f"13_messages_d_{suf_}", "d", "three typical neurons: each sender's message", "")):   # no caption (Cedric)
+                deck.append((nm_, frame_wide(
+                    ttl_, "\\vspace*{1.0\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.70\\textheight,"
+                    f"keepaspectratio]{{figs/messages_{run_}{set_}_{f_}.png}}\\par\\vspace{{2pt}}"
+                    + ("{\\fontsize{4.6}{5.5}\\selectfont " + cap_ + "\\par}" if cap_ else ""),
+                    f"tools/exp17_messages.py {run_} terms{set_}",
+                    deck_title=f"batch {b_} $\\cdot$ {rt_} $\\cdot$ messages" + loc_)))
     jw0_ = os.path.join(GD, "log", "training", "zapbench", "zap_e15_cur", "results", "zap_e15_cur_wind_fields_sigma0.npz")
     h0_ = float(np.load(jw0_)["grid"][2]) if os.path.exists(jw0_) else float("nan")      # the wind grid's cell, um
     for mv_, nm_, ttl_, cap_ in (("flow_meshes_sigma10", "11c_flow_meshes_s10", "the flow on the three meshes and the base, smoothed over 10 um",
@@ -2763,37 +3003,42 @@ def main():
             "blue, over the RECORDED dF/F in grey; from above (head left) and from the side (head left: the same "
             "arrows projected on the sagittal plane); tools/exp17\\_wind\\_views.py\\par}", "tools/exp17_wind_views.py zap_g17_mesh4",
             deck_title="batch 17 $\\cdot$ the flow of the 4-level mesh, two views")))
-    if os.path.exists(os.path.join(PRES, "Movies", "flow_views_zap_g17_mesh4_combined.mp4")):   # Cedric, 2026-10-04: slide 42
+    # Cedric, 2026-10-06: the flow slides redone on 17.14 (Dale's law as a prior, lambda 1e-3: one sign per sender, so
+    # the excitatory and the inhibitory flows are those of distinct senders) and moved to batch 15's section
+    FR_ = "zap_g17_mesh3_dale_d1em3" if os.path.exists(os.path.join(PRES, "Movies", "flow_views_zap_g17_mesh3_dale_d1em3_combined.mp4")) else "zap_g17_mesh4"
+    fl_ = "17.14 (Dale's law, 3-level mesh)" if FR_ != "zap_g17_mesh4" else "17.10 (the 4-level mesh)"
+    fa_ = "17.14" if FR_ != "zap_g17_mesh4" else "17"
+    if os.path.exists(os.path.join(PRES, "Movies", f"flow_views_{FR_}_combined.mp4")):   # Cedric, 2026-10-04: slide 42
         deck.append(("11c_flow_views_combined", frame_wide(
-            "the flow of the 4-level mesh, excitatory and inhibitory together",
-            "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.84\\textwidth]{Movies/flow_views_zap_g17_mesh4_combined}\\par\\vspace{2pt}"
+            f"the flow of {fl_}, excitatory and inhibitory together",
+            f"\\vspace*{{1.2\\baselineskip}}\\centering\\playmovie[0.84\\textwidth]{{Movies/flow_views_{FR_}_combined}}\\par\\vspace{{2pt}}"
             "{\\tiny\\color{gray} one map per view -- from above, oblique from 45 deg above, from the side: excitatory "
             "particles red, inhibitory cyan (tone-mapped, mixed by weight: never white), on the RECORDED dF/F in grey; "
-            "tools/exp17\\_wind\\_views.py\\par}", "tools/exp17_wind_views.py zap_g17_mesh4",
-            deck_title="batch 17 $\\cdot$ the flow of the 4-level mesh, red and blue together")))
-    for mv_, nm_, ttl_ in (("flow_views_zap_g17_mesh4_sigma10", "11c_flow_views_s10",
-                            "the flow of the 4-level mesh from above and from the side, smoothed over 10 um"),
-                           ("flow_views_zap_g17_mesh4_combined_sigma10", "11c_flow_views_combined_s10",
-                            "the flow of the 4-level mesh, red and blue together, smoothed over 10 um")):
+            f"{fl_}'s learned messages as wind; tools/exp17\\_wind\\_views.py\\par}}", f"tools/exp17_wind_views.py {FR_}",
+            deck_title=f"batch {fa_} $\\cdot$ the flow, red and blue together")))
+    for mv_, nm_, ttl_ in ((f"flow_views_{FR_}_sigma10", "11c_flow_views_s10",
+                            f"the flow of {fl_} from above and from the side, smoothed over 10 um"),
+                           (f"flow_views_{FR_}_combined_sigma10", "11c_flow_views_combined_s10",
+                            f"the flow of {fl_}, red and blue together, smoothed over 10 um")):
         if os.path.exists(os.path.join(PRES, "Movies", mv_ + ".mp4")):              # Cedric, 2026-10-04: twins of 41, 42
             deck.append((nm_, frame_wide(ttl_, "\\vspace*{1.2\\baselineskip}\\centering\\playmovie[" + ("0.84" if "combined" in mv_ else "0.80")
                                          + "\\textwidth]{Movies/" + mv_ + "}\\par\\vspace{2pt}{\\tiny\\color{gray} as the 25-\\textmu m slide, the wind "
                                          "smoothed over 10 \\textmu m; excitatory red, inhibitory blue, the RECORDED dF/F in grey; "
                                          "tools/exp17\\_wind\\_views.py --sigma 10\\par}", "tools/exp17_wind_views.py --sigma 10",
-                                         deck_title="batch 17 $\\cdot$ " + ttl_)))
+                                         deck_title=f"batch {fa_} $\\cdot$ " + ttl_.split(", ", 1)[-1])))
     for S_, nm_ in ((25, "11c_field_s25"), (10, "11c_field_s10")):          # Cedric, 2026-10-04: the field, not the flows
-        mv_ = f"Movies/field_zap_g17_mesh4_sigma{S_}"                           # ... as a movie, the flow slides' colours
-        f_ = f"figs/field_zap_g17_mesh4_sigma{S_}.png"
+        mv_ = f"Movies/field_{FR_}_sigma{S_}"                                   # ... as a movie, the flow slides' colours
+        f_ = f"figs/field_{FR_}_sigma{S_}.png"
         body_ = ("\\playmovie[0.72\\textwidth]{" + mv_ + "}" if os.path.exists(os.path.join(PRES, mv_ + ".mp4")) else
                  "\\includegraphics[width=\\textwidth,height=0.74\\textheight,keepaspectratio]{" + f_ + "}")
         if os.path.exists(os.path.join(PRES, f_)) or os.path.exists(os.path.join(PRES, mv_ + ".mp4")):
             deck.append((nm_, frame_wide(
-                f"the field of the 4-level mesh, smoothed over {S_} um",
+                f"the field of {fl_}, smoothed over {S_} um",
                 "\\vspace*{1.4\\baselineskip}\\centering" + body_ + "\\par\\vspace{2pt}{\\tiny\\color{gray} the field the "
                 "particles ride, frame by frame: the messages $m_{ji} = W_{ji}\\tanh z_j\\,\\Omega_i$ as arrows sender $\\to$ "
                 f"receiver, gridded, smoothed over {S_} \\textmu m; excitatory red, inhibitory cyan, length by the square root "
                 "of the strength (one scale over the movie), over the RECORDED dF/F in grey; tools/exp17\\_wind\\_fieldmovie.py\\par}",
-                "tools/exp17_wind_fieldmovie.py", deck_title=f"batch 17 $\\cdot$ the field of the 4-level mesh, {S_} \\textmu m")))
+                f"tools/exp17_wind_fieldmovie.py {FR_}", deck_title=f"batch {fa_} $\\cdot$ the field, {S_} \\textmu m")))
     if os.path.exists(os.path.join(PRES, "Movies", "flow_graphs.mp4")):
         deck.append(("11c_flow_graphs", frame_wide(
             "the flow (the learned messages as wind) on each graph",
@@ -2853,7 +3098,7 @@ def main():
                          "zapbench_destripe_ephys")
             return f"{qv(m_['mean'])} $\\pm$ {m_['sd']:.2f}" if m_ else "--"
         right_gc = (head("the graphs, side by side") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
-                    "& \\multicolumn{2}{c}{brain mean} & local \\\\\n& r & RMSE & r \\\\\n\\hline\n"
+                    "& \\multicolumn{2}{c}{brain mean} & per-neuron \\\\\n& r & RMSE & r \\\\\n\\hline\n"
                     + "".join(f"{_tex(v_['label'].split(':')[0])} & {qv(bmr_(k_))} & {v_['bm_rmse']:.4f} & {lr_(k_)} \\\\\n"
                               for k_, v_ in GC_.items())
                     + (("no W (15.9) & " + "{} & {:.4f}".format(
@@ -2983,6 +3228,161 @@ def main():
             deck_title="multi-level GNN on fish 2 $\\cdot$ the big picture")))
     except (KeyError, FileNotFoundError) as e_:
         print(f"[big picture] not made: {e_}")
+    # Cedric, 2026-10-05: THE MEAN-FIELD CONTROL, one table, one sentence and the significance tests -- 15.4 (the graph),
+    # its W = 0 at inference, 15.17 (15.4's law with the graph's message replaced by each neuron's gain on the brain mean
+    # of tanh z) and 15.9 (trained with no W); the numbers and p values from tools/exp17_meanfield_stats.py
+    try:
+        import torch
+        fit_ = {n: torch.load(os.path.join(landed[n]["dir"], "models", "best.pt"), map_location="cpu",
+                              weights_only=False)["fitted"] for n in ("zap_e15_cur_siren", "zap_e15_cur_siren_mf")}
+        n_edges = sum(v.numel() for k, v in fit_["zap_e15_cur_siren"].items() if k.startswith("state_diffuse.W_"))
+        n_gains = fit_["zap_e15_cur_siren_mf"]["state_diffuse.W_mean"].numel()
+        g_, w0_, mf_, nw_ = "15.4 graph", "15.4, W = 0 at inference", "15.17 mean field", "15.9 no W"
+        TEXT_ = ("\\textbf{Textbook methods.} The 95~\\% intervals are percentile bootstrap confidence intervals (Efron "
+                 "1979; Efron \\& Tibshirani 1993, \\emph{An Introduction to the Bootstrap}). The p values shift the "
+                 "resampled differences to the null and add 1 to the count, the standard bootstrap test (Hall \\& Wilson "
+                 "1991; Davison \\& Hinkley 1997). Resampling time blocks rather than single frames is the moving block "
+                 "bootstrap for correlated time series (K\\\"unsch 1989). Pairing, the same resamples for both laws, is "
+                 "how machine-learning papers compare two models on one test set (Koehn 2004; Berg-Kirkpatrick et al.\\ "
+                 "2012).")
+        # Cedric, 2026-10-05: and its twin WITHOUT the brain-mean subtraction (r per neuron on the raw traces)
+        # Cedric, 2026-10-05: "per-neuron r", brain mean removed / kept, not "local r"
+        for suf_, ml_, nm_, ttl_ in (("", "per-neuron r", "13_meanfield_e15", ""),
+                                     ("_raw", "per-neuron r", "13_meanfield_e15_raw", ", brain mean kept")):
+            ST_ = json.load(open(os.path.join(EXP, "data", f"meanfield_stats{suf_}.json")))
+            L_ = ST_["laws"]
+            T_ = {(t["a"], t["b"]): t for t in ST_["tests"]}
+
+            def pq(p):
+                return f"p {p:.3f}" if p >= 1e-3 else f"p $<$ {1 / (ST_['resamples'] + 1) * 1.0001:.0e}".replace("e-0", "e-")
+            rows_ = ""
+            for k in (g_, w0_, mf_, nw_):
+                b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
+                big_ = k == g_
+                rows_ += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{k}}}}}" if big_ else k)
+                          + f" & {qv(b_['estimate'], big=big_)} & {qv(l_['estimate'], big=big_)} $\\pm$ {l_['sd_over_neurons']:.2f} \\\\\n")
+            t1, t2, t3 = T_[(g_, mf_)], T_[(mf_, nw_)], T_[(g_, w0_)]
+            right_mf = (head("the mean-field control, 2 h free rollout") + "{\\scriptsize\\raggedright "
+                        + "\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n& brain-mean r & " + ml_ + (", kept" if suf_ else ", removed") + ", mean $\\pm$ SD \\\\\n"
+                        "\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{3pt}\n"
+                        + "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$, " + f"{n_edges:,}" + " edge weights; mean "
+                        "field: $m_i = a_i\\,\\langle\\tanh z\\rangle$, " + f"{n_gains:,}" + " gains, one per neuron; no W: $m_i = 0$, "
+                        "so $\\Omega$ (which scales $m_i$) has nothing to act on. The rest is 15.4's known ODE.\\par}" + SEC_GAP
+                        + head("conclusion")
+                        + "{\\scriptsize\\raggedright One brain-wide signal does not replace the graph: the mean field's " + ml_ + " is "
+                        f"{L_[mf_]['local_r']['estimate']:+.2f} against the graph's {L_[g_]['local_r']['estimate']:+.2f} "
+                        f"({pq(t1['local_r']['p'])}), so the learned coupling carries neuron-to-neuron network dynamics.\\par}}"
+                        + SEC_GAP + head("the test")
+                        + "{\\scriptsize\\raggedright \\textbf{Null (no difference):} two laws follow the recording equally well. \\textbf{Method:} "
+                        f"a paired block bootstrap over time: the 2 h cut into {ST_['blocks'] + 1} blocks of {ST_['block_min']:.1f} min, "
+                        f"the first (the transient from the recorded start) left out; {ST_['resamples']:,} resamples of the "
+                        f"{ST_['blocks']} others, the same blocks for every law; p two-sided. "
+                        "Blocks, not frames or neurons: both are correlated, and neuron-wise tests would give p $\\approx$ 0 for any "
+                        f"difference. Per-neuron r over the same {ST_['neurons']:,} neurons for every law; a neuron whose learned trace is "
+                        "flat scores 0 (with $W = 0$ most neurons relax to rest within 5 min). Bars: each law's 95~\\% interval; the "
+                        "tests are on the paired differences, so laws whose intervals overlap can still differ.\\par}\\vspace{3pt}\n"
+                        + "{\\scriptsize\\raggedright graph $-$ mean field: brain-mean r " + f"{t1['brain_mean_r']['difference']:+.3f} "
+                        f"({pq(t1['brain_mean_r']['p'])}), {ml_} {t1['local_r']['difference']:+.3f} ({pq(t1['local_r']['p'])})\\\\\n"
+                        f"mean field $-$ no W: {t2['brain_mean_r']['difference']:+.3f} ({pq(t2['brain_mean_r']['p'])}), "
+                        f"{t2['local_r']['difference']:+.3f} ({pq(t2['local_r']['p'])})\\\\\n"
+                        f"graph $-$ its $W = 0$: {t3['brain_mean_r']['difference']:+.3f} ({pq(t3['brain_mean_r']['p'])}), "
+                        f"{t3['local_r']['difference']:+.3f} ({pq(t3['local_r']['p'])})\\\\[2pt]\n"
+                        "Retraining with another seed (15.1 against 17.8, the same spec) moves brain-mean r by "
+                        f"{ST_['seed_pair']['brain_mean_r']:.3f} and {ml_} by {ST_['seed_pair']['local_r']:.4f}.\\par}}")
+            deck.append((nm_, frame_narrow(
+                "the mean-field control" + ttl_, f"figs/meanfield_stats{suf_}.png", right_mf,
+                f"tools/exp17_meanfield_stats.py{' --raw' if suf_ else ''} (data/meanfield_stats{suf_}.json); models/best.pt",
+                deck_title="batch 15.17 $\\cdot$ the mean-field control" + (ttl_ or ": is the coupling network dynamics?"), left=0.50, height=0.70,
+                img_top="0.12\\textheight",            # Cedric, 2026-10-05: the bar plot down, in the middle of the slide
+                # Cedric, 2026-10-05: where the local metric and the test come from
+                caption=("\\fontsize{3.8}{4.6}\\selectfont "      # Cedric, 2026-10-05: smaller than the deck's captions
+                         + ("\\textbf{Brain mean kept.} The twin of the previous slide: each neuron's r on its raw traces, the "
+                            "brain mean NOT regressed out, so a law also earns credit for the shared brain-wide signal.\\\\[3pt]"
+                            if suf_ else "\\textbf{Per-neuron r and global signal regression.} Regressing each trace on the brain "
+                            "mean before correlating is global signal regression in fMRI, reviewed with its debate by Murphy \\& "
+                            "Fox (2017): it can create artificial negative correlations. In population recordings, neuron-to-neuron "
+                            "correlations are routinely computed after removing the population-wide fluctuation, e.g.\\ Okun et "
+                            "al.\\ (2015) on ``population coupling''.\\\\[3pt]")
+                         + TEXT_))))
+    except (KeyError, FileNotFoundError, TypeError) as e_:
+        print(f"[mean field] not made: {e_}")
+    # Cedric, 2026-10-06: DALE'S LAW AS A PRIOR, on 17.9 (tools/exp17_dale.py --figure -> data/dale_g17.json)
+    try:
+        DL_ = json.load(open(os.path.join(EXP, "data", "dale_g17.json")))
+        lam_ = lambda d: "--" if not d["lambda"] else f"{d['lambda']:.0e}".replace("e-0", "e-")    # noqa: E731
+        rows_d = "".join(f"{d['label'].split(',')[0]} & {lam_(d)} & "
+                         f"{100 * d['consistent_senders']:.1f} \\% & {d['minority_mass']:.3f} & {100 * d['excitatory_senders']:.0f} \\% & "
+                         f"{d['long_mse']:.3f} & {qv(d['brain_mean_r'])} & {qv(d['per_neuron_r'])} \\\\\n" for d in DL_)
+        d0, d1 = DL_[0], DL_[1]
+        right_d = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.56\\textwidth}\n\\fitcol{%\n"
+                   + head("the three priors against 17.9") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
+                   "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                   "run & $\\lambda$ & one-sign & minority & excit. & long MSE & brain-mean r & per-neuron r \\\\\n"
+                   "& & senders & mass & senders & ($10^{-3}$) & & \\\\\n\\hline\n" + rows_d + "\\end{tabular}\\par}}\n"
+                   "\\end{column}\n\\begin{column}{0.40\\textwidth}\n\\fitcol{%\n"
+                   + head("the prior") + "{\\scriptsize\\raggedright $\\lambda\\sum_j \\min(P_j, N_j)$, with $P_j$ / $N_j$ the "
+                   "positive / negative outgoing weight of sender $j$ summed over every edge set: the weight on each sender's "
+                   "minority sign. 17.9's law (3-level mesh, no SIREN) trained from scratch with it.\\par}" + SEC_GAP
+                   + head("conclusion") + "{\\scriptsize\\raggedright Dale's law holds as a prior: at $\\lambda = 10^{-3}$, "
+                   f"{100 * d1['consistent_senders']:.0f} \\% of the senders are one sign (17.9: {100 * d0['consistent_senders']:.0f} \\%), "
+                   f"the brain-mean r unchanged ({d1['brain_mean_r']:+.3f} against {d0['brain_mean_r']:+.3f}), the per-neuron r "
+                   f"{d1['per_neuron_r'] - d0['per_neuron_r']:+.3f} and the long MSE {100 * (d1['long_mse'] / d0['long_mse'] - 1):+.1f} \\%. "
+                   "The weakest prior gets nearly all of the sign consistency for the least cost.\\par}}\n"
+                   "\\end{column}\n\\end{columns}")
+        deck.append(("13_dale_g17", frame_wide(
+            "Dale's law as a prior", "\\vspace*{0.5\\baselineskip}\\centering\\includegraphics[width=\\textwidth,height=0.42"
+            "\\textheight,keepaspectratio]{figs/dale_g17.png}\\par\\vspace{6pt}\\raggedright\n" + right_d,
+            "tools/exp17_dale.py --figure (data/dale_g17.json)",
+            deck_title="batch 17.14--17.16 $\\cdot$ Dale's law as a prior")))
+    except (KeyError, FileNotFoundError) as e_:
+        print(f"[dale] not made: {e_}")
+    # Cedric, 2026-10-06: where the excitatory and the inhibitory senders are, 17.14 (tools/exp17_dale.py --map)
+    jdm_ = os.path.join(EXP, "data", "dale_map_zap_g17_mesh3_dale_d1em3.json")
+    if os.path.exists(jdm_):
+        DM_ = json.load(open(jdm_))
+        right_dm = (head("excitatory and inhibitory senders")
+                    + rows([("senders", f"{DM_['senders']:,} (outgoing $|W| > 10^{{-3}}$)"),
+                            ("excitatory", f"{DM_['excitatory']:,} ({100 * DM_['excitatory'] / DM_['senders']:.0f} \\%)"),
+                            ("inhibitory", f"{DM_['inhibitory']:,} ({100 * DM_['inhibitory'] / DM_['senders']:.0f} \\%)"),
+                            ("excitatory weight", f"{100 * DM_['excitatory_mass']:.0f} \\% of the outgoing $|W|$")])
+                    + "{\\scriptsize\\raggedright 17.14, Dale's law as a prior ($\\lambda = 10^{-3}$): a sender is excitatory "
+                      "when its positive outgoing weight $P_j$ exceeds its negative $N_j$, inhibitory otherwise; its colour "
+                      "strength is its net outgoing weight $|P_j - N_j|$ over the 98th percentile. Every neuron at its "
+                      "position, head left; the others dark grey.\\par}")
+        deck.append(("13_dale_map_g17", frame_wide(
+            "excitatory and inhibitory senders", "\\vspace*{0.4\\baselineskip}\\centering\\includegraphics[width=\\textwidth,"
+            "height=0.48\\textheight,keepaspectratio]{figs/dale_map_zap_g17_mesh3_dale_d1em3.png}\\par\\vspace{4pt}"
+            "\\raggedright\\begin{columns}[T,onlytextwidth]\\begin{column}{0.46\\textwidth}\\centering"
+            "\\includegraphics[width=\\linewidth,height=0.30\\textheight,keepaspectratio]{figs/dale_ei_bars.png}"
+            "\\end{column}\\begin{column}{0.50\\textwidth}\\fitcol{%\n" + right_dm
+            + "}\\end{column}\\end{columns}",     # Cedric, 2026-10-06: the exc / inh split against lambda beside it
+            "tools/exp17_dale.py --map zap_g17_mesh3_dale_d1em3 / --ei",
+            deck_title="batch 17.14 $\\cdot$ excitatory and inhibitory senders")))
+    # Cedric, 2026-10-06: THE ONE-TO-ONE COMPARISONS FROM BATCH 15 -- each row one change between two landed runs
+    try:
+        def m3_(a_):
+            n_ = ARM_RUN[a_]
+            res_ = os.path.join(landed[n_]["dir"], "results")
+            t_ = json.load(open(os.path.join(res_, f"{n_}_test.json")))
+            mm_ = np.asarray(t_["mse_model"], float)
+            return (1e3 * mm_[15:32].mean(), bm_metrics(os.path.join(res_, f"{n_}_movie.npz"))["r"],
+                    local_r(os.path.join(res_, f"{n_}_movie.npz"), t_.get("trace_recording", "zapbench"))["mean"])
+        M_ = {a_: m3_(a_) for a_ in {x for _, a_, b_, _ in ONE_TO_ONE for x in (a_, b_)}}
+        rows_o = "".join(f"{lab_} & {a_} $\\to$ {b_} & {100 * (M_[b_][0] / M_[a_][0] - 1):+.1f} \\% & {M_[b_][1] - M_[a_][1]:+.3f} & "
+                         f"{M_[b_][2] - M_[a_][2]:+.3f} & {rd_} \\\\\n" for lab_, a_, b_, rd_ in ONE_TO_ONE)
+        body_o = ("\\vspace*{0.6\\baselineskip}\\fitcol{%\n" + head("one change at a time, batches 15--18 (in sample, 2 h free rollout)")
+                  + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}l@{}}\n"
+                  "change & from $\\to$ to & long MSE & brain-mean r & per-neuron r & reading \\\\\n\\hline\n" + rows_o
+                  + "\\end{tabular}\\par}\\vspace{4pt}\n{\\scriptsize\\raggedright Long MSE (h 16--32) in \\% of the ``from'' run's; "
+                  "brain-mean r and per-neuron r (brain mean removed) as differences. What counts: another training seed moves "
+                  "them by 0.1 \\%, 0.002 and 0.001 (15.1 against 17.8); the recording's own sampling (slide 17's paired "
+                  "block bootstrap) by about 0.035 brain-mean r and 0.009 per-neuron r, so differences under $\\sim$0.07 and "
+                  "$\\sim$0.02 are not significant. Batch 19 fills the gaps on the new nominal, with the first held-out pair since "
+                  "batch 13.\\par}}")
+        deck.append(("99b_one_to_one", frame_wide("one change at a time", body_o, "the landed runs' results",
+                                                 deck_title="batches 15--18 $\\cdot$ one change at a time")))
+    except (KeyError, FileNotFoundError, TypeError) as e_:
+        print(f"[one to one] not made: {e_}")
     # Cedric, 2026-10-04: the MULTI-LEVEL MESHES of batch 17 (graph: mesh) -- GraphCast's construction on the neurons, no
     # encoder / decoder (cell_ops.neuron_mesh_levels); tools/exp17_mesh_figures.py makes the turntables (slide 3's
     # renderer), the level panels (GraphCast Fig. 1e, g) and data/gcmesh_<L>.json, read here
@@ -3024,7 +3424,8 @@ def main():
         sets_ = [("short", f"$M^{len(pl_) - 1}$"), ("mid", ", ".join(mid_lv_)), ("long", ", ".join(long_lv_) or "none")]
         right_m = (head(f"the multi-level mesh, {L_} levels") + tab_
                    + "{\\scriptsize the law's three W sets, every edge both ways:\\par}\\vspace{2pt}\n"
-                   + rows([(k_, f"{lv_}: {sd_[k_]['edges']:,} edges, {sd_[k_]['per_neuron']:.2f} per neuron, "
+                   # Cedric, 2026-10-05: "2 x" the neighbour pairs, so the count reads against the level table's
+                   + rows([(k_, f"{lv_}: 2 $\\times$ {sd_[k_]['edges'] // 2:,} edges, {sd_[k_]['per_neuron']:.2f} per neuron, "
                                     f"mean {_um(sd_[k_]['mean_um'])} \\textmu m" if sd_[k_]["edges"] else
                                  "none: no level of 64 \\textmu m or coarser") for k_, lv_ in sets_])
                    + "{\\scriptsize the merged multi-mesh is ONE graph over "
@@ -3070,6 +3471,9 @@ def main():
                        "13_traces_e15m3": "zap_e15_cur_siren_mesh3_movie",
                        "13_messages_abc_e15m3": "13_traces_e15m3", "13_messages_d_e15m3": "13_messages_abc_e15m3",
                        "13_edges_amp_e15m3": "13_messages_d_e15m3",
+                       # Cedric, 2026-10-05: 15.14's traces, messages and edges twinned on 17.9, after its movie
+                       "13_traces_g17m3": "zap_g17_mesh3_movie", "13_messages_abc_g17m3": "13_traces_g17m3",
+                       "13_messages_d_g17m3": "13_messages_abc_g17m3", "13_edges_amp_g17m3": "13_messages_d_g17m3",
                        "zap_e15_cur_siren_mesh3_no_short": "13_edges_amp_e15m3",
                        "zap_e15_cur_siren_mesh3_no_mid": "zap_e15_cur_siren_mesh3_no_short",
                        "zap_e15_cur_siren_mesh3_no_M0": "zap_e15_cur_siren_mesh3_no_mid",
@@ -3078,8 +3482,19 @@ def main():
                        "zap_e15_cur_siren_mesh5_movie": "zap_e15_cur_siren_mesh4_movie",
                        "zap_e15_cur_siren_mf_movie": "zap_e15_cur_siren_mesh5_movie",
                        "zap_e15_cur_siren_tau_movie": "zap_e15_cur_siren_mf_movie",
-                       "13_dots_residual_e15": "zap_e15_cur_siren_omega", "11c_flow_mesh4_s0": "11c_flow_meshes_s0",
+                       "13_dots_residual_e15": "zap_e15_cur_siren_omega", "13_meanfield_e15": "13_edges_amp_e15", "13_meanfield_e15_raw": "13_meanfield_e15", "13_dale_g17": "13_meanfield_e15_raw", "13_dale_map_g17": "13_dale_g17", "99b_one_to_one": "99a_big_picture",   # Cedric, 2026-10-05: 15.4's network test closes its block
+                        "11c_flow_mesh4_s0": "11c_flow_meshes_s0",
                        "11f_graph_curves": "11c_flow_mesh4_s0"})
+    prev_ = "13_messages_d_g17m3"                         # Cedric, 2026-10-05: the 5 location sets right after it
+    for k_ in range(1, 6):
+        for p_ in ("13_traces", "13_messages_abc", "13_messages_d"):
+            MOVE_AFTER[f"{p_}_g17m3_s{k_}"] = prev_
+            prev_ = f"{p_}_g17m3_s{k_}"
+    # Cedric, 2026-10-06: the four flow slides (now 17.14's, Dale's law) after the Dale slides, in batch 15's section
+    for k_ in ("11c_flow_views_combined", "11c_field_s25", "11c_flow_views_combined_s10", "11c_field_s10"):
+        MOVE_AFTER.pop(k_, None)
+    MOVE_AFTER.update({"11c_flow_views_combined": "13_dale_map_g17", "11c_field_s25": "11c_flow_views_combined",
+                       "11c_flow_views_combined_s10": "11c_field_s25", "11c_field_s10": "11c_flow_views_combined_s10"})
     for nm, after in MOVE_AFTER.items():
         item = next((x for x in deck if x[0] == nm), None)
         if item is not None and any(x[0] == after for x in deck):
@@ -3087,7 +3502,7 @@ def main():
             i = next(k for k, x in enumerate(deck) if x[0] == after)
             deck.insert(i + 1, item)
     # Cedric, 2026-10-04: the calcium block (slides 24-26) at the very end, after an appendix slide
-    APPENDIX = ("08_latent_calcium", "zap_c16_t2_movie", "zap_c16_t2_curves")
+    APPENDIX = ("08_latent_calcium", "zap_b18_ca_h50_x25_movie", "zap_b18_ca_h50_x25_curves")   # Cedric, 2026-10-06: 18.7, not 16.3
     apx = [x for n_ in APPENDIX for x in deck if x[0] == n_]
     if apx:
         deck = ([x for x in deck if x[0] not in APPENDIX]
@@ -3130,6 +3545,18 @@ def main():
                       "11c_flow_meshes_s0", "11c_flow_mesh4_s0"}        # Cedric, 2026-10-04: slides 21 22 35 39 41 45 46
     HIDDEN_SLIDES |= {"11c_flow_mesh4", "11c_flow_meshes_s10", "11c_flow_mesh4_s10", "11c_flow_views_s10",
                       "11h_mesh4", "zap_g17_mesh5_movie"}              # Cedric, 2026-10-04: slides 36 39 40 41, then 32 35
+    HIDDEN_SLIDES |= {"13_edges_amp_e15m3", "zap_e15_cur_siren_mesh3_no_short", "zap_e15_cur_siren_mesh3_no_mid",
+                      "zap_e15_cur_siren_mesh3_no_M0", "zap_e15_cur_siren_mesh3_no_M1",
+                      "zap_e15_cur_siren_mesh4_movie", "zap_e15_cur_siren_mesh5_movie"}   # Cedric, 2026-10-05: slides 27-33
+    HIDDEN_SLIDES |= {"zap_e15_cur_siren_no_short", "zap_e15_cur_siren_no_mid", "zap_e15_cur_siren_no_long",
+                      "zap_e15_cur_siren_short_only", "zap_e15_cur_siren_noeph_movie", "zap_e15_noeph_now_movie",
+                      "zap_e15_cur_siren_mesh3_movie", "13_traces_e15m3", "13_messages_abc_e15m3",
+                      "13_messages_d_e15m3"}             # Cedric, 2026-10-05: then slides 17-26
+    HIDDEN_SLIDES |= {"zap_g17_mesh3_tau_movie", "zap_g17_mesh3_dale_d1em3_movie", "zap_g17_mesh3_dale_d3em3_movie",
+                      "zap_g17_mesh3_dale_d1em2_movie", "zap_c16_t2_movie", "zap_c16_t2_curves"}   # Cedric, 2026-10-06:
+    # 17.12-17.16 as the Dale slide and the one-to-one table; 16.3 replaced in the appendix by 18.7
+    HIDDEN_SLIDES |= {"zap_e15_cur_siren_mf_movie", "zap_g17_mf_movie", "zap_g17_mf_curves"}   # Cedric, 2026-10-05: 15.17 shown as
+                                                                                       # one slide (13_meanfield_e15)
     for nm, r_ in CURVES_TODO.items():                  # the shown curves slides' figures, panel c the brain mean
         if nm not in HIDDEN_SLIDES:
             fp = os.path.join(PRES, "figs", f"{r_['name']}_curves_bm.png")

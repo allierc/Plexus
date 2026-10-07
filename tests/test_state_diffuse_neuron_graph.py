@@ -327,3 +327,48 @@ def test_rate_bounds(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         setup(str(tmp_path), rate_min=1.0, rate_max=0.5)
+
+
+def test_dale_priors(tmp_path):
+    """exp17 (Cedric, 2026-10-05): `dale` is the outgoing weight mass on each sender's minority sign, over every edge
+    set at once; `dale_keep` the fall of each sender's majority mass below its first value."""
+    import torch
+    o = setup(str(tmp_path))[0]
+    E = {s: o._E[s][0] for s in o.EDGE_SETS}
+    g = torch.Generator().manual_seed(0)
+    for s in o.EDGE_SETS:
+        setattr(o, f"W_{s}", torch.randn(E[s].numel(), generator=g))
+    P = torch.zeros(o.n_elements)
+    N = torch.zeros(o.n_elements)
+    for s in o.EDGE_SETS:
+        w = getattr(o, f"W_{s}")
+        P.index_add_(0, E[s], torch.relu(w))
+        N.index_add_(0, E[s], torch.relu(-w))
+    assert torch.allclose(o.prior_term("W_short", "dale"), torch.minimum(P, N).sum())
+    assert float(o.prior_term("W_short", "dale_keep")) == 0.0                  # at its first value: nothing lost
+    for s in o.EDGE_SETS:                                                      # Dale-consistent: each sender one sign
+        w = getattr(o, f"W_{s}")
+        setattr(o, f"W_{s}", w.abs() * torch.where(E[s] % 2 == 0, 1.0, -1.0))
+    assert float(o.prior_term("W_short", "dale")) == 0.0
+    for s in o.EDGE_SETS:                                                      # every weight halved: the majority falls
+        setattr(o, f"W_{s}", 0.5 * getattr(o, f"W_{s}"))
+    assert float(o.prior_term("W_short", "dale_keep")) > 0
+    import pytest
+    with pytest.raises(ValueError):
+        o.prior_term("tau", "dale")
+
+
+def test_w_init_sd(tmp_path):
+    """exp17 batch 19 (Cedric, 2026-10-06: Dale maps over seeds): `w_init_sd` starts every edge weight from a Gaussian
+    draw of that spread, set by the op's seed -- the same seed the same start, another seed another; absent = the
+    constant start, as before."""
+    import torch
+    o = setup(str(tmp_path))[0]
+    a = setup(str(tmp_path), w_init_sd=0.01, seed=1)[0]
+    b = setup(str(tmp_path), w_init_sd=0.01, seed=1)[0]
+    c = setup(str(tmp_path), w_init_sd=0.01, seed=2)[0]
+    for s in o.EDGE_SETS:
+        w0, wa, wb, wc = (getattr(x, f"W_{s}") for x in (o, a, b, c))
+        assert torch.all(w0 == 0)                                                   # no spread: the constant start
+        assert torch.equal(wa, wb) and not torch.equal(wa, wc)                      # the seed sets the draw
+        assert 0.005 < float(wa.std()) < 0.02 and abs(float(wa.mean())) < 0.005

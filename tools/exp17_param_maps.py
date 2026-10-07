@@ -2,7 +2,8 @@
 
 Local analysis. Every neuron a dot at its position, horizontal and head left as the run movies -- from above and, under it, from the
 side -- coloured by one of its learned constants (models/best.pt):
-    a  tau = 0.914 s / softplus(tau_raw), the leak's time constant (log colour scale)
+    a  tau = 0.914 s / rate, the leak's time constant (log colour scale); rate = softplus(tau_raw), or bounded by the
+       run's rate_min / rate_max, the colour bar then spanning exactly that bound
     b  V, the rest value, in dF/F (V sd + mu, the reference's normalisation)
     c  the summed signed W into the neuron over its three edge sets (blue < 0 < red)
     d  |B|, the norm of its stimulus weights; grey where the input mask keeps the stimulus out (B unused there)
@@ -43,7 +44,11 @@ def constants(name):
             snd, rcv = (t.cpu().numpy() for t in op._E[p[2:]])
             np.add.at(w_in, rcv, fit[T.Learnables.key(e)].float().numpy().reshape(-1))
     mask = op.input_mask.cpu().numpy().reshape(-1).astype(bool) if op.input_mask is not None else np.ones(N, bool)
-    return {"tau_s": FRAME_S / torch.nn.functional.softplus(fit["neuron.tau"].float()).numpy().reshape(-1),
+    # tau through the law's own rate: the bound [rate_min, rate_max] when the run declares one (15.18, 2026-10-06)
+    tau_s = FRAME_S / op._rate(fit["neuron.tau"].float()).detach().numpy().reshape(-1)
+    lo_, hi_ = getattr(op, "rate_min", None), getattr(op, "rate_max", None)
+    bounds = (FRAME_S / hi_, FRAME_S / lo_) if lo_ and hi_ else None          # tau's allowed range, s
+    return {"tau_s": tau_s, "tau_bounds": bounds,
             "V": fit["neuron.rest"].float().numpy().reshape(-1) * sd + mu, "W_in": w_in,
             "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask,
             "pos": np.asarray(rec["pos_um"], np.float64)}
@@ -69,7 +74,7 @@ def render(name):
     RH = LB + th + GP + sh + 0.18
     FH = 2 * RH
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
-    lo_t, hi_t = np.percentile(c["tau_s"], [2, 98])
+    lo_t, hi_t = c["tau_bounds"] or np.percentile(c["tau_s"], [2, 98])   # a bounded tau: the colour bar IS the bound
     wl = np.percentile(np.abs(c["W_in"]), 98)
     panels = [("a   leak time constant $\\tau$, s (log)", c["tau_s"], "viridis", LogNorm(lo_t, hi_t)),
               ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
@@ -109,6 +114,10 @@ def render(name):
     plt.close(fig)
     stats["n"], stats["n_masked"] = int(len(c["mask"])), int(c["mask"].sum())
     stats["frac_tau_below_frame"] = float((c["tau_s"] < FRAME_S).mean())
+    if c["tau_bounds"]:                               # the share of neurons pinned at the floor / the ceiling (within 5 %)
+        stats["tau_bounds"] = list(c["tau_bounds"])
+        stats["frac_tau_at_floor"] = float((c["tau_s"] < 1.05 * c["tau_bounds"][0]).mean())
+        stats["frac_tau_at_ceiling"] = float((c["tau_s"] > 0.95 * c["tau_bounds"][1]).mean())
     stats["frac_W_in_negative"] = float((c["W_in"] < 0).mean())
     json.dump(stats, open(os.path.join(EXP, "data", f"param_maps_{name}.json"), "w"), indent=1)
     print("[maps]", path, json.dumps(stats))

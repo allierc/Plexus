@@ -40,6 +40,8 @@ FRAME_S = 0.914                      # seconds per recording frame
 NSEG = 256                           # Welch segment length, frames (234 s), as exp17_stim_coherence.py
 MASK = {"zapbench": "input_mask_zapbench_coh10.npz", "zapbench_destripe": "input_mask_destripe_coh10.npz"}
 MASK_MIX = {"zapbench_destripe_ephys": "input_mask_destripe_mix_coh20.npz"}
+# batch 19's mask (2026-10-06): the 20 % most coherent with one of the 13 changing visual features, no ephys
+MASK_VIS20 = {"zapbench_destripe": "input_mask_destripe_vis_coh20.npz"}
 MASK_VARYING = {"zapbench_destripe": "input_mask_destripe_coh10v.npz",
                 "zapbench_destripe_ephys": "input_mask_destripe_ephys_coh10.npz"}
 LABEL = {"zapbench": "ZAPBench release traces", "zapbench_destripe": "destriped zap-inr traces",
@@ -164,7 +166,8 @@ def analyse(rec, device, variant="all"):
     else:
         sc = np.load(os.path.join(EXP, "data", f"stim_coherence_{rec}{'' if variant == 'all' else '_varying'}.npz"))
         coh, best, band_hz = sc["coherence"], sc["best_feature"].astype(int), sc["band_hz"]
-        mk = np.load(graphs_data_path("zebrafish", MASK[rec] if variant == "all" else MASK_VARYING[rec]))
+        mk = np.load(graphs_data_path("zebrafish", MASK[rec] if variant == "all" else
+                                      MASK_VIS20[rec] if variant == "vis20" else MASK_VARYING[rec]))
         sel = mk["mask"] > 0
         thr = float(mk["threshold"])
         assert np.allclose(mk["coherence"], coh), "mask and coherence file disagree"
@@ -209,7 +212,8 @@ def analyse(rec, device, variant="all"):
         top = idx_sel[np.argsort(coh[idx_sel])[::-1][:100]]
     Xt = np.asarray(X[:, top], np.float64)
     lag = np.array([peak_lag(Xt[:, i], U[:, best[n_]]) for i, n_ in enumerate(top)])
-    o = np.lexsort((lag, best[top]))
+    # the half-and-half mask: the visually picked block first, the motor (ephys) picked below (Cedric, 2026-10-06)
+    o = np.lexsort((lag, best[top], pick[top])) if variant == "mix" else np.lexsort((lag, best[top]))
     top, Xt, lag = top[o], Xt[:, o], lag[o]
     return dict(rec=rec, variant=variant, flabels=flabels, pick=pick, X=X, U=U, names=names, off=off, T=T, N=N, K=K, feat_cond=feat_cond, coh=coh, best=best,
                 sel=sel, thr=thr, Suu=Suu, f=f, band=band, ex_sel=ex_sel, ex_un=ex_un, Cex=Cex, common=common,
@@ -527,7 +531,7 @@ def _kymo_frames(ks):
     plt.close(fig)
 
 
-def fig_kymo_full(d):
+def fig_kymo_full(d, bar_movie=False, n_frames=300, fps=25):
     """THE WHOLE RECORDING AS ONE KYMOGRAPH (Cedric, 2026-10-02: a still, not a movie, with the block partition):
     top the 22 stimulus features (rows grouped by the condition that uses each), bottom the 100 most coherent input
     neurons (each row z-scored over the recording, grouped by best feature then lag), the nine conditions as named,
@@ -540,19 +544,53 @@ def fig_kymo_full(d):
     tmin = T * FRAME_S / 60
     m = lambda fr: fr * FRAME_S / 60
     fig = plt.figure(figsize=(13.33, 7.5), facecolor="black")
-    tag = ", 20 % mask: 10 % visual + 10 % ephys" if d.get("variant") == "mix" else "" if d.get("variant", "all") == "all" else (
+    tag = ", 20 % mask: 10 % visual + 10 % ephys" if d.get("variant") == "mix" else (
+        ", the balanced 20 % mask: 13 changing visual features, >= 50 per block, left = right" if d.get("variant") == "vis20" else "") if d.get("variant") in ("mix", "vis20") or d.get("variant", "all") == "all" else (
         ", mask: 13 visual + 5 ephys features" if d["K"] > N_VISUAL else ", mask: 13 changing visual features")
-    fig.text(0.015, 0.975, f"The input neurons and the stimulus over the whole recording ({LABEL[d['rec']]}{tag})",
-             color="white", fontsize=11, va="top")
+    if not bar_movie:                 # the movie has no title (Cedric, 2026-10-06)
+        fig.text(0.015, 0.975, f"The input neurons and the stimulus over the whole recording ({LABEL[d['rec']]}{tag})",
+                 color="white", fontsize=11, va="top")
     L, R = 0.13, 0.69                         # the kymographs; the brain on the right (Cedric, 2026-10-02)
+    if bar_movie:                             # Cedric, 2026-10-07: no fish in the movie (slides 9-10 show them): wide
+        R = 0.93
     axn = fig.add_axes([L, 0.885, R - L, 0.035])
     axs = fig.add_axes([L, 0.60, R - L, 0.25])
-    axk = fig.add_axes([L, 0.08, R - L, 0.44])
+    axk = fig.add_axes([L, 0.08, R - L, 0.44] if not bar_movie else [L, 0.185, R - L, 0.335])
+    if bar_movie:                     # Cedric, 2026-10-07: the brain mean in green under the kymograph, the bar on it too
+        axbm = fig.add_axes([L, 0.065, R - L, 0.095])
+        tb_ = np.arange(d["T"]) * FRAME_S / 60
+        axbm.plot(tb_, np.asarray(d["X"]).mean(1), color="#2ca02c", lw=0.6)
+        axbm.set_xlim(0, tmin)
+        axbm.set_facecolor("black")
+        axbm.tick_params(colors="0.75", labelsize=7, length=2)
+        for sp in axbm.spines.values():
+            sp.set_color("0.4")
+        for b in off[1:-1]:
+            axbm.axvline(m(b), color="white", lw=0.9, ls="--")
+        axbm.set_ylabel("brain\nmean", fontsize=8, color="#2ca02c")
+        axbm.set_xlabel("time since the recording's start, min", fontsize=9, color="0.8")
+        fig._bm_ax = axbm
     ims = axs.imshow(d["U"].T, aspect="auto", interpolation="nearest",
                      cmap=LinearSegmentedColormap.from_list("stim", STIM_CMAP), vmin=-1, vmax=1,
                      extent=(0, tmin, K - 0.5, -0.5))
-    imk = axk.imshow(d["Zt"], aspect="auto", interpolation="nearest", cmap="inferno", vmin=-1, vmax=3,
-                     extent=(0, tmin, d["Zt"].shape[0] - 0.5, -0.5))
+    Zk = d["Zt"]
+    if bar_movie:
+        # Cedric, 2026-10-06: per block, the 20 input neurons that respond most in it -- the highest mean of their dF/F,
+        # z-scored over the whole recording, over the block's frames; 9 blocks x 20 rows
+        from plexus.paths import graphs_data_path as gdp_
+        si_ = np.where(np.load(gdp_("zebrafish", "input_mask_destripe_bal20.npz"))["mask"] > 0)[0]   # the balanced mask
+        Xs = np.asarray(d["X"][:, si_], np.float32)
+        Xs = (Xs - Xs.mean(0)) / np.maximum(Xs.std(0), 1e-6)
+        rows_, blk_ = [], []
+        for k in range(len(names)):
+            mz = Xs[off[k]:off[k + 1]].mean(0)
+            top_ = np.argsort(mz)[::-1][:20]
+            rows_.append(Xs[:, top_].T)
+            blk_ += [k] * len(top_)
+        Zk, blk_ = np.concatenate(rows_), np.asarray(blk_)
+        del Xs
+    imk = axk.imshow(Zk, aspect="auto", interpolation="nearest", cmap="inferno", vmin=-1, vmax=3,
+                     extent=(0, tmin, Zk.shape[0] - 0.5, -0.5))
     axn.axis("off")
     axn.set_xlim(0, tmin)
     axn.set_ylim(0, 1)
@@ -573,29 +611,49 @@ def fig_kymo_full(d):
         if cond[j] != cond[j - 1]:
             axs.axhline(j - 0.5, color="0.45", lw=0.6)
     plt.setp(axs.get_xticklabels(), visible=False)
-    bt = d["best"][d["top"]]
+    bt = blk_ if bar_movie else d["best"][d["top"]]
     axk.set_yticks([])
     cuts = np.r_[0, np.flatnonzero(np.diff(bt)) + 1, len(bt)]
     for a_, b_ in zip(cuts[:-1], cuts[1:]):
         if a_:
             axk.axhline(a_ - 0.5, color="0.6", lw=0.7)
-        axk.text(-0.008, (a_ + b_ - 1) / 2, f"best {d['flabels'][bt[a_]]} ({b_ - a_})",
+        axk.text(-0.008, (a_ + b_ - 1) / 2, (f"{names[bt[a_]]} ({b_ - a_})" if bar_movie else
+                                              f"best {d['flabels'][bt[a_]]} ({b_ - a_})"),
                  transform=axk.get_yaxis_transform(), ha="right", va="center", fontsize=6.5, color="0.85")
-    axk.set_xlabel("time since the recording's start, min", fontsize=9, color="0.8")
+    if d.get("pick") is not None and not bar_movie:               # Cedric, 2026-10-06: which block is visual, which motor (ephys)
+        pk = d["pick"][d["top"]]
+        for code, col, lab_ in ((0, "#56b4e9", "visual"), (1, "#ff9f1c", "motor (ephys)")):
+            rr = np.flatnonzero(pk == code)
+            if not len(rr):
+                continue
+            a_, b_ = rr.min() - 0.5, rr.max() + 0.5
+            axk.plot([-0.19, -0.19], [a_ + 0.6, b_ - 0.6], transform=axk.get_yaxis_transform(), color=col, lw=3,
+                     clip_on=False, solid_capstyle="butt")
+            axk.text(-0.20, (a_ + b_) / 2, f"{lab_} ({len(rr)})", transform=axk.get_yaxis_transform(), rotation=90,
+                     ha="right", va="center", fontsize=9, color=col, weight="bold")
+            if code == 1:
+                axk.axhline(a_, color="white", lw=1.2)
+    if bar_movie:
+        plt.setp(axk.get_xticklabels(), visible=False)
+    else:
+        axk.set_xlabel("time since the recording's start, min", fontsize=9, color="0.8")
     fig.text(L, 0.855, "stimulus features, grouped by condition: -1 (blue) .. 0 (black) .. +1 (orange)", color="white",
              fontsize=9.5, va="bottom")
-    fig.text(L, 0.525, "the 100 most coherent input neurons: dF/F, rows z-scored, grouped by best feature (n), "
-             "then by lag", color="white", fontsize=9.5, va="bottom")
-    cb1 = fig.add_axes([0.70, 0.62, 0.008, 0.21])
+    fig.text(L, 0.525, ("per block, the 20 input neurons that respond most in it: dF/F, rows z-scored" if bar_movie else
+                        "the 100 most coherent input neurons: dF/F, rows z-scored, grouped by best feature (n), then by lag"),
+             color="white", fontsize=9.5, va="bottom")
+    cb1 = fig.add_axes([R + 0.01, 0.62, 0.008, 0.21])
     fig.colorbar(ims, cax=cb1).ax.tick_params(colors="0.75", labelsize=7)
     cb1.set_title("value", fontsize=7, color="0.75")
-    cb2 = fig.add_axes([0.70, 0.10, 0.008, 0.40])
+    cb2 = fig.add_axes([R + 0.01, 0.10, 0.008, 0.40] if not bar_movie else [R + 0.01, 0.20, 0.008, 0.30])
     fig.colorbar(imk, cax=cb2).ax.tick_params(colors="0.75", labelsize=7)
     cb2.set_title("z", fontsize=7, color="0.75")
     # THE INPUT NEURONS ON THE BRAIN, vertical and head up, beside the kymographs: the mask's neurons coloured (the
     # half-and-half mask: blue those picked by visual coherence, orange those picked by ephys), the others grey
     P = d["pos"]
     V = np.stack([P[:, 1], -P[:, 0]], 1)        # brain_view is horizontal, head left: turned to head up
+    if bar_movie:                               # Cedric, 2026-10-06: two fish -- the input neurons, and the activity now
+        return _kymo_bar_movie(d, fig, axs, axk, V, m, tmin, n_frames, fps)
     axb = fig.add_axes([0.745, 0.06, 0.24, 0.84])
     axb.set_facecolor("black")
     axb.axis("off")
@@ -618,6 +676,101 @@ def fig_kymo_full(d):
     plt.close(fig)
     shutil.copy(out, os.path.join(PNG, stem))
     print(f"[input neurons] wrote {out}")
+
+
+def _kymo_bar_movie(d, fig, axs, axk, V, m, tmin, n_frames, fps):
+    """THE KYMOGRAPH AS A MOVIE (Cedric, 2026-10-06: "two zebrafishes, a vertical bar moving on the two kymographs"):
+    fig_kymo_full's kymographs with a white bar at the current frame, and beside them two brains, head up -- left the
+    input neurons (the mask, fixed), right every neuron's dF/F at that frame (inferno, 0 .. the 97th percentile). One
+    frame of the movie every T / n_frames recorded frames, the whole recording; the poster is its first frame.
+    -> Movies/input_neurons_<rec>_<variant>_kymo_bar.mp4 (+ .png)."""
+    import tempfile
+    import matplotlib.pyplot as plt
+    from plexus.tasks.trace_recording import _ffmpeg
+    X, sel, T = d["X"], d["sel"], d["T"]
+    vmax = float(np.percentile(np.asarray(X[::50]), 97))
+    # Cedric, 2026-10-06: 2 x 3 fish -- rows the 5 %, 10 % and 20 % visual masks (nested), left each mask's input
+    # neurons, right the others, each neuron with its own activity, the excluded set faint grey
+    import matplotlib.pyplot as plt_
+    from plexus.paths import graphs_data_path
+    cm_ = plt_.get_cmap("inferno")
+    U_ = np.asarray(d["U"])
+    # Cedric, 2026-10-07: 2 x 2 -- the balanced 20 % mask read per feature (an input neuron lit only while one of its
+    # features is on) against the same mask with every input neuron reading all the stimulus (lit always)
+    z_ = np.load(graphs_data_path("zebrafish", "input_mask_destripe_bal20.npz"))
+    masks = [("per feature", z_["mask"] > 0, z_["mask_by_input"] > 0), ("all features", z_["mask"] > 0, None)]
+    masks = []                                # Cedric, 2026-10-07: the fish removed, redundant with slides 9-10
+    # the fish drawn with VTK, as the deck's other brains (Cedric, 2026-10-06): one off-screen plotter per panel, head
+    # up, seen from above, parallel projection; each frame's image pasted into its axes
+    import pyvista as pv
+    pv.OFF_SCREEN = True
+    P3 = np.column_stack([V[:, 0], V[:, 1], np.zeros(len(V))]).astype(np.float32)
+    lo2, hi2 = V.min(0), V.max(0)
+    ctr = (lo2 + hi2) / 2
+
+    def plotter(grey, col):
+        pl = pv.Plotter(off_screen=True, window_size=(300, 380))
+        pl.set_background("black")
+        pl.add_mesh(pv.PolyData(P3[grey]), color="#262626", point_size=2.0, render_points_as_spheres=True)
+        mesh = pv.PolyData(P3[col])
+        mesh.point_data["rgb"] = np.zeros((len(col), 3), np.uint8)
+        pl.add_mesh(mesh, scalars="rgb", rgb=True, point_size=4.0, render_points_as_spheres=True)
+        pl.enable_parallel_projection()
+        pl.camera.focal_point = (float(ctr[0]), float(ctr[1]), 0.0)
+        pl.camera.position = (float(ctr[0]), float(ctr[1]), 5000.0)
+        pl.camera.up = (0.0, 1.0, 0.0)
+        pl.camera.parallel_scale = float(hi2[1] - lo2[1]) / 2 * 1.03
+        return pl, mesh
+    scs = []
+    for r, (lab, mk, mbi) in enumerate(masks):
+        y0 = 0.07 + (len(masks) - 1 - r) * 0.44
+        for c_, (part, name) in enumerate(((mk, "input"), (~mk, "others"))):
+            a_ = fig.add_axes([0.745 + 0.123 * c_, y0, 0.12, 0.38])
+            a_.axis("off")
+            a_.set_title(f"{lab}: {name} {int(part.sum()):,}" if c_ == 0 else f"{name} {int(part.sum()):,}",
+                         color="white", fontsize=8.5)
+            ix = np.where(part)[0]
+            pl_, mesh_ = plotter(np.where(~part)[0], ix)
+            im_ = a_.imshow(np.zeros((380, 300, 3), np.uint8), aspect="equal")
+            scs.append((pl_, mesh_, im_, ix, mbi[ix][:, :U_.shape[1]] if (c_ == 0 and mbi is not None) else None))
+    ls = axs.axvline(0.0, color="white", lw=1.6)
+    lk = axk.axvline(0.0, color="white", lw=1.6)
+    lb = fig._bm_ax.axvline(0.0, color="white", lw=1.6) if hasattr(fig, "_bm_ax") else None
+    tt = fig.text(0.93, 0.855, "", color="white", fontsize=11, ha="right", va="bottom", weight="bold")
+    tmp = tempfile.mkdtemp(prefix="kymo_bar_")
+    CROP_TOP = 0.065                 # the band the title held (0.92 .. 1 of the height), cut: no title in the movie
+    frames = np.linspace(0, T - 1, n_frames).astype(int)
+    for i, t in enumerate(frames):
+        ls.set_xdata([m(t), m(t)])
+        lk.set_xdata([m(t), m(t)])
+        if lb is not None:
+            lb.set_xdata([m(t), m(t)])
+        xt = np.asarray(X[t])
+        on_ = np.abs(U_[t]) > 0                      # the stimulus features on at this frame
+        for pl_, mesh_, im_, ix, fm_ in scs:
+            rgba = cm_(np.clip(xt[ix] / vmax, 0.0, 1.0))
+            if fm_ is not None:                      # an input neuron: its colour only while one of its features is on
+                rgba[~fm_[:, on_].any(1)] = (0.18, 0.18, 0.18, 1.0)
+            mesh_.point_data["rgb"] = (rgba[:, :3] * 255).astype(np.uint8)
+            pl_.render()
+            im_.set_data(pl_.screenshot(return_img=True))
+        tt.set_text(f"t = {m(t):5.1f} of {tmin:.0f} min")
+        fig.savefig(os.path.join(tmp, f"{i:05d}.png"), dpi=110, facecolor="black")
+    plt.close(fig)
+    for pl_, *_r in scs:
+        pl_.close()
+    v_ = d.get("variant", "all")
+    stem = os.path.join(MOVIES, f"input_neurons_{d['rec']}{'' if v_ == 'all' else '_' + v_}_kymo_bar")
+    subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(3 * fps), "-i", os.path.join(tmp, "%05d.png"),
+                    "-r", str(fps),                    # 3x, frames dropped (Cedric, 2026-10-07)
+                    "-vf", f"crop=iw:ih*{1 - CROP_TOP}:0:ih*{CROP_TOP},scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p",
+                    "-c:v", "libx264", stem + ".mp4"], check=True)
+    from PIL import Image
+    im0 = Image.open(os.path.join(tmp, "00000.png"))
+    im0.crop((0, int(im0.height * CROP_TOP), im0.width, im0.height)).save(stem + ".png")
+    shutil.rmtree(tmp)
+    print(f"[input neurons] wrote {stem}.mp4")
+    return stem
 
 
 def movie_kymo(d, W=300, step=10, fps=25, dpi=120, workers=16):
@@ -656,7 +809,9 @@ def main():
     ap.add_argument("--recording", nargs="+", default=["zapbench", "zapbench_destripe"])
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--no-movie", action="store_true")
-    ap.add_argument("--mask", default="all", choices=["all", "varying", "mix"],
+    ap.add_argument("--bar-movie", action="store_true", help="also the kymograph movie: a moving time bar and two fish")
+    ap.add_argument("--bar-frames", type=int, default=300, help="frames of the kymograph movie, over the whole recording")
+    ap.add_argument("--mask", default="all", choices=["all", "varying", "mix", "vis20"],
                     help="varying: the mask from the 13 features that change within their condition")
     a = ap.parse_args()
     for p in (FIGS, MOVIES, PNG):
@@ -664,6 +819,8 @@ def main():
     for rec in a.recording:
         d = analyse(rec, a.device, a.mask)
         fig_kymo_full(d)
+        if a.bar_movie:
+            fig_kymo_full(d, bar_movie=True, n_frames=a.bar_frames)
         s = summary(d)
         fig_method(d)
         fig_map(d, s)

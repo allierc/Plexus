@@ -12,7 +12,11 @@ Figure d: each sender's own message Omega_i W_ji tanh(z_j), stacked, the stronge
 neuron; labelled by the sender's edge set, its distance (um) and W.
 
     PYTHONPATH=src:tools python tools/exp17_messages.py zap_e15_cur_siren_mesh3 7 8 12
-the numbers are those of tools/exp17_traces.py's figure (data/traces_<run>.json).
+the numbers are those of tools/exp17_traces.py's figure (data/traces_<run>.json); `terms` the three of
+tools/exp17_terms.py, `terms_s<k>` those of its location set k (Cedric, 2026-10-05: "other locations x5"), written with
+the suffix _s<k>.
+Figure d also draws each sender's tanh(z_j) dashed, on one fixed scale (-1 .. 1 the row's height), so a flat message
+reads as either a quiet sender or a small W (Cedric, 2026-10-05).
 Writes presentation/figs/messages_<run>_abc.png, _d.png and data/messages_<run>.json (+ png/).
 """
 import json
@@ -42,8 +46,10 @@ def main(run, numbers):
     rec = TR.load(spec["task"]["reference"]["trace_recording"])
     op = neuron_graph_op(spec, "cpu")
     fit = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location="cpu")["fitted"]
-    if numbers == ["terms"]:                     # the representative neurons of tools/exp17_terms.py (Cedric, 2026-10-05)
-        TP = json.load(open(os.path.join(EXP, "data", f"terms_{run}.json")))["picks"]
+    suf = ""
+    if len(numbers) == 1 and numbers[0].startswith("terms"):    # the representative neurons of tools/exp17_terms.py
+        suf = numbers[0][len("terms"):]                         # "" or "_s<k>", a location set (Cedric, 2026-10-05)
+        TP = json.load(open(os.path.join(EXP, "data", f"terms_{run}{suf}.json")))["picks"]
         ids, numbers = [p_["index"] for p_ in TP], [p_["label"] for p_ in TP]
     else:
         TQ = json.load(open(os.path.join(EXP, "data", f"traces_{run}.json")))
@@ -56,6 +62,7 @@ def main(run, numbers):
     act = np.tanh(Zp)
     om_p = os.path.join(G, run, "results", f"{run}_omega.npz")
     om = np.load(om_p)["omega"].astype(np.float64) if op.modulation != "none" else np.ones_like(Zp)
+    oml, omi = ("$\\Omega$ ", "\\Omega_i ") if op.modulation != "none" else ("", "")   # no Omega without modulation
     tm = fr * 0.914 / 60
     u = np.asarray(rec["stimulus"], np.float64)[fr]
     B = fit["neuron.input"].float().numpy()
@@ -112,7 +119,7 @@ def main(run, numbers):
         b = figA.add_axes([x0, 0.38, w, 0.23])
         blocks(b)
         b.plot(tm, leak, color="0.65", lw=0.8, label="leak pull  V - z")
-        b.plot(tm, m_tot, color="#ff9f1c", lw=0.8, label="network  $\\Omega$ m")
+        b.plot(tm, m_tot, color="#ff9f1c", lw=0.8, label=f"network  {oml}m")
         b.plot(tm, drive, color="#c77dff", lw=0.8, label="stimulus  B$\\cdot$u")
         b.axhline(0, color="0.4", lw=0.5)
         b.set_ylabel("normalised units", fontsize=9)
@@ -141,13 +148,15 @@ def main(run, numbers):
         for q, e in enumerate(order):
             s, j, wj = senders[e]
             off = (len(order) - 1 - q) * 1.0
+            dax.plot(tm, act[:, j] / 2.2 + off, color="0.6", lw=0.6, ls=(0, (3, 2)))      # tanh z_j, -1..1 fixed
             dax.plot(tm, msgs[:, e] / (2.2 * scale) + off, color="#ff9f1c" if wj > 0 else "#4aa8ff", lw=0.7)
             dist = float(np.linalg.norm(pos[j] - pos[i]))
             dax.text(tm[-1] + 1, off, f"{s} {dist:.0f} um\nW {wj:+.3g}", fontsize=6.5, color="0.8", va="center")
         dax.set_yticks([])
         dax.set_xlabel("time, min", fontsize=9)
         dax.set_title(f"{k if isinstance(k, str) else 'neuron ' + str(k)}: its {min(NS, len(senders))} strongest of {len(senders)} senders\n"
-                      f"$\\Omega_i W_{{ji}}\\tanh z_j$, one scale: the largest |message| {scale:.3g} (orange W > 0, blue W < 0)",
+                      f"${omi}W_{{ji}}\\tanh z_j$, one scale: the largest |message| {scale:.3g}\n(orange W > 0, blue W < 0;\n"
+                      f"dashed grey $\\tanh z_j$, from -1 to 1 across its row)",   # 3 lines: 2 ran into the next column
                       fontsize=10, loc="left")
         if c == 0:
             dax.text(-0.10, 1.03, "d", transform=dax.transAxes, fontsize=14, weight="bold")
@@ -157,12 +166,12 @@ def main(run, numbers):
                                                                      "network": float(np.abs(m_tot).mean()),
                                                                      "stimulus": float(np.abs(drive).mean())}})
     for f_, nm in ((figA, "abc"), (figD, "d")):
-        path = os.path.join(EXP, "presentation", "figs", f"messages_{run}_{nm}.png")
+        path = os.path.join(EXP, "presentation", "figs", f"messages_{run}{suf}_{nm}.png")
         f_.savefig(path, dpi=115, facecolor="black", bbox_inches="tight", pad_inches=0.04)
         plt.close(f_)
         shutil.copy(path, os.path.join(EXP, "png", os.path.basename(path)))
         print("[messages]", path)
-    json.dump(doc, open(os.path.join(EXP, "data", f"messages_{run}.json"), "w"), indent=1)
+    json.dump(doc, open(os.path.join(EXP, "data", f"messages_{run}{suf}.json"), "w"), indent=1)
     print(json.dumps(doc["neurons"], indent=0)[:1500])
 
 

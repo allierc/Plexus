@@ -239,8 +239,10 @@ def render_amplitude(name, pooled_top=9000, size=(1300, 800)):
         cb = fig.colorbar(sm, cax=cax)
         cb.ax.tick_params(colors="0.75", labelsize=9)
         cb.set_label("|W|", color="0.75", fontsize=10)
+    # a mesh's sets are its levels, every edge stored both ways: the count as 2 x its neighbour pairs (Cedric, 2026-10-05)
+    n_all = f"2 x {len(allw) // 2:,}" if "level" in reach["short"] else f"{len(allw):,}"
     fig.text(0.01, 0.01, f"one cut for the three sets: |W| >= {cut:.3g} (the {pooled_top:,} largest |W| of all "
-             f"{len(allw):,} edges); one colour range {cut:.3g} .. {vmax:.3g}; grey: the neurons; head left",
+             f"{n_all} edges); one colour range {cut:.3g} .. {vmax:.3g}; grey: the neurons; head left",
              color="0.6", fontsize=10)
     path = os.path.join(EXP, "presentation", "figs", f"edges_amp_{name}.png")
     fig.savefig(path, dpi=130, facecolor="black", bbox_inches="tight", pad_inches=0.03)
