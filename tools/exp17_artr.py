@@ -144,66 +144,20 @@ def main():
     cL = cand[keepL | sel["rotation"][0]]
     cR = cand[keepR | sel["rotation"][1]]
     cells = np.r_[cL, cR]
-    base = np.array([[1.0, 0.25, 0.25]] * len(cL) + [[0.29, 0.48, 1.0]] * len(cR))
+    base = np.array([[1.0, 0.19, 0.19]] * len(cL) + [[0.23, 0.42, 1.0]] * len(cR))   # the phase slide's red / blue
     f0, f1 = blocks["open loop"][0] - int(round(SKIP_S / DT)), blocks["dark"][1]
-    Zc = zs(S[f0:f1][:, np.searchsorted(cand, cells)])   # each cell's band activity over the window, z
+    ix = np.searchsorted(cand, cells)
+    Zc = smooth3(zs(X[f0:f1][:, ix]))                    # each cell's dF/F over the window, z, the 3-frame mean
     stim = np.asarray(z["stimulus"][f0:f1, 19], np.float32)
+    t = (np.arange(f0, f1) - f0) * DT / 60
+    tr = [(Zc[:, :len(cL)].mean(1), "#ff3030", f"red, ARTR left ({len(cL)})"),
+          (Zc[:, len(cL):].mean(1), "#3a6bff", f"blue, ARTR right ({len(cR)})")]
+    marks = [(0.0, "open loop")] + [((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60, b) for b in ("rotation", "dark")]
 
     def build():
-        plt.style.use("dark_background")
-        fig = plt.figure(figsize=(15, 8.4), facecolor="black")
-        xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
-        ins = za["inside"]
-        scs = []
-        for rect, Y, ttl in (([0.02, 0.50, 0.40, 0.44], yd, "from above, head left"),
-                             ([0.02, 0.22, 0.40, 0.25], A[:, 2], "from the side")):   # dorsal up (Cedric, 2026-10-07)
-            a = fig.add_axes(rect)
-            a.scatter(xd[ins], Y[ins], s=0.08, color="0.25", lw=0, rasterized=True)
-            scs.append(a.scatter(xd[cells], Y[cells], s=7, c=base, lw=0))
-            a.set_aspect("equal")
-            a.axis("off")
-            a.text(0, 1.02, ttl, transform=a.transAxes, fontsize=10)
-        fig.text(0.03, 0.17, f"ARTR left ({len(cL)}), red; right ({len(cR)}), blue -- selected on dark or on rotation",
-                 fontsize=9, color="0.85")
-        a3 = fig.add_axes([0.50, 0.58, 0.47, 0.34])
-        pb = doc["by_selection"]["dark"]["per_block"]
-        pr_ = doc["by_selection"]["rotation"]["per_block"]
-        ks = list(pb)
-        xs = np.arange(len(ks))
-        a3.bar(xs - 0.2, [pb[k]["slow_r"] for k in ks], 0.38, color="#ff4a4a", label=f"selected on dark, {CUT_S:g}-{HI_S:g} s")
-        a3.bar(xs + 0.2, [pb[k]["full_r"] for k in ks], 0.38, color="#ffb0b0", label="selected on dark, full band")
-        a3.scatter(xs - 0.2, [pr_[k]["slow_r"] for k in ks], marker="D", s=26, color="#ffd24a", zorder=3,
-                   label=f"selected on rotation, {CUT_S:g}-{HI_S:g} s")
-        for k_, b_ in enumerate(ks):
-            if b_ in ("dark", "rotation"):
-                a3.text(k_, -0.98, "selection" if b_ == "dark" else "selection (yellow)", ha="center", fontsize=7, color="0.7")
-        a3.errorbar(xs, [pb[k]["ctrl_slow_r_median"] for k in ks],
-                    yerr=[[pb[k]["ctrl_slow_r_median"] - pb[k]["ctrl_slow_r_p5"] for k in ks],
-                          [pb[k]["ctrl_slow_r_p95"] - pb[k]["ctrl_slow_r_median"] for k in ks]],
-                    fmt="o", color="0.75", ms=4, label="random hindbrain cells, slow (5-95 %)")
-        a3.axhline(0, color="0.5", lw=0.6)
-        a3.set_xticks(xs)
-        a3.set_xticklabels(ks, rotation=30, ha="right", fontsize=8.5)
-        a3.set_ylim(-1, 1)
-        a3.set_ylabel("left mean vs right mean, r", fontsize=10)
-        a3.legend(fontsize=8, frameon=False, loc="lower left")
-        a4 = fig.add_axes([0.50, 0.08, 0.47, 0.32])
-        t = (np.arange(f0, f1) - f0) * DT / 60
-        a4.plot(t, zs(S[f0:f1, keepL]).mean(1), color="#ff4a4a", lw=0.9, label="ARTR left")
-        a4.plot(t, zs(S[f0:f1, keepR]).mean(1), color="#4a7bff", lw=0.9, label="ARTR right")
-        a4.plot(t, 2.6 + 0.3 * stim, color="orange", lw=0.8, label="rotation direction")
-        for b in ("rotation", "dark"):
-            a4.axvline((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60, color="0.6", ls="--", lw=0.7)
-            a4.text((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60 + 0.2, 1.02, b,
-                    transform=a4.get_xaxis_transform(), fontsize=9)
-        a4.text(0.2, 1.02, "open loop", transform=a4.get_xaxis_transform(), fontsize=9)
-        a4.axvspan((d0 - f0) * DT / 60, (d1 - f0) * DT / 60, color="0.3", alpha=0.35, lw=0)
-        a4.set_xlabel("time from the open-loop onset, min (shaded: the frames the red cells were selected on)", fontsize=9)
-        a4.set_ylabel(f"dF/F {CUT_S:g}-{HI_S:g} s, z", fontsize=10)
-        a4.legend(fontsize=8, frameon=False, loc="lower left", ncol=3)
-        bar = a4.axvline(0.0, color="white", lw=1.4)
-        bar.set_visible(False)
-        return fig, scs, bar
+        return twin_figure(A, za["inside"], cells, base, t, tr, stim, marks,
+                           f"the ARTR: {len(cL) + len(cR)} cells of rhombomeres 1-3, the 100 per side that best follow left - "
+                           "right, picked on the dark and on the rotation block")
     fig, scs, bar = build()
     fig.savefig(os.path.join(EXP, "presentation", "figs", "artr.png"), dpi=130, facecolor="black")
     plt.close(fig)
@@ -211,9 +165,56 @@ def main():
         movie(build, scs_rgb=base, Zc=Zc, n=f1 - f0)
 
 
-def movie(build, scs_rgb, Zc, n, name="artr", fps=30, workers=12, dpi=100):
+def smooth3(Z):
+    """The centred 3-frame mean of Z [T, n], the ends repeated."""
+    c = np.cumsum(np.r_[np.zeros((1, Z.shape[1]), Z.dtype), Z], 0)
+    m = (c[3:] - c[:-3]) / 3.0
+    return np.r_[m[:1], m, m[-1:]]
+
+
+def twin_figure(A, ins, cells, rgb, t, traces, stim, marks, caption, t0=10.0):
+    """The twin layout of the deck's ARTR and phase slides (Cedric, 2026-10-07: "just the oscillation traces, the two
+    slides twins"): top row the fish from above (head left) and from the side (dorsal up), the cells drawn in rgb over
+    every neuron in grey; bottom, full width, the traces [(y, colour, label)] against t (min), the rotation direction in
+    orange on top, from t0 min. -> (fig, [the two cell scatters], the time bar, hidden)."""
+    import matplotlib.pyplot as plt
+    plt.style.use("dark_background")
+    fig = plt.figure(figsize=(15, 8.4), facecolor="black")
+    xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
+    scs = []
+    for rect, Y, ttl in (([0.01, 0.42, 0.49, 0.53], yd, "from above, head left"),
+                         ([0.51, 0.42, 0.48, 0.53], A[:, 2], "from the side")):
+        a = fig.add_axes(rect)
+        a.scatter(xd[ins], Y[ins], s=0.08, color="0.22", lw=0, rasterized=True)
+        scs.append(a.scatter(xd[cells], Y[cells], s=3 if len(cells) > 2000 else 9, c=rgb, lw=0, rasterized=True))
+        a.set_aspect("equal")
+        a.axis("off")
+        a.text(0.02, 0.95, ttl, transform=a.transAxes, fontsize=11)
+    a.plot([np.percentile(xd, 99) - 100, np.percentile(xd, 99)], [np.percentile(A[:, 2], 0.5) - 20] * 2, color="w", lw=2)
+    a.text(np.percentile(xd, 99) - 50, np.percentile(A[:, 2], 0.5) - 28, "100 µm", ha="center", va="top", fontsize=9)
+    fig.text(0.02, 0.405, caption, fontsize=10, color="0.85")
+    at = fig.add_axes([0.06, 0.08, 0.92, 0.27])
+    for y, c, lab in traces:
+        at.plot(t, y, color=c, lw=0.9, label=lab)
+    top = max(float(np.max(y[t >= t0])) for y, _, _ in traces)
+    at.plot(t, top + 0.5 + 0.35 * stim, color="orange", lw=0.9, label="rotation direction")
+    for x_, name in marks:
+        if x_ >= t0:
+            at.axvline(x_, color="0.6", ls="--", lw=0.7)
+        at.text(max(x_, t0) + 0.15, 1.02, name, transform=at.get_xaxis_transform(), fontsize=10)
+    at.set_xlim(t0, t[-1])
+    at.set_xlabel("time from the open-loop onset, min", fontsize=10)
+    at.set_ylabel("dF/F, z (group mean)", fontsize=10)
+    at.legend(fontsize=9, frameon=False, loc="lower left", ncol=len(traces) + 1)
+    bar = at.axvline(t0, color="white", lw=1.4)
+    bar.set_visible(False)
+    return fig, scs, bar
+
+
+def movie(build, scs_rgb, Zc, n, name="artr", start_min=10.0, fps=30, workers=12, dpi=100):
     """A fish figure as a movie: one frame per recorded frame, each cell's colour scaled by its activity Zc [n, cells]
-    (z 2.5 = full, below -0.5 = dim), the bar at the frame. build() -> (fig, scatters, bar).
+    (z 2.5 = full, below -0.5 = dim), the bar at the frame. build() -> (fig, scatters, bar). The movie starts
+    start_min minutes into the window (Cedric, 2026-10-07: "start at t = 10", 5 min before the rotation block).
     -> presentation/Movies/<name>.mp4 (+ .png, the first frame). Also used by tools/exp17_phase.py."""
     import multiprocessing as mp
     import shutil
@@ -231,10 +232,11 @@ def movie(build, scs_rgb, Zc, n, name="artr", fps=30, workers=12, dpi=100):
             for sc in scs:
                 sc.set_facecolors(np.c_[scs_rgb * g, np.ones(len(g))])
             bar.set_xdata([i * DT / 60] * 2)
-            fig.savefig(os.path.join(tmp, f"{i:05d}.png"), dpi=dpi, facecolor="black")
+            fig.savefig(os.path.join(tmp, f"{i - i0:05d}.png"), dpi=dpi, facecolor="black")
         plt.close(fig)
     ctx = mp.get_context("fork")
-    ps = [ctx.Process(target=run, args=(list(range(w, n, workers)),)) for w in range(workers)]
+    i0 = int(round(start_min * 60 / DT))
+    ps = [ctx.Process(target=run, args=(list(range(i0 + w, n, workers)),)) for w in range(workers)]
     for p_ in ps:
         p_.start()
     for p_ in ps:
@@ -245,7 +247,7 @@ def movie(build, scs_rgb, Zc, n, name="artr", fps=30, workers=12, dpi=100):
                    check=True)
     shutil.copy(os.path.join(tmp, "00000.png"), stem + ".png")
     shutil.rmtree(tmp)
-    print(f"[{name}] wrote {stem}.mp4, {n} frames at {fps} fps")
+    print(f"[{name}] wrote {stem}.mp4, {n - i0} frames at {fps} fps")
 
 if __name__ == "__main__":
     main()

@@ -477,6 +477,12 @@ def draw_raster(fig, D, x0, x1, y0=0.07, y1=0.95, name_w=0.15, fs=7.5):
                        interpolation="nearest")
     ax.set_yticks([])
     ax.set_xlabel(f"time in the {blk} block, min" if blk else "time since the recording's start, min", fontsize=fs + 1.5)
+    if blk is not None and D.get("U") is not None:       # the stimulus's front edges, dashed (Cedric, 2026-10-07): a frame
+        Uu = np.asarray(D["U"])                           # where the features change to a state that is not all off
+        ed = np.flatnonzero((np.abs(np.diff(Uu, axis=0)) > 1e-6).any(1) & (np.abs(Uu[1:]) > 1e-6).any(1)) + 1
+        for e_ in ed:
+            for a_ in (ax, ab):
+                a_.axvline(e_ * 0.914 / 60, color="#ff9f1c", lw=0.6, ls=(0, (4, 3)), alpha=0.85)
     for c_ in D.get("lr_cut", []):                      # left / right within each region
         ax.axhline(c_, color="#4a7bff", lw=0.5, ls="--")
     ax.tick_params(labelsize=fs + 0.5)
