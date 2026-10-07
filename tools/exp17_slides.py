@@ -173,36 +173,48 @@ def _brain_frames(ks):
     for j, p in enumerate(panels):
         x0, w = j / n, 1.0 / n
         two_ = p.get("band") is not None                               # Cedric, 2026-10-07: the brain mean alone above
-        ax = fig.add_axes([x0 + 0.01, 0.53 if two_ else 0.31, w - 0.02, 0.40 if two_ else 0.56])   # the band strip
-        ax.set_facecolor("black")
-        ax.axis("off")
-        P, o = p["P"], p["order"]
-        sc.append(ax.scatter(P[o, 0], P[o, 1], c=np.zeros(len(o)), s=0.5 if len(o) < 90000 else 0.35, cmap="inferno",
-                             vmin=0, vmax=vmax, linewidths=0))
+        P = p["P"]
         lo, hi = np.percentile(P[:, :2], [0.2, 99.8], 0)               # stray points do not set the frame
         pad = 0.03 * (hi - lo).max()
+        if two_:
+            # TOP AND SIDE AT ONE SCALE (Cedric, 2026-10-07: "the top and side views are not to scale"): um per inch the
+            # same in both, the side view right under the top one, both centred in the fish's half
+            zz_ = P[:, 2] * p.get("side_flip", 1.0)
+            zl_, zh_ = np.percentile(zz_, [0.2, 99.8])
+            dz_ = zh_ - zl_
+            yb_ = zl_ - 0.16 * dz_                                     # the 100-um bar's height, under the side view
+            ex_, ey_, ez_ = hi[0] - lo[0] + 2 * pad, hi[1] - lo[1] + 2 * pad, 1.27 * dz_
+            FH_ = 9.0 if tall_ else 6.6
+            sc_ = min(d["fig_w"] * (w - 0.02) / ex_, (0.60 * FH_) / (ey_ + ez_))
+            wt_, ht_, hs_ = ex_ * sc_ / d["fig_w"], ey_ * sc_ / FH_, ez_ * sc_ / FH_
+            xc_ = x0 + 0.01 + (w - 0.02 - wt_) / 2
+            ax = fig.add_axes([xc_, 0.925 - ht_, wt_, ht_])
+        else:
+            ax = fig.add_axes([x0 + 0.01, 0.31, w - 0.02, 0.56])   # the band strip
+        ax.set_facecolor("black")
+        ax.axis("off")
+        o = p["order"]
+        sc.append(ax.scatter(P[o, 0], P[o, 1], c=np.zeros(len(o)), s=0.5 if len(o) < 90000 else 0.35, cmap="inferno",
+                             vmin=0, vmax=vmax, linewidths=0))
         ax.set_xlim(lo[0] - pad, hi[0] + pad)
         ax.set_ylim(lo[1] - pad, hi[1] + pad)
-        ax.set_aspect("equal")                                         # the box shrinks to the brain, centred
+        if not two_:
+            ax.set_aspect("equal")                                     # the box shrinks to the brain, centred
         if not two_:                      # with a side view the bar goes under it (Cedric, 2026-10-07)
             ax.plot([hi[0] - 100, hi[0]], [lo[1] - 0.4 * pad] * 2, color="white", lw=1.5)
             ax.text(hi[0] - 50, lo[1] + 0.4 * pad, "100 µm", color="0.7", fontsize=8, ha="center", va="bottom")
         fig.text(x0 + 0.02, 0.975, p.get("short", p["label"]), color="white", fontsize=16, va="top")   # Cedric, 2026-10-07
         if two_:                          # Cedric, 2026-10-07: the side view under the top view, tail up and head down
-            axs_ = fig.add_axes([x0 + 0.01, 0.32, w - 0.02, 0.20])
+            axs_ = fig.add_axes([xc_, 0.925 - ht_ - 0.01 - hs_, wt_, hs_])   # the top view's scale
             axs_.set_facecolor("black")
             axs_.axis("off")
-            zz_ = P[:, 2] * p.get("side_flip", 1.0)
             os_ = np.argsort(P[:, 1])
             side_sc.append((axs_.scatter(P[os_, 0], zz_[os_], c=np.zeros(len(os_)), s=0.35, cmap="inferno", vmin=0,
                                          vmax=vmax, linewidths=0), os_))
-            zl_, zh_ = np.percentile(zz_, [0.2, 99.8])
             axs_.set_xlim(lo[0] - pad, hi[0] + pad)
-            yb_ = zl_ - 0.16 * (zh_ - zl_)                     # the 100-um bar below the side view
-            axs_.plot([hi[0] - 100, hi[0]], [yb_, yb_], color="white", lw=1.5)
+            axs_.plot([hi[0] - 100, hi[0]], [yb_, yb_], color="white", lw=1.5)   # the 100-um bar below the side view
             axs_.text(hi[0] - 104, yb_, "100 µm", color="0.7", fontsize=9, ha="right", va="center")
-            axs_.set_ylim(yb_ - 0.06 * (zh_ - zl_), zh_ + 0.05 * (zh_ - zl_))
-            axs_.set_aspect("equal", adjustable="box")     # both limits kept: the whole side, never cropped
+            axs_.set_ylim(yb_ - 0.06 * dz_, zh_ + 0.05 * dz_)  # its extent ez_ exactly: the same um per inch as above
         else:
             side_sc.append(None)
         strips = ([("mean", [x0 + 0.05 * w, 0.175, 0.90 * w, 0.085]), ("band", [x0 + 0.05 * w, 0.045, 0.90 * w, 0.095])]

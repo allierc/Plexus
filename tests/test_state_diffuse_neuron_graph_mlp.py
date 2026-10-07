@@ -53,3 +53,35 @@ def test_priors_and_refusals(tmp_path):
         setup(str(tmp_path), integrator="exponential")
     with pytest.raises(ValueError):
         setup(str(tmp_path), message="edge")
+
+
+@pytest.mark.parametrize("model", ["neuron_graph_mlp", "neuron_graph_mlp_leak"])
+def test_context_block_onehot(tmp_path, model):
+    """context: block (exp17, 2026-10-07): a one-hot of the stimulus block enters g_phi (and f_theta): the input widths
+    grow by the number of blocks, the law needs the frame, and at one state the update changes with the block alone."""
+    n = 600
+    g = np.random.default_rng(0)
+    P = (g.uniform(0, 1, (n, 3)) * [300.0, 400.0, 120.0]).astype(np.float32)
+    f = os.path.join(str(tmp_path), "rec.npz")
+    np.savez(f, pos_um=P, offsets=np.array([0, 100, 250, 400]))
+    cls = get_contract("state_diffuse").implementations[model]
+    p = {"_at": "neuron", "block": "dff", "positions": "xyz", "positions_file": f, "inputs": 1, "substeps": 1,
+         "short_k": 6, "mid_um": 32.0, "long_um": 128.0, "forcing": "stimulus.u", "forcing_dim": 22,
+         "w_init": 0.05, "hidden": 16}
+    o0, o = cls(dict(p)), cls({**p, "context": "block"})
+    for name, w in o0._shapes().items():
+        assert o._shapes()[name] == w + 3
+    assert o.FRAME_CLOCK
+    nb = {"input": 0.1 * torch.randn(n, 22), "embedding": torch.ones(n, 2), "tau": torch.zeros(n, 1),
+          "rest": torch.zeros(n, 1)}
+    if "theta_f" in o._shapes():
+        o.theta_f = o.theta_f.clone()
+        o.theta_f[-1 - o.hidden:] = 0.1                                     # f_theta's last layer: the update moves
+    x, u = torch.randn(n, 1), torch.randn(22, 1)
+    o.frame = 50
+    d0 = o.step(x, torch.as_tensor(P), None, u, nb=nb)
+    o.frame = 300
+    d1 = o.step(x, torch.as_tensor(P), None, u, nb=nb)
+    assert not torch.allclose(d0, d1)                                       # the same state, another block
+    with pytest.raises(ValueError):
+        cls({**p, "context": "hour"})

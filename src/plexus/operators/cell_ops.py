@@ -2216,6 +2216,7 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
                    "w_init": "every edge weight's start (0; a conductance needs > 0: W^2 has no gradient at 0)",
                    "w_init_sd": "a Gaussian spread added to every edge weight's start, drawn from the op's seed (0 = "
                                 "none): seeds then start from different W, not only a different sampling order",
+                   "mod_context": "none (default) or block: the SIREN also reads a one-hot of the stimulus block",
                    "modulation": "none (default), hash or siren: Omega_i(t) = 1 + f(x_i, y_i, z_i, t) scales each "
                                  "element's message sum (Allier et al. 2026, arXiv 2602.13325, eq. 3)",
                    "mod_levels": "hash: levels (12)", "mod_features": "hash: features per level (2)",
@@ -2318,12 +2319,27 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         # element's message sum, f a hash grid + decoder or a SIREN of the position and the ABSOLUTE frame time (the
         # trainer sets `frame` each tick and `n_frames_ref` once: FRAME_CLOCK). f's last layer starts at 0: Omega = 1.
         self.modulation = str(params.get("modulation", "none"))
+        # `mod_context: block` (exp17, Cedric 2026-10-07: "inject the block number in the SIREN as an additional input,
+        # a one-hot"): the SIREN's input is (x, y, z, t, one-hot of the stimulus block) -- Omega_i(t) can then differ per
+        # context; the blocks read from the positions file's `offsets`. Default none.
+        self.mod_context = str(params.get("mod_context", "none"))
+        if self.mod_context not in ("none", "block"):
+            raise ValueError("state_diffuse[neuron_graph] `mod_context:` none (default) or block")
+        self._mod_offsets = None
+        if self.mod_context == "block":
+            import numpy as np
+            from plexus.paths import graphs_data_path
+            pf_ = str(params.get("positions_file", ""))
+            pf_ = pf_ if os.path.isabs(pf_) else graphs_data_path(*pf_.split("/"))
+            self._mod_offsets = np.asarray(np.load(pf_)["offsets"], dtype=np.int64)
+            if params.get("modulation", "none") != "siren":
+                raise ValueError("state_diffuse[neuron_graph] `mod_context: block` needs `modulation: siren`")
         if self.modulation not in ("none", "hash", "siren"):
             raise ValueError("state_diffuse[neuron_graph] `modulation:` none (default), hash or siren")
         self.FRAME_CLOCK = self.modulation != "none"
         self.frame, self.n_frames_ref = 0, 1
         self._mod_params = {k: params[k] for k in ("mod_levels", "mod_features", "mod_log2_table", "mod_res_space",
-                                                   "mod_res_time", "mod_hidden", "mod_layers", "siren_omega")
+                                                   "mod_res_time", "mod_hidden", "mod_layers", "siren_omega", "mod_context")
                             if k in params}
         import numpy as np
         from plexus.paths import graphs_data_path
@@ -2465,7 +2481,8 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         else:
             n = int(mp.get("mod_layers", 5))
             self._omega0 = float(mp.get("siren_omega", 30.0))
-            dims = [4] + [H] * (n - 1) + [1]
+            nb_ = 0 if self._mod_offsets is None else len(self._mod_offsets) - 1   # mod_context: block
+            dims = [4 + nb_] + [H] * (n - 1) + [1]
             shapes = [s_ for i in range(n) for s_ in ((dims[i], dims[i + 1]), (dims[i + 1],))]
         self._mlp_shapes = shapes
         parts = []
@@ -2518,6 +2535,13 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
             h = torch.relu(h @ ws[0] + ws[1])
             return 1.0 + h @ ws[2] + ws[3]
         c = torch.cat([self._xyz01, torch.full((N, 1), t, device=self._xyz01.device)], 1)
+        if self._mod_offsets is not None:                  # mod_context: block -- the one-hot of the frame's block
+            import numpy as np
+            nb_ = len(self._mod_offsets) - 1
+            b_ = min(max(int(np.searchsorted(self._mod_offsets, int(self.frame), side="right") - 1), 0), nb_ - 1)
+            oh = torch.zeros(N, nb_, device=self._xyz01.device)
+            oh[:, b_] = 1.0
+            c = torch.cat([c, oh], 1)
         h = c * 2 - 1
         for i in range(0, len(ws) - 2, 2):
             h = torch.sin(self._omega0 * (h @ ws[i] + ws[i + 1]))
@@ -2667,6 +2691,7 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
                    "embedding": "the elements' learned embedding block a_i (its width is E)",
                    "embedding_dim": "E, the embedding block's width (2)",
                    "hidden": "both MLPs' width (64)",
+                   "context": "none (default) or block: a one-hot of the stimulus block appended to g_phi's and f_theta's inputs",
                    "theta_g": "the message MLP g_phi, flat", "theta_f": "the update MLP f_theta, flat"}
 
     def __init__(self, params, device="cpu"):
@@ -2681,12 +2706,41 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
         self.embedding_dim = int(params.get("embedding_dim", 2))
         self.blocks = {"input": str(params.get("input", "input")), "embedding": str(params.get("embedding", "embedding"))}
         self._a_last = None
+        self._init_context(params)
         self.init_theta()
+
+    def _init_context(self, params):
+        """`context: block` (exp17, Cedric 2026-10-07: "one-hot block inputs in f_theta and g_phi"): a one-hot of the
+        stimulus block appended to g_phi's and f_theta's inputs, the blocks read from the positions file's `offsets`;
+        the law then needs the frame (FRAME_CLOCK). Default none."""
+        self.context = str(params.get("context", "none"))
+        if self.context not in ("none", "block"):
+            raise ValueError("state_diffuse[neuron_graph_mlp] `context:` none (default) or block")
+        self._ctx_offsets, self.n_ctx = None, 0
+        if self.context == "block":
+            import numpy as np
+            from plexus.paths import graphs_data_path
+            pf_ = str(params.get("positions_file", ""))
+            pf_ = pf_ if os.path.isabs(pf_) else graphs_data_path(*pf_.split("/"))
+            self._ctx_offsets = np.asarray(np.load(pf_)["offsets"], dtype=np.int64)
+            self.n_ctx = len(self._ctx_offsets) - 1
+            self.FRAME_CLOCK = True
+
+    def _ctx(self, n, device):
+        """[n, n_ctx] the one-hot of the current frame's block (an empty [n, 0] without a context)."""
+        if not self.n_ctx:
+            return torch.zeros(n, 0, device=device)
+        import numpy as np
+        b_ = int(np.searchsorted(self._ctx_offsets, int(self.frame), side="right") - 1)
+        oh = torch.zeros(n, self.n_ctx, device=device)
+        oh[:, min(max(b_, 0), self.n_ctx - 1)] = 1.0
+        return oh
 
     def _shapes(self):
         E = self.embedding_dim
         n_g = (2 + 2 * E) if self.message == "pair" else (1 + E)
-        return {"theta_g": n_g, "theta_f": 2 + E + (1 if self.forcing_dim else 0)}
+        c = getattr(self, "n_ctx", 0)                                          # context: block
+        return {"theta_g": n_g + c, "theta_f": 2 + E + (1 if self.forcing_dim else 0) + c}
 
     def init_theta(self):
         g = torch.Generator().manual_seed(self.seed)
@@ -2704,6 +2758,8 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
 
     def _g(self, zi, zj, ai, aj):
         x = torch.cat([zj, aj], 1) if self.message == "sender" else torch.cat([zi, zj, ai, aj], 1)
+        if getattr(self, "n_ctx", 0):                                          # context: block
+            x = torch.cat([x, self._ctx(x.shape[0], x.device)], 1)
         return self._mlp3("theta_g", x) ** 2
 
     def prior_term(self, param, kind):
@@ -2752,7 +2808,7 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
                     w = getattr(self, f"W_{s}")[:, None]
                     ge = gn[snd] if gn is not None else self._g(z[rcv], z[snd], ae[rcv], ae[snd])
                     agg = agg.index_add(0, rcv, w * ge)
-            z = z + self._mlp3("theta_f", torch.cat([z, ae, agg] + feats_d, 1)) / self.substeps
+            z = z + self._mlp3("theta_f", torch.cat([z, ae, agg] + feats_d + [self._ctx(z.shape[0], z.device)], 1)) / self.substeps
         return sd * (z - z0)
 
 
@@ -2801,11 +2857,12 @@ class StateDiffuseNeuronGraphLeakMLP(StateDiffuseNeuronGraphMLP):
         self.embedding_dim = int(params.get("embedding_dim", 2))
         self.blocks = {k: str(params.get(k, k)) for k in ("tau", "rest", "input", "embedding")}
         self._a_last = None
+        self._init_context(params)
         self.init_theta()
 
     def _shapes(self):
         E = self.embedding_dim
-        return {"theta_g": (2 + 2 * E) if self.message == "pair" else (1 + E)}
+        return {"theta_g": ((2 + 2 * E) if self.message == "pair" else (1 + E)) + getattr(self, "n_ctx", 0)}
 
     def step(self, x, xyz, a=None, u=None, nb=None):
         E = self._E

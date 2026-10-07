@@ -132,13 +132,15 @@ def main(rec_name="zapbench_destripe"):
     a2 = fig.add_axes([0.38, 0.58, 0.27, 0.36])
     # a linear amplitude axis (Cedric, 2026-10-06), up to the 99.5th percentile of s_i / s_b
     h = a2.hist2d(r, amp, bins=[np.linspace(-1, 1, 120), np.linspace(0, np.percentile(amp, 99.5), 120)],
-                  cmap="inferno", norm=LogNorm(), cmin=1)
+                  cmap="gray", norm=LogNorm(), cmin=1)          # a grey LUT (Cedric, 2026-10-07)
     a2.axhline(1.0, color="white", lw=0.8, ls=":")
     a2.set_xlabel("correlation with brain mean", fontsize=10)
     a2.set_ylabel("swings, $s_i / s_b$", fontsize=10)
     for i_, lab_, off_ in ((i_close, "closest", (-7, -1)), (i_far, "r = 0", (5, 4)), (i_big, "large swings", (5, 4)),
                            (i_med, "r = 0.32", (5, 4))):
         a2.scatter([r[i_]], [amp[i_]], s=28, color="white", edgecolors="black", lw=0.6, zorder=5)
+        if lab_ == "large swings":                     # its dot kept, its label removed (Cedric, 2026-10-07)
+            continue
         a2.annotate(lab_, (r[i_], amp[i_]), xytext=off_, textcoords="offset points", color="white", fontsize=8.5,
                     ha="right" if lab_ == "closest" else "left", va="center" if lab_ == "closest" else "baseline")
     a2.scatter([1.0], [1.0], s=28, color=GB, edgecolors="black", lw=0.6, zorder=5)      # b itself: r 1, s/s_b 1
@@ -218,6 +220,16 @@ def main(rec_name="zapbench_destripe"):
         ax_.tick_params(labelsize=7.5, pad=1.5)
         ax_.set_ylabel("dF/F", fontsize=8.5, labelpad=1)
         ax_.set_xlabel("time, min", fontsize=8, labelpad=0)               # on every trace (Cedric, 2026-10-06)
+    # each panel also on its own (Cedric, 2026-10-07: three of them reused next to the atlas raster): the
+    # correlation-sorted raster with its brain mean, the spectra, the correlation-against-swings density
+    from matplotlib.transforms import Bbox
+    fig.canvas.draw()
+    rnd = fig.canvas.get_renderer()
+    inch = fig.dpi_scale_trans.inverted()
+    for tag_, axs_ in (("raster", (a5, a4)), ("spectrum", (a3,)), ("swings", (a2, cb.ax))):
+        bb = Bbox.union([x_.get_tightbbox(rnd) for x_ in axs_]).transformed(inch).expanded(1.02, 1.03)
+        fig.savefig(os.path.join(EXP, "presentation", "figs", f"brain_mean_spread_{rec_name}_{tag_}.png"), dpi=200,
+                    facecolor="black", bbox_inches=bb)
     out = os.path.join(EXP, "presentation", "figs", f"brain_mean_spread_{rec_name}.png")
     fig.savefig(out, dpi=130, facecolor="black")
     plt.close(fig)

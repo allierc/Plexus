@@ -3,6 +3,7 @@ import os
 import sys
 
 import numpy as np
+import pytest
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -372,3 +373,32 @@ def test_w_init_sd(tmp_path):
         assert torch.all(w0 == 0)                                                   # no spread: the constant start
         assert torch.equal(wa, wb) and not torch.equal(wa, wc)                      # the seed sets the draw
         assert 0.005 < float(wa.std()) < 0.02 and abs(float(wa.mean())) < 0.005
+
+
+def test_mod_context_block_onehot(tmp_path):
+    """mod_context: block (exp17, 2026-10-07) -- the SIREN reads (x, y, z, t, one-hot of the stimulus block): 4 + 3
+    inputs here; untrained Omega = 1; at one frame (one t), Omega changes with the block alone; refused without a
+    SIREN or with an unknown value."""
+    n = 400
+    g = np.random.default_rng(0)
+    P = (g.uniform(0, 1, (n, 3)) * [300.0, 400.0, 120.0]).astype(np.float32)
+    f = os.path.join(str(tmp_path), "rec.npz")
+    np.savez(f, pos_um=P, offsets=np.array([0, 100, 250, 400]))
+    base = {"_at": "neuron", "block": "dff", "positions": "xyz", "positions_file": f, "inputs": 1, "substeps": 4,
+            "short_k": 6, "mid_um": 32.0, "long_um": 128.0, "forcing": "stimulus.u", "forcing_dim": 22,
+            "modulation": "siren", "seed": 0}
+    o = CLS({**base, "mod_context": "block"})
+    assert o._mlp_shapes[0][0] == 4 + 3
+    o.n_frames_ref, o.frame = 400, 50
+    assert torch.allclose(o._omega(None), torch.ones(n, 1))
+    o.omega_mlp = torch.randn(o.omega_mlp.shape, generator=torch.Generator().manual_seed(5)) * 0.3
+    o.frame = 99                                   # the same frame (same t), in block 0 then, offsets moved, block 1
+    om0 = o._omega(None).clone()
+    o._mod_offsets = np.array([0, 90, 250, 400])
+    om1 = o._omega(None).clone()
+    assert not torch.allclose(om0, om1)            # the block alone changes Omega
+    o._mod_offsets = np.array([0, 95, 250, 400])   # another boundary, frame 99 still in block 1: the same Omega
+    assert torch.allclose(om1, o._omega(None))
+    for bad in ({**base, "mod_context": "hour"}, {**base, "mod_context": "block", "modulation": "none"}):
+        with pytest.raises(ValueError):
+            CLS(bad)

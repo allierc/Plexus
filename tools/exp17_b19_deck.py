@@ -718,20 +718,47 @@ def write_slides():
                      "a thin-plate spline on " + f"{AT_['landmarks']}" + " BigWarp landmarks (leave-one-out error, median "
                    + f"{AT_['loo_um_median']:.0f} \\textmu m); {100 * AT_['inside_share'][AT_['rotation_used']]:.0f} \\% land "
                      "inside the brain. Each neuron gets the Z-Brain regions its voxel lies in.\\par}\\vspace{6pt}\n"
-                   + head("per region")
-                   + "{\\scriptsize\\raggedright \\textbf{Activity runs tail to head}: the hindbrain and spinal cord lead "
-                     "the brain mean (" + ", ".join(f"{k} {v:+.1f} s" for k, v in ld_[-2:][::-1]) + "), the forebrain trails it ("
-                   + ", ".join(f"{k} {v:+.1f} s" for k, v in ld_[:2]) + ").\\par}\\vspace{3pt}\n"
-                     "{\\scriptsize\\raggedright \\textbf{The input neurons are visual}: "
-                   + ", ".join(f"{k} {v['input neurons, %']:.0f} \\%" for k, v in ip_)
-                   + " of their neurons.\\par}\\vspace{3pt}\n"
-                     "{\\scriptsize\\raggedright \\textbf{Open-loop ramps}: most common in the torus semicircularis and "
-                     "the noradrenergic neurons -- the population tied to futility-induced passivity (Mu et al. 2019).\\par}")
-            col2_ = lambda fig_, txt_: col_(fig_, txt_).replace("{0.72\\textwidth}", "{0.79\\textwidth}").replace(   # noqa: E731
-                "{0.26\\textwidth}", "{0.19\\textwidth}")         # the atlas wider (Cedric, 2026-10-07)
-            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", col2_("atlas_regions_merged.png", tA_),
+                   + head("the stimulus blocks")                    # Cedric, 2026-10-07: in place of the per-region notes
+                   + "{\\scriptsize\\raggedright What the fish sees in each block (ZAPBench, Lueckmann et al. 2025, A.4), "
+                     "the raster's columns:\\par}\\vspace{2pt}\n"
+                   + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}>{\\raggedright\\arraybackslash}p{10em}@{}}\n"
+                   + "".join(f"\\rule{{0pt}}{{2.1ex}}\\textbf{{{b_}}} & {d_} \\\\\n" for b_, d_ in (
+                       ("gain", "forward grating; feedback gain low / high every 30 s"),
+                       ("dots", "random dots; 3 x 20 s all moving right"),
+                       ("flash", "whole field light / dark every 30 s"),
+                       ("taxis", "left / right half-fields light or dark, 20 s"),
+                       ("turning", "grating forward, left, right, back; 30 s on, 30 s still"),
+                       ("position", "1-s forward pulse, 3 / 6 / 9-s delay, 30 s forward"),
+                       ("open loop", "forward grating, swims change nothing (15 min)"),
+                       ("rotation", "grating rotating clockwise / counter-clockwise, 30 s"),
+                       ("dark", "nothing shown: spontaneous activity")))
+                   + "\\end{tabular}\\par}")
+            col2_ = lambda fig_, txt_: col_(fig_, txt_).replace("{0.72\\textwidth}", "{0.78\\textwidth}").replace(   # noqa: E731
+                "{0.26\\textwidth}", "{0.20\\textwidth}").replace(   # the template's margins kept (Cedric, 2026-10-07)
+                "\\vspace*{0.03\\textheight}", "\\vspace*{0.09\\textheight}")   # blank lines under the title band
+            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", col2_("atlas_regions_raster.png", tA_),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
-            at_ += 1                                         # Cedric, 2026-10-07: its twin, the regions as VTK isosurfaces
+            at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
+            if os.path.exists(os.path.join(PRES, "figs", "atlas_raster.png")):
+                tR_ = (head("the raster, by region")
+                       + "{\\scriptsize\\raggedright Every neuron in one of the atlas regions, its dF/F z-scored over "
+                         "the recording; rows sorted by region, head to tail, then within a region by the correlation "
+                         "with the brain mean (green, top), highest first; averaged in 1,000 bins of consecutive rows, so "
+                         "every neuron counts. The coloured bar and the names: the regions, their neurons in "
+                         "parentheses.\\par}\\vspace{6pt}\n"
+                       + head("what it shows")
+                       + "{\\scriptsize\\raggedright The blocks show as columns: the regions respond to the same "
+                         "conditions (turning, rotation, the open-loop onset), each with its own pattern; the top rows "
+                         "of a region follow the brain mean, its bottom rows do not.\\par}")
+                tT_ = (head("the regions' mean traces")
+                       + "{\\scriptsize\\raggedright Per region, the mean dF/F of its neurons over the recording, about "
+                         "its median, every row on one dF/F scale (the 0.02 dF/F bar); the brain mean in green on top. "
+                         "The raster (previous slide) shows the neurons inside each region.\\par}")
+                deck.insert(at_, ("00l_atlas_raster", S.frame_wide("the regions' mean traces",
+                                  col2_("atlas_regions_merged.png", tT_), "tools/exp17_atlas.py summary --merged",
+                                  deck_title="in the Z-Brain atlas $\\cdot$ each region's mean trace")))
+                at_ += 1
+            # (its twin, the regions as VTK isosurfaces, now merged into the atlas slide)
             if False:                                    # merged into the atlas slide (Cedric, 2026-10-07)
                 deck.insert(at_, ("00k_atlas_regions_iso", S.frame_wide("the atlas", col2_("atlas_regions_iso.png", tA_),
                                   "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ the regions as surfaces")))
@@ -938,7 +965,8 @@ def write_slides():
         it_ = deck.pop(nm_.index("00e_brain_mean_lag"))
         deck.insert([n for n, _ in deck].index("05_input_neurons") + 1, it_)
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
-             "00i_classic_circuits"}                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
+             "00i_classic_circuits", "00d_brain_mean_spread", "06_model"}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
+    deck = [(n, b) for n, b in deck if n != "00l_atlas_raster"]   # Cedric, 2026-10-07: "delete slide 5" (the mean traces)                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
     deck = [(n, b) for n, b in deck if n not in ("00g_classic_regressors", "00h_classic_reliability", "00i_classic_circuits")]  # Cedric, 2026-10-07: "slide 3 in comments", then "slide 13 in comments"
     open(os.path.join(SL, "all.tex"), "w").write("".join(("% " if n in hide_ else "") + f"\\input{{slides_b19/{n}}}\n"
                                                          for n, _ in deck))
