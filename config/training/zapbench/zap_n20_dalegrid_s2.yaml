@@ -51,7 +51,7 @@ task:
   - name: nominal
   - name: W0
     zero:
-    - A_send
+    - W_grid
   - name: no_stimulus
     drive: 'off'
 training:
