@@ -211,16 +211,17 @@ def main():
         movie(build, scs_rgb=base, Zc=Zc, n=f1 - f0)
 
 
-def movie(build, scs_rgb, Zc, n, fps=30, workers=12, dpi=100):
-    """The ARTR as a movie: one frame per recorded frame, each cell's colour scaled by its band activity (z 2.5 = full,
-    below 0 = dim). -> presentation/Movies/artr.mp4 (+ .png, the first frame)."""
+def movie(build, scs_rgb, Zc, n, name="artr", fps=30, workers=12, dpi=100):
+    """A fish figure as a movie: one frame per recorded frame, each cell's colour scaled by its activity Zc [n, cells]
+    (z 2.5 = full, below -0.5 = dim), the bar at the frame. build() -> (fig, scatters, bar).
+    -> presentation/Movies/<name>.mp4 (+ .png, the first frame). Also used by tools/exp17_phase.py."""
     import multiprocessing as mp
     import shutil
     import subprocess
     import tempfile
     import matplotlib.pyplot as plt
     from plexus.tasks.trace_recording import _ffmpeg
-    tmp = tempfile.mkdtemp(prefix="artr_movie_")
+    tmp = tempfile.mkdtemp(prefix=f"{name}_movie_")
 
     def run(ids):
         fig, scs, bar = build()
@@ -238,13 +239,13 @@ def movie(build, scs_rgb, Zc, n, fps=30, workers=12, dpi=100):
         p_.start()
     for p_ in ps:
         p_.join()
-    stem = os.path.join(EXP, "presentation", "Movies", "artr")
+    stem = os.path.join(EXP, "presentation", "Movies", name)
     subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
                     "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", stem + ".mp4"],
                    check=True)
     shutil.copy(os.path.join(tmp, "00000.png"), stem + ".png")
     shutil.rmtree(tmp)
-    print(f"[artr] wrote {stem}.mp4, {n} frames at {fps} fps")
+    print(f"[{name}] wrote {stem}.mp4, {n} frames at {fps} fps")
 
 if __name__ == "__main__":
     main()
