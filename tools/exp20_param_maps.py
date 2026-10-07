@@ -76,7 +76,7 @@ def render(name):
         stats[key] = {"median": float(np.median(vs)), "p2": float(np.percentile(vs, 2)), "p98": float(np.percentile(vs, 98))}
     os.makedirs(os.path.join(EXP, "presentation", "figs"), exist_ok=True)
     path = os.path.join(EXP, "presentation", "figs", f"param_maps_{name}.png")
-    fig.savefig(path, dpi=110, facecolor="black")
+    fig.savefig(path, dpi=110, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     stats.update({"n": int(len(c["mask"])), "n_masked": int(c["mask"].sum()), "frame_s": frame_s,
                   "frac_tau_below_frame": float((c["tau_s"] < frame_s).mean()),

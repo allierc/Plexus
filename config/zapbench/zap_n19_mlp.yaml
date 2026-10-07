@@ -1,0 +1,42 @@
+general:
+  name: zap_n19_mlp
+  seed: 0
+  n_frames: 1
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  save_data: false
+sets:
+  brain: {n: 1}
+  neuron:
+    parent: brain
+    per_parent: 100759
+    grow_reserve: 0
+    title: "the 100,759 neurons of the destriped ZAPBench traces (zap-inr), at their anatomy-frame positions"
+    state:
+      dff: {width: 1, role: coordinate, integration: first_order, boundary: free, title: "dF/F now"}
+      xyz: {width: 3, integration: none, boundary: free, record: false, title: "soma centroid, um"}
+      tau: {width: 1, integration: none, boundary: free, record: false, title: "raw rate, 1/tau = softplus"}
+      rest: {width: 1, integration: none, boundary: free, record: false, title: "rest value, normalised dF/F"}
+      input: {width: 22, integration: none, boundary: free, record: false, title: "weights on the 22 stimulus features"}
+      embedding: {width: 2, integration: none, boundary: free, record: false, title: "each neuron's learned embedding a_i (2 numbers)"}
+  stimulus:
+    parent: brain
+    per_parent: 22
+    grow_reserve: 0
+    title: "the 22 known stimulus features of ZAPBench"
+    state:
+      u: {width: 1, integration: none, boundary: free, record: false, title: "each feature at frame t"}
+fields: {}
+seed:
+- {op: seed_state_from_file, at: neuron, file: zebrafish/zapbench_destripe_recording.npz, blocks: {xyz: pos_um}}
+- {op: seed_state_random, at: neuron, block: tau, lo: -2.97, hi: -2.97}
+- {op: seed_state_random, at: neuron, block: rest, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: neuron, block: input, lo: 0.0, hi: 0.0}
+- {op: seed_state_random, at: neuron, block: embedding, lo: 1.0, hi: 1.0}
+- {op: seed_state_random, at: stimulus, block: u, lo: 0.0, hi: 0.0}
+operators:
+- {op: state_diffuse, model: neuron_graph_mlp, message: sender, hidden: 64, embedding_dim: 2, input_mask: zebrafish/input_mask_destripe_bal20.npz, at: neuron, block: dff, positions: xyz, positions_file: zebrafish/zapbench_destripe_recording.npz, substeps: 4, inputs: 1, forcing: stimulus.u, forcing_dim: 22, checkpoint: true, graph: mesh, mesh_levels: 3, mesh_bin_um: 32.0, mesh_fine_um: 8.0, mesh_mid_max_um: 32.0, seed: 0, title: "the GNN-MLP (slide 10): learned message g_phi(z_j, a_j)^2 and update f_theta, on the 3-level mesh"}
+schedule: [state_diffuse]
+plotting: {renderer: none, max_frames: 0}

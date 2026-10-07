@@ -38,11 +38,16 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 DECK_TITLE = "multi-level GNN on brain-gut fish"
 HIDDEN = {"04_fig3d", "90_overview", "b6_mask_rules"}   # b6_mask_rules: Cedric, 2026-10-04 "delete slide 127"
-HIDDEN_BATCHES = {"1", "2", "3"}  # Cedric, 2026-10-04: "comment batch 1 2 and 3 slides" (kept in slides/, out of the deck)
+HIDDEN |= {"b6_kymo_uv_old", "b6_mask_traces", "b6_results"}   # Cedric, 2026-10-05: slide 10 replaced by the visual
+#   cells, slide 13 by the arms' input cells counted (slide_arms_cells), "delete slide 15" (the bars; the table stays)
+HIDDEN |= {"05_law", "06_baselines", "06_kymo_uv", "06_kymo_visual", "06_kymo_swim", "99a_summary", "99b_paper",
+           "99c_next", "b5_summary"}       # Cedric, 2026-10-05: "put slide 6 to 14 included to comments" (the 61-page deck)
+HIDDEN_BATCHES = {"1", "2", "3", "4"}  # Cedric, 2026-10-04: "comment batch 1 2 and 3 slides"; 2026-10-05: "put in
+                                       # comments batch 4" (every b4_ slide; kept in slides/, out of the deck)
 HIDDEN_PAT = ("gb_ex_f4",)
 # batch 4's per-fish W = 0 slide and no-network-twin movie (Cedric, 2026-10-04: "put in comments slide W=0 and no_W"):
 # the 24-fish table and the site slides carry both controls' numbers
-HIDDEN_RE = re.compile(r"^b4_.*_(controls|nonet_movie)$")       # batch 2's fish 4 slides: another law than fish 1's shown one (W prior), not comparable (Cedric)
+HIDDEN_RE = re.compile(r"^(b4|b6arm)_.*_(controls|nonet_movie)$")       # batch 2's fish 4 slides: another law than fish 1's shown one (W prior), not comparable (Cedric)
 NET_DECK = "batch {b} $\\cdot$ network dynamics"   # the control slides' title
 # PER BATCH, ONE GROUP PER FISH (Cedric, 2026-10-03: "batch 2 on the template of batch 1, results for the two fish"):
 # (fish, the run whose movie and curves are shown, the run the network test is read on, its no-network twin or None)
@@ -93,6 +98,38 @@ def head(s):
     return f"{{\\normalsize\\textbf{{{s}}}}}\\\\[4pt]\n"
 
 
+SEC_GAP = "\\vspace{\\baselineskip}\n"     # one blank line between a results column's sections (exp17's, Cedric 2026-10-05)
+CAPF = "\\fontsize{4.6}{5.5}\\selectfont"    # a caption under a plot, one size on every slide (exp17's, Cedric 2026-10-05)
+_ARMS = {}
+
+
+def arm_numbers():
+    """{run: "b.k"}, the md's numbering (Cedric, 2026-10-05: every batch slide titled by its batch.arm): batches 1-4 by
+    their arm lists (BATCHES; batch 4 the 24 fish, each its law then its no-W twin: 4.7 = glucose fish 4), batches 5
+    and 6 by their runs' order in the md's results table."""
+    if not _ARMS:
+        md = open(os.path.join(ROOT, "experiments", "exp20_gutbrain_graphcast.md")).read()
+        runs = re.findall(r"^\| \S+ \| `training/gutbrain/(\w+)` \|", md, re.M)
+        for b in ("1", "2", "3", "4"):
+            for i, n in enumerate(BATCHES[b][1], 1):
+                _ARMS.setdefault(n, f"{b}.{i}")
+        for b in ("5", "6", "7", "8"):
+            for i, n in enumerate([n for n in runs if n.startswith(f"gb_b{b}_")], 1):
+                _ARMS[n] = f"{b}.{i}"
+    return _ARMS
+
+
+def arm_range(names):
+    """'6.1--6.13' for a run of consecutive arms, '6.7, 6.9' otherwise."""
+    A = sorted({arm_numbers()[n] for n in names if n in arm_numbers()}, key=lambda a: tuple(int(x) for x in a.split(".")))
+    if not A:
+        return ""
+    b0, ks = A[0].split(".")[0], [int(a.split(".")[1]) for a in A]
+    if len(A) > 1 and len({a.split(".")[0] for a in A}) == 1 and ks == list(range(ks[0], ks[-1] + 1)):
+        return f"{A[0]}--{A[-1]}"
+    return ", ".join(A)
+
+
 def rows(pairs):
     body = "".join(f"{k} & {v} \\\\\n" for k, v in pairs)
     return ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{7pt}}l@{}}\n" + body + "\\end{tabular}\\par}\n"
@@ -110,6 +147,18 @@ def _black(ax):
 
 
 # ============================================================================== 01 the paper
+def _pack(items, width):
+    """Items joined by ', ' into rows of at most `width` characters (one item a row when it alone is longer)."""
+    rows_, cur = [], ""
+    for it in items:
+        if cur and len(cur) + 2 + len(it) > width:
+            rows_.append(cur)
+            cur = it
+        else:
+            cur = f"{cur}, {it}" if cur else it
+    return rows_ + ([cur] if cur else [])
+
+
 def slide_paper():
     import fitz
     pdf = os.path.join(PAPERS, "Chen_2026_NatCommun_s41467-026-76242-8_gut_vascular_interoception.pdf")
@@ -127,7 +176,9 @@ def slide_paper():
         ("", "a drifting grating (optomotor); fictive swimming"),
         ("controls", "UV off the fish; caged L-glucose; fish water")])
         + head("what they found (Fig. 1e, 2, 3)") + rows([
-            ("D-glucose", ", ".join(f"{k} {v}/{f1['N']}" for k, v in f1.items() if k != "N") + " fish"),
+            *((("D-glucose" if i == 0 else ""), part + (" fish" if i == len(rows_f1) - 1 else ","))
+              for rows_f1 in [_pack([f"{plain_english(k)} {v}/{f1['N']}" for k, v in f1.items() if k != "N"], 34)]
+              for i, part in enumerate(rows_f1)),     # the stations' names in full (Cedric, 2026-10-06), packed by length
             ("", "L-glucose and fish water: 0 fish (Fig. 2c,d)"),
             ("site", f"foregut {PAPER['fig2g']['foregut']:,} vs midgut {PAPER['fig2g']['midgut']:,} cells (Fig. 2g)"),
             ("integration", "hindbrain: gut + motor; midbrain: gut + visual + motor")])
@@ -190,11 +241,12 @@ def slide_deposit():
         ax.plot([], [], color=SITE_COLS[k], lw=4, label=f"site {k}: {SITE_NAME[k]}")
     ax.legend(frameon=False, fontsize=9, labelcolor="white", loc="lower right", handlelength=1.5)
     fig.tight_layout()
-    fig.savefig(os.path.join(PRES, "figs", "02_design.png"), dpi=200, facecolor="black")
+    fig.savefig(os.path.join(PRES, "figs", "02_design.png"), dpi=200, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     n_f = len(D)
     per = {c: [d for d in D if d["condition"] == c] for c in COND_ORDER}
-    rate = lambda ds: ", ".join(sorted({f"{d['volume_s']:.2f} s" for d in ds}))
+    rate = lambda ds: (lambda v: f"{v[0]:.2f} s" if len(v) == 1 else f"{v[0]:.2f}-{v[-1]:.2f} s")(    # noqa: E731
+        sorted({round(d["volume_s"], 2) for d in ds}))                  # a range: the row fits the column (2026-10-05)
     right = (head(f"{n_f} fish, one session each, all on disk") + rows(
         [(COND_LABEL[c], f"{len(per[c])} fish, {np.mean([d['minutes'] for d in per[c]]):.0f} min, "
                          f"{np.mean([len(d['pulses']) for d in per[c]]):.0f} pulses, volume {rate(per[c])}") for c in COND_ORDER])
@@ -247,7 +299,7 @@ def slide_anatomy():
         [Line2D([], [], marker="s", ls="", color=c, markersize=7, label=l) for l, c in org]
     fig.legend(handles=h, loc="lower center", ncol=5, frameon=False, fontsize=8, labelcolor="white")
     fig.tight_layout(rect=(0, 0.08, 1, 1))
-    fig.savefig(os.path.join(PRES, "figs", "02b_anatomy.png"), dpi=200, facecolor="black")
+    fig.savefig(os.path.join(PRES, "figs", "02b_anatomy.png"), dpi=200, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     D = json.load(open(os.path.join(DATA, "design.json")))
     from collections import defaultdict
@@ -452,7 +504,7 @@ def figure_graph(op, P, path, n_show=80, seed=0, box_um=300.0):
     fig.tight_layout(rect=(0, 0.08, 1, 0.84))               # both panels under one title line, tops aligned
     pa, pb = a.get_position(), b.get_position()
     b.set_position([pb.x0, pa.y0, pb.width, pa.height])
-    fig.savefig(path, dpi=200, facecolor="black")
+    fig.savefig(path, dpi=200, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
 
 
@@ -564,7 +616,7 @@ def figure_graph3d(op, P, path, mp4=None, n_frames=200, fps=25, n_show=80, seed=
         fig.text(0.01, 0.012, note, color="#fd8d3c", fontsize=8)
         for k, x in zip(("short", "mid", "long"), (0.60, 0.72, 0.84)):
             fig.text(x, 0.10, k, color=COL[k], fontsize=11, weight="bold")
-        fig.savefig(out, dpi=150, facecolor="black")
+        fig.savefig(out, dpi=150, facecolor="black", bbox_inches="tight", pad_inches=0.04)
         plt.close(fig)
 
     compose(fa, path)
@@ -709,7 +761,7 @@ def slides_kymo(rec_name=REC1, n_rows=100, bio=""):
                   else f"{DECK_TITLE} $\\cdot$ the input cells of the {_tex(label)}")
         body = (f"% generated by tools/exp20_slides.py (input kymograph {key})\n\\begin{{frame}}[t]{{{dtitle}}}\n"
                 f"\\vspace*{{\\bandgap}}\n"
-                f"\\begin{{center}}\\includegraphics[width=0.98\\textwidth,height=0.80\\textheight,keepaspectratio]"
+                f"\\begin{{center}}\\includegraphics[width=0.98\\textwidth,height=0.78\\textheight,keepaspectratio]"
                 f"{{figs/{png}}}\\end{{center}}\n\\end{{frame}}\n")
         out.append((f"b6{bio}_kymo_{key}" if bio else f"06_kymo_{key}", body))
     return out
@@ -786,20 +838,47 @@ def bm(d, stem):
 
 
 def control_table(name, now):
-    """THE NETWORK TEST, exp17's table (Cedric, 2026-10-03), first on every results slide: the full model, W = 0 at
-    inference, the batch's model trained with no network -- brain-mean R2 and RMSE (dF/F), per-cell R2."""
+    """THE NETWORK TEST, exp17's results print (Cedric, 2026-10-05: "use the new results print of exp17.pdf: R2 changed to
+    r, the local activity added"), first on every results slide. (1) The brain-mean dF/F over the whole session's free
+    rollout: Pearson r of the learned brain mean against the recorded, and the RMSE (dF/F) -- for the full model, W = 0 at
+    inference, no stimulus, and the twin trained with no network. (2) The local activity, the brain mean removed: per
+    cell, the correlation over the movie's frames of its learned and recorded traces, each first regressed on its OWN
+    brain mean (the learned on the learned, the recorded on the recorded) -- what the shared brain-wide signal does not
+    carry; mean +- SD over the cells. Both by exp17's own functions (tools/exp17_slides.py bm_metrics, local_r, qv:
+    green > 0.8, orange > 0.4, red below), imported so the two decks compute the same thing."""
+    import exp17_slides as E17
     r, rn = landed(name), landed(now) if now else None
-    f = lambda v, fmt="{:+.3f}": fmt.format(v) if v is not None and np.isfinite(v) else "--"
-    rws = [("full model", r["dir"], name)]
-    if os.path.exists(os.path.join(r["dir"], "results", f"{name}_W0_movie.npz")):
-        rws.append(("W = 0 at inference", r["dir"], f"{name}_W0"))
+    res = os.path.join(r["dir"], "results")
+    lines = [("full model", os.path.join(res, f"{name}_movie.npz")),
+             ("W = 0 at inference", os.path.join(res, f"{name}_W0_movie.npz")),
+             ("no stimulus", os.path.join(res, f"{name}_no_stimulus_movie.npz"))]
     if rn and now != name:
-        rws.append(("trained with no network", rn["dir"], now))
-    body = "".join(f"{a} & {f(bm(d, st)[0])} & {f(bm(d, st)[1], '{:.4f}')} \\\\\n"
-                   for a, d, st in rws)
-    return (head("the network test, free rollout") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r"
-            "@{}}\n& \\multicolumn{2}{c}{brain-mean dF/F} \\\\\n& R$^2$ & RMSE \\\\\n\\hline\n"
-            + body + "\\end{tabular}\\par}\\vspace{6pt}\n")
+        lines.append(("no W", os.path.join(rn["dir"], "results", f"{now}_movie.npz")))   # exp17's label (2026-10-05)
+    rec = r["test"].get("trace_recording")
+    if rec not in E17._REC:
+        E17._REC.clear()                       # one recording held at a time: 24 fish would not fit in memory
+    body, loc = "", ""
+    for lab, f in lines:
+        m = E17.bm_metrics(f)
+        if m is None:
+            continue
+        big = lab == "full model"
+        lab_ = f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{lab}}}}}" if big else lab
+        body += f"{lab_} & {E17.qv(m['r'], big=big)} & {m['rmse']:.4f} \\\\\n"
+        lr = E17.local_r(f, rec) if rec else None
+        if lr is not None:
+            loc += f"{lab_} & {E17.qv(lr['mean'], big=big)} $\\pm$ {lr['sd']:.3f} \\\\\n"
+    z_ = np.load(lines[0][1]) if os.path.exists(lines[0][1]) else None          # the session's length, for the head
+    mins = (f"{len(z_['mean_obs_all']) * r['test']['frame_s'] / 60:.0f} min" if z_ is not None and "mean_obs_all" in z_
+            and r["test"].get("frame_s") else "the whole session")
+    out = (head(f"the network test: brain-mean dF/F, {mins}") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r"
+           "@{\\hspace{5pt}}r@{}}\n& r & RMSE \\\\\n\\hline\n" + body + "\\end{tabular}\\par}" + SEC_GAP)
+    if loc:
+        out += (head("local activity, the brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
+                "& r per cell, mean $\\pm$ SD \\\\\n\\hline\n" + loc + "\\end{tabular}\\par}\\vspace{2pt}\n"
+                "{\\tiny\\color{gray} per cell: the correlation over the session of its learned and recorded traces, each "
+                "first regressed on its own brain mean -- what the shared brain-wide signal does not carry\\par}" + SEC_GAP)
+    return out
 
 
 def numbers(r):
@@ -839,7 +918,7 @@ def figure_batch(b, names, path):
     ax[-1].set_xticks(x, [f"{i + 1}" for i in range(len(names))], fontsize=8)
     ax[-1].set_xlabel("arm (table, right)")
     fig.tight_layout()
-    fig.savefig(path, dpi=180, facecolor="black")
+    fig.savefig(path, dpi=180, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     return N
 
@@ -869,10 +948,12 @@ def run_deck(b, fish=""):
     """A batch's title, naming the fish when the batch runs more than one (Cedric, 2026-10-03)."""
     if b == "4" and fish:
         return f"batch 4 $\\cdot$ {fish} $\\cdot$ the SIREN law"
+    if b == "6" and fish:
+        return f"batch 6 $\\cdot$ {fish}"
     return BATCH_DECK[b] if not fish else BATCH_DECK[b].replace("glucose fish 1 and 4", fish).replace("glucose fish 1-6", fish)
 
 
-def slides_run(name, b, now=None, fish=""):
+def slides_run(name, b, now=None, fish="", what_=None):
     """Two slides per shown run, exp17's (tools/exp17_slides.py slides_run): the movie with the network test, the MSE
     table, exp20's gut trials, the free rollout and the training; the curves with the per-trial MSE and the scale."""
     import shutil
@@ -881,9 +962,9 @@ def slides_run(name, b, now=None, fish=""):
         return []
     out, rw = [], md_rows()
     v, what = rw.get(name, ("", ""))
-    names = BATCHES[b][1]
-    arm = names.index(name) + 1 if name in names else ""
-    tag = f"batch {b}, arm {arm}" if arm and b != "4" else f"batch {b}"      # batch 4: the fish names the run
+    tag = f"batch {arm_numbers().get(name, b)}"     # "batch 6.11", never "batch 6, arm 11" (Cedric, 2026-10-05)
+    if what_ is not None:
+        what = what_                              # a one-line description, so the column keeps the deck's one size
     dt = run_deck(b, fish)
     t, rep = r["test"], r["report"]
     N = numbers(r)
@@ -894,7 +975,8 @@ def slides_run(name, b, now=None, fish=""):
     stages = rep.get("stages") or []
     ft = r["freetrial"]["arms"]["full"] if r["freetrial"] else None
     pm = lambda a, sd: f"{a:+.3f} $\\pm$ {sd:.3f}" if sd is not None else f"{a:+.3f}"
-    num = (head(f"{tag}: {_tex(name)}") + "{\\scriptsize " + _tex(what) + "\\par}\\vspace{6pt}\n"
+    num = (head(f"{tag}: " + _tex(name).replace("\\_", "\\_\\allowbreak{}"))      # a long run name may break at _
+           + "{\\scriptsize " + _tex(what) + "\\par}" + SEC_GAP
            + control_table(name, now)
            + head("training") + rows([
                ("updates", f"{rep.get('iters', 0):,} (horizons {stages[0][0]}..{stages[-1][0]})" if stages else "--"),
@@ -1179,7 +1261,7 @@ def slide_params(name, b, fish=""):
         return ("", "")
     return (f"{name}_params", f"% generated by tools/exp20_slides.py (learned constants of {name})\n"
             f"\\begin{{frame}}[t]{{batch {b} $\\cdot$ {fish or SHOWN[b][0][0]} $\\cdot$ the learned constants of {_tex(name)}}}\n"
-            "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.80\\textheight,"
+            "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.78\\textheight,"
             f"keepaspectratio]{{figs/param_maps_{name}.png}}\\end{{center}}\n\\vfill\n\\end{{frame}}\n")
 
 
@@ -1218,7 +1300,7 @@ def slides_fish_compare(b="3"):
     if os.path.exists(os.path.join(PRES, "figs", "param_24_b3.png")):
         PARAM_FISH[:] = [("97_param_fish_all", f"% generated by tools/exp20_slides.py (six-fish constants)\n\\begin{{frame}}[t]"
                           f"{{batch {b} $\\cdot$ six glucose fish, one law: the learned constants}}\n\\vspace*{{\\bandgap}}\\vfill\n"
-                          "\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,keepaspectratio]"
+                          "\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                           "{figs/param_24_b3.png}\\end{center}\n\\vfill\n\\end{frame}\n")]
     rows_ = [x for x in rows_ if x is not None]
     panels = [x for x in panels if x is not None]
@@ -1249,11 +1331,11 @@ def slides_fish_compare(b="3"):
     ax[1, 0].set_ylabel("mean dF/F, gut-responsive cells", fontsize=8)
     ax[0, 0].legend(frameon=False, fontsize=8, labelcolor="white")
     fig.tight_layout()
-    fig.savefig(os.path.join(PRES, "figs", "96_fish_traces.png"), dpi=170, facecolor="black")
+    fig.savefig(os.path.join(PRES, "figs", "96_fish_traces.png"), dpi=170, facecolor="black", bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     out.append(("96_fish_traces", f"% generated by tools/exp20_slides.py (fish to fish traces)\n\\begin{{frame}}[t]{{batch {b} "
                 f"$\\cdot$ six glucose fish, one law: the response to a gut pulse, recorded and learned}}\n\\vspace*{{\\bandgap}}\\vfill\n"
-                "\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.80\\textheight,keepaspectratio]{figs/96_fish_traces.png}"
+                "\\begin{center}\\includegraphics[width=0.96\\textwidth,height=0.78\\textheight,keepaspectratio]{figs/96_fish_traces.png}"
                 "\\end{center}\n\\vfill\n\\end{frame}\n"))
     return out + PARAM_FISH
 
@@ -1315,6 +1397,9 @@ def site_region(rec, site):
 
 
 def frame_full(title, body, src, deck_title=None):
+    """exp17's frame_wide: a slide with no right column, never through \\fitcol; its captions (\\tiny or 5.5 pt) at
+    CAPF, one size on every slide (Cedric, 2026-10-05)."""
+    body = body.replace("\\fontsize{5.5}{6.5}\\selectfont", CAPF).replace("\\tiny", CAPF)
     return (f"% generated by tools/exp20_slides.py from {src} ({title})\n\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n"
             f"\\vspace*{{\\bandgap}}\n{body}\n\\end{{frame}}\n")
 
@@ -1328,7 +1413,7 @@ def _small(t):
 
 
 def frame_top(title, png, w, left, right, src, deck_title=None):
-    """A wide figure across the slide, two text columns under it (the batch-4 comparison slides)."""
+    """A wide figure across the slide, two text columns under it (the batch-4 comparison slides); the text at CAPF."""
     left, right = _small(left), _small(right)
     body = (f"\\vspace*{{0.2\\baselineskip}}{{\\centering\\includegraphics[width={w}\\textwidth]{{{png}}}\\par}}\\vspace{{4pt}}\n"
             "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\n" + left + "\n\\end{column}\n"
@@ -1418,7 +1503,7 @@ def figure_sites_grid(name, now, path):
     return ev, regs
 
 
-def slide_sites_b4(name, now, fish):
+def slide_sites_b4(name, now, fish, b="4"):
     r = landed(name)
     if not (r and r["freetrial"] and "pulses" in r["freetrial"]["arms"]["full"]):
         return ("", "")
@@ -1432,10 +1517,10 @@ def slide_sites_b4(name, now, fish):
              "@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n& & recorded & \\multicolumn{3}{c}{over the recorded} \\\\\n"
              "site & spot & dF/F & law & W = 0 & no\\_W \\\\\n\\hline\n" + body + "\\end{tabular}\\par}")
     return (f"b4_{name}_sites", frame("the pulse sites", f"\\panel{{figs/{png}}}", right, f"{name}_freetrial.json",
-                                      deck_title=f"batch 4 $\\cdot$ {fish} $\\cdot$ network dynamics, every site"))
+                                      deck_title=f"batch {b} $\\cdot$ {fish} $\\cdot$ network dynamics, every site"))
 
 
-def slide_omega(name, fish):
+def slide_omega(name, fish, b="4"):
     """exp17's slide 17 on a batch-4 fish: the learned modulation Omega_i(t) beside the recorded activity
     (tools/exp20_modulation.py)."""
     import shutil
@@ -1457,7 +1542,7 @@ def slide_omega(name, fish):
                "$\\Omega$ per cell, one colour scale centred on 1\\par}\n")
     return (f"b4_{name}_omega", frame("the learned modulation of the messages", f"\\playmovie{{Movies/{name}_omega}}", right,
                                       "tools/exp20_modulation.py", left_gap=True,
-                                      deck_title=f"batch 4 $\\cdot$ {fish} $\\cdot$ modulation"))
+                                      deck_title=f"batch {b} $\\cdot$ {fish} $\\cdot$ modulation"))
 
 
 def slides_b4_fish(cond, k):
@@ -1656,6 +1741,20 @@ def slides_timescales():
     return out
 
 
+def _bm_local(n, stem):
+    """(brain-mean r, local r) of a run's free-rollout movie npz by exp17's functions; Nones when not landed."""
+    import exp17_slides as E17
+    tj = os.path.join(RUNS, n, "results", f"{n}_test.json")
+    npz = os.path.join(RUNS, n, "results", f"{stem}_movie.npz")
+    if not (os.path.exists(tj) and os.path.exists(npz)):
+        return None, None
+    rec = json.load(open(tj)).get("trace_recording")
+    if rec not in E17._REC:
+        E17._REC.clear()                       # one recording held at a time
+    m, lr = E17.bm_metrics(npz), E17.local_r(npz, rec)
+    return (m["r"] if m else None), (lr["mean"] if lr else None)
+
+
 def _b4_stats():
     """The summary's numbers, from data/compare24.json, flow_gut_fish.json and integration.json (so a fish that lands
     later updates them)."""
@@ -1683,6 +1782,15 @@ def _b4_stats():
         for k, kk in (("brain_r2", "bm"), ("brain_r2_W0", "bm_W0"), ("brain_r2_now", "bm_now"), ("omega_mean", "om")):
             if r.get(k) is not None and (kk != "bm_now" or r.get("brain_r2") is not None):
                 S[kk].append(r[k])
+        # exp17's print (Cedric, 2026-10-05: R2 -> r, + the local activity): brain-mean r and local r, the law, W = 0 and
+        # the no-network twin, from the runs' own movie npz (exp17_slides.bm_metrics / local_r, cached per npz)
+        for arm, n_, st in (("", r["net"], r["net"]), ("_W0", r["net"], r["net"] + "_W0"), ("_now", r["now"], r["now"])):
+            br, lr = _bm_local(n_, st)
+            if br is not None:
+                S.setdefault("br" + arm, []).append(br)
+                S.setdefault("br_fish" + arm, {})[(c, r["fish"])] = (br, r["minutes"])
+            if lr is not None:
+                S.setdefault("lr" + arm, []).append(lr)
     gut = S["fw"].get("glucose", []) + S["fw"].get("glutamate", [])
     ves = S["fw"].get("blood_glucose", [])
     gl = S["fw_law"].get("glucose", []) + S["fw_law"].get("glutamate", [])
@@ -1716,17 +1824,27 @@ def slides_summary():
     head_ok = [o for o in tail if (o["per_bin"][0].get("GV_over_GM") or 0) > 1.0]
     tail_v = [o["per_bin"][-1]["GV_over_GM"] for o in tail_ok]
     p_ = lambda v: f"{v:.3f}" if v is not None and v >= 0.001 else ("< 0.001" if v is not None else "--")
+    BF = S.get("br_fish", {})
+    fit_ = [BF[k] for k in BF if (k[0] == "glucose" and k[1] <= 3) or k[0] == "glutamate" or (k[0] == "blood_glucose" and k[1] <= 4)]
+    long_ = [BF[k] for k in BF if k[0] == "glucose" and k[1] >= 4]
+    bg5_ = [BF[k] for k in BF if k == ("blood_glucose", 5)]
+    fw_ = [BF[k] for k in BF if k[0] == "fish_water"]
+    grp = lambda v, w="r": ("--" if not v else rg([x[0] for x in v], '{:+.2f}') if w == "r" and len(v) > 1 else   # noqa: E731
+                            f"{v[0][0]:+.2f}" if w == "r" else f"{min(x[1] for x in v):.0f}-{max(x[1] for x in v):.0f}")
     found = (
         "\\begin{itemize}\\setlength{\\itemsep}{2pt}\n"
         f"\\item \\textbf{{The gut response is the network's.}} In the {S['n']} fish where the law and its twin landed, the "
         f"SIREN law's free rollout -- one recorded volume, then the beam and the grating only -- keeps {md_(S['law'])} of the "
         f"gut-responsive cells' recorded response (median; {rg(S['law'])}); the same law with W = 0 keeps {md_(S['W0'])} "
         f"(at most {max(S['W0']):.2f}), the twin trained with no network {md_(S['now'])} ({rg(S['now'])}). Whole brain: "
-        f"brain-mean R$^2$ {md_(S['bm'], '{:+.2f}')} for the law against {md_(S['bm_W0'], '{:+.2f}')} with W = 0 and "
-        f"{md_(S['bm_now'], '{:+.2f}')} with no network.\n"
-        "\\item \\textbf{Fish to fish.} The law fits glucose 1-3, glutamate 1-5 and blood glucose 1-4 (12-50 min sessions: "
-        "brain-mean R$^2$ 0.61-0.93), not the long glucose 4-6 (83-107 min: 0.01-0.14) nor blood glucose 5 (0.12) nor fish "
-        "water (0.15-0.51), even on exp17's rig: batch 3's guess, too few long-horizon updates, is not the whole story.\n"
+        f"brain-mean r {md_(S.get('br', []), '{:+.2f}')} for the law against {md_(S.get('br_W0', []), '{:+.2f}')} with W = 0 "
+        f"and {md_(S.get('br_now', []), '{:+.2f}')} with no network; the local activity, the brain mean removed (exp17's "
+        f"local r, per cell): {md_(S.get('lr', []), '{:+.2f}')}, {md_(S.get('lr_W0', []), '{:+.2f}')} and "
+        f"{md_(S.get('lr_now', []), '{:+.2f}')} (medians over the fish).\n"
+        f"\\item \\textbf{{Fish to fish.}} The law fits glucose 1-3, glutamate 1-5 and blood glucose 1-4 ({grp(fit_, 'm')} min "
+        f"sessions: brain-mean r {grp(fit_)}), less the long glucose 4-6 ({grp(long_, 'm')} min: {grp(long_)}), blood glucose 5 "
+        f"({grp(bg5_)}) and fish water ({grp(fw_)}), even on exp17's rig: batch 3's guess, too few long-horizon updates, "
+        "is not the whole story.\n"
         f"\\item \\textbf{{The law keeps the paper's spatial and route effects from the beam position alone:}} the second gut "
         f"spot (midgut?) evokes {rg([x['site5_over_site2_rec'] for x in S['fm']])} of the foregut spot's change recorded, "
         f"{rg([x['site5_over_site2_law'] for x in S['fm']])} in the law (glucose 4-6); the vessel's response is half as long "
@@ -1784,7 +1902,7 @@ def slides_summary():
            "a per-cell law (the no-network twin) loses the response and the brain mean", "differs")]
     tab = ("{\\fontsize{6.5}{7.8}\\selectfont\\begin{tabular}{@{}p{0.33\\textwidth}@{\\hspace{8pt}}p{0.45\\textwidth}@{\\hspace{8pt}}p{0.17\\textwidth}@{}}\n"
            "\\textbf{the paper} & \\textbf{this session (recordings; laws)} & \\textbf{verdict} \\\\\n\\hline\n"
-           + "".join(f"{a} & {b} & {c} \\\\[2pt]\n" for a, b, c in T_) + "\\end{tabular}\\par}")
+           + "".join(f"{a} & {b} & {c} \\\\\\noalign{{\\vskip 9pt}}\n" for a, b, c in T_) + "\\end{tabular}\\par}")   # p{} rows: \\[Xpt] is swallowed
     out.append(("99b_paper", frame_full("the paper against the session", "\\vspace*{0.6\\baselineskip}" + tab,
                                         "Chen 2026; data/compare24.json, integration.json",
                                         deck_title="summary $\\cdot$ Chen 2026 against the session")))
@@ -1792,7 +1910,8 @@ def slides_summary():
             + "{\\small\\textbf{what differs, or is not shown yet}}\\\\[4pt]\n" + "{\\fontsize{7}{8.6}\\selectfont\\begin{itemize}\\setlength{\\itemsep}{2pt}\n"
             "\\item the response needs the network: the paper's per-cell kernels fit each cell, our per-cell law cannot "
             "carry the response through a free rollout\n"
-            "\\item the long sessions (83-107 min) and fish water are fitted badly (brain-mean R$^2$ under 0.4)\n"
+            f"\\item the long sessions ({grp(long_, 'm')} min) and fish water are fitted worse (brain-mean r {grp(long_)} and "
+            f"{grp(fw_)}, against {grp(fit_)} for the shorter sessions)\n"
             "\\item no region test in the laws: the swim is no input since batch 3 (the leak review), so Fig. 3d's "
             "integration is measured on the recordings only (G-region unset)\n"
             "\\item the stations are inferred from clusters: no atlas, no ventro-medial idMO, the nodose a guess\n"
@@ -1830,12 +1949,12 @@ def slides_atlas24(variant=None):
     if os.path.exists(os.path.join(PRES, "figs", "atlas_montage.png")):
         out.append(("at_montage", "% generated by tools/exp20_slides.py (atlas montage)\n\\begin{frame}[t]{atlas $\\cdot$ every "
                     "fish in Z-Brain: fish $\\to$ fish 1 (SimpleITK) $\\to$ Z-Brain (Cedric's 30 BigWarp landmarks)}\n"
-                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.84\\textheight,"
+                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,"
                     "keepaspectratio]{figs/atlas_montage.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     if os.path.exists(os.path.join(PRES, "figs", "atlas_regions_24.png")):
         def tab(keys):
             return ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{\\hspace{3pt}}r@{}}\n"
-                    "fish & rho & inside & score & AP & AP gut \\\\\n\\hline\n"
+                    "fish & rho & inside & score & \\multicolumn{2}{c}{area postrema} \\\\\n& & & & anatomy & gut \\\\\n\\hline\n"
                     + "".join(f"{_tex(k_)} & {f3(SC[k_].get('rho', float('nan')))} & {f3(SC[k_]['inside'])} & "
                               f"{f3(SC[k_]['score'])} & {apc(SC[k_])} & {apx(k_)} \\\\\n" for k_ in keys)
                     + "\\end{tabular}\\par}")
@@ -1845,9 +1964,9 @@ def slides_atlas24(variant=None):
                 "of the fish's anatomy with Z-Brain carried onto it; inside, the share of its cells landing inside the "
                 f"Z-Brain brain; score = rho $\\times$ inside. Median over the {len(rest)} fish: "
                 f"\\textbf{{{np.median(rest):.2f}}} (variant {_tex(variant)}).\\par\\vspace{{4pt}}"
-                "\\textbf{Cedric's area-postrema (AP) test}, never in the score. AP: the fish's anatomy inside the Z-Brain "
-                "AP outline over a 12-um shell around it (above 1 = the hotspot inside; fish 1 by hand 1.22). AP gut: the "
-                "AP cells' gut-responsive share over the fish's brain-wide share (fish 1 by hand 67$\\times$; the "
+                "\\textbf{Cedric's area-postrema test}, never in the score. Anatomy: the fish's anatomy inside the Z-Brain "
+                "area-postrema outline over a 12-um shell around it (above 1 = the hotspot inside; fish 1 by hand 1.22). Gut: the "
+                "area-postrema cells' gut-responsive share over the fish's brain-wide share (fish 1 by hand 67$\\times$; the "
                 "L-glucose and fish-water controls have few gut-responsive cells).\\par}")
         body = ("\\vspace*{0.3\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.22\\textwidth}\n" + left
                 + "\n\\end{column}\n\\begin{column}{0.77\\textwidth}\n\\vspace*{0.3\\baselineskip}"
@@ -1867,16 +1986,17 @@ def slides_atlas24(variant=None):
             out.append((f"at_check_{RA.tag(c_, k_)}", f"% generated by tools/exp20_slides.py (registration check)\n"
                         f"\\begin{{frame}}[t]{{atlas check $\\cdot$ {_tex(c_.replace('_', ' '))} fish {k_} $\\cdot$ score "
                         f"{v.get('score', float('nan')):.2f} (rho {v.get('rho', float('nan')):.2f}, inside "
-                        f"{v.get('inside', float('nan')):.2f}) $\\cdot$ AP {apc(v)}, AP gut {apx(RA.tag(c_, k_))}}}"
+                        f"{v.get('inside', float('nan')):.2f}) $\\cdot$ area postrema: anatomy {apc(v)}, gut {apx(RA.tag(c_, k_))}}}"
                         "\n\\vspace*{\\bandgap}\\vfill\n\\begin{center}"
-                        f"\\includegraphics[width=\\textwidth,height=0.84\\textheight,keepaspectratio]{{figs/{png}}}"
+                        f"\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]{{figs/{png}}}"
                         "\\end{center}\n\\vfill\n\\end{frame}\n"))
     return out
 
 
 def slides_b5():
-    """BATCH 5 (the summary's new jobs, 2026-10-04/05): each arm against its batch-4 twin -- brain-mean R2 of the free
-    rollout and the gut response kept (tools/exp20_batch6.py's measures); fish 4's 41-min window as the movie."""
+    """BATCH 5 (the summary's new jobs, 2026-10-04/05): each arm against its batch-4 twin -- brain-mean r and local r of
+    the free rollout (exp17's print) and the gut response kept (tools/exp20_batch6.py's measures); fish 4's 41-min window
+    as the movie."""
     import shutil
     import exp20_batch6 as B6
     pairs = [("fish 4, a 41-min window", "gb_sx_f4_mask_siren", "gb_b5_glucose_f4_w41"),
@@ -1888,25 +2008,37 @@ def slides_b5():
              ("glucose 3, swim as input", "gb_sx_f3_mask_siren", "gb_b5_glucose_f3_swim")]
 
     def m(n):
+        """brain-mean r, local r (exp17's print, Cedric 2026-10-05) and the gut response kept, or Nones."""
         if not landed(n):
-            return None, None
+            return None, None, None
         G = B6.gut(n)
-        return B6.bm(n), (G["full"]["law"] / G["full"]["rec"]) if G and "full" in G else None
+        return B6.bm(n, key="r"), B6.local(n), (G["full"]["law"] / G["full"]["rec"]) if G and "full" in G else None
     f = lambda v, fm="{:+.2f}": fm.format(v) if v is not None else "--"          # noqa: E731
+    M_ = {n: m(n) for _, a, b in pairs for n in (a, b)}
     rows_ = []
     for lab, a, b in pairs:
-        (ba, ga), (bb, gb) = m(a), m(b)
-        rows_.append(f"{lab} & {f(ba)} & {f(ga, '{:.2f}')} & {f(bb) if bb is not None else 'training'} & "
-                     f"{f(gb, '{:.2f}') if bb is not None else ''} \\\\\n")
-    tab = ("{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{\\hspace{10pt}}r@{\\hspace{6pt}}r@{}}\n"
-           "& \\multicolumn{2}{c}{batch-4 twin} & \\multicolumn{2}{c}{this run} \\\\\n"
-           "arm & brain R$^2$ & gut kept & brain R$^2$ & gut kept \\\\\n\\hline\n" + "".join(rows_) + "\\end{tabular}\\par}\\vspace{6pt}\n"
-           "{\\tiny brain R$^2$: the brain-mean dF/F of the free rollout of the session; gut kept: the gut-responsive "
-           "cells' evoked change after every gut pulse, the law's over the recorded\\par}\\vspace{6pt}\n"
-           + head("what batch 5 says") + "{\\scriptsize the same law on 41 minutes of fish 4 fits as fish 1-3 do: the "
-           "long sessions fail by their length (100 min of slow drift), not by the fish. The seed moves both numbers by "
-           "0.05 at most: the fish-to-fish differences are real. The swim, the brain's own motor output, lifts the brain "
-           "mean by 0.07-0.10 and leaves the gut response.\\par}")
+        (ba, la, ga), (bb, lb, gb) = M_[a], M_[b]
+        rows_.append(f"{lab} & {f(ba)} & {f(la)} & {f(ga, '{:.2f}')} & " + (f"{f(bb)} & {f(lb)} & {f(gb, '{:.2f}')}"
+                     if bb is not None else "\\multicolumn{3}{c}{training}") + " \\\\\n")
+    d_ = lambda a, b, i: M_[b][i] - M_[a][i] if M_[a][i] is not None and M_[b][i] is not None else float("nan")   # noqa: E731
+    seeds = [(a, b) for lab, a, b in pairs if "seed" in lab]
+    swim = [(a, b) for lab, a, b in pairs if "swim" in lab]
+    w41, x2 = pairs[0], pairs[1]
+    sd_ = max(abs(d_(a, b, i)) for a, b in seeds for i in (0, 1, 2)) if seeds else float("nan")
+    sw_ = [d_(a, b, 0) for a, b in swim]
+    tab = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{8pt}}r@{\\hspace{4pt}}r"
+           "@{\\hspace{4pt}}r@{}}\n& \\multicolumn{3}{c}{batch-4 twin} & \\multicolumn{3}{c}{this run} \\\\\n"
+           "arm & brain r & local r & gut kept & brain r & local r & gut kept \\\\\n\\hline\n" + "".join(rows_)
+           + "\\end{tabular}\\par}\\vspace{6pt}\n"
+           "{\\tiny brain r: the brain-mean dF/F of the free rollout of the session, learned against recorded; local r: per "
+           "cell, the same after each trace is regressed on its own brain mean, the mean over the cells (exp17's); gut kept: "
+           "the gut-responsive cells' evoked change after every gut pulse, the law's over the recorded\\par}\\vspace{6pt}\n"
+           + head("what batch 5 says") + "{\\scriptsize the same law on 41 minutes of fish 4 fits as fish 1-3 do (brain r "
+           f"{f(M_[w41[1]][0])} on the whole 107 min, {f(M_[w41[2]][0])} on the window); twice the updates on the whole "
+           f"session reaches {f(M_[x2[2]][0])}: the long sessions fail by their length (100 min of slow drift), not by the "
+           f"fish or too few updates. The seed moves the three numbers by {sd_:.2f} at most: the fish-to-fish differences "
+           "are real. The swim, the brain's own motor output, moves the brain r by "
+           + ", ".join(f"{v:+.2f}" for v in sw_) + " and leaves the gut response.\\par}")
     n = "gb_b5_glucose_f4_w41"
     r = landed(n)
     left = ""
@@ -1917,6 +2049,48 @@ def slides_b5():
     return [("b5_summary", frame("batch 5: the follow-up jobs", left, tab, "tools/exp20_batch6.py measures",
                                  left_gap=True, deck_title="batch 5 $\\cdot$ the summary's new jobs $\\cdot$ left: fish 4 "
                                                            "on a 41-min window"))]
+
+
+def slide_arms_cells():
+    """THE BATCH-6 ARMS ON FISH 1 AND THEIR INPUT CELLS (Cedric, 2026-10-05: "a focus on the batch-6 arms; add the number
+    of gut-input cells before / after the control threshold, of visual input cells with the 10 % and the 3-sigma rule,
+    the intersection of gut and visual input cells"), from data/input_cells_f1.json (tools/exp20_input_cells.py)."""
+    jp = os.path.join(DATA, "input_cells_f1.json")
+    if not os.path.exists(jp):
+        return []
+    J = json.load(open(jp))
+    A = arm_numbers()
+    V = J["visual"]
+    n_ = lambda v: f"{v:,}" if v is not None else "--"                                      # noqa: E731
+    pc = lambda a, b: f"{a:,} ({100 * a / b:.0f} \\%)" if b else "--"                    # noqa: E731
+    run_ = lambda n: (f"{A[n]} " if n in A else "") + _tex(n.replace("gb_b6_glucose_f1_", "").replace(   # noqa: E731
+        "gb_sx_f1_mask_siren", "gb_sx_f1_mask_siren"))
+    body_rows = "".join(
+        f"{_tex(r['rule'])} & {run_(r['neuron_graph'])} & {run_(r['mesh4'])} & {n_(r['gut_before'])} & "
+        f"{n_(r['gut_after']) if r['gut_after'] is not None else 'not applied'} & {pc(r['and_visual_10'], r['gut_used'])} & "
+        f"{pc(r['and_visual_3sd'], r['gut_used'])} \\\\\n" for r in J["rules"])
+    tab = ("\\resizebox{\\textwidth}{!}{\\begin{tabular}{@{}l@{\\hspace{8pt}}l@{\\hspace{8pt}}l@{\\hspace{10pt}}r"
+           "@{\\hspace{6pt}}r@{\\hspace{10pt}}r@{\\hspace{6pt}}r@{}}\n"
+           "& & & \\multicolumn{2}{c}{gut-input cells} & \\multicolumn{2}{c}{of them, also visual} \\\\\n"
+           "UV rule & neuron graph & 4-level mesh & before & after the control & 10 \\% rule & 3 SD rule \\\\\n\\hline\n"
+           + body_rows + "\\end{tabular}}")
+    th = V["paper 3 SD threshold"]
+    cap = ("{\\tiny \\textbf{visual input cells} of fish 1 (" + f"{J['cells']:,}" + " cells): the 10 \\% rule, the top "
+           "10 \\% by coherence with the grating speed -- every arm's grating cells -- " + f"{V['10 %']:,}" + "; the paper's "
+           "rule on the grating, each cell's regression on the grating speed (the paper's 5-s kernel) correlating above "
+           f"mode + 3 SD of the left half-Gaussian (r > {th['r']:.2f}; mode {th['mode']:+.3f}, SD {th['left_sd']:.3f}), "
+           f"{V['paper 3 SD']:,}; {V['both']:,} in both. "
+           "\\textbf{gut-input cells}, before / after the control threshold -- 10 \\% rule: the top 10 \\% by t after "
+           "the training gut pulses / minus the cells the control pulses also excite (t $\\geq$ 2); the paper's rule: "
+           "the gut + all-UV regression above mode + K SD and above all-UV alone / and a larger change after the gut "
+           "pulses than after the control pulses; batches 1-5 and the atlas sets: no control threshold. Training frames "
+           "only. \\textbf{Chen 2026}: ``many gut-responsive neurons also responded to swimming and visual stimuli, with "
+           "brainstem areas primarily integrating gut and motor signals and midbrain regions integrating jointly gut, "
+           "visual, and motor signals''.\\par}")
+    body = "\\vspace*{1.2\\baselineskip}" + tab + "\\par\\vspace{14pt}" + cap
+    return [("b6_arms_cells", frame_full("the batch-6 arms and their input cells", body, "data/input_cells_f1.json",
+                                         deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the arms and their input "
+                                                    "cells: gut, visual, both"))]
 
 
 def slides_b6():
@@ -1981,7 +2155,7 @@ def slides_b6():
         J = json.load(open(mr))
         r_ = np.load(os.path.join(DATA, "baselines_gutbrain_glucose_f1_cells.npz"))["responsive"]
         g = lambda k: J[k]
-        body = ("\\vspace*{0.2\\baselineskip}\\vfill{\\centering\\includegraphics[width=\\textwidth,height=0.84\\textheight,"
+        body = ("\\vspace*{0.2\\baselineskip}\\vfill{\\centering\\includegraphics[width=\\textwidth,height=0.78\\textheight,"
                 "keepaspectratio]{figs/mask_rules_f1.png}\\par}\\vfill")      # the maps large (Cedric, 2026-10-04)
         out.append(("b6_mask_rules", frame_full("the gut-input cells, six rules", body, "tools/exp20_mask_rules.py",
                                                 deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the gut-input cells (the "
@@ -1994,16 +2168,16 @@ def slides_b6():
                 "{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\nrule & gut & control \\\\\n\\hline\n"
                 + "".join(f"{lab} & {f3(J[k]['evoked_gut'])} & {f3(J[k]['evoked_control'])} \\\\\n" for lab, k in
                           (("batches 1-5", "_batch1_5"), ("batch 6, 10 \\%", "_bio"), ("batch 6, 2 SD", "_paper2sd"),
-                           ("batch 6, 3 SD", "_paper3sd"), ("atlas: AP + vagal ganglia", "_anat_apvg"),
-                           ("atlas: + DVC", "_anat_dvc")) if k in J)
+                           ("batch 6, 3 SD", "_paper3sd"), ("atlas: area postrema + vagal ganglia", "_anat_apvg"),
+                           ("atlas: area postrema + vagal ganglia + dorsal vagal complex", "_anat_dvc")) if k in J)
                 + "\\end{tabular}\\par}\\vspace{2pt}{\\tiny batches 1-5's gut-input cells answer the light as much as the gut: "
                   "the gut response had to come from elsewhere. The paper's rule (2 / 3 SD): the gut + all-UV regression "
                   "tracks the cell above mode + 2 / 3 SD of all cells, better than all-UV alone, and the cell changes more "
                   "after gut than control pulses; no quota\\par}")
         arms = [("batches 1-5", "(batch 4: gb\\_sx\\_f1\\_mask\\_siren)", "mesh4"),
                 ("batch 6, 10 \\%", "bio", "mesh4\\_bio"), ("batch 6, 2 SD", "paper2", "mesh4\\_paper2"),
-                ("batch 6, 3 SD", "paper3", "mesh4\\_paper3"), ("atlas: AP + vagal ganglia", "anat\\_apvg", "mesh4\\_anat\\_apvg"),
-                ("atlas: + DVC", "anat\\_dvc", "mesh4\\_anat\\_dvc")]
+                ("batch 6, 3 SD", "paper3", "mesh4\\_paper3"), ("atlas: area postrema + vagal ganglia", "anat\\_apvg", "mesh4\\_anat\\_apvg"),
+                ("atlas: area postrema + vagal ganglia + dorsal vagal complex", "anat\\_dvc", "mesh4\\_anat\\_dvc")]
         right = ("{\\scriptsize\\textbf{the batch-6 arms on fish 1}}\\\\[2pt]{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{\\hspace{6pt}}l@{}}\n"
                  "UV rule & neuron graph & 4-level mesh \\\\\n\\hline\n"
                  + "".join(f"{a} & {b} & {c} \\\\\n" for a, b, c in arms)
@@ -2012,55 +2186,486 @@ def slides_b6():
         out.append(("b6_mask_traces", frame_top("what each rule's gut-input cells do", "figs/mask_rules_traces_f1.png", 0.64, left,
                                                 right, "tools/exp20_mask_rules.py", deck_title="batch 6 $\\cdot$ glucose "
                                                 "fish 1 $\\cdot$ the gut-input cells of each rule, around gut and control pulses")))
+    if os.path.exists(os.path.join(PRES, "figs", "06_kymo_visual.png")):  # Cedric, 2026-10-05: slide 10 the visual cells
+        out.append(("b6_kymo_visual", "% generated by tools/exp20_slides.py (the visual input cells)\n\\begin{frame}[t]"
+                    "{batch 6 $\\cdot$ discussion $\\cdot$ the visual input cells (the grating's; 10 \\% rule, every arm)}\n"
+                    "\\vspace*{\\bandgap}\n\\begin{center}\\includegraphics[width=0.98\\textwidth,height=0.78\\textheight,"
+                    "keepaspectratio]{figs/06_kymo_visual.png}\\end{center}\n\\end{frame}\n"))
     if os.path.exists(os.path.join(PRES, "figs", "06_kymo_uv.png")):      # slide 8, again, for the discussion
         out.append(("b6_kymo_uv_old", "% generated by tools/exp20_slides.py (slide 8 again)\n\\begin{frame}[t]"
                     "{batch 6 $\\cdot$ discussion $\\cdot$ the gut-input cells of batches 1-5 (slide 8)}\n"
-                    "\\vspace*{\\bandgap}\n\\begin{center}\\includegraphics[width=0.98\\textwidth,height=0.80\\textheight,"
+                    "\\vspace*{\\bandgap}\n\\begin{center}\\includegraphics[width=0.98\\textwidth,height=0.78\\textheight,"
                     "keepaspectratio]{figs/06_kymo_uv.png}\\end{center}\n\\end{frame}\n"))
     out += slides_kymo(bio="_paper3sd")
     if os.path.exists(os.path.join(GD, "graphs_data", "zebrafish", "input_mask_gutbrain_glucose_f1_anat_apvg.npz")):
         out += slides_kymo(bio="_anat_apvg")
+    # the rules' traces after the three kymograph slides (Cedric, 2026-10-05: "move slide 10 after slide 13")
+    out = [x for x in out if x[0] != "b6_mask_traces"] + [x for x in out if x[0] == "b6_mask_traces"]
+    out += slide_arms_cells()
     if os.path.exists(os.path.join(PRES, "figs", "atlas_f1.png")):          # fish 1 in Z-Brain (BigWarp, Cedric's landmarks)
         out.append(("b6_atlas", f"% generated by tools/exp20_slides.py (fish 1 in the atlas)\n\\begin{{frame}}[t]"
-                    "{batch 6 $\\cdot$ glucose fish 1 in the Z-Brain atlas (BigWarp, 30 landmarks)}\n\\vspace*{\\bandgap}\\vfill\n"
-                    "\\begin{center}\\includegraphics[width=\\textwidth,height=0.84\\textheight,keepaspectratio]"
+                    "{batch 6 $\\cdot$ glucose fish 1's gut- and visual-input cells in Z-Brain}\n\\vspace*{\\bandgap}\\vfill\n"
+                    "\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                     "{figs/atlas_f1.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
     bj = os.path.join(DATA, "batch6.json")                  # THE RESULTS (tools/exp20_batch6.py)
     if os.path.exists(bj) and os.path.exists(os.path.join(PRES, "figs", "batch6_bars.png")):
         B6 = json.load(open(bj))
         f2 = lambda v, f="{:+.2f}": f.format(v) if v is not None else "--"         # noqa: E731
-        tab = ("{\\tiny\\begin{tabular}{@{}l@{\\hspace{6pt}}l@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{\\hspace{8pt}}r@{\\hspace{6pt}}r@{}}\n"
-               "& & \\multicolumn{2}{c}{brain-mean R$^2$} & \\multicolumn{2}{c}{gut response kept} \\\\\n"
-               "graph & gut-input cells & law & W = 0 & law & W = 0 \\\\\n\\hline\n"
-               + "".join(f"{r['graph']} & {_tex(r['mask'])} & {f2(r['brain_r2'])} & {f2(r['brain_r2_W0'])} & "
+        tab = ("\\resizebox{\\linewidth}{!}{\\begin{tabular}{@{}l@{\\hspace{5pt}}l@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{6pt}}r"
+               "@{\\hspace{4pt}}r@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{}}\n"
+               "& & \\multicolumn{2}{c}{brain-mean r} & \\multicolumn{2}{c}{local r} & \\multicolumn{2}{c}{gut response kept} \\\\\n"
+               "graph & gut-input cells & law & W = 0 & law & W = 0 & law & W = 0 \\\\\n\\hline\n"
+               + "".join(f"{r['graph']} & {_tex(r['mask'])} & {f2(r.get('brain_r'))} & {f2(r.get('brain_r_W0'))} & "
+                         f"{f2(r.get('local_r'))} & {f2(r.get('local_r_W0'))} & "
                          f"{f2(r.get('gut_kept'), '{:.2f}')} & {f2(r.get('gut_kept_W0'), '{:.2f}')} \\\\\n" for r in B6)
-               + "\\end{tabular}\\par}")
+               + "\\end{tabular}}")
+        # the text's numbers read from data/batch6.json (Cedric, 2026-10-05: exp17's r and local r, no R2)
+        rng = lambda rs, k, f="{:.2f}": (f.format(min(x[k] for x in rs)) + "-" + f.format(max(x[k] for x in rs))   # noqa: E731
+                                         if len({round(x[k], 2) for x in rs}) > 1 else f.format(rs[0][k])) if rs else "--"
+        ok_ = [x for x in B6 if x.get("brain_r") is not None and x.get("local_r") is not None and x.get("gut_kept") is not None]
+        by = {(x["graph"], x["mask"]): x for x in ok_}
+        ng = by.get(("neuron graph", "batches 1-5"), {})
+        mesh = [x for x in ok_ if x["graph"].startswith("mesh") and x["mask"] == "batches 1-5"]
+        g_ = lambda gr, mk, k="gut_kept": f"{by[(gr, mk)][k]:.2f}" if (gr, mk) in by else "--"    # noqa: E731
         left = ("{\\scriptsize\\textbf{what batch 6 says}}\\\\[2pt]{\\tiny\\begin{itemize}\\setlength{\\itemsep}{1pt}\n"
-                "\\item every arm makes the gut response through the network: W = 0 keeps 0.00-0.02 of it\n"
-                "\\item the multi-level mesh keeps MORE of the gut response than the neuron graph (0.51-0.59 against 0.48 "
-                "with the batch 1-5 mask; more levels, more kept), for a little less brain-mean R$^2$ (0.64-0.67 against 0.72)\n"
-                "\\item truer gut-input cells cost gut response on the neuron graph (0.48 with 19,035 cells, 0.34 with the "
-                "paper's 2,538, 0.18 with the atlas's 527) but hardly brain-mean R$^2$ (0.70-0.76); the 4-level mesh "
-                "carries the signal from few entry cells better (0.51 with 2,538, 0.29 with 527)\n"
+                f"\\item every arm makes the gut response through the network: W = 0 keeps {rng(ok_, 'gut_kept_W0')} of it, "
+                f"and its brain-mean r falls from {rng(ok_, 'brain_r')} to {rng(ok_, 'brain_r_W0')}, its local r from "
+                f"{rng(ok_, 'local_r')} to {rng(ok_, 'local_r_W0')}\n"
+                f"\\item the multi-level mesh keeps MORE of the gut response than the neuron graph ({rng(mesh, 'gut_kept')} "
+                f"against {ng.get('gut_kept', float('nan')):.2f} with the batch 1-5 mask), at a brain-mean r of "
+                f"{rng(mesh, 'brain_r')} against {ng.get('brain_r', float('nan')):.2f} and a local r of {rng(mesh, 'local_r')} "
+                f"against {ng.get('local_r', float('nan')):.2f}\n"
+                "\\item truer gut-input cells cost gut response on the neuron graph ("
+                f"{g_('neuron graph', 'batches 1-5')} with 19,035 cells, {g_('neuron graph', 'paper, 3 SD')} with the paper's "
+                f"2,538, {g_('neuron graph', 'atlas: AP + vagal ganglia')} with the atlas's 527) but not the brain-mean r "
+                f"({rng([x for x in ok_ if x['graph'] == 'neuron graph'], 'brain_r')}); the 4-level mesh carries the signal "
+                f"from few entry cells better ({g_('mesh 4', 'paper, 3 SD')} with 2,538, {g_('mesh 4', 'atlas: AP + vagal ganglia')} "
+                "with 527)\n"
+                "\\item local r: per cell, learned against recorded after each is regressed on its own brain mean (exp17's)\n"
                 "\\end{itemize}\\par}")
         out.append(("b6_results", "% generated by tools/exp20_slides.py (batch 6 bars)\n\\begin{frame}[t]{batch 6 $\\cdot$ "
                     "glucose fish 1 $\\cdot$ results: the graph and the gut-input cells, the network test}\n\\vspace*{\\bandgap}"
-                    "\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,keepaspectratio]"
+                    "\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,keepaspectratio]"
                     "{figs/batch6_bars.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
-        body = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.44\\textwidth}\n" + left
-                + "\n\\end{column}\n\\begin{column}{0.54\\textwidth}\n" + tab + "\n\\end{column}\n\\end{columns}")
+        body = ("\\vspace*{0.8\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.34\\textwidth}\n" + left
+                + "\n\\end{column}\n\\begin{column}{0.64\\textwidth}\n" + tab + "\n\\end{column}\n\\end{columns}")
         out.append(("b6_results_table", frame_full("batch 6, the numbers", body, "data/batch6.json",
                                                    deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ results, the numbers")))
     if os.path.exists(os.path.join(PRES, "figs", "batch6_traces.png")):
         out.append(("b6_traces", "% generated by tools/exp20_slides.py (batch 6 traces)\n\\begin{frame}[t]{batch 6 $\\cdot$ "
                     "glucose fish 1 $\\cdot$ the response to a gut pulse, per gut-input rule: neuron graph (solid), mesh (dashed)}\n"
-                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.82\\textheight,"
+                    "\\vspace*{\\bandgap}\\vfill\n\\begin{center}\\includegraphics[width=\\textwidth,height=0.78\\textheight,"
                     "keepaspectratio]{figs/batch6_traces.png}\\end{center}\n\\vfill\n\\end{frame}\n"))
+    out += slides_b6_arms()
     if os.path.exists(os.path.join(PRES, "Movies", "mask3d_f1.mp4")):
         body = "\\vspace*{1.0\\baselineskip}{\\centering\\playmovie[0.92\\textwidth]{Movies/mask3d_f1}\\par}"   # no caption (Cedric)
         out.append(("b6_mask3d", frame_full("the input masks in 3-D", body, "tools/exp20_mask3d.py",
                                             deck_title="batch 6 $\\cdot$ glucose fish 1 $\\cdot$ the input masks in 3-D")))
     return out
+
+
+B6_ARMS = [("gb_b6_glucose_f1_mesh4_anat_apvg", "atlas: area postrema + vagal ganglia, 4-level mesh",
+            "the atlas's area postrema + vagal ganglia (527 cells) as the gut-input cells, on the 4-level mesh"),
+           ("gb_b6_glucose_f1_mesh4_anat_dvc", "atlas: dorsal vagal complex, 4-level mesh",
+            "the atlas's dorsal vagal complex (2,037 cells) as the gut-input cells, on the 4-level mesh")]
+
+
+def slides_b6_arms():
+    """THE TWO ATLAS ARMS ON THE 4-LEVEL MESH, run by run (Cedric, 2026-10-05: "add ... results slides"): batch 4's
+    per-fish template -- the free-rollout movie with the network test (brain-mean R2, the law and W = 0), the SIREN
+    modulation, the learned constants, every pulse site; the W = 0 slide built but commented out, as batch 4's."""
+    out = []
+    for name, lab, what_ in B6_ARMS:
+        if not landed(name):
+            continue
+        fish = f"glucose fish 1, {lab}"
+        o = [s for s in slides_run(name, "6", None, fish, what_=what_) if s[0].endswith("_movie")]
+        o += [slide_omega(name, fish, b="6"), slide_params(name, "6", fish), slide_sites_b4(name, None, fish, b="6")]
+        o += slides_controls(name, None, "6", fish)
+        out += [(f"b6arm_{st[3:] if st.startswith('b4_') else st}", bd) for st, bd in o if bd]
+    return out
+
+
+_B6 = lambda *suf: [f"gb_b6_glucose_f1_{x}" for x in suf]                              # noqa: E731
+_B6_ALL = ["mesh3", "mesh4", "mesh5", "bio", "mesh4_bio", "paper2", "paper3", "mesh4_paper2", "mesh4_paper3", "anat_apvg",
+           "mesh4_anat_apvg", "anat_dvc", "mesh4_anat_dvc"]
+STEM_ARMS = {"b6_mesh_levels": _B6("mesh3", "mesh4", "mesh5"), "b6_mesh3": _B6("mesh3"), "b6_mesh4": _B6("mesh4"),
+             "b6_mesh5": _B6("mesh5"), "b6_kymo_uv_old": _B6("mesh3", "mesh4", "mesh5"), "b6_kymo_visual": _B6(*_B6_ALL),
+             "b6_arms_cells": _B6(*_B6_ALL),
+             **{k: [f"gb_b7_glucose_f1_{x}_anat_{y}" for y in ("apvg", "dvc") for x in ("mesh3", "mf", "now")]
+                for k in ("b7_meanfield", "b7_meanfield_raw", "b7_gut")},
+             "b6_paper3sd_kymo_uv": _B6("paper3", "mesh4_paper3"), "b6_anat_apvg_kymo_uv": _B6("anat_apvg", "mesh4_anat_apvg"),
+             "b6_atlas": _B6(*_B6_ALL),
+             **{k: _B6(*_B6_ALL) for k in ("b6_mask_rules", "b6_mask_traces", "b6_results", "b6_results_table", "b6_traces",
+                                           "b6_mask3d")}}
+RUN_KIND = {"omega": "modulation", "params": "the learned constants", "sites": "network dynamics, every site",
+            "controls": "W = 0 at inference, and no W", "nonet_movie": "no W", "curves": "the prediction, step by step"}
+
+
+def retitle(stem, body):
+    """CEDRIC, 2026-10-05 (exp17's rule): every batch slide's title carries its batch.arm, the md's numbering -- a run's
+    results slide "batch 6.11 (<law>)", no run name (it stays in the column's head); an analysis slide of one run
+    "batch 6.11 $\\cdot$ modulation"; a batch-wide slide its arm range, "batch 6.1--6.13 $\\cdot$ ...". Never
+    "batch X, arm Y"."""
+    m_ = re.search(r"\\begin\{frame\}\[t\]\{(.*)\}\n", body)
+    if not m_:
+        return body
+    old, new = m_.group(1), None
+    A = arm_numbers()
+    run = next((n for n in sorted(A, key=len, reverse=True) if stem.startswith((f"b6arm_{n}_", f"b4_{n}_", f"{n}_"))), None)
+    if run:                                                     # a slide of one run
+        kind = stem.split(run + "_", 1)[1]
+        if kind == "movie":
+            rest = re.sub(r"^batch \d+ \$\\cdot\$ ", "", old).replace(" $\\cdot$ ", ", ")
+            law = f"the SIREN law, {rest}" if A[run].startswith("6.") else rest
+            new = f"batch {A[run]} ({law})"
+        else:
+            new = f"batch {A[run]} $\\cdot$ {RUN_KIND.get(kind, kind.replace('_', ' '))}"
+    elif stem in STEM_ARMS or stem.startswith(("b4_", "b5_")):  # a batch-wide slide
+        names = STEM_ARMS.get(stem) or [n for n in A if A[n].startswith("4." if stem.startswith("b4_") else "5.")]
+        rest = re.sub(r"^batch \d+ \$\\cdot\$ ", "", old).replace(" (slide 8)", "")
+        new = f"batch {arm_range(names)} $\\cdot$ {rest}" if arm_range(names) else None
+    if not new:
+        return body
+    return body.replace("\\begin{frame}[t]{" + old + "}", "\\begin{frame}[t]{" + new + "}", 1)
+
+
+def frame_narrow(title, img, right, src, deck_title=None, left=0.74, height=0.78, img_top="0pt", caption=""):
+    """exp17's (Cedric, 2026-10-05): a figure in a wide left column, a caption under it at CAPF, and a narrow right column
+    through \\fitcol, so its print has the deck's one size."""
+    return (f"% generated by tools/exp20_slides.py from {src} ({title})\n"
+            f"\\begin{{frame}}[t]{{{deck_title or DECK_TITLE}}}\n\\vspace*{{\\bandgap}}\n"
+            f"\\begin{{columns}}[T,onlytextwidth]\n\\begin{{column}}{{{left}\\textwidth}}\n\\centering\\vspace*{{{img_top}}}"
+            f"\\includegraphics[width=\\linewidth,height={height}\\textheight,keepaspectratio]{{{img}}}\n"
+            + (f"\\par\\vspace{{6pt}}{{{CAPF}\\raggedright {caption}\\par}}\n" if caption else "")
+            + f"\\end{{column}}\n\\begin{{column}}{{{0.98 - left:.2f}\\textwidth}}\n\\vspace*{{2\\baselineskip}}\n"
+            f"\\fitcol{{%\n{right}}}\n\\end{{column}}\n\\end{{columns}}\n\\end{{frame}}\n")
+
+
+B7_ARMS = (("A", "the atlas's area postrema + vagal ganglia (527 cells)", ("7.1 graph", "7.1, W = 0", "7.2 mean field", "7.3 no W")),
+           ("B", "the atlas's area postrema + vagal ganglia + dorsal vagal complex (2,037 cells)",
+            ("7.4 graph", "7.4, W = 0", "7.5 mean field", "7.6 no W")))
+B7_CKPT = None    # the graphs' checkpoint: None = their end (landed 2026-10-06 11:46); "stage_40" scored them while training
+
+
+def figure_meanfield(suf, path):
+    """exp17's slides 17-18 figure redrawn for two arms of four laws (exp17_meanfield_stats.py draws four): panel a the
+    brain-mean r, panel b the per-neuron r (brain mean removed, or kept with `_raw`); each law's estimate with its 95 %
+    interval, coloured by quality (green > 0.8, orange > 0.4, red otherwise), the paired tests bracketed."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    J = json.load(open(os.path.join(DATA, f"meanfield_stats{suf}.json")))
+    L, T = J["laws"], {(t["a"], t["b"]): t for t in J["tests"]}
+    col = lambda v: "#4caf50" if v > 0.8 else ("#ffa726" if v > 0.4 else "#ff5252")    # noqa: E731
+    xs, names = [], []
+    for g, (_, _, ks) in enumerate(B7_ARMS):
+        for j, k in enumerate(ks):
+            xs.append(g * 5.0 + j); names.append(k)
+    fig, axs = plt.subplots(1, 2, figsize=(11, 5.4), facecolor="black")
+    for ax, key, ttl in zip(axs, ("brain_mean_r", "local_r"),
+                            ("a  brain-mean r", "b  per-neuron r, brain mean " + ("kept" if suf else "removed"))):
+        _black(ax)
+        v = [L[k][key]["estimate"] for k in names]
+        lo = [L[k][key]["ci95"][0] for k in names]
+        hi = [L[k][key]["ci95"][1] for k in names]
+        ax.bar(xs, v, 0.72, color=[col(x) for x in v])
+        ax.errorbar(xs, v, yerr=[np.subtract(v, lo), np.subtract(hi, v)], fmt="none", ecolor="white", capsize=3, lw=1)
+        top = max(hi)
+        for x, y, h in zip(xs, v, hi):
+            ax.text(x, h + 0.02 * top, f"{y:.2f}", color="white", fontsize=8, ha="center", va="bottom")
+        lev = 1.12 * top
+        for g, (_, _, ks) in enumerate(B7_ARMS):
+            for a_, b_ in ((0, 1), (2, 3), (0, 2)):
+                t = T.get((ks[a_], ks[b_]))
+                if t is None:
+                    continue
+                x0, x1 = g * 5.0 + a_, g * 5.0 + b_
+                y = lev + (0.10 * top if (a_, b_) == (0, 2) else 0.0)
+                ax.plot([x0, x0, x1, x1], [y - 0.02 * top, y, y, y - 0.02 * top], color="white", lw=0.9)
+                ax.text((x0 + x1) / 2, y + 0.01 * top, t[key]["stars"], color="white", fontsize=9, ha="center", va="bottom")
+        ax.set_ylim(0, lev + 0.22 * top)
+        ax.set_xticks(xs, [n.split(" ", 1)[0].rstrip(",") + "\n" + n.split(" ", 1)[1].replace("W = 0", "W = 0") for n in names],
+                      fontsize=8, color="0.9")
+        for g, (a_lab, _, _) in enumerate(B7_ARMS):
+            ax.text(g * 5.0 + 1.5, -0.16 * (lev + 0.22 * top), f"arm {a_lab}", color="white", fontsize=10, ha="center",
+                    va="top", weight="bold")
+        ax.set_title(ttl, color="white", fontsize=11, loc="left")
+        for sp_ in ("top", "right"):
+            ax.spines[sp_].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, facecolor="black", bbox_inches="tight", pad_inches=0.04)
+    plt.close(fig)
+
+
+def slides_b7():
+    """BATCH 7 -- exp17's slides 17-18 on two exp20 arms (Cedric via exp17, 2026-10-05): the mean-field control and its
+    significance test. Per arm, four laws on the same free rollout: the 3-level-mesh graph (at its horizon-40
+    checkpoint), the same with W = 0 at inference, the mean-field twin (m_i = a_i <tanh z>, Omega kept) and the no-W twin
+    (m_i = 0: Omega scales only the message, nothing to act on); numbers and p values from tools/exp17_meanfield_stats.py (data/meanfield_stats[_raw].json)."""
+    import torch
+    from exp17_slides import qv                        # exp17's quality colours: green > 0.8, orange > 0.4, red below
+    out = []
+    g_run = {"A": "gb_b7_glucose_f1_mesh3_anat_apvg", "B": "gb_b7_glucose_f1_mesh3_anat_dvc"}
+    mf_run = "gb_b7_glucose_f1_mf_anat_apvg"
+    try:
+        ckg = torch.load(os.path.join(RUNS, g_run["A"], "models", f"{B7_CKPT or 'best'}.pt"), map_location="cpu",
+                         weights_only=False)
+        n_edges = sum(v.numel() for k, v in ckg["fitted"].items() if k.startswith("state_diffuse.W_"))
+        it_ = int(ckg.get("it") or 0)
+        n_gains = torch.load(os.path.join(RUNS, mf_run, "models", "best.pt"), map_location="cpu",
+                             weights_only=False)["fitted"]["state_diffuse.W_mean"].numel()
+    except Exception as e:                                      # noqa: BLE001
+        print(f"[slides] batch 7: {e!r}")
+        return out
+    TEXT_ = ("\\textbf{Textbook methods.} The 95~\\% intervals are percentile bootstrap confidence intervals (Efron "
+             "1979; Efron \\& Tibshirani 1993, \\emph{An Introduction to the Bootstrap}). The p values shift the "
+             "resampled differences to the null and add 1 to the count, the standard bootstrap test (Hall \\& Wilson "
+             "1991; Davison \\& Hinkley 1997). Resampling time blocks rather than single frames is the moving block "
+             "bootstrap for correlated time series (K\\\"unsch 1989). Pairing, the same resamples for both laws, is "
+             "how machine-learning papers compare two models on one test set (Koehn 2004; Berg-Kirkpatrick et al.\\ 2012).")
+    # THE GUT RESPONSE KEPT per law (exp17, 2026-10-06: "the clearest network signal, worth its own row"): the
+    # gut-responsive cells' change after every gut pulse in the free rollout, the law's over the recorded
+    import exp20_summary as SU
+    GUT = {}
+    for arm, _, ks in B7_ARMS:
+        g_, w0_, mf_, nw_ = ks
+        gr = g_run[arm]
+        GUT[g_] = SU.gut_kept(gr, f"_{B7_CKPT}" if B7_CKPT else "")
+        GUT[mf_] = SU.gut_kept(gr.replace("mesh3", "mf"), "")
+        GUT[nw_] = SU.gut_kept(gr.replace("mesh3", "now"), "")
+        GUT[w0_] = SU.gut_kept(gr, f"_{B7_CKPT}" if B7_CKPT else "", arm="W0")
+    for suf in ("", "_raw"):
+        jp = os.path.join(DATA, f"meanfield_stats{suf}.json")
+        if not os.path.exists(jp):
+            continue
+        ST = json.load(open(jp))
+        L_, T_ = ST["laws"], {(t["a"], t["b"]): t for t in ST["tests"]}
+        png = f"meanfield_stats{suf}_b7.png"
+        figure_meanfield(suf, os.path.join(PRES, "figs", png))
+        ml = "per-neuron r"
+        kept = "kept" if suf else "removed"
+        mins = (ST["blocks"] + 1) * ST["block_min"]
+
+        def pq(p):
+            return f"p {p:.3f}" if p >= 1e-3 else f"p $<$ {1 / (ST['resamples'] + 1) * 1.0001:.0e}".replace("e-0", "e-")
+        rows_ = ""
+        for arm, _, ks in B7_ARMS:
+            for k in ks:
+                b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
+                big = k.endswith("graph")
+                gk = GUT.get(k)
+                rows_ += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{k}}}}}" if big else k)
+                          + f" & {qv(b_['estimate'], big=big)} & {qv(l_['estimate'], big=big)} $\\pm$ {l_['sd_over_neurons']:.2f}"
+                          + f" & {(chr(123) + chr(92) + 'normalsize' + chr(92) + 'textbf{' + f'{gk:.2f}' + '}}') if big and gk is not None else (f'{gk:.2f}' if gk is not None else '--')} \\\\\n")
+        tests_ = ""
+        verdict = []
+        for arm, _, ks in B7_ARMS:
+            g_, w0_, mf_, nw_ = ks
+            t1, t2, t3 = T_[(g_, mf_)], T_[(mf_, nw_)], T_[(g_, w0_)]
+            tests_ += (f"\\textbf{{arm {arm}}}: graph $-$ mean field: brain-mean r {t1['brain_mean_r']['difference']:+.3f} "
+                       f"({pq(t1['brain_mean_r']['p'])}), {ml} {t1['local_r']['difference']:+.3f} ({pq(t1['local_r']['p'])}); "
+                       f"mean field $-$ no W: {t2['brain_mean_r']['difference']:+.3f} ({pq(t2['brain_mean_r']['p'])}), "
+                       f"{t2['local_r']['difference']:+.3f} ({pq(t2['local_r']['p'])}); graph $-$ its W = 0: "
+                       f"{t3['brain_mean_r']['difference']:+.3f} ({pq(t3['brain_mean_r']['p'])}), "
+                       f"{t3['local_r']['difference']:+.3f} ({pq(t3['local_r']['p'])})\\\\[2pt]\n")
+            d, p_ = t1["local_r"]["difference"], t1["local_r"]["p"]
+            verdict.append(f"arm {arm} {L_[mf_]['local_r']['estimate']:+.2f} against the graph's "
+                           f"{L_[g_]['local_r']['estimate']:+.2f} ({pq(p_)})")
+        sig = [T_[(ks[0], ks[2])]["local_r"] for _, _, ks in B7_ARMS]
+        gut_s = (" Only the graph makes the gut response: kept " + ", ".join(
+            f"{GUT[ks[0]]:.2f} against the mean field's {GUT[ks[2]]:.2f}" for _, _, ks in B7_ARMS
+            if GUT.get(ks[0]) is not None and GUT.get(ks[2]) is not None) + ".")
+        if all(t["p"] >= 0.05 for t in sig):
+            concl = ("On fish 1, one brain-wide signal does as well as the graph: the mean field's " + ml + " is "
+                     + "; ".join(verdict) + ". The learned coupling is not distinguished from a shared signal here, unlike "
+                     "exp17's ZAPBench fish (graph $-$ mean field $+0.134$, p $<$ 1e-4); both are far above no W.")
+        elif all(t["p"] < 0.05 and t["difference"] > 0 for t in sig):
+            concl = ("One brain-wide signal does not replace the graph: the mean field's " + ml + " is " + "; ".join(verdict)
+                     + ", so the learned coupling carries neuron-to-neuron network dynamics.")
+        else:
+            concl = ("The arms disagree: the mean field's " + ml + " is " + "; ".join(verdict) + "; a shared brain-wide "
+                     "signal explains most of what the graph does here.")
+        concl += gut_s
+        right = (head(f"the mean-field control, {mins:.0f}-min free rollout") + "{\\scriptsize\\raggedright "
+                 "\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{\\hspace{6pt}}r@{}}\n& brain-mean r & " + ml + f", {kept}, mean $\\pm$ SD & gut kept \\\\\n"
+                 "\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{3pt}\n"
+                 "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$ on the 3-level mesh, " + f"{n_edges:,}"
+                 + (" edge weights, at its horizon-40 checkpoint (update " + f"{it_:,}" + " of 49,000, still training); mean "
+                    if B7_CKPT else f" edge weights, {it_:,} updates; mean ")
+                 + "field: $m_i = a_i\\,\\langle\\tanh z\\rangle$, " + f"{n_gains:,}" + " gains, one per cell; no W: $m_i = 0$ "
+                 "($\\Omega$ scales only $m_i$: it has nothing to act on without W). The rest is the SIREN law of batch 6. Arm A: " + B7_ARMS[0][1] + " as the gut-input "
+                 "cells; arm B: " + B7_ARMS[1][1] + ".\\par}" + SEC_GAP
+                 + head("conclusion") + "{\\scriptsize\\raggedright " + concl + "\\par}" + SEC_GAP
+                 + head("the test")
+                 + "{\\scriptsize\\raggedright \\textbf{Null (no difference):} two laws follow the recording equally well. "
+                 f"\\textbf{{Method:}} a paired block bootstrap over time: the free rollout cut into {ST['blocks'] + 1} blocks of "
+                 f"{ST['block_min']:.1f} min, the first (the transient from the recorded start) left out; {ST['resamples']:,} "
+                 f"resamples of the {ST['blocks']} others, the same blocks for every law; p two-sided. Per-neuron r over the same "
+                 f"{ST['neurons']:,} cells for every law; a cell whose learned trace is flat scores 0. Bars: each law's 95~\\% "
+                 "interval; the tests are on the paired differences. No seed pair for these arms.\\par}\\vspace{3pt}\n"
+                 + "{\\scriptsize\\raggedright " + tests_ + "\\par}")
+        cap = ("\\fontsize{3.8}{4.6}\\selectfont "
+               + ("\\textbf{Brain mean kept.} The twin of the previous slide: each cell's r on its raw traces, the brain mean "
+                  "NOT regressed out, so a law also earns credit for the shared brain-wide signal.\\\\[3pt]" if suf else
+                  "\\textbf{Per-neuron r and global signal regression.} Regressing each trace on the brain mean before "
+                  "correlating is global signal regression in fMRI, reviewed with its debate by Murphy \\& Fox (2017): it can "
+                  "create artificial negative correlations. In population recordings, neuron-to-neuron correlations are "
+                  "routinely computed after removing the population-wide fluctuation, e.g.\\ Okun et al.\\ (2015) on "
+                  "``population coupling''.\\\\[3pt]") + TEXT_)
+        out.append((f"b7_meanfield{suf}", frame_narrow(
+            "the mean-field control" + (", brain mean kept" if suf else ""), f"figs/{png}", right,
+            f"tools/exp17_meanfield_stats.py (data/meanfield_stats{suf}.json); models/{B7_CKPT or 'best'}.pt",
+            deck_title="batch 7 $\\cdot$ glucose fish 1 $\\cdot$ the mean-field control" + (", brain mean kept" if suf else
+                                                                                       ": is the coupling network dynamics?"),
+            left=0.52, height=0.62, img_top="0.06\\textheight", caption=cap)))
+    out += slide_gut_meanfield()
+    return out
+
+
+def slide_gut_meanfield():
+    """THE GUT RESPONSE, THE GRAPH AGAINST ONE BRAIN-WIDE SIGNAL (Cedric, 2026-10-06: "after slides 26-27, show the
+    difference in gut response between brain-wide and not brain-wide"), tools/exp20_gut_meanfield.py: the
+    gut-responsive cells' mean dF/F around the gut pulses per law, and every cell's evoked change from above."""
+    zp = os.path.join(DATA, "gut_meanfield_b7.npz")
+    if not (os.path.exists(zp) and os.path.exists(os.path.join(PRES, "figs", "gut_meanfield_b7.png"))):
+        return []
+    z = np.load(zp)
+    resp, n_p = z["responsive"], int(z["n_pulses"])
+    er = z["rec_evoked"]
+    kept = lambda k: float(np.nanmean(z[f"{k}|evoked"][resp]) / er[resp].mean())            # noqa: E731
+    mr = lambda k: float(np.corrcoef(np.nan_to_num(z[f"{k}|evoked"]), er)[0, 1])          # noqa: E731
+    ST = json.load(open(os.path.join(DATA, "meanfield_stats.json")))
+    share = resp.mean() * n_p * 20.0 / (ST["rollout_min"] * 60)                              # cell-time of the gut response
+    rise = lambda k: float(np.nanmean(z[f"{k}|evoked"][resp]))                              # noqa: E731
+    r0 = float(er[resp].mean())
+    rs = lambda k: f"{rise(k):.3f} ({100 * kept(k):.0f} \\%"                               # noqa: E731
+    cap = ("{\\tiny \\textbf{Top}: both panels show the same " + f"{int(resp.sum()):,}" + " gut-responsive cells (the paper's "
+           "rule), their mean dF/F around the " + f"{n_p}" + " gut pulses (mean $\\pm$ SEM over the pulses), in each law's free "
+           "rollout of the whole session; the arms differ only in where the UV input enters (527 or 2,037 cells). "
+           "\\textbf{How large a response each law makes}: in the 20 s after a gut pulse these cells rise by "
+           + f"{r0:.3f}" + " dF/F in the recording (over the 10 s before, mean over the pulses); the graph makes them rise by "
+           + rs("A graph") + " of that, arm A) and " + rs("B graph") + ", arm B); the mean field by " + rs("A mean field")
+           + ") and " + rs("B mean field") + "); no W " + rs("A no W") + ") and " + rs("B no W") + "); the graph with W = 0 "
+           + rs("A graph, W = 0") + ") and " + rs("B graph, W = 0") + "). \\textbf{Bottom}: the same rise for every cell, from "
+           "above, head left; the maps' agreement with the recorded one (correlation over all cells): graph "
+           + f"{mr('A graph'):+.2f} / {mr('B graph'):+.2f}" + ", mean field " + f"{mr('A mean field'):+.2f} / {mr('B mean field'):+.2f}"
+           + ", no W " + f"{mr('A no W'):+.2f} / {mr('B no W'):+.2f}" + ". \\textbf{Why slides 26-27 do not see it}: these cells "
+           "are " + f"{100 * resp.mean():.1f}" + " \\% of the brain and respond for 20 s after each of " + f"{n_p}" + " pulses, "
+           + f"{100 * share:.1f}" + " \\% of the cell-time of the " + f"{ST['rollout_min']:.0f}" + "-min session -- too little to "
+           "move a whole-brain average. One brain-wide signal, heard by every cell through its own gain, reproduces the shared "
+           "fluctuations those averages are made of; it cannot carry a signal from the few entry cells to particular cells, "
+           "which the gut response needs.\\par}")
+    body = ("\\vspace*{0.2\\baselineskip}{\\centering\\includegraphics[width=\\textwidth,height=0.66\\textheight,"
+            "keepaspectratio]{figs/gut_meanfield_b7.png}\\par}\\vspace{4pt}" + cap)
+    return [("b7_gut", frame_full("the gut response, the graph against one brain-wide signal", body,
+                                  "data/gut_meanfield_b7.npz (tools/exp20_gut_meanfield.py)",
+                                  deck_title="batch 7 $\\cdot$ glucose fish 1 $\\cdot$ the gut response: the graph against "
+                                             "one brain-wide signal"))]
+
+
+def slides_summary_b6():
+    """THE SUM-UP FROM BATCH 6 ON (Cedric, 2026-10-06: "one-to-one comparisons that allow conclusions; what jobs would
+    complete the comparison"), from data/summary_b6.json (tools/exp20_summary.py): two tables of runs differing by one
+    thing, each difference judged against twice the seed-to-seed difference, then the conclusions and the next jobs."""
+    jp = os.path.join(DATA, "summary_b6.json")
+    if not os.path.exists(jp):
+        return []
+    J = json.load(open(jp))
+    tol = J["tolerance"]
+    keys = (("brain_r", "brain-mean r", "{:+.2f}"), ("local_r", "per-neuron r", "{:+.2f}"), ("gut_kept", "gut kept", "{:.2f}"))
+    arrow = {"up": "$\\uparrow$", "down": "$\\downarrow$", "=": "$=$", "": ""}
+
+    def cell(r, k, f):
+        a, b, d = r["a_val"][k], r["b_val"][k], r["delta"][k]
+        if d is None:
+            return "--"
+        v = r["verdict"][k]
+        col = {"up": "{rgb}{0.30,0.85,0.30}", "down": "{rgb}{1.0,0.30,0.25}"}.get(v)
+        dd = f"{d:+.2f} {arrow[v]}"
+        return f"{f.format(a)} $\\to$ {f.format(b)} " + (f"\\textcolor[{col.split('}{')[0][1:]}]{{{col.split('}{')[1][:-1]}}}{{{dd}}}"
+                                                        if col else dd)
+
+    def table(groups):
+        rows = ""
+        for g in groups:
+            rs = [r for r in J["rows"] if r["group"] == g]
+            if not rs:
+                continue
+            rows += f"\\multicolumn{{5}}{{@{{}}l}}{{\\rule{{0pt}}{{2.6ex}}\\textbf{{{g}}}}} \\\\\n"
+            for r in rs:
+                rows += (f"{r['a']} $\\to$ {r['b']} & {_tex(r['what'].replace('->', 'to'))} & "
+                         + " & ".join(cell(r, k, f) for k, _, f in keys) + " \\\\\n")
+        return ("\\resizebox{\\textwidth}{!}{\\begin{tabular}{@{}l@{\\hspace{8pt}}l@{\\hspace{10pt}}l@{\\hspace{10pt}}l"
+                "@{\\hspace{10pt}}l@{}}\nruns & what changes & brain-mean r & per-neuron r & gut kept \\\\\n\\hline\n"
+                + rows + "\\end{tabular}}")
+    cap = ("{\\tiny Glucose fish 1, every run on its own free rollout of the whole session: brain-mean r, the learned "
+           "brain-mean dF/F against the recorded; per-neuron r, each cell's learned against recorded trace after each is "
+           "regressed on its own brain mean, the mean over the cells; gut kept, the gut-responsive cells' change after every "
+           "gut pulse, the law's over the recorded. A $\\to$ B: two runs that differ by one thing; $=$ within twice the "
+           f"seed-to-seed difference (4.1 against 5.5, the one seed pair: brain-mean r {tol['brain_r'] / 2:.3f}, per-neuron r "
+           f"{tol['local_r'] / 2:.3f}, gut kept {tol['gut_kept'] / 2:.3f}), else $\\uparrow$ / $\\downarrow$. These are "
+           "whole-session numbers; the mean-field test of slides "
+           "26-27 leaves the first 1.7 min out, where the graph's brain-wide lead over the mean field mostly lies.\\par}")
+    out = []
+    for i, (groups, ttl) in enumerate(((("the graph",), "the graph"), (("the gut-input cells", "the network", "the noise"),
+                                                                         "gut-input cells, network, noise"))):
+        body = "\\vspace*{0.6\\baselineskip}" + table(groups) + "\\par\\vspace{8pt}" + cap
+        out.append((f"b67_summary_{i + 1}", frame_full(f"sum-up from batch 6: {ttl}", body, "data/summary_b6.json",
+                                                      deck_title=f"summary $\\cdot$ batches 6-7, one change at a time: {ttl}")))
+    R = {(r["a"], r["b"]): r for r in J["rows"]}
+    d = lambda a, b, k: R[(a, b)]["delta"][k] if (a, b) in R and R[(a, b)]["delta"][k] is not None else float("nan")   # noqa: E731
+    concl = ("\\begin{itemize}\\setlength{\\itemsep}{3pt}\n"
+             "\\item \\textbf{The mesh carries the gut response further, at the same brain mean.} Neuron graph to 4-level "
+             f"mesh: gut kept {d('4.1', '6.2', 'gut_kept'):+.2f} (batches 1-5's cells), {d('6.4', '6.5', 'gut_kept'):+.2f}, "
+             f"{d('6.6', '6.8', 'gut_kept'):+.2f}, {d('6.7', '6.9', 'gut_kept'):+.2f}, {d('6.10', '6.11', 'gut_kept'):+.2f} "
+             "for the other rules; the brain-mean r within the seed spread every time. 3-level to 4-level (atlas sets): "
+             f"{d('7.1', '6.11', 'gut_kept'):+.2f} and {d('7.4', '6.13', 'gut_kept'):+.2f}.\n"
+             "\\item \\textbf{Truer gut-input cells cost gut response, not the brain mean.} From batches 1-5's 19,035 cells "
+             f"to the paper's 2,538: {d('4.1', '6.7', 'gut_kept'):+.2f}; to the atlas's 527: {d('4.1', '6.10', 'gut_kept'):+.2f} "
+             f"(on the mesh {d('6.2', '6.11', 'gut_kept'):+.2f}); brain-mean r unchanged. Few entry cells must reach a "
+             "brain-wide response through the network alone.\n"
+             "\\item \\textbf{The gut response needs the graph; a shared signal does not make it.} Mean field to graph: "
+             f"gut kept {d('7.2', '7.1', 'gut_kept'):+.2f} and {d('7.5', '7.4', 'gut_kept'):+.2f}; no W to mean field: "
+             f"{d('7.3', '7.2', 'gut_kept'):+.2f} and {d('7.6', '7.5', 'gut_kept'):+.2f}. The mean field lifts the "
+             f"brain-mean r over no W ({d('7.3', '7.2', 'brain_r'):+.2f}) but leaves the gut response at 0.01.\n"
+             "\\item \\textbf{The noise is barely known.} One seed pair (4.1, 5.5): per-neuron r moved "
+             f"{tol['local_r'] / 2:.3f} between seeds, so most per-neuron r differences here are within it.\n"
+             "\\end{itemize}")
+    jobs = ("\\begin{itemize}\\setlength{\\itemsep}{3pt}\n"
+            "\\item \\textbf{seeds}: a second seed of the 4-level mesh (6.2) and of both atlas arms (6.11, 6.13) -- the noise "
+            "floor of the mesh laws, the yardstick of every row\n"
+            "\\item \\textbf{the 4-level mesh's own twins}: its mean-field and no-W twins (batch 8, on the new nominal)\n"
+            "\\item \\textbf{the grid}: the 3- and 5-level meshes with the paper's 3 SD and the atlas sets\n"
+            "\\item \\textbf{the visual input}: the paper's 3 SD visual cells (47,746) in place of the 10 \\% rule, on an atlas arm\n"
+            "\\item \\textbf{the swim as an input} on an atlas arm (batch 5: brain-mean $+0.07$-$0.10$ on the neuron graph)\n"
+            "\\item \\textbf{other fish}: the atlas arms on glucose 2, 3 and 5 (registered; their area postrema 12-26$\\times$ "
+            "gut-enriched)\n"
+            "\\item \\textbf{held out} (Cedric via exp17): the free-rollout metrics on the held-out windows only, and the "
+            "nominal without SIREN (it reads absolute time)\n"
+            "\\end{itemize}")
+    body = ("\\vspace*{0.6\\baselineskip}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.55\\textwidth}\n"
+            "{\\fontsize{6}{7.2}\\selectfont\\textbf{what the comparisons say}\\par\\vspace{3pt}" + concl + "\\par}\n\\end{column}\n"
+            "\\begin{column}{0.42\\textwidth}\n{\\fontsize{6}{7.2}\\selectfont\\textbf{jobs that would complete them}\\par\\vspace{3pt}" + jobs
+            + "\\par}\n\\end{column}\n\\end{columns}")
+    out.append(("b67_summary_3", frame_full("sum-up from batch 6: conclusions and next jobs", body, "data/summary_b6.json",
+                                            deck_title="summary $\\cdot$ batches 6-7: what the comparisons say, and the "
+                                                       "jobs that would complete them")))
+    return out
+
+
+# PLAIN ENGLISH ON EVERY SLIDE (Cedric, 2026-10-06: "do not use acronyms, AP and DVC: plain English on every slide"); the
+# expansions are Chen 2026's own (the paper defines each one)
+PLAIN = [(r"\bmedial idMO\b", "medial inferior dorsal medulla oblongata"), (r"\bidMO\b", "inferior dorsal medulla oblongata"),
+         (r"\bDVC\b", "dorsal vagal complex"), (r"\bAP\b", "area postrema"), (r"\bVG\b", "vagal ganglia"),
+         (r"\bPBN\b", "parabrachial nucleus"), (r"\bDMNX\b", "dorsal motor nucleus of the vagus"),
+         (r"\bOT\b", "optic tectum"), (r"\bLH\b", "lateral hypothalamus")]
+
+
+def plain_english(body):
+    for a_, b_ in PLAIN:
+        body = re.sub(a_, b_, body)
+    return body
 
 
 def main():
@@ -2114,6 +2719,14 @@ def main():
     except Exception as e:
         print(f"[slides] slides_b6 FAILED: {e!r}")
     try:
+        deck += slides_b7()                                # batch 7: exp17's mean-field control, after batch 6
+    except Exception as e:
+        print(f"[slides] slides_b7 FAILED: {e!r}")
+    try:
+        deck += slides_summary_b6()                        # the sum-up of batches 6-7, one change at a time
+    except Exception as e:
+        print(f"[slides] slides_summary_b6 FAILED: {e!r}")
+    try:
         deck += slides_atlas24()                           # every fish in Z-Brain, after batch 6
     except Exception as e:
         print(f"[slides] slides_atlas24 FAILED: {e!r}")
@@ -2123,11 +2736,11 @@ def main():
         if not body:
             print(f"[slides] {stem}: no data yet, skipped")
             continue
-        open(os.path.join(PRES, "slides", f"{stem}.tex"), "w").write(no_stimuli_only(body))
+        open(os.path.join(PRES, "slides", f"{stem}.tex"), "w").write(retitle(stem, plain_english(no_stimuli_only(body))))
         out.append(stem)
         print(f"[slides] {stem}")
     open(os.path.join(PRES, "slides", "all.tex"), "w").write(
-        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN or s in hidden_b or any(h in s for h in HIDDEN_PAT) or HIDDEN_RE.match(s) else ''}\\input{{slides/{s}.tex}}\n"
+        "% generated by tools/exp20_slides.py\n" + "".join(f"{'% ' if s in HIDDEN or s in hidden_b or any(h in s for h in HIDDEN_PAT) or HIDDEN_RE.match(s) or ('4' in HIDDEN_BATCHES and s.startswith('b4_')) else ''}\\input{{slides/{s}.tex}}\n"
                                                            for s in out))
 
 

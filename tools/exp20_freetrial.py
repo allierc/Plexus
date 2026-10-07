@@ -72,14 +72,15 @@ def rollout_windows(T, spec, learn, box, device, windows):
     return {f: torch.stack([got[f][t] for t in range(a, b + 1)]) for f, (a, b) in windows.items()}, int(dead.sum())
 
 
-def run_one(name, device, w0=True):
+def run_one(name, device, w0=True, ckpt=None):
     from plexus import engine
     from plexus import trainer as T
     import exp17_ablation as A
     engine.quiet(True)
     spec = T.load(name)
     out = T.out_dir(spec, None)
-    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    # `ckpt`: a per-stage checkpoint (models/stage_40.pt), as the trainer's --checkpoint; written as <run>_<ckpt>_freetrial
+    ck = torch.load(os.path.join(out, "models", f"{ckpt or 'best'}.pt"), weights_only=False, map_location=device)
     learn = T.Learnables(spec["learnable"], device)
     learn.restore(ck["fitted"])
     box = T._trace_setup(spec, device)
@@ -136,7 +137,7 @@ def run_one(name, device, w0=True):
               f"{a['evoked_ctrl_free_over_rec_gut']}; " + ", ".join(
                   f"{r['kind'][0]}{r['onset']} {r['evoked_free']:+.3f}/{r['evoked_rec']:+.3f}" for r in a["trials"]),
               flush=True)
-    json.dump(res, open(os.path.join(out, "results", f"{name}_freetrial.json"), "w"), indent=1)
+    json.dump(res, open(os.path.join(out, "results", f"{name}{'_' + ckpt if ckpt else ''}_freetrial.json"), "w"), indent=1)
     return res
 
 
@@ -145,9 +146,10 @@ def main():
     ap.add_argument("runs", nargs="+")
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--no-w0", action="store_true")
+    ap.add_argument("--checkpoint", default=None, help="models/<name>.pt instead of best.pt, e.g. stage_40")
     a = ap.parse_args()
     for r in a.runs:
-        run_one(r, a.device, w0=not a.no_w0)
+        run_one(r, a.device, w0=not a.no_w0, ckpt=a.checkpoint)
 
 
 if __name__ == "__main__":

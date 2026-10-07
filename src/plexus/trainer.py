@@ -95,7 +95,7 @@ _KEYS = {
     "observe": {"set", "block", "channel", "unit", "measure", "grid", "of", "field", "alive"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
                  "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
-                 "iters", "save_every", "anneal", "select"},
+                 "iters", "save_every", "anneal", "select", "init_from"},
     "term": {"term", "weight", "reduction"},
     "stage": {"resolution", "iters", "horizon"},
 }
@@ -105,7 +105,7 @@ REFERENCES = ("corpus", "shape", "recording", "field_recording", "trace_recordin
 _LOSS_FOR = {"corpus": ("mse",), "shape": ("log_mse",), "recording": ("affine_mse",),
              "field_recording": ("masked_mse",), "trace_recording": ("trace_mse",)}
 PRIORS = ("shrink", "shrink_to_mean", "smooth", "l1", "l2", "group_l1", "row_l1", "sign",
-          "monotone", "pin", "input_group_l1")      # the last three: computed by the operator (`prior_term`)
+          "monotone", "pin", "input_group_l1", "dale", "dale_keep")   # from `monotone` on: computed by the operator (`prior_term`)
 # THE EVIDENCE TERMS each reference kind can score, by name. `task.loss` is one name or a list of
 # {term, weight, reduction}; the loop computes the quantities, `_objective` weighs and records them.
 TERMS = {"corpus": ("mse",), "shape": ("log_mse", "volume", "point_mse"),
@@ -594,7 +594,7 @@ class Learnables:
                     term = x.reshape(-1, x.shape[-1]).norm(2, dim=0).sum()
                 elif kind == "row_l1":
                     term = x.reshape(x.shape[0], -1).norm(2, dim=1).sum()
-                elif kind in ("monotone", "pin", "input_group_l1"):
+                elif kind in ("monotone", "pin", "input_group_l1", "dale", "dale_keep"):
                     # A PRIOR ONLY THE MODEL CAN EVALUATE (connectome-gnn's g_phi_diff, g_phi_norm, input-group
                     # lasso): the activity that holds the parameter computes it from its own current values.
                     op = self._ops.get(self.key(e))
@@ -2694,6 +2694,18 @@ def _train_trace(spec, device="cpu", root=None):
     sims = {k: _trace_sim(spec, True, k) for k in sorted({k for k, _ in stages})}
     learn = Learnables(spec["learnable"], device)
     _trace_rollout(sims[stages[0][0]], learn, spec, box, int(origins[0]), stages[0][0], device, False)  # creates the leaves
+    if tr.get("init_from"):
+        # A WARM START (exp17, Cedric 2026-10-05: "smoke tests on top of 15.14"): every learnable starts at another
+        # run's trained values (its models/best.pt); a learnable it does not have, or of another shape, is refused
+        src_ = load(str(tr["init_from"]))
+        fit_ = torch.load(os.path.join(out_dir(src_, root), "models", "best.pt"), weights_only=False,
+                          map_location=device)["fitted"]
+        bad_ = [k for k, v in learn.p.items() if k not in fit_ or fit_[k].shape != v.shape]
+        if bad_:
+            raise ValueError(f"training.init_from {tr['init_from']}: no trained value of the same shape for {bad_}")
+        learn.restore({k: fit_[k] for k in learn.p})
+        print(f"[init] {len(learn.p)} learnables from {tr['init_from']}", flush=True)
+        _trace_rollout(sims[stages[0][0]], learn, spec, box, int(origins[0]), stages[0][0], device, False)
     params = learn.parameters()
     n_par = sum(p.numel() for p in params)
     lr, batch, clip = float(tr.get("lr", 1e-3)), max(1, int(tr.get("batch", 4))), float(tr.get("clip", 1.0))

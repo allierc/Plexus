@@ -1,8 +1,9 @@
 """exp17: THE LEARNED CONSTANTS ON THE BRAIN (Cedric, 2026-10-03: "a heatmap over tau, V rest, W, B").
 
-Local analysis. Every neuron a dot at its position, horizontal and head left as the run movies, coloured by one of its
-learned constants (models/best.pt):
-    a  tau = 0.914 s / softplus(tau_raw), the leak's time constant (log colour scale)
+Local analysis. Every neuron a dot at its position, horizontal and head left as the run movies -- from above and, under it, from the
+side -- coloured by one of its learned constants (models/best.pt):
+    a  tau = 0.914 s / rate, the leak's time constant (log colour scale); rate = softplus(tau_raw), or bounded by the
+       run's rate_min / rate_max, the colour bar then spanning exactly that bound
     b  V, the rest value, in dF/F (V sd + mu, the reference's normalisation)
     c  the summed signed W into the neuron over its three edge sets (blue < 0 < red)
     d  |B|, the norm of its stimulus weights; grey where the input mask keeps the stimulus out (B unused there)
@@ -43,7 +44,11 @@ def constants(name):
             snd, rcv = (t.cpu().numpy() for t in op._E[p[2:]])
             np.add.at(w_in, rcv, fit[T.Learnables.key(e)].float().numpy().reshape(-1))
     mask = op.input_mask.cpu().numpy().reshape(-1).astype(bool) if op.input_mask is not None else np.ones(N, bool)
-    return {"tau_s": FRAME_S / torch.nn.functional.softplus(fit["neuron.tau"].float()).numpy().reshape(-1),
+    # tau through the law's own rate: the bound [rate_min, rate_max] when the run declares one (15.18, 2026-10-06)
+    tau_s = FRAME_S / op._rate(fit["neuron.tau"].float()).detach().numpy().reshape(-1)
+    lo_, hi_ = getattr(op, "rate_min", None), getattr(op, "rate_max", None)
+    bounds = (FRAME_S / hi_, FRAME_S / lo_) if lo_ and hi_ else None          # tau's allowed range, s
+    return {"tau_s": tau_s, "tau_bounds": bounds,
             "V": fit["neuron.rest"].float().numpy().reshape(-1) * sd + mu, "W_in": w_in,
             "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask,
             "pos": np.asarray(rec["pos_um"], np.float64)}
@@ -60,8 +65,16 @@ def render(name):
     order = np.argsort(P[:, 2])
     P = P[order]
     m = c["mask"][order]
-    fig = plt.figure(figsize=(16, 9.2), facecolor="black")
-    lo_t, hi_t = np.percentile(c["tau_s"], [2, 98])
+    # Cedric, 2026-10-04: no blank inside the panels -- each view's axes sized to the brain's own extent (0.2-99.8th
+    # percentiles, so a few stray neurons do not set the frame), the figure as tall as its content
+    lo3, hi3 = np.percentile(P, 0.2, 0), np.percentile(P, 99.8, 0)
+    ex = hi3 - lo3
+    FW, CW, LB, GP, CB = 16.0, 7.35, 0.32, 0.12, 0.45          # inches: figure width, map width, label, gap, colour bar
+    th, sh = CW * ex[1] / ex[0], CW * ex[2] / ex[0]             # the top and the side view's heights
+    RH = LB + th + GP + sh + 0.18
+    FH = 2 * RH
+    fig = plt.figure(figsize=(FW, FH), facecolor="black")
+    lo_t, hi_t = c["tau_bounds"] or np.percentile(c["tau_s"], [2, 98])   # a bounded tau: the colour bar IS the bound
     wl = np.percentile(np.abs(c["W_in"]), 98)
     panels = [("a   leak time constant $\\tau$, s (log)", c["tau_s"], "viridis", LogNorm(lo_t, hi_t)),
               ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
@@ -69,29 +82,42 @@ def render(name):
               ("d   stimulus weight $|B|$ (input neurons; grey: outside the mask)", c["B_norm"], "inferno",
                Normalize(*np.percentile(c["B_norm"][c["mask"]], [2, 98])))]
     stats = {}
+    so = np.argsort(P[:, 1])                                              # the side view: nearer neurons drawn last
     for i, (lab, v, cm, nrm) in enumerate(panels):
-        ax = fig.add_axes([0.02 + (i % 2) * 0.49, 0.52 - (i // 2) * 0.48, 0.44, 0.40])
-        ax.set_facecolor("black")
-        ax.axis("off")
-        ax.set_aspect("equal")
         vv = v[order]
-        if i == 3:
-            ax.scatter(P[~m, 0], P[~m, 1], c="0.25", s=0.25, linewidths=0)
-            sc = ax.scatter(P[m, 0], P[m, 1], c=vv[m], s=0.6, cmap=cm, norm=nrm, linewidths=0)
-        else:
-            sc = ax.scatter(P[:, 0], P[:, 1], c=vv, s=0.35, cmap=cm, norm=nrm, linewidths=0)
-        fig.text(0.02 + (i % 2) * 0.49, 0.955 - (i // 2) * 0.48, lab, color="white", fontsize=12, va="top")
-        cax = fig.add_axes([0.465 + (i % 2) * 0.49, 0.56 - (i // 2) * 0.48, 0.008, 0.30])
+        x0 = 0.05 + (i % 2) * (CW + CB + 0.25)                            # inches
+        ytop = FH - (i // 2) * RH                                         # the row's top, inches
+        for view, (yb, h, ys, ye) in (("top", (ytop - LB - th, th, 1, (lo3[1], hi3[1]))),
+                                      ("side", (ytop - LB - th - GP - sh, sh, 2, (lo3[2], hi3[2])))):
+            ax = fig.add_axes([x0 / FW, yb / FH, CW / FW, h / FH])
+            ax.set_facecolor("black")
+            ax.axis("off")
+            o_ = np.arange(len(P)) if view == "top" else so
+            X_, Y_ = P[:, 0], P[:, ys]
+            if i == 3:
+                mo, mi = o_[~m[o_]], o_[m[o_]]
+                ax.scatter(X_[mo], Y_[mo], c="0.25", s=0.25, linewidths=0)
+                sc = ax.scatter(X_[mi], Y_[mi], c=vv[mi], s=0.6, cmap=cm, norm=nrm, linewidths=0)
+            else:
+                sc = ax.scatter(X_[o_], Y_[o_], c=vv[o_], s=0.4, cmap=cm, norm=nrm, linewidths=0)
+            ax.set_xlim(lo3[0], hi3[0])
+            ax.set_ylim(*ye)
+        fig.text(x0 / FW, (ytop - 0.04) / FH, lab, color="white", fontsize=13, va="top")
+        cax = fig.add_axes([(x0 + CW + 0.08) / FW, (ytop - LB - th) / FH, 0.10 / FW, th / FH])
         cb = fig.colorbar(sc, cax=cax)
-        cb.ax.tick_params(colors="0.8", labelsize=8)
+        cb.ax.tick_params(colors="0.8", labelsize=9)
         key = ["tau_s", "V", "W_in", "B_norm"][i]
         vs = v[c["mask"]] if i == 3 else v
         stats[key] = {"median": float(np.median(vs)), "p2": float(np.percentile(vs, 2)), "p98": float(np.percentile(vs, 98))}
     path = os.path.join(EXP, "presentation", "figs", f"param_maps_{name}.png")
-    fig.savefig(path, dpi=110, facecolor="black")
+    fig.savefig(path, dpi=110, facecolor="black", bbox_inches="tight", pad_inches=0.03)   # no margins (Cedric, 2026-10-04)
     plt.close(fig)
     stats["n"], stats["n_masked"] = int(len(c["mask"])), int(c["mask"].sum())
     stats["frac_tau_below_frame"] = float((c["tau_s"] < FRAME_S).mean())
+    if c["tau_bounds"]:                               # the share of neurons pinned at the floor / the ceiling (within 5 %)
+        stats["tau_bounds"] = list(c["tau_bounds"])
+        stats["frac_tau_at_floor"] = float((c["tau_s"] < 1.05 * c["tau_bounds"][0]).mean())
+        stats["frac_tau_at_ceiling"] = float((c["tau_s"] > 0.95 * c["tau_bounds"][1]).mean())
     stats["frac_W_in_negative"] = float((c["W_in"] < 0).mean())
     json.dump(stats, open(os.path.join(EXP, "data", f"param_maps_{name}.json"), "w"), indent=1)
     print("[maps]", path, json.dumps(stats))

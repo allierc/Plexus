@@ -57,6 +57,12 @@ task:
     - W_mid
   - name: no_stimulus
     drive: 'off'
+  - name: no_short
+    zero:
+    - W_short
+  - name: no_mid
+    zero:
+    - W_mid
 training:
   optimizer: adam
   lr: 0.0018

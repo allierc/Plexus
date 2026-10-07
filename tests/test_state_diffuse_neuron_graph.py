@@ -3,6 +3,7 @@ import os
 import sys
 
 import numpy as np
+import pytest
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -310,3 +311,94 @@ def test_mesh_graph(tmp_path):
         setup(str(tmp_path), graph="mesh")                                        # levels needed
     with pytest.raises(ValueError):
         setup(str(tmp_path), mesh_levels=3)                                       # only with graph: mesh
+
+
+def test_rate_bounds(tmp_path):
+    """exp17 (Cedric, 2026-10-05: tau in [1, 100] s): `rate_min` and `rate_max` bound every learned rate to (rate_min,
+    rate_max) for any raw value; without them the law is unchanged."""
+    import torch
+    o = setup(str(tmp_path))[0]
+    lo, hi = 0.914 / 100, 0.914 / 1
+    b = setup(str(tmp_path), rate_min=lo, rate_max=hi)[0]
+    raw = torch.linspace(-30, 30, 2001)
+    r = b._rate(raw)
+    assert float(r.min()) > lo * 0.999 and float(r.max()) < hi * 1.001
+    assert torch.all(r[1:] >= r[:-1])                                          # still monotone in the raw value
+    assert torch.equal(o._rate(raw), torch.nn.functional.softplus(raw))       # no bounds: softplus, as before
+    import pytest
+    with pytest.raises(ValueError):
+        setup(str(tmp_path), rate_min=1.0, rate_max=0.5)
+
+
+def test_dale_priors(tmp_path):
+    """exp17 (Cedric, 2026-10-05): `dale` is the outgoing weight mass on each sender's minority sign, over every edge
+    set at once; `dale_keep` the fall of each sender's majority mass below its first value."""
+    import torch
+    o = setup(str(tmp_path))[0]
+    E = {s: o._E[s][0] for s in o.EDGE_SETS}
+    g = torch.Generator().manual_seed(0)
+    for s in o.EDGE_SETS:
+        setattr(o, f"W_{s}", torch.randn(E[s].numel(), generator=g))
+    P = torch.zeros(o.n_elements)
+    N = torch.zeros(o.n_elements)
+    for s in o.EDGE_SETS:
+        w = getattr(o, f"W_{s}")
+        P.index_add_(0, E[s], torch.relu(w))
+        N.index_add_(0, E[s], torch.relu(-w))
+    assert torch.allclose(o.prior_term("W_short", "dale"), torch.minimum(P, N).sum())
+    assert float(o.prior_term("W_short", "dale_keep")) == 0.0                  # at its first value: nothing lost
+    for s in o.EDGE_SETS:                                                      # Dale-consistent: each sender one sign
+        w = getattr(o, f"W_{s}")
+        setattr(o, f"W_{s}", w.abs() * torch.where(E[s] % 2 == 0, 1.0, -1.0))
+    assert float(o.prior_term("W_short", "dale")) == 0.0
+    for s in o.EDGE_SETS:                                                      # every weight halved: the majority falls
+        setattr(o, f"W_{s}", 0.5 * getattr(o, f"W_{s}"))
+    assert float(o.prior_term("W_short", "dale_keep")) > 0
+    import pytest
+    with pytest.raises(ValueError):
+        o.prior_term("tau", "dale")
+
+
+def test_w_init_sd(tmp_path):
+    """exp17 batch 19 (Cedric, 2026-10-06: Dale maps over seeds): `w_init_sd` starts every edge weight from a Gaussian
+    draw of that spread, set by the op's seed -- the same seed the same start, another seed another; absent = the
+    constant start, as before."""
+    import torch
+    o = setup(str(tmp_path))[0]
+    a = setup(str(tmp_path), w_init_sd=0.01, seed=1)[0]
+    b = setup(str(tmp_path), w_init_sd=0.01, seed=1)[0]
+    c = setup(str(tmp_path), w_init_sd=0.01, seed=2)[0]
+    for s in o.EDGE_SETS:
+        w0, wa, wb, wc = (getattr(x, f"W_{s}") for x in (o, a, b, c))
+        assert torch.all(w0 == 0)                                                   # no spread: the constant start
+        assert torch.equal(wa, wb) and not torch.equal(wa, wc)                      # the seed sets the draw
+        assert 0.005 < float(wa.std()) < 0.02 and abs(float(wa.mean())) < 0.005
+
+
+def test_mod_context_block_onehot(tmp_path):
+    """mod_context: block (exp17, 2026-10-07) -- the SIREN reads (x, y, z, t, one-hot of the stimulus block): 4 + 3
+    inputs here; untrained Omega = 1; at one frame (one t), Omega changes with the block alone; refused without a
+    SIREN or with an unknown value."""
+    n = 400
+    g = np.random.default_rng(0)
+    P = (g.uniform(0, 1, (n, 3)) * [300.0, 400.0, 120.0]).astype(np.float32)
+    f = os.path.join(str(tmp_path), "rec.npz")
+    np.savez(f, pos_um=P, offsets=np.array([0, 100, 250, 400]))
+    base = {"_at": "neuron", "block": "dff", "positions": "xyz", "positions_file": f, "inputs": 1, "substeps": 4,
+            "short_k": 6, "mid_um": 32.0, "long_um": 128.0, "forcing": "stimulus.u", "forcing_dim": 22,
+            "modulation": "siren", "seed": 0}
+    o = CLS({**base, "mod_context": "block"})
+    assert o._mlp_shapes[0][0] == 4 + 3
+    o.n_frames_ref, o.frame = 400, 50
+    assert torch.allclose(o._omega(None), torch.ones(n, 1))
+    o.omega_mlp = torch.randn(o.omega_mlp.shape, generator=torch.Generator().manual_seed(5)) * 0.3
+    o.frame = 99                                   # the same frame (same t), in block 0 then, offsets moved, block 1
+    om0 = o._omega(None).clone()
+    o._mod_offsets = np.array([0, 90, 250, 400])
+    om1 = o._omega(None).clone()
+    assert not torch.allclose(om0, om1)            # the block alone changes Omega
+    o._mod_offsets = np.array([0, 95, 250, 400])   # another boundary, frame 99 still in block 1: the same Omega
+    assert torch.allclose(om1, o._omega(None))
+    for bad in ({**base, "mod_context": "hour"}, {**base, "mod_context": "block", "modulation": "none"}):
+        with pytest.raises(ValueError):
+            CLS(bad)

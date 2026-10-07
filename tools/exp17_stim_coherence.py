@@ -30,10 +30,11 @@ EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 FS, NSEG = 1 / 0.914, 256
 
 
-def segments(x, nseg=NSEG):
-    """[S, nseg, ...] half-overlapping Hann-windowed, detrended (mean) segments along axis 0."""
+def segments(x, nseg=NSEG, keep=None):
+    """[S, nseg, ...] half-overlapping Hann-windowed, detrended (mean) segments along axis 0; with `keep` ([T] bool) only
+    the segments whose every frame is kept (--train-only: wholly inside ZAPBench's training frames)."""
     T = x.shape[0]
-    starts = range(0, T - nseg + 1, nseg // 2)
+    starts = [s for s in range(0, T - nseg + 1, nseg // 2) if keep is None or bool(keep[s:s + nseg].all())]
     w = torch.hann_window(nseg, periodic=False, device=x.device, dtype=x.dtype).reshape(nseg, *([1] * (x.dim() - 1)))
     return torch.stack([(x[s:s + nseg] - x[s:s + nseg].mean(0)) * w for s in starts], 0)
 
@@ -51,6 +52,9 @@ def main():
                     help="pick the band from the live features among the first BAND_COLS stimulus columns (0 = all)")
     ap.add_argument("--mask-out", default="", help="write the top-`--top` mask to graphs_data/zebrafish/<this>")
     ap.add_argument("--top", type=float, default=0.10, help="the fraction of neurons the mask keeps")
+    ap.add_argument("--train-only", action="store_true",
+                    help="only the Welch windows wholly inside ZAPBench's TRAINING frames (Cedric, 2026-10-06: the mask of "
+                         "a held-out run must not see its test frames)")
     a = ap.parse_args()
     from plexus.paths import graphs_data_path
     z = np.load(graphs_data_path("zebrafish", f"{a.recording}_recording.npz"))
@@ -68,9 +72,15 @@ def main():
             return U[frames, j].std() > 1e-6
         live = np.array([j for j in live if changes(j)])
     print(f"[stim coherence] features used: {live.tolist()}")
+    U_all_cols = U.shape[1]
     U = U[:, live]
     dev = a.device
-    Uf = torch.fft.rfft(segments(torch.as_tensor(U, device=dev)), dim=1)        # [S, F, K]
+    keep = None
+    if a.train_only:
+        from plexus.tasks.trace_recording import zapbench_split
+        keep = zapbench_split(np.asarray(z["offsets"]), U.shape[0]) == 0
+        print(f"[stim coherence] training frames only: {int(keep.sum()):,} of {len(keep):,}")
+    Uf = torch.fft.rfft(segments(torch.as_tensor(U, device=dev), keep=keep), dim=1)        # [S, F, K]
     Suu = (Uf.abs() ** 2).mean(0)                                                # [F, K]
     f = np.fft.rfftfreq(NSEG, d=1 / FS)
     bc = np.where(live < a.band_cols)[0] if a.band_cols else np.arange(len(live))   # the features that set the band
@@ -78,26 +88,39 @@ def main():
     T, N = X.shape
     coh = np.zeros(N, np.float32)
     best = np.zeros(N, np.int16)
+    coh_all = np.zeros((N, len(live)), np.float32)                     # every neuron's band coherence per feature
     for c0 in range(0, N, a.chunk):
         c1 = min(N, c0 + a.chunk)
         x = torch.as_tensor(np.asarray(X[:, c0:c1], np.float32), device=dev)
-        Xf = torch.fft.rfft(segments(x), dim=1)                                  # [S, F, n]
+        Xf = torch.fft.rfft(segments(x, keep=keep), dim=1)                       # [S, F, n]
         Sxx = (Xf.abs() ** 2).mean(0)                                            # [F, n]
         Sxu = torch.einsum("sfn,sfk->fnk", Xf, Uf.conj()) / Xf.shape[0]          # [F, n, K]
         C = (Sxu.abs() ** 2) / (Sxx[:, :, None] * Suu[:, None, :]).clamp(min=1e-20)
         cb = C[band].mean(0)                                                     # [n, K] band coherence per feature
         v, k = cb.max(1)
         coh[c0:c1], best[c0:c1] = v.cpu().numpy(), k.cpu().numpy()
-    tag = a.recording + ("_varying" if a.varying_only else "")
+        coh_all[c0:c1] = cb.cpu().numpy()
+    tag = a.recording + ("_varying" if a.varying_only else "") + ("_train" if a.train_only else "")
     out = os.path.join(EXP, "data", f"stim_coherence_{tag}.npz")
     np.savez(out, coherence=coh, best_feature=live[best], band_hz=f[band], features=live)
     print(f"[stim coherence] {len(live)} features {live.tolist()}; band from {live[bc].tolist()}")
     if a.mask_out:
         thr = np.float32(np.quantile(coh, 1 - a.top))
         m = (coh >= thr).astype(np.float32)
+        # THE PER-FEATURE MASK (Cedric, 2026-10-06: "restrict neurons to just their selecting feature(s)"): neuron i
+        # receives feature k only if it is in the mask AND its band coherence with k clears the same cut -- its best
+        # feature always, any other feature that also selects it; [N, all stimulus columns], read by the law as
+        # `input_mask_array: mask_by_input` (each input enters only its own neurons)
+        mbi = np.zeros((N, U_all_cols), np.float32)
+        sel_k = (coh_all >= thr) & (m[:, None] > 0)
+        mbi[:, live] = sel_k
+        mbi[np.arange(N), live[best]] = np.maximum(mbi[np.arange(N), live[best]], m)
         np.savez(graphs_data_path("zebrafish", a.mask_out), mask=m, coherence=coh, threshold=thr,
-                 best_feature=live[best].astype(np.int64), features=live, band_hz=f[band])
-        print(f"[stim coherence] mask {a.mask_out}: {int(m.sum()):,} neurons, coherence >= {thr:.4f}")
+                 best_feature=live[best].astype(np.int64), features=live, band_hz=f[band], mask_by_input=mbi,
+                 coherence_by_feature=coh_all)
+        nf = mbi[m > 0].sum(1)
+        print(f"[stim coherence] mask {a.mask_out}: {int(m.sum()):,} neurons, coherence >= {thr:.4f}; features per input "
+              f"neuron: mean {nf.mean():.2f}, max {int(nf.max())}; per feature {mbi.sum(0).astype(int).tolist()}")
     print(f"[stim coherence] {a.recording}: {N:,} neurons; band {np.round(f[band], 4)} Hz; median {np.median(coh):.3f}, "
           f"p90 {np.percentile(coh, 90):.3f}")
     pos = z["pos_um"]

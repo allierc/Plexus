@@ -1,0 +1,68 @@
+learnable:
+- lr: 0.0009
+  op: state_diffuse
+  param: W_short
+  prior:
+    l1: 7.5e-05
+    l2: 7.5e-07
+    dale: 0.001
+    dale_keep: 0.01
+  title: one weight per short edge (the finest level, every neuron's Delaunay neighbours)
+- lr: 0.0009
+  op: state_diffuse
+  param: W_mid
+  prior:
+    l1: 7.5e-05
+    l2: 7.5e-07
+  title: one weight per middle edge (the 16- and 32-um levels)
+- block: tau
+  lr: 0.0018
+  of: neuron
+  title: each neuron's rate 1/tau
+- block: rest
+  lr: 0.0018
+  of: neuron
+  title: each neuron's rest value
+- block: input
+  lr: 0.0018
+  of: neuron
+  title: each neuron's weights on the 27 stimulus features (22 visual + 5 ephys)
+- lr: 1.0e-06
+  op: state_diffuse
+  param: omega_mlp
+  title: the modulation's SIREN weights
+model: config/zapbench/zap_e15_cur_siren_mesh3.yaml
+name: zap_dale_d0p001_k0p01
+task:
+  drive:
+    block: u
+    set: stimulus
+    window:
+    - 0
+    - 0
+  loss:
+  - reduction: norm2
+    term: trace_mse
+  observe:
+    block: dff
+    set: neuron
+  reference:
+    split: all
+    test_stride: 8
+    trace_recording: zapbench_destripe_ephys
+  rollouts:
+  - name: nominal
+  warmup: 10
+training:
+  batch: 4
+  clip: 1.0
+  lr: 0.0018
+  optimizer: adam
+  save_every: 500
+  schedule: none
+  seed: 0
+  select: last
+  stages:
+  - horizon: 10
+    iters: 200
+  init_from: zap_e15_cur_siren_mesh3
