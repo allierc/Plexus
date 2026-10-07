@@ -848,9 +848,14 @@ def write_slides():
                          "(rhombomere 2: left " + f"{pr2_['rhombomere 2']['left_red_blue'][0]}" + " red / "
                        + f"{pr2_['rhombomere 2']['left_red_blue'][1]}" + " blue, right "
                        + f"{pr2_['rhombomere 2']['right_red_blue'][0]}" + " / " + f"{pr2_['rhombomere 2']['right_red_blue'][1]}"
-                       + ") -- the ARTR's place. The two groups alternate with the stimulus and merge again in the dark."
+                       + ") -- the ARTR's place. The two groups alternate with the stimulus and merge again in the dark. "
+                         "The movie: each neuron lit by its own dF/F at the frame."
                          "\\par}")
-                deck.insert(at_, ("00j_phase", S.frame_wide("half a cycle apart", col2_("phase_rotation.png", tP_),
+                deck.insert(at_, ("00j_phase", S.frame_wide("half a cycle apart", (col2_("phase_rotation.png", tP_).replace(
+                                  "\\includegraphics[width=\\linewidth,height=\\colheight,keepaspectratio]{figs/phase_rotation.png}",
+                                  "\\playmovie[\\linewidth]{Movies/phase_rotation}")   # Cedric, 2026-10-07: a movie
+                                  if os.path.exists(os.path.join(PRES, "Movies", "phase_rotation.mp4"))
+                                  else col2_("phase_rotation.png", tP_)),
                                   "tools/exp17_phase.py",
                                   deck_title="in the Z-Brain atlas $\\cdot$ the rotation block, in antiphase")))
                 at_ += 1
