@@ -739,6 +739,51 @@ def write_slides():
             deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", col2_("atlas_regions_raster.png", tA_),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
+            # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
+            for b_, lr_, what_ in (
+                    ("gain", False, "Forward grating; the feedback gain (how far the scene moves per swim) switches low / "
+                     "high every 30 s. The 30-s alternation shows as vertical bands in most regions."),
+                    ("dots", False, "Random dots; three 20-s episodes of all dots moving right (orange). The slow rise and "
+                     "fall over the block dominates; the episodes leave short marks in the tectum and the tegmentum."),
+                    ("turning", True, "Grating forward, left, right, back: 30 s moving, 30 s still (orange, the stimulus "
+                     "features). Each region split by Z-Brain's midline, left hemisphere above the dashed line, right below.")):
+                f_ = f"atlas_regions_block_{b_}{'_lr' if lr_ else ''}.png"
+                if os.path.exists(os.path.join(PRES, "figs", f_)):
+                    tB_ = (head(f"the {b_} block")
+                           + "{\\scriptsize\\raggedright " + what_ + "\\par}\\vspace{6pt}\n"
+                           + head("the raster")
+                           + "{\\scriptsize\\raggedright Only the block's frames, every one; each neuron's dF/F z-scored "
+                             "within the block; rows by region as on the atlas slide, within a region by the correlation "
+                             "with the brain mean (green, top).\\par}")
+                    deck.insert(at_, (f"00j_block_{b_}", S.frame_wide(f"the {b_} block", col2_(f_, tB_), "tools/exp17_atlas.py "
+                                      f"summary --block {b_}{' --lr' if lr_ else ''}",
+                                      deck_title=f"in the Z-Brain atlas $\\cdot$ the {b_} block")))
+                    at_ += 1
+            jl_ = os.path.join(EXP, "data", "lateral.json")
+            if os.path.exists(jl_) and os.path.exists(os.path.join(PRES, "figs", "lateral.png")):
+                LA_ = json.load(open(jl_))
+                pb_ = LA_["per_block"]
+                lo_, hi_ = min(v["median_mirror_r"] for v in pb_.values()), max(v["median_mirror_r"] for v in pb_.values())
+                ro_ = pb_["rotation"]
+                lrr_ = {k: v["lr_mean_r_by_block"]["rotation"] for k, v in LA_["per_region"].items()}
+                tL_ = (head("a lateral chess board?")
+                       + "{\\scriptsize\\raggedright Each left neuron paired with the right neuron at its mirror image "
+                         "across Z-Brain's midline (mutual nearest, within " + f"{LA_['max_um']:g}" + " \\textmu m): "
+                       + f"{LA_['pairs']:,}" + " pairs. Per block, the correlation of the two members' dF/F. Null: the "
+                         "same left neuron against a random right neuron of its region and depth band.\\par}\\vspace{6pt}\n"
+                       + head("what it shows")
+                       + "{\\scriptsize\\raggedright No chess board. The mirror pairs move together (median r "
+                       + f"{lo_:+.2f} to {hi_:+.2f}" + " across blocks, above the null's), and anti-correlated pairs "
+                         "(r $<$ -" + f"{LA_['r_neg']:g}" + ") are no more common than in the null in any block. The "
+                         "region halves track each other at r $>$ 0.5 almost everywhere. The exception: the rotation "
+                         "block, where " + f"{100 * ro_['neg_share']:.1f}" + " \\% of pairs alternate (vs "
+                       + f"{100 * ro_['null_neg_share']:.1f}" + " \\% in the null), along the hindbrain midline, and "
+                         "the halves of rhombomere 5 decouple (r " + f"{lrr_['rhombomere 5']:+.2f}" + ", rhombomere 2 "
+                       + f"{lrr_['rhombomere 2']:+.2f}" + "): a hemisphere-wide left / right alternation, not a "
+                         "neuron-to-mirror one -- where the hindbrain oscillator (ARTR) sits.\\par}")
+                deck.insert(at_, ("00j_lateral", S.frame_wide("a lateral chess board?", col2_("lateral.png", tL_),
+                                  "tools/exp17_lateral.py", deck_title="in the Z-Brain atlas $\\cdot$ left against right")))
+                at_ += 1
             if os.path.exists(os.path.join(PRES, "figs", "atlas_raster.png")):
                 tR_ = (head("the raster, by region")
                        + "{\\scriptsize\\raggedright Every neuron in one of the atlas regions, its dF/F z-scored over "
@@ -960,6 +1005,10 @@ def write_slides():
         if "00k_atlas_regions_iso" in nm2_:
             it2_ = deck.pop(nm2_.index("00k_atlas_regions_iso"))
             deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1, it2_)
+        for k_, nb_ in enumerate(("00j_block_gain", "00j_block_dots", "00j_block_turning", "00j_lateral")):
+            if nb_ in [n for n, _ in deck]:                  # the block twins follow the atlas slide
+                it3_ = deck.pop([n for n, _ in deck].index(nb_))
+                deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1 + k_, it3_)
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-07: the lead / lag slide after the input neurons
     if "00e_brain_mean_lag" in nm_ and "05_input_neurons" in nm_:
         it_ = deck.pop(nm_.index("00e_brain_mean_lag"))

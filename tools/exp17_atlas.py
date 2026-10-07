@@ -202,8 +202,10 @@ def summary(iso=False):
         out[short] = dict(zip([c for c, _ in cols], v))
     json.dump(out, open(os.path.join(EXP, "data", "atlas_regions.json"), "w"), indent=1)
     plt.style.use("dark_background")
-    FH = 12.4 if iso in ("merged", "merged_raster") else 8.6                  # taller: the slide's free height filled (Cedric, 2026-10-07)
-    FW = 21.0 if iso == "merged_raster" else 14.0      # wide: fish, a large raster, three panels (Cedric, 2026-10-07)
+    blkv = str(iso).startswith("block:")                 # a block raster beside the fish (Cedric, 2026-10-07)
+    mg = iso in ("merged", "merged_raster") or blkv
+    FH = 12.4 if mg else 8.6                  # taller: the slide's free height filled (Cedric, 2026-10-07)
+    FW = 21.0 if (iso == "merged_raster" or str(iso).startswith("block:")) else 14.0      # wide: fish, a large raster, three panels (Cedric, 2026-10-07)
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
     # the neurons in the atlas, head left (the reference turned as Cedric turned it), each coloured by its TABLE region
     # (Cedric, 2026-10-07: "only 5 regions in the fish, many more in the table"): of the table's regions it lies in, the
@@ -222,17 +224,17 @@ def summary(iso=False):
         upd = m & (n_ < best_n)
         lab_[upd], best_n[upd] = k, n_
     ins_ = lab_ >= 0
-    if iso in ("merged", "merged_raster"):
+    if mg:
         # ONE SCALE for the four panels (Cedric, 2026-10-07: "top and side views are not to scale"): um per inch the
         # same everywhere, each panel's height its own extent at that scale, stacked from the top
         ext = lambda v: float(np.percentile(v[ins_], 99.9) - np.percentile(v[ins_], 0.1))     # noqa: E731
         ex, ey, ez = ext(xd), ext(yd), ext(A[:, 2]) + 40.0
         TT = 0.28                                          # a title line, inches
-        sc = min((0.30 if iso == "merged_raster" else 0.60) * FW / ex, (0.97 * FH - 4 * TT) / (2 * ey + 2 * ez))
+        sc = min((0.30 if (iso == "merged_raster" or blkv) else 0.60) * FW / ex, (0.97 * FH - 4 * TT) / (2 * ey + 2 * ez))
         wf = ex * sc / FW
         tot_ = (4 * TT + (2 * ey + 2 * ez) * sc) / FH          # the stack's height, figure fraction
         # centred on the raster's height (Cedric, 2026-10-07: "the fish a bit lower, centred with the raster")
-        panels, ycur = [], (min(0.985, 0.54 + tot_ / 2) if iso == "merged_raster" else 0.985)
+        panels, ycur = [], (min(0.985, 0.54 + tot_ / 2) if (iso == "merged_raster" or blkv) else 0.985)
         for kind, view, ttl in (("dots", "top", "from above, head left: the neurons"),
                                 ("iso", "top", "from above: the regions as surfaces"),
                                 ("dots", "side", "from the side: the neurons"),
@@ -256,10 +258,10 @@ def summary(iso=False):
     for kind, rect, view, ttl in panels:
         ax = fig.add_axes(rect)
         ax.axis("off")
-        ax.set_title(ttl + ("" if iso in ("merged", "merged_raster") else " -- the colours of the table's names"), fontsize=9.5, loc="left",
+        ax.set_title(ttl + ("" if mg else " -- the colours of the table's names"), fontsize=9.5, loc="left",
                      x=0.06, pad=2)
         if kind == "iso":
-            ax.imshow(imgs[view], aspect="auto" if iso in ("merged", "merged_raster") else "equal")
+            ax.imshow(imgs[view], aspect="auto" if mg else "equal")
             continue
         Y = yd if view == "top" else A[:, 2]
         ax.scatter(xd[~ins_], Y[~ins_], s=0.15, color="0.25", lw=0, rasterized=True)
@@ -270,14 +272,18 @@ def summary(iso=False):
             ax.text(xb_ + 50.0, yb_ - 8.0, "100 µm", color="white", fontsize=9, ha="center", va="top")
         for k, r_ in enumerate(rlist):
             m = lab_ == k
-            ax.scatter(xd[m], Y[m], s=0.35 if iso not in ("merged", "merged_raster") else 0.25, color=rcol[r_], lw=0, rasterized=True)
-        if iso in ("merged", "merged_raster"):                               # the brain's own extent, the panel's
+            ax.scatter(xd[m], Y[m], s=0.35 if not mg else 0.25, color=rcol[r_], lw=0, rasterized=True)
+        if mg:                                                               # the brain's own extent, the panel's
             ax.set_xlim(np.percentile(xd[ins_], 0.1), np.percentile(xd[ins_], 99.9))
             ax.set_ylim(np.percentile(Y[ins_], 0.1) - (40.0 if view == "side" else 0.0), np.percentile(Y[ins_], 99.9))
             ax.set_aspect("auto")
         else:
             ax.set_aspect("equal")
-    if iso == "merged_raster":
+    if isinstance(iso, str) and iso.startswith("block:"):
+        _, blk_, lr_ = iso.split(":")
+        draw_raster(fig, raster_data(block=blk_, split_lr=lr_ == "lr"), wf + 0.025, 0.985, y0=0.07, y1=0.975,
+                    name_w=0.085, fs=7.5)
+    elif iso == "merged_raster":
         # right: THE RASTER BY REGION next to the fish (Cedric, 2026-10-07: "put the raster by region next to the fish")
         imr = draw_raster(fig, raster_data(), wf + 0.025, 0.735, y0=0.105, y1=0.975, name_w=0.085, fs=7.5)
         cbx = fig.add_axes([wf + 0.025 + 0.102, 0.045, 0.735 - wf - 0.025 - 0.102, 0.012])      # the grey LUT below
@@ -370,13 +376,18 @@ def summary(iso=False):
             ax.text(j + 0.5, nr + 0.2, c, ha="left", va="bottom", fontsize=8.5, rotation=35)
         ax.set_xlim(-4.6, nc + 1.2)                            # room for the names (left) and the last column title
         ax.set_ylim(0, nr + 2.6)
-    fig.savefig(os.path.join(EXP, "presentation", "figs", {"merged": "atlas_regions_merged.png", "merged_raster": "atlas_regions_raster.png", True: "atlas_regions_iso.png",
+    fout = (f"atlas_regions_block_{iso.split(':')[1].replace(' ', '_')}{'_lr' if iso.endswith(':lr') else ''}.png" if blkv
+            else None)
+    fig.savefig(os.path.join(EXP, "presentation", "figs", fout or {"merged": "atlas_regions_merged.png", "merged_raster": "atlas_regions_raster.png", True: "atlas_regions_iso.png",
                                                            False: "atlas_regions.png"}[iso]), dpi=130, facecolor="black")
     plt.close(fig)
 
 
-def raster_data():
-    """The raster's rows (raster() below): binned z-scored dF/F [NB, T], the region bounds in rows, names, colours."""
+def raster_data(block=None, split_lr=False, NB=1000):
+    """The raster's rows (raster() below): binned z-scored dF/F [NB, T], the region bounds in rows, names, colours.
+    block: one stimulus block's frames only, z-scored over it, every frame shown (Cedric, 2026-10-07: "a twin focused
+    on the gain block, so we see all frames"); split_lr: within each region the left neurons, then the right (Z-Brain's
+    midline), each sorted by correlation (Cedric: "left / right, to see a chess-board pattern")."""
     import matplotlib.pyplot as plt
     from plexus.paths import graphs_data_path
     za = np.load(os.path.join(EXP, "data", "atlas_destripe.npz"))
@@ -384,7 +395,15 @@ def raster_data():
     z_ = np.load(graphs_data_path("zebrafish", "zapbench_destripe_recording.npz"))
     X = np.asarray(z_["dff"], np.float32)
     off_, nm_b = z_["offsets"], [str(x) for x in z_["names"]]
+    U_ = np.asarray(z_["stimulus"], np.float32)
+    f0 = 0
+    if block is not None:
+        kb = nm_b.index(block)
+        f0, f1 = int(off_[kb]), int(off_[kb + 1])
+        X, U_ = X[f0:f1], U_[f0:f1]
+        off_, nm_b = np.array([0, f1 - f0]), [block]
     T = X.shape[0]
+    left = za["atlas_um"][:, 0] < (621 - 1) * ZVOX[0] / 2          # Z-Brain's midline (x, head up)
     rlist = [short for full, short in REGIONS if full in names and reg[:, names.index(full)].sum() >= 50]
     rfull = {short: full for full, short in REGIONS}
     pal = list(plt.get_cmap("tab20")(np.arange(20))) + list(plt.get_cmap("Set1")(np.arange(9)))
@@ -399,12 +418,16 @@ def raster_data():
     bc = (b - b.mean()) / b.std()
     mu, sd = X.mean(0), np.maximum(X.std(0), 1e-9)
     r = ((X - mu) / sd * bc[:, None].astype(np.float32)).mean(0)
-    order, bounds = [], []
+    order, bounds, lr_cut = [], [], []
     for k in range(len(rlist)):
-        ids = np.flatnonzero(lab == k)
-        ids = ids[np.argsort(-r[ids])]
-        bounds.append((len(order), len(order) + len(ids)))
-        order.extend(ids.tolist())
+        a0 = len(order)
+        for side in ((True, False) if split_lr else (None,)):
+            ids = np.flatnonzero((lab == k) & (True if side is None else (left == side)))
+            ids = ids[np.argsort(-r[ids])]
+            order.extend(ids.tolist())
+            if side is True:
+                lr_cut.append(len(order))
+        bounds.append((a0, len(order)))
     order = np.array(order)
     NB = 1000
     edges = np.linspace(0, len(order), NB + 1).astype(int)
@@ -412,8 +435,9 @@ def raster_data():
     for q in range(NB):
         ids = order[edges[q]:edges[q + 1]]
         img[q] = ((X[:, ids] - mu[ids]) / sd[ids]).mean(1)
+    fl = [j for j in range(U_.shape[1]) if U_[:, j].std() > 1e-6] if block is not None else []
     return {"img": img, "bounds": bounds, "rlist": rlist, "rcol": rcol, "n": len(order), "b": b, "off": off_,
-            "names": nm_b, "T": T}
+            "names": nm_b, "T": T, "lr_cut": lr_cut, "U": U_[:, fl] if fl else None, "block": block}
 
 
 def draw_raster(fig, D, x0, x1, y0=0.07, y1=0.95, name_w=0.15, fs=7.5):
@@ -423,6 +447,7 @@ def draw_raster(fig, D, x0, x1, y0=0.07, y1=0.95, name_w=0.15, fs=7.5):
     img, bounds, rlist, rcol, n, b, off_, nm_b, T = (D[k] for k in ("img", "bounds", "rlist", "rcol", "n", "b", "off",
                                                                    "names", "T"))
     tmin = T * 0.914 / 60
+    blk = D.get("block")
     xa = x0 + name_w + 0.017
     hb = 0.09 * (y1 - y0) / 0.88
     yr1 = y1 - hb - 0.01
@@ -432,6 +457,14 @@ def draw_raster(fig, D, x0, x1, y0=0.07, y1=0.95, name_w=0.15, fs=7.5):
         abb = {"turning": "turn", "position": "pos", "open loop": "open", "rotation": "rot"}.get(nm_b[k_], nm_b[k_])
         ab.text((off_[k_] + min(off_[k_ + 1], T - 1)) / 2 * 0.914 / 60, 1.02, abb, color="0.75", fontsize=fs,
                 ha="center", va="bottom", transform=ab.get_xaxis_transform())
+    if blk is not None and D.get("U") is not None:       # the block's changing stimulus features, faint orange
+        Uu = D["U"]
+        Uz = (Uu - Uu.min(0)) / np.maximum(np.ptp(Uu, 0), 1e-9)
+        ab2 = ab.twinx()
+        for j in range(Uz.shape[1]):
+            ab2.plot(np.arange(T) * 0.914 / 60, Uz[:, j] + 1.2 * j, color="#ff9f1c", lw=0.6, alpha=0.8)
+        ab2.set_yticks([])
+        ab2.set_ylim(-0.2, 1.2 * Uz.shape[1])
     ab.plot(np.arange(T) * 0.914 / 60, b, color="#2ca02c", lw=0.6)
     ab.set_xlim(0, tmin)
     ab.set_xticklabels([])
@@ -443,7 +476,9 @@ def draw_raster(fig, D, x0, x1, y0=0.07, y1=0.95, name_w=0.15, fs=7.5):
     im_out = ax.imshow(img, aspect="auto", cmap="gray", vmin=-0.3 * vm, vmax=vm, extent=(0, tmin, n, 0),
                        interpolation="nearest")
     ax.set_yticks([])
-    ax.set_xlabel("time since the recording's start, min", fontsize=fs + 1.5)
+    ax.set_xlabel(f"time in the {blk} block, min" if blk else "time since the recording's start, min", fontsize=fs + 1.5)
+    for c_ in D.get("lr_cut", []):                      # left / right within each region
+        ax.axhline(c_, color="#4a7bff", lw=0.5, ls="--")
     ax.tick_params(labelsize=fs + 0.5)
     bar = fig.add_axes([xa - 0.014, y0, 0.011, yr1 - y0])
     bar.set_ylim(n, 0)
@@ -493,6 +528,9 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "raster":
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "summary":
-        summary(iso="merged_raster" if "--raster" in sys.argv else ("merged" if "--merged" in sys.argv else ("--iso" in sys.argv)))
+        if "--block" in sys.argv:                          # summary --block gain [--lr]
+            summary(iso=f"block:{sys.argv[sys.argv.index('--block') + 1]}:{'lr' if '--lr' in sys.argv else ''}")
+        else:
+            summary(iso="merged_raster" if "--raster" in sys.argv else ("merged" if "--merged" in sys.argv else ("--iso" in sys.argv)))
     elif len(sys.argv) == 1:
         main()
