@@ -167,14 +167,28 @@ class NeuralPanel:
         return r, om
 
     # ------------------------------------------------------------------ the figure
-    def _build(self):
+    def _figure(self):
+        """(figure, the circuit's axes, the kinograph's axes). A subclass that draws more than the circuit
+        (`plexus.tasks.plot_trainer.TaskCircuitPanel`: the trace and the eye) lays the figure out here and
+        keeps its own axes; the circuit is drawn in axes coordinates, so it fits whatever box it is given."""
         import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
-        self.cmap = _ei_cmap()
-        N = self.N
         fig = plt.figure(figsize=(14.0, 8.6), facecolor=BG, dpi=100)
         gs = GridSpec(2, 1, height_ratios=[1.0, 0.58], hspace=0.10, left=0.06, right=0.985, top=0.95, bottom=0.07)
-        ax = fig.add_subplot(gs[0]); ax.set_facecolor(BG); ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+        return fig, fig.add_subplot(gs[0]), fig.add_subplot(gs[1])
+
+    def _build_extra(self, fig):
+        """A subclass's own panels, built once after the circuit's."""
+
+    def _draw_extra(self, idx: int):
+        """A subclass's own panels at rendered frame `idx`, before the canvas is drawn."""
+
+    def _build(self):
+        import matplotlib.pyplot as plt
+        self.cmap = _ei_cmap()
+        N = self.N
+        fig, ax, ax_k = self._figure()
+        ax.set_facecolor(BG); ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
         mid_l, mid_r, lo, hi = 0.30, 0.72, 0.06, 0.96
         im_rec = ax.imshow(np.zeros((N, N)), cmap=self.cmap, vmin=-1, vmax=1, extent=(mid_l, mid_r, lo, hi),
                            aspect="auto", zorder=3, interpolation="nearest")
@@ -209,7 +223,7 @@ class NeuralPanel:
         for x0, x1, yy in ((0.11, 0.128, 0.5 * (lo + hi)), (mid_r + 0.004, 0.73, 0.5 * (lo + hi)), (0.77, 0.855, 0.5 * (lo + hi))):
             ax.annotate("", xy=(x1, yy), xytext=(x0, yy), arrowprops=dict(arrowstyle="-|>", color="#ffffff", lw=1.0))
         self.txt = ax.text(0.0, 1.0, "", transform=ax.transAxes, color="#fff", fontsize=FS_NOTE, ha="left", va="bottom")
-        ax_k = fig.add_subplot(gs[1]); ax_k.set_facecolor(BG)
+        ax_k.set_facecolor(BG)
         im_kino = ax_k.imshow(np.full((N, self.kino_w), np.nan, np.float32), cmap=self.cmap, vmin=-1, vmax=1,
                               aspect="auto", interpolation="nearest", origin="upper")
         ax_k.set_yticks([]); ax_k.set_xticks([])
@@ -222,6 +236,7 @@ class NeuralPanel:
                       fontsize=FS_TICK, ha="right", va="center")
         ax_k.set_xlabel(f"time  (last {self.kino_w} rendered frames)", color="#ddd", fontsize=FS_AXIS, labelpad=4)
         self.fig, self.art = fig, dict(im_rec=im_rec, im_in=im_in, im_rate=im_rate, im_out=im_out, im_kino=im_kino)
+        self._build_extra(fig)
         fig.canvas.draw()
 
     # ------------------------------------------------------------------ the LUTs
@@ -285,6 +300,7 @@ class NeuralPanel:
                           f"frame {tick}/{self.n_frames}{clk}   "
                           + (f"brightness = |W r| up to {self.msg_lim or 0:.3g}" if _traffic
                              else "brightness = |W|, the synapse weight (no traffic yet)"))
+        self._draw_extra(idx)
         self.fig.canvas.draw()
         return np.asarray(self.fig.canvas.buffer_rgba())[..., :3].copy()
 
