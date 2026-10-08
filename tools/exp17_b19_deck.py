@@ -1547,6 +1547,25 @@ def write_slides():
         "markers, so its rest gains a learned offset per stimulus block (the 20 \\% input neurons read all 22 "
         "columns); SIREN $\\Omega$, $\\tau$ in [1, 100] s, x1 updates"),
         label="V$_{rest}$ per block, lattice grid") if not x[0].startswith("19_edges_")]
+    jv_ = os.path.join(EXP, "data", "vrest_blocks_zap_n20_markall.json")   # Cedric, 2026-10-08: how V_rest changes per block
+    if os.path.exists(jv_) and os.path.exists(os.path.join(PRES, "figs", "vrest_blocks_zap_n20_markall.png")):
+        VB_ = json.load(open(jv_))
+        rk_ = VB_["r_dV_vs_recorded_shift"]
+        right_v = (head("V$_{rest}$ per block, 20.3")
+                   + "{\\scriptsize\\raggedright Every neuron reads the 9 condition markers, each 1 while its block plays: "
+                     "the neuron's rest is V$_i$ + dV$_{i,k}$ in block $k$, dV its learned weight on block $k$'s marker "
+                     "(" + f"{VB_['neurons_reading_markers']:,}" + " neurons), in dF/F.\\par}\\vspace{6pt}\n"
+                   + head("what it shows")
+                   + "{\\scriptsize\\raggedright The brain-wide V$_{rest}$ moves little from block to block (a), but "
+                     "each neuron's offset follows its own recorded block shift (c): r " + f"{min(rk_.values()):+.2f}" + " to "
+                   + f"{max(rk_.values()):+.2f}" + " over the neurons (lowest " + min(rk_, key=rk_.get) + ", highest "
+                   + max(rk_, key=rk_.get) + "). The offsets fit each neuron's slow baseline per block: much of this run's "
+                     "per-neuron r is that baseline, not network dynamics. Per region (b), the offsets are mostly "
+                     "negative, the hypothalamus and preoptic area lowest; (d) the block whose offsets spread most, "
+                   + VB_["block_most_spread"] + ", on the fish.\\par}")
+        deck.append(("19_vrest_zap_n20_markall", S.frame_narrow("V$_{rest}$ per block", "figs/vrest_blocks_zap_n20_markall.png",
+                                                               right_v, "tools/exp17_vrest_blocks.py zap_n20_markall",
+                                                               left=0.76, deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ the offsets")))
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     from PIL import Image
