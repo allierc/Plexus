@@ -643,9 +643,8 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
         srt = sorted(pr_.items(), key=lambda kv: kv[1]["median"])
         right_t = (S.head("$\\tau$ by brain region")
                    + "{\\scriptsize each neuron's learned leak time constant $\\tau$ (bounded to [1, 100] s), grouped by "
-                     "its atlas region (the most specific of the table's), head to tail. Left, as on the atlas slide: the neurons "
-                     "by their own $\\tau$, the regions' surfaces by their neurons' mean $\\tau$ (geometric), one linear "
-                     "colour scale\\par}\\vspace{6pt}\n"
+                     "its atlas region (the most specific of the table's), head to tail. Left: every neuron by its own $\\tau$, "
+                     "from above and from the side; one linear colour scale, red fast, blue slow\\par}\\vspace{6pt}\n"
                    + S.head("what it shows")
                    + "{\\scriptsize\\raggedright The regions differ: they explain " + f"{100 * T_['eta2_log_tau_by_region']:.0f}"
                    + " \\% of the variance of log $\\tau$ (shuffled labels: " + f"{100 * T_['eta2_shuffled_max']:.2f}" + " \\%). "
@@ -1028,6 +1027,29 @@ def write_slides():
             deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all"),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
+            # Cedric, 2026-10-08: slide 4 -- slide 3's fish alone, and each table region explained: its role in plain words
+            # and its Z-Brain sub-masks (tools/exp17_atlas.py summary --fish: the masks >= 80 % inside it)
+            js_ = os.path.join(EXP, "data", "atlas_subregions.json")
+            if os.path.exists(js_) and os.path.exists(os.path.join(PRES, "figs", "atlas_regions_fish.png")):
+                SR_ = json.load(open(js_))
+                # the table is drawn on the figure, on slide 3's canvas, so the fish sit exactly where slide 3 has them
+                tS_ = (head("the regions, explained")
+                       + "{\\scriptsize\\raggedright The 24 regions of slide 3, head to tail, in their colours: what each "
+                         "does, in plain words, its neurons in parentheses, and in grey the Z-Brain masks inside it (80 \\% "
+                         "of their voxels or more).\\par}\\vspace{\\baselineskip}\n"
+                       + head("the atlas")
+                       + "{\\scriptsize\\raggedright Randlett et al. 2015, Nature Methods 12:1039: the Z-Brain larval "
+                         "zebrafish reference brain, 294 masks -- anatomical divisions, nuclei and transgene-labelled "
+                         "clusters (Gad1b inhibitory, Vglut2 excitatory, Isl1 motor neurons, Vmat2 monoaminergic).\\par}"
+                         "\\vspace{\\baselineskip}\n"
+                       + head("the roles")
+                       + "{\\scriptsize\\raggedright Textbook summaries of the larval zebrafish brain, one line each; "
+                         "the ARTR as on slides 14-15.\\par}")
+                body_s = col2_("atlas_regions_fish.png", tS_)
+                deck.insert(at_, ("00j_atlas_sub", S.frame_wide("the regions of the atlas", body_s,
+                                                               "tools/exp17_atlas.py summary --fish (data/atlas_subregions.json)",
+                                                               deck_title="in the Z-Brain atlas $\\cdot$ the regions, explained")))
+                at_ += 1
             # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
             for b_, lr_, what_ in (                  # Cedric, 2026-10-07: one raster per block, in the recording's order
                     ("gain", False, "Forward grating; the feedback gain (how far the scene moves per swim) switches low / "
@@ -1368,17 +1390,19 @@ def write_slides():
             body21 = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.56\\textwidth}\n"
                       + body21.replace("\\vspace*{2\\baselineskip}\\fitcol", "\\vspace*{0pt}\\fitcol", 1)   # up (2026-10-08)
                       + "\\end{column}\n\\begin{column}{0.42\\textwidth}\\vspace*{0pt}\n"
-                        "{\\small\\textbf{exp18: one wiring, six circuits}}\\\\[3pt]\n"
-                        "{\\tiny\\raggedright The 285-cell zebrafish oculomotor integrator, its wiring fixed; six laws "
-                        "(1 integrate, 2 delay, 3 low-pass, 4 high-pass, 5 resonator, 6 differentiate), each selected by one "
-                        "angle $\\alpha_k$, $\\varphi$ learned from random. Left: one held-out trial per law, the target "
-                        "(white) and the circuit (dashed, the law's colour). Right: the six angles, the held-out error over "
-                        "the law's own variance.\\par}\\vspace{6pt}\n"
-                        "\\begin{minipage}[t]{0.52\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.56\\textheight,"
+                        # the header and caption in a fitted column too, so at the left's size (Cedric, 2026-10-08)
+                        "\\fitcol{%\n{\\Large\\textbf{exp18: one wiring, six circuits}}\\\\[4pt]\n"
+                        "{\\small\\raggedright The 285-cell zebrafish oculomotor integrator, its wiring fixed; six laws "
+                        "(1 integrate, 2 delay, 3 low-pass, 4 high-pass, 5 resonator, 6 differentiate),\\\\ each selected by one "
+                        "angle $\\alpha_k$, $\\varphi$ learned from random. Left: one held-out trial per law,\\\\ the target "
+                        "(white), the circuit (dashed, the law's colour). Right: the wiring, then the six angles\\\\ and the "
+                        "held-out error over the law's own variance.\\par}}\\par\\vspace{4pt}\n"
+                        # the wiring on top, the angles below (Cedric, 2026-10-08), clear of the title band and the footer
+                        "\\begin{minipage}[t]{0.52\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.54\\textheight,"
                         "keepaspectratio]{figs/exp18_toy_traces.png}\\end{minipage}\\hfill"
-                        "\\begin{minipage}[t]{0.46\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.30\\textheight,"
-                        "keepaspectratio]{figs/exp18_toy_circle.png}\\par\\vspace{4pt}"
-                        "\\includegraphics[width=\\linewidth,height=0.33\\textheight,keepaspectratio]{figs/exp18_toy_W.png}"
+                        "\\begin{minipage}[t]{0.46\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.27\\textheight,"
+                        "keepaspectratio]{figs/exp18_toy_W.png}\\par\\vspace{2pt}"
+                        "\\includegraphics[width=\\linewidth,height=0.26\\textheight,keepaspectratio]{figs/exp18_toy_circle.png}"
                         "\\end{minipage}\n\\end{column}\n\\end{columns}")
         deck.append(("07b_angle", S.frame_wide("the angular modulation", body21,
                                                "cell_ops: neuron_graph_phase; Allier 2026, GNN_Transformer note, Eq. 27",
@@ -1476,6 +1500,37 @@ def write_slides():
                                                   "\\playmovie{Movies/b19_fish_prune}", right_pf,
                                                   "tools/exp17_b19_deck.py --prune-movie",
                                                   deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the whole fish, pruned")))
+        je_ = os.path.join(EXP, "data", "ei_dale_n19.json")   # Cedric, 2026-10-08: excitatory / inhibitory under Dale
+        if os.path.exists(je_) and os.path.exists(os.path.join(PRES, "figs", "ei_dale_n19.png")):
+            EI_ = json.load(open(je_))
+            G_ = EI_["global"]
+            mE = np.mean([g["excitatory"] for g in G_]); mI = np.mean([g["inhibitory"] for g in G_])
+            pr_ = EI_["per_region"]
+            hi_i = sorted(pr_.items(), key=lambda kv: -kv[1]["inhibitory_share_mean"])[:3]
+            lo_i = sorted(pr_.items(), key=lambda kv: kv[1]["inhibitory_share_mean"])[:3]
+            right_ei = (S.head("excitatory and inhibitory, the five Dale folds")
+                        + "{\\scriptsize\\raggedright 19.25 with the Dale prior (a sender's minority-sign weight "
+                          "penalised), five seeds (19.29-19.33). A neuron is excitatory when most of its outgoing weight is "
+                          "positive, inhibitory when negative.\\par}\\vspace{6pt}\n"
+                        + S.head("what it shows")
+                        + "{\\scriptsize\\raggedright Globally " + f"{100 * mE:.0f}" + " \\% excitatory, " + f"{100 * mI:.0f}"
+                        + " \\% inhibitory in every fold; the prior holds (" + f"{100 * np.mean([g['minority_mass'] for g in G_]):.1f}"
+                        + " \\% of the weight on a minority sign). It costs per-neuron r "
+                        + f"{np.mean([g['per_neuron_r'] for g in G_]):.3f}" + " against 19.25's 0.423. But a neuron's sign "
+                          "is weakly identified: all five folds agree on " + f"{100 * EI_['unanimous_share']:.0f}"
+                        + " \\% of the neurons (chance " + f"{100 * EI_['unanimous_chance']:.0f}" + " \\%). Per region the "
+                          "share is stable over the folds: most inhibitory "
+                        + ", ".join(f"{k} ({100 * v['inhibitory_share_mean']:.0f} \\%)" for k, v in hi_i)
+                        + "; least " + ", ".join(f"{k} ({100 * v['inhibitory_share_mean']:.0f} \\%)" for k, v in lo_i)
+                        + ".\\par}\\vspace{6pt}\n"
+                        + S.head("against the atlas")
+                        + "{\\scriptsize\\raggedright The Z-Brain transmitter masks (Gad1b, Glyt2 inhibitory; Vglut2 "
+                          "excitatory) give the yellow marks: across regions r " + f"{EI_['r_learned_vs_atlas_across_regions']:+.2f}"
+                        + ". A weak reference -- the masks label regions, not cells (0 or 100 \\% where one mask covers "
+                          "the region) -- but no sign that the learned E / I follows the anatomy.\\par}")
+            deck.append(("19_ei_dale", S.frame_narrow("excitatory and inhibitory neurons", "figs/ei_dale_n19.png", right_ei,
+                                                      "tools/exp17_ei.py (data/ei_dale_n19.json)", left=0.74,
+                                                      deck_title="batch 19.29-19.33 $\\cdot$ the Dale folds $\\cdot$ excitatory and inhibitory")))
         right_pd = (S.head("which weights are near 0?")
                     + "{\\scriptsize\\raggedright Per level, $\\log_{10}|W|$ is bimodal: a dead mode near $10^{-3}$, the L1 "
                       "prior's floor (edges training never used), and a live mode near 0.05. Two Gaussians fitted per level "
@@ -1516,7 +1571,7 @@ def write_slides():
             it2_ = deck.pop(nm2_.index("00k_atlas_regions_iso"))
             deck.insert([n for n, _ in deck].index("00j_atlas_regions") + 1, it2_)
         pos3_ = [n for n, _ in deck].index("00j_atlas_regions") + 1
-        for k_, nb_ in enumerate(("00j_block_gain", "00j_block_dots", "00j_block_flash", "00j_block_taxis",
+        for k_, nb_ in enumerate(("00j_atlas_sub", "00j_block_gain", "00j_block_dots", "00j_block_flash", "00j_block_taxis",
                                     "00j_block_turning", "00j_block_position", "00j_block_open_loop", "00j_block_rotation",
                                     "00j_block_dark", "00j_lateral", "00j_artr", "00j_phase")):
             if nb_ in [n for n, _ in deck]:                  # the block twins follow the atlas slide, in this order
@@ -1549,7 +1604,7 @@ def write_slides():
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
     ed_ = [n for n in nm_ if n.startswith("19_edges_")]
     if ed_:
-        for k_, nb_ in enumerate(("19_prune_window", "19_prune_fish", "19_prune_dist")):
+        for k_, nb_ in enumerate(("19_prune_fish", "19_prune_window", "19_prune_dist", "19_ei_dale")):   # the fish first (2026-10-08)
             if nb_ in [n for n, _ in deck]:
                 it_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert([n for n, _ in deck].index(ed_[0]) + 1 + k_, it_)
