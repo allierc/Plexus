@@ -115,7 +115,9 @@ def render(run, V, bg, n_part, combined, suffix=""):
     fig.text(*((0.05, 1.42 / Hf) if not combined else (0.54, 3.85 / Hf)), "brain-mean dF/F: recorded (green), learned "
              "(white); time, min", color="0.75", fontsize=9 if not combined else 11)
     cur = m_.axvline(tm[0], color="#ff7f0e", lw=0.9)
-    t_txt = fig.text(0.70, (Hf - 0.05) / Hf, "", color="0.75", fontsize=10, va="top")
+    # the clock: in combined mode beside the brain-mean label (2026-10-08: at the top it overprinted the oblique view's title)
+    t_txt = (fig.text(0.70, (Hf - 0.05) / Hf, "", color="0.75", fontsize=10, va="top") if not combined else
+             fig.text(0.97, 3.85 / Hf, "", color="0.9", fontsize=12, ha="right"))
     tmp = tempfile.mkdtemp(prefix="wind_views_")
     for f in range(F):
         for v, _ in rows:
