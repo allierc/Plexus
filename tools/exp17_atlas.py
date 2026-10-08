@@ -103,32 +103,80 @@ REGIONS = [("Telencephalon - Olfactory Bulb", "olfactory bulb"), ("Telencephalon
            ("Rhombencephalon - X Vagus motorneuron cluster", "vagus motor neurons"), ("Spinal Cord", "spinal cord")]
 
 
-# THE TABLE REGIONS IN PLAIN WORDS (Cedric, 2026-10-08: "explain each region"): textbook summaries of the larval zebrafish
-# brain, for the atlas slides; the atlas itself is Randlett et al. 2015 (Nature Methods 12:1039)
-REGION_ROLE = {"olfactory bulb": "the first relay of smell",
-               "pallium": "dorsal forebrain, homologue of cortex, hippocampus and amygdala: learning, memory",
-               "subpallium": "ventral forebrain, homologue of the basal ganglia: action selection",
-               "habenula": "links the forebrain to the midbrain's monoamine nuclei: aversion, coping",
-               "dorsal thalamus": "relays sensory input to the forebrain",
-               "ventral thalamus": "the prethalamus, inhibitory: gates the thalamic relay",
-               "pretectum": "direction-selective optic flow: drives the optomotor and optokinetic responses",
-               "preoptic area": "neuroendocrine: stress, homeostasis",
-               "hypothalamus (intermediate)": "neuroendocrine: feeding, arousal",
-               "posterior tuberculum": "dopaminergic neurons projecting to the hindbrain and spinal cord",
-               "tectum (periventricular)": "the optic tectum's cell layer: vision, prey capture",
-               "torus semicircularis": "the midbrain's hearing and lateral-line centre",
-               "tegmentum": "midbrain motor centres (nMLF, oculomotor nucleus): swimming, eye movements",
-               "cerebellum": "motor coordination and learning, e.g. visuomotor gain adaptation",
-               "rhombomere 1": "anterior hindbrain, the cerebellum's base: locus coeruleus, raphe",
-               "rhombomere 2": "the ARTR (turn direction); reticulospinal neurons",
-               "rhombomere 3": "the ARTR's back; trigeminal motor neurons",
-               "rhombomere 4": "the Mauthner cells: the escape",
-               "rhombomere 5": "vestibular nuclei; abducens (eye movements)",
-               "rhombomere 6": "facial motor neurons, reticulospinal neurons",
-               "rhombomere 7": "caudal hindbrain: the eye-position integrator, rhythms of swimming and breathing",
-               "noradrenergic (IFN, vagal)": "noradrenergic cluster of the caudal medulla",
-               "vagus motor neurons": "vagal motor nucleus: gut, heart, gills",
-               "spinal cord": "motor neurons and the swim rhythm generator"}
+# THE TABLE REGIONS IN PLAIN WORDS (Cedric, 2026-10-08: "explain each region", then "expand a bit, + a reference in grey
+# small font"): what each region holds and does in the larval zebrafish, one reference each (REGION_REF). The atlas itself
+# is Randlett et al. 2015 (Nature Methods 12:1039). Kawashima 2016, Mu 2019 and Daie 2015 are in the experiment's papers/;
+# the others are cited from memory, not yet checked against their PDFs.
+REGION_ROLE = {
+    "olfactory bulb": "the first relay of smell: its mitral cells receive the nose's sensory neurons and project to the "
+                      "pallium (Dp, the olfactory cortex), the habenula and the hypothalamus",
+    "pallium": "dorsal forebrain, everted in fish: homologue of the cortex -- Dl of the hippocampus, Dm of the amygdala, "
+               "Dp of the olfactory cortex: learning, memory, valence",
+    "subpallium": "ventral forebrain, mostly GABAergic: homologue of the striatum and septum (basal ganglia), fed "
+                  "dopamine by the posterior tuberculum: action selection",
+    "habenula": "dorsal diencephalon, left / right asymmetric: relays the forebrain, smell and light to the "
+                "interpeduncular nucleus and the raphe: fear, aversion, giving up",
+    "dorsal thalamus": "the thalamus proper: relays sensory input (vision, light level) to the pallium and the habenula",
+    "ventral thalamus": "the prethalamus, GABAergic, homologue of the reticular thalamic nucleus and the zona incerta: "
+                        "gates the thalamic relay",
+    "pretectum": "between thalamus and tectum, fed directly by the retina: direction-selective optic-flow neurons drive "
+                 "the optomotor and optokinetic responses; one retinal target (AF7) detects prey",
+    "preoptic area": "in front of the optic chiasm; neurosecretory cells (oxytocin, vasopressin, CRH) driving the "
+                     "pituitary: stress axis, water and temperature balance",
+    "hypothalamus (intermediate)": "the hypothalamus's middle: feeding and hunger (prey in view activates it), arousal; "
+                                   "neuroendocrine output to the pituitary",
+    "posterior tuberculum": "ventral diencephalon: the dopaminergic neurons (A11-like) that project down to the hindbrain "
+                            "and spinal cord and up to the subpallium",
+    "tectum (periventricular)": "the optic tectum's cell layer, homologue of the superior colliculus and the retina's main "
+                                "target: a visual map of space; detects prey and looming threats, drives hunting and escape",
+    "torus semicircularis": "below the tectum, homologue of the inferior colliculus: hearing and the lateral line "
+                            "(water flow)",
+    "tegmentum": "ventral midbrain: the nMLF (nucleus of the medial longitudinal fasciculus), which sets swim speed and "
+                 "posture, and the oculomotor nucleus (III, the eye muscles)",
+    "cerebellum": "Purkinje and granule cells, climbing fibres from the inferior olive: motor coordination and learning, "
+                  "e.g. adapting the swim to its visual feedback",
+    "rhombomere 1": "the hindbrain's first segment, under the cerebellum: the locus coeruleus (noradrenaline) and the "
+                    "dorsal raphe (serotonin), which tracks the outcome of swims for short-term motor learning",
+    "rhombomere 2": "the ARTR's front (anterior rhombencephalic turning region): left and right populations in "
+                    "antiphase that set the turn direction and alternate slowly; reticulospinal neurons",
+    "rhombomere 3": "the ARTR's back; the trigeminal motor nucleus (jaw) and reticulospinal neurons",
+    "rhombomere 4": "the two Mauthner cells, one per side: a single spike launches the fast escape (the C-start)",
+    "rhombomere 5": "the abducens motor nucleus (eye, with r6) and the saccade generator; the vestibular tangential "
+                    "nucleus: gravity-driven eye movements",
+    "rhombomere 6": "the abducens nucleus's back; reticulospinal neurons of the escape network (MiD3, a Mauthner "
+                    "homologue); facial motor neurons",
+    "rhombomere 7": "caudal hindbrain: the oculomotor integrator that holds the eyes still between saccades (with r8); "
+                    "V2a reticulospinal neurons of the swim command",
+    "noradrenergic (IFN, vagal)": "the noradrenaline cluster of the medulla (NE-MO, like the mammalian A2): it signals "
+                                  "failed swims to radial astrocytes, which switch the fish to giving up",
+    "vagus motor neurons": "the vagal motor nucleus (X), the last branchiomotor nucleus: muscles of the gill arches and "
+                           "the pharynx, heart rate, the gut",
+    "spinal cord": "motor neurons and the interneurons of the swim rhythm, recruited in order of swim speed; the "
+                   "mechanosensory Rohon-Beard neurons"}
+REGION_REF = {"olfactory bulb": "Yaksi et al. 2009, Nat Neurosci",
+              "pallium": "Wullimann & Mueller 2004, J Comp Neurol",
+              "subpallium": "Wullimann & Mueller 2004, J Comp Neurol; Rink & Wullimann 2001, Brain Res",
+              "habenula": "Agetsuma et al. 2010, Nat Neurosci; Andalman et al. 2019, Cell",
+              "dorsal thalamus": "Mueller 2012, Front Neural Circuits",
+              "ventral thalamus": "Mueller 2012, Front Neural Circuits",
+              "pretectum": "Kubo et al. 2014, Neuron; Naumann et al. 2016, Cell; Semmelhack et al. 2014, eLife",
+              "preoptic area": "Herget et al. 2014, J Comp Neurol",
+              "hypothalamus (intermediate)": "Muto et al. 2017, Nat Commun; Wee et al. 2019, eLife",
+              "posterior tuberculum": "Tay et al. 2011, Nat Commun; Rink & Wullimann 2001, Brain Res",
+              "tectum (periventricular)": "Bianco & Engert 2015, Curr Biol; Temizer et al. 2015, Curr Biol",
+              "torus semicircularis": "Privat et al. 2019, Curr Biol",
+              "tegmentum": "Severi et al. 2014, Neuron; Thiele et al. 2014, Neuron",
+              "cerebellum": "Ahrens et al. 2012, Nature",
+              "rhombomere 1": "Kawashima et al. 2016, Cell",
+              "rhombomere 2": "Dunn et al. 2016, eLife; Wolf et al. 2017, Nat Commun",
+              "rhombomere 3": "Dunn et al. 2016, eLife; Higashijima et al. 2000, J Neurosci",
+              "rhombomere 4": "Korn & Faber 2005, Neuron",
+              "rhombomere 5": "Schoonheim et al. 2010, J Neurosci; Bianco et al. 2012, Curr Biol",
+              "rhombomere 6": "Kinkhabwala et al. 2011, PNAS",
+              "rhombomere 7": "Daie et al. 2015, Neuron; Kinkhabwala et al. 2011, PNAS",
+              "noradrenergic (IFN, vagal)": "Mu et al. 2019, Cell",
+              "vagus motor neurons": "Higashijima et al. 2000, J Neurosci",
+              "spinal cord": "McLean et al. 2007, Nature"}
 
 
 _SUB_CACHE = {}
@@ -370,7 +418,8 @@ def summary(iso=False):
         # the four panels, and each table region's colour and its Z-Brain sub-masks for the slide's table
         SUB = {r_: subregions(rfull[r_], names, reg) for r_ in rlist}
         json.dump({r_: {"colour": [float(c_) for c_ in rcol[r_][:3]], "full": rfull[r_], "neurons": int((lab_ == k).sum()),
-                        "subregions": SUB[r_], "role": REGION_ROLE.get(r_, "")} for k, r_ in enumerate(rlist)},
+                        "subregions": SUB[r_], "role": REGION_ROLE.get(r_, ""), "ref": REGION_REF.get(r_, "")}
+                   for k, r_ in enumerate(rlist)},
                   open(os.path.join(EXP, "data", "atlas_subregions.json"), "w"), indent=1)
         # THE TABLE ON SLIDE 3'S CANVAS (Cedric, 2026-10-08: "the fishes aligned to slide 3, the text larger"): where slide 3
         # has its raster, the regions head to tail in two columns, each a block -- its name in its colour, its role, and
@@ -380,11 +429,11 @@ def summary(iso=False):
         h_ = (len(rlist) + 1) // 2
         blocks_ = []
         for k, r_ in enumerate(rlist):
-            tops = [x["name"].strip() for x in SUB[r_]["top"][:3] if x["neurons"] > 0]
+            tops = [x["name"].strip() for x in SUB[r_]["top"][:2] if x["neurons"] > 0]   # one line (2026-10-08: room for the refs)
             more = SUB[r_]["count"] - len(tops)
             sub = ("atlas: " + ", ".join(tops) + (f" (+{more} more)" if more > 0 else "")) if tops else ""
-            blocks_.append((r_, f"{r_} ({int((lab_ == k).sum()):,})", textwrap.fill(REGION_ROLE.get(r_, ""), 60),
-                            textwrap.fill(sub, 74) if sub else ""))
+            blocks_.append((r_, f"{r_} ({int((lab_ == k).sum()):,})", textwrap.fill(REGION_ROLE.get(r_, ""), 66),
+                            textwrap.fill(sub, 82) if sub else "", textwrap.fill(REGION_REF.get(r_, ""), 82)))
         # FLOWED top-down from the lines each block holds (no overlap), one font scale so the fuller column fits
         lh = lambda pt: pt * 1.22 / 72 / FH                                  # noqa: E731   one line, figure fraction
         F0 = (16.0, 13.5, 11.5)
@@ -392,16 +441,20 @@ def summary(iso=False):
 
         def col_h(bl, f):
             return sum(lh(f * F0[0]) + lh(f * F0[1]) * (r.count("\n") + 1) + (lh(f * F0[2]) * (sb.count("\n") + 1)
-                       if sb else 0) + gap for _, _, r, sb in bl)
+                       if sb else 0) + (lh(f * F0[2]) * (rf.count("\n") + 1) if rf else 0) + gap for _, _, r, sb, rf in bl)
         f_ = min(1.0, 0.95 / max(col_h(blocks_[:h_], 1.0), col_h(blocks_[h_:], 1.0)))
+        print(f"[atlas] the table's font scale {f_:.3f} of its nominal sizes {F0} pt")
         for c_, bl in enumerate((blocks_[:h_], blocks_[h_:])):
             y = 0.5 + col_h(bl, f_) / 2                                      # centred in height
             cx = x0_ + c_ * cw_
-            for r_, nm, role, sb in bl:
+            for r_, nm, role, sb, rf in bl:
                 fig.text(cx, y, nm, color=rcol[r_], fontsize=f_ * F0[0], weight="bold", va="top")
                 y -= lh(f_ * F0[0])
                 fig.text(cx, y, role, color="white", fontsize=f_ * F0[1], va="top", linespacing=1.1)
                 y -= lh(f_ * F0[1]) * (role.count("\n") + 1)
+                if rf:                                   # the reference: grey, small, italic (Cedric, 2026-10-08)
+                    fig.text(cx, y, rf, color="0.55", fontsize=f_ * F0[2], style="italic", va="top", linespacing=1.1)
+                    y -= lh(f_ * F0[2]) * (rf.count("\n") + 1)
                 if sb:
                     fig.text(cx, y, sb, color="0.6", fontsize=f_ * F0[2], va="top", linespacing=1.1)
                     y -= lh(f_ * F0[2]) * (sb.count("\n") + 1)
