@@ -676,9 +676,13 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
                                          ("weights", f"{rep.get('n_params', 0):,}")]))
     # the atlas frame with the side views when tools/exp17_run_movie.py has drawn it (Cedric, 2026-10-08)
     mvr_ = f"{run}_atlas" if os.path.exists(os.path.join(PRES, "Movies", f"{run}_atlas.mp4")) else run
-    out.append((f"19_run_{run}", S.frame(f"batch {num}: the free rollout of the whole 2 h, recorded left, learned right",
-                                         f"\\playmovie{{Movies/{mvr_}}}", right, f"log/training/zapbench/{run}",
-                                         left_gap=True, deck_title=dt)))
+    ttl_r = f"batch {num}: the free rollout of the whole 2 h, recorded left, learned right"
+    if law:                                          # 20.3: slide 31's layout (Cedric, 2026-10-08)
+        out.append((f"19_run_{run}", movie_narrow(S, ttl_r, f"Movies/{mvr_}", right, f"log/training/zapbench/{run}", dt,
+                                                  left=0.70)))
+    else:
+        out.append((f"19_run_{run}", S.frame(ttl_r, f"\\playmovie{{Movies/{mvr_}}}", right, f"log/training/zapbench/{run}",
+                                             left_gap=True, deck_title=dt)))
     # the modulation Omega_i(t) beside the recorded activity, x4 (tools/exp17_modulation.py)
     if os.path.exists(os.path.join(res, "movie_omega.mp4")):
         # the atlas frame with the side views when tools/exp17_modulation.py --atlas has drawn it (Cedric, 2026-10-08)
@@ -692,7 +696,7 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
         # ragged, the law on two explicit lines: justified in the narrow column it stretched its spaces (2026-10-08)
         right_om = (("\\raggedright{\\Large\\textbf{\\textcolor{yellow}{" + (law or ("known ODE, current synapses",))[0] + "}}}\\\\[4pt]\n"
                      "{\\Large " + (law or (None, "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_i$\\\\ $\\quad + \\Omega_i(t)\\textstyle\\sum_j "
-                                              "W_{ij}\\tanh z_j + B_i\\cdot u(t)$"))[1] + "\\par}\\vspace{10pt}\n")   # Cedric, 2026-10-08
+                                              "W_{ij}\\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$"))[1] + "\\par}\\vspace{10pt}\n")   # Cedric, 2026-10-08
                     + S.head("the learned modulation $\\Omega_i(t)$")
                     + "{\\scriptsize each neuron's message sum is multiplied by $\\Omega_i(t) = 1 + f(x_i, y_i, z_i, t)$, "
                       "$f$ a SIREN of the position and the absolute time; 1 = no modulation, 0 = no input from the "
@@ -703,10 +707,9 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
                               ("below 1", f"{100 * (O_ < 1).mean():.1f} \\% of neuron-frames")])
                     + "{\\tiny\\color{gray} the movie's 800 frames over the 2 h, 4x; left the recorded dF/F, right "
                       "$\\Omega$ per neuron, one colour scale centred on 1\\par}\n")
-        out.append((f"19_omega_{run}", S.frame("the learned modulation of the messages", f"\\playmovie{{Movies/{run}_omega}}",
-                                               right_om, "tools/exp17_modulation.py", left_gap=True,
-                                               widths=(0.50, 0.48) if law else (0.58, 0.4),   # 20.3's longer law (Cedric, 2026-10-08)
-                                               deck_title=dt + " $\\cdot$ modulation")))
+        out.append((f"19_omega_{run}", movie_narrow(S, "the learned modulation of the messages", f"Movies/{run}_omega",
+                                                    right_om, "tools/exp17_modulation.py", dt + " $\\cdot$ modulation",
+                                                    left=0.72)))
     # the learned constants on the brain (tools/exp17_param_maps.py)
     jm_ = os.path.join(EXP, "data", f"param_maps_{run}.json")
     if os.path.exists(jm_):
@@ -857,6 +860,21 @@ def flow_slides(S, run, num, law_txt, msg_txt, dt):
                                                                           f"tools/exp17_flow_pruned.py {run} --sigma {sg_}",
                                                                           deck_title=dt + f" $\\cdot$ the flow, pruned, {res_} ({sg_} \\textmu m)")))
     return out
+
+
+DECK_AR = 398.3386 / 252.0748                   # the deck's text box, width over height (exp17.log, DECKDIM)
+
+
+def movie_narrow(S, title, stem, right, src, deck_title, left=0.76, height=0.82):
+    """SLIDE 31'S LAYOUT FOR A MOVIE (Cedric, 2026-10-08: "align to slide 31: the text column to the right, a larger
+    movie"): a wide left column, the movie as large as the slide's height lets it (its poster's aspect), the text in a
+    narrow right column through \\fitcol."""
+    from PIL import Image
+    w_, h_ = Image.open(os.path.join(PRES, stem + ".png")).size
+    w = min(left, height * (w_ / h_) / DECK_AR)                      # of the text width
+    return S.frame(title, "\\centering\\playmovie[" + f"{w / left:.3f}" + "\\linewidth]{" + stem + "}",
+                   "\\raggedright " + right, src,                    # ragged: justified, a narrow column gapes
+                   deck_title=deck_title, widths=(left, round(0.98 - left, 2)))
 
 
 def centred_movie(stem, right, left_w=0.58):
@@ -1685,8 +1703,8 @@ def write_slides():
         "columns); SIREN $\\Omega$, $\\tau$ in [1, 100] s, x1 updates"),
         label="V$_{rest}$ per block, lattice grid",
         law=("known ODE, lattice grid, V$_{rest}$ per block",
-             "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_{i,k(t)}$\\\\ $\\quad + \\Omega_i(t)\\,g_i\\textstyle\\sum_{c} w_{ic}\\,"
-             "\\textstyle\\sum_j a_j \\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$")) if not x[0].startswith("19_edges_")]
+             "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_{i,k(t)}$\\\\ $\\quad + \\Omega_i(t)\\,g_i\\textstyle\\sum_{c} w_{ic}$\\\\ "
+             "$\\qquad\\textstyle\\sum_j a_j \\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$")) if not x[0].startswith("19_edges_")]
     jv_ = os.path.join(EXP, "data", "vrest_blocks_zap_n20_markall.json")   # Cedric, 2026-10-08: how V_rest changes per block
     if os.path.exists(jv_) and os.path.exists(os.path.join(PRES, "figs", "vrest_blocks_zap_n20_markall.png")):
         VB_ = json.load(open(jv_))
