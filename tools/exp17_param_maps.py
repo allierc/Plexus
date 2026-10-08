@@ -76,7 +76,7 @@ def render(name):
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
     lo_t, hi_t = c["tau_bounds"] or np.percentile(c["tau_s"], [2, 98])   # a bounded tau: the colour bar IS the bound
     wl = np.percentile(np.abs(c["W_in"]), 98)
-    panels = [("a   leak time constant $\\tau$, s (log)", c["tau_s"], "viridis", LogNorm(lo_t, hi_t)),
+    panels = [("a   leak time constant $\\tau$, s", c["tau_s"], "RdBu", Normalize(lo_t, hi_t)),   # linear, red fast / blue slow (Cedric, 2026-10-08)
               ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
               ("c   summed W into the neuron (blue < 0 < red)", c["W_in"], "RdBu_r", TwoSlopeNorm(0, -wl, wl)),
               ("d   stimulus weight $|B|$ (input neurons; grey: outside the mask)", c["B_norm"], "inferno",
