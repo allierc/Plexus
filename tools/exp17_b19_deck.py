@@ -1518,16 +1518,12 @@ def write_slides():
                         + " \\% of the weight on a minority sign). It costs per-neuron r "
                         + f"{np.mean([g['per_neuron_r'] for g in G_]):.3f}" + " against 19.25's 0.423. But a neuron's sign "
                           "is weakly identified: all five folds agree on " + f"{100 * EI_['unanimous_share']:.0f}"
-                        + " \\% of the neurons (chance " + f"{100 * EI_['unanimous_chance']:.0f}" + " \\%). Per region the "
+                        + " \\% of the neurons (chance " + f"{100 * EI_['unanimous_chance']:.0f}" + " \\%), drawn on the fish; "
+                          "of those sure cells " + f"{100 * EI_['sure_excitatory_share']:.0f}" + " \\% are excitatory. Per region the "
                           "share is stable over the folds: most inhibitory "
                         + ", ".join(f"{k} ({100 * v['inhibitory_share_mean']:.0f} \\%)" for k, v in hi_i)
                         + "; least " + ", ".join(f"{k} ({100 * v['inhibitory_share_mean']:.0f} \\%)" for k, v in lo_i)
-                        + ".\\par}\\vspace{6pt}\n"
-                        + S.head("against the atlas")
-                        + "{\\scriptsize\\raggedright The Z-Brain transmitter masks (Gad1b, Glyt2 inhibitory; Vglut2 "
-                          "excitatory) give the yellow marks: across regions r " + f"{EI_['r_learned_vs_atlas_across_regions']:+.2f}"
-                        + ". A weak reference -- the masks label regions, not cells (0 or 100 \\% where one mask covers "
-                          "the region) -- but no sign that the learned E / I follows the anatomy.\\par}")
+                        + ".\\par}")
             deck.append(("19_ei_dale", S.frame_narrow("excitatory and inhibitory neurons", "figs/ei_dale_n19.png", right_ei,
                                                       "tools/exp17_ei.py (data/ei_dale_n19.json)", left=0.74,
                                                       deck_title="batch 19.29-19.33 $\\cdot$ the Dale folds $\\cdot$ excitatory and inhibitory")))
@@ -1604,7 +1600,7 @@ def write_slides():
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
     ed_ = [n for n in nm_ if n.startswith("19_edges_")]
     if ed_:
-        for k_, nb_ in enumerate(("19_prune_fish", "19_prune_window", "19_prune_dist", "19_ei_dale")):   # the fish first (2026-10-08)
+        for k_, nb_ in enumerate(("19_prune_window", "19_prune_fish", "19_prune_dist", "19_ei_dale")):   # detail, then the fish   # the fish first (2026-10-08)
             if nb_ in [n for n, _ in deck]:
                 it_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert([n for n, _ in deck].index(ed_[0]) + 1 + k_, it_)
