@@ -449,9 +449,9 @@ def input_fish(path, size=(700, 1150)):
     pl.close()
 
 
-def slides_run19(S, run="zap_b19_x1_bal20all", num="19.20", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf")):
+def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf")):
     """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
-    slide, and prepare slide 17; the no-W and mean-field controls run on the new nominal, blank until they land"):
+    slide, and prepare slide 17"; 2026-10-08: "make all the slides with 19.25", the new nominal, its controls landed):
     the free rollout with the network test, the modulation Omega, the learned constants, tau by region, the edge
     weights, and the mean-field control. -> [(name, tex)]."""
     from plexus.tasks import trace_recording as TR_
@@ -483,15 +483,16 @@ def slides_run19(S, run="zap_b19_x1_bal20all", num="19.20", now_=("19.40", "zap_
         loc_ += lab_t + (f" & {S.qv(l_['mean'], big=big_)} $\\pm$ {l_['sd']:.3f} \\\\\n" if l_ else " & \\\\\n")
     stg = rep.get("stages") or []
     right = (S.head(f"batch {num}: {rt}")
-             + "{\\scriptsize the balanced 20 \\% input mask, every input neuron reading all 22 stimulus columns (13 "
-               "features + 9 condition markers); known ODE on the neuron graph, SIREN $\\Omega$, $\\tau$ in [1, 100] s, "
-               "x1 updates\\par}" + S.SEC_GAP
+             + "{\\scriptsize the new nominal: the balanced 20 \\% input mask, every input neuron reading all 22 "
+               "stimulus columns (13 features + 9 condition markers); known ODE on the new mesh (level 0 every neuron, "
+               "edges up to 16 \\textmu m; level 1 the 32-\\textmu m cubes; level 2 the 64-\\textmu m cubes), SIREN "
+               "$\\Omega$, $\\tau$ in [1, 100] s, x1 updates\\par}" + S.SEC_GAP
              + S.head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
                "& r & RMSE \\\\\n\\hline\n" + bm_ + "\\end{tabular}\\par}" + S.SEC_GAP
              + S.head("per-neuron r, brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
                "& mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + loc_ + "\\end{tabular}\\par}\\vspace{2pt}\n"
-             + "{\\tiny\\color{gray} the two controls blank until they land: trained on the new nominal 19.25 (the new "
-               "mesh), with no W (" + now_[0] + ") and with the mean field in place of the graph (" + mf_[0] + ")\\par}" + S.SEC_GAP
+             + "{\\tiny\\color{gray} the two controls: the new nominal trained from scratch with no W (" + now_[0]
+             + ") and with the mean field in place of the graph (" + mf_[0] + ")\\par}" + S.SEC_GAP
              + S.head("training") + S.rows([("updates", f"{rep.get('iters', 0):,} (horizons {stg[0][0]}..{stg[-1][0]})" if stg else "--"),
                                          ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"),
                                          ("weights", f"{rep.get('n_params', 0):,}")]))
@@ -571,7 +572,9 @@ def slides_run19(S, run="zap_b19_x1_bal20all", num="19.20", now_=("19.40", "zap_
         A_ = json.load(open(ja_))
         c_ = A_["counts"]
         sk_ = [k for k in ("short", "mid", "long") if k + "+" in c_ and c_[k + "+"] + c_[k + "-"] > 0]
-        lbl_ = {"short": "short (6 nearest)", "mid": "mid ($\\pm$32 \\textmu m)", "long": "long ($\\pm$128 \\textmu m)"}
+        lbl_ = ({"short": "short (every neuron)", "mid": "mid (32-\\textmu m cubes)", "long": "long (64-\\textmu m cubes)"}
+                if run.startswith("zap_n") else
+                {"short": "short (6 nearest)", "mid": "mid ($\\pm$32 \\textmu m)", "long": "long ($\\pm$128 \\textmu m)"})
         right_e = (S.head("strongest edges: one |W| cut for all sets")
                    + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
                      "edge set & W $>$ 0 & W $<$ 0 & W $>$ 0 share \\\\\n\\hline\n"
@@ -584,35 +587,54 @@ def slides_run19(S, run="zap_b19_x1_bal20all", num="19.20", now_=("19.40", "zap_
         out.append((f"19_edges_{run}", S.frame_narrow("edge weights on one scale", f"figs/edges_amp_{run}.png", right_e,
                                                       "tools/exp17_edges.py --amplitude", left=0.69,
                                                       deck_title=dt + " $\\cdot$ edge weights")))
-    # the mean-field control, PREPARED (Cedric, 2026-10-07): the table's controls blank until 19.40 / 19.41 land
-    m_full = S.bm_metrics(lines[0][1])
-    l_full = S.local_r(lines[0][1], "zapbench_destripe")
-    m_w0 = S.bm_metrics(lines[1][1])
-    l_w0 = S.local_r(lines[1][1], "zapbench_destripe")
-    rows_mf = (f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{num} graph}}}} & {S.qv(m_full['r'], big=True)} & "
-               f"{S.qv(l_full['mean'], big=True)} $\\pm$ {l_full['sd']:.2f} \\\\\n"
-               f"{num}, W = 0 at inference & {S.qv(m_w0['r'])} & {S.qv(l_w0['mean'])} $\\pm$ {l_w0['sd']:.2f} \\\\\n"
-               f"{mf_[0]} mean field & -- & -- \\\\\n{now_[0]} no W & -- & -- \\\\\n")
-    right_mf = (S.head("the mean-field control, 2 h free rollout")
-                + "{\\scriptsize\\raggedright\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
-                  "& brain-mean r & per-neuron r, removed, mean $\\pm$ SD \\\\\n\\hline\n" + rows_mf
-                + "\\end{tabular}\\par}\\vspace{3pt}\n"
-                + "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$, one weight per edge; mean field: "
-                  "$m_i = a_i\\,\\langle\\tanh z\\rangle$, one gain per neuron; no W: $m_i = 0$, so $\\Omega$ (which "
-                  "scales $m_i$) has nothing to act on.\\par}" + S.SEC_GAP
-                + S.head("pending")
-                + "{\\scriptsize\\raggedright The two controls train on the new nominal 19.25 (the new mesh): " + now_[0]
-                + " (no W) and " + mf_[0] + " (mean field), submitted 2026-10-07, about 10 h each. Then the bars and the "
-                  "paired block-bootstrap tests (tools/exp17\\_meanfield\\_stats.py), as batch 15.17's slide.\\par}")
-    out.append((f"19_meanfield_{run}", S.frame_wide("the mean-field control",
-                                                   "\\vspace*{0.04\\textheight}\\begin{columns}[t,onlytextwidth]\n"
-                                                   "\\begin{column}{0.50\\textwidth}\\centering\\vspace*{0.22\\textheight}"
-                                                   "{\\large\\color{gray} the bars and the tests,\\\\ once " + now_[0] + " and "
-                                                   + mf_[0] + " land}\\par\\end{column}\n"
-                                                   "\\begin{column}{0.46\\textwidth}\\fitcol{%\n" + right_mf
-                                                   + "}\\end{column}\n\\end{columns}",
-                                                   "tools/exp17_meanfield_stats.py (pending)",
-                                                   deck_title=dt + " $\\cdot$ the mean-field control: is the coupling network dynamics?")))
+    # the mean-field control (Cedric, 2026-10-07; filled 2026-10-08 once 19.40 / 19.41 landed): the bars and the paired
+    # block-bootstrap tests from tools/exp17_meanfield_stats.py --n19, in batch 15.17's slide's words
+    jm_ = os.path.join(EXP, "data", "meanfield_stats_n19.json")
+    if os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "meanfield_stats_n19.png")):
+        ST_ = json.load(open(jm_))
+        L_ = ST_["laws"]
+        T_ = {(t["a"], t["b"]): t for t in ST_["tests"]}
+        g_, w0_, m_, n_ = ST_["law_order"]
+
+        def pq(p):
+            return f"p {p:.3f}" if p >= 1e-3 else f"p $<$ {1 / (ST_['resamples'] + 1) * 1.0001:.0e}".replace("e-0", "e-")
+        rows_mf = ""
+        for k in (g_, w0_, m_, n_):
+            b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
+            big_ = k == g_
+            rows_mf += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{k}}}}}" if big_ else k)
+                        + f" & {S.qv(b_['estimate'], big=big_)} & {S.qv(l_['estimate'], big=big_)} $\\pm$ {l_['sd_over_neurons']:.2f} \\\\\n")
+        t1, t2, t3 = T_[(g_, m_)], T_[(m_, n_)], T_[(g_, w0_)]
+        right_mf = (S.head("the mean-field control, 2 h free rollout")
+                    + "{\\scriptsize\\raggedright\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
+                      "& brain-mean r & per-neuron r, removed, mean $\\pm$ SD \\\\\n\\hline\n" + rows_mf
+                    + "\\end{tabular}\\par}\\vspace{3pt}\n"
+                    + "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$, one weight per edge; mean field: "
+                      "$m_i = a_i\\,\\langle\\tanh z\\rangle$, one gain per neuron; no W: $m_i = 0$, so $\\Omega$ (which "
+                      "scales $m_i$) has nothing to act on. The rest is " + num + "'s known ODE; the two controls trained "
+                      "on it from scratch.\\par}" + S.SEC_GAP
+                    + S.head("conclusion")
+                    + "{\\scriptsize\\raggedright One brain-wide signal does not replace the graph: the mean field's per-neuron r "
+                      f"is {L_[m_]['local_r']['estimate']:+.2f} against the graph's {L_[g_]['local_r']['estimate']:+.2f} "
+                      f"({pq(t1['local_r']['p'])}), and the mean field still beats no W ({pq(t2['local_r']['p'])}): part of "
+                      "the coupling is a shared signal, the rest neuron-to-neuron network dynamics.\\par}" + S.SEC_GAP
+                    + S.head("the test")
+                    + "{\\scriptsize\\raggedright \\textbf{Null:} two laws follow the recording equally well. \\textbf{Method:} "
+                      f"a paired block bootstrap over time, {ST_['blocks']} blocks of {ST_['block_min']:.1f} min (the first, "
+                      f"the transient, left out), {ST_['resamples']:,} resamples, the same blocks for every law, p two-sided; "
+                      f"per-neuron r over the same {ST_['neurons']:,} neurons, a flat learned trace scored 0.\\par}}\\vspace{{3pt}}\n"
+                    + "{\\scriptsize\\raggedright graph $-$ mean field: brain-mean r " + f"{t1['brain_mean_r']['difference']:+.3f} "
+                      f"({pq(t1['brain_mean_r']['p'])}), per-neuron r {t1['local_r']['difference']:+.3f} ({pq(t1['local_r']['p'])})\\\\\n"
+                      f"mean field $-$ no W: {t2['brain_mean_r']['difference']:+.3f} ({pq(t2['brain_mean_r']['p'])}), "
+                      f"{t2['local_r']['difference']:+.3f} ({pq(t2['local_r']['p'])})\\\\\n"
+                      f"graph $-$ its $W = 0$: {t3['brain_mean_r']['difference']:+.3f} ({pq(t3['brain_mean_r']['p'])}), "
+                      f"{t3['local_r']['difference']:+.3f} ({pq(t3['local_r']['p'])})\\\\[2pt]\n"
+                      "Retraining with another seed (19.25 against 19.26, the same spec) moves brain-mean r by "
+                      f"{ST_['seed_pair']['brain_mean_r']:.3f} and per-neuron r by {ST_['seed_pair']['local_r']:.4f}.\\par}}")
+        out.append((f"19_meanfield_{run}", S.frame_narrow("the mean-field control", "figs/meanfield_stats_n19.png", right_mf,
+                                                          "tools/exp17_meanfield_stats.py --n19 (data/meanfield_stats_n19.json)",
+                                                          deck_title=dt + " $\\cdot$ the mean-field control: is the coupling network dynamics?",
+                                                          left=0.50, height=0.70, img_top="0.12\\textheight")))
     return out
 
 
@@ -1255,7 +1277,7 @@ def write_slides():
                                                deck_title="the model $\\cdot$ batch 21: the angle that switches the circuit")))
     # Cedric, 2026-10-07: an appendix, its title slide as the first deck's slide 66, then the first deck's slide-8 look
     # (the forecast error step by step, panel a) for the held-out runs against ZAPBench (batch 20) that have landed
-    deck += slides_run19(S)                  # Cedric, 2026-10-07: 19.20's results, the first deck's slides 12-17
+    deck += slides_run19(S)                  # Cedric, 2026-10-07: the nominal's results (19.25 since 2026-10-08), the first deck's slides 12-17
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     from PIL import Image

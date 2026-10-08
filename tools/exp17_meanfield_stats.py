@@ -22,7 +22,7 @@ flat (the no-W twin: 40 %), so the deck's local r of those rows comes from the o
 without that block their r is 0 / 0. On a resample both come from
 weighted sums per block (local r: 9 sums per neuron per block), so a resample costs a matrix product.
 
-    PYTHONPATH=src:tools python tools/exp17_meanfield_stats.py [--raw]
+    PYTHONPATH=src:tools python tools/exp17_meanfield_stats.py [--raw] [--n19]
 Another experiment (exp20, 2026-10-05) calls main(laws, tests, seeds, exp_dir, raw) with its own runs: laws = ((label,
 run name, rollout suffix "" or "_W0"), ...), tests = ((i, j), ...) indices into laws, seeds = a (label, run, "") pair of
 one spec trained with two seeds, or None; every run's free rollout must share its frames.
@@ -50,6 +50,11 @@ LAWS = (("15.4 graph", "zap_e15_cur_siren", ""), ("15.4, W = 0 at inference", "z
         ("15.17 mean field", "zap_e15_cur_siren_mf", ""), ("15.9 no W", "zap_e15_now", ""))
 TESTS = ((0, 2), (2, 3), (0, 1))            # graph vs mean field, mean field vs no W, graph vs its own W = 0
 SEEDS = (("15.1, seed 0", "zap_e15_cur", ""), ("17.8, seed 1", "zap_g17_s1", ""))
+# `--n19` (Cedric, 2026-10-08: "make all the slides with 19.25"): the same test on the new nominal and its controls,
+# written as meanfield_stats_n19*; its seed pair is the nominal itself, seeds 0 and 1 (19.25, 19.26)
+LAWS_N19 = (("19.25 graph", "zap_n19_nom", ""), ("19.25, W = 0 at inference", "zap_n19_nom", "_W0"),
+            ("19.41 mean field", "zap_n19_mf", ""), ("19.40 no W", "zap_n19_now", ""))
+SEEDS_N19 = (("19.25, seed 0", "zap_n19_nom", ""), ("19.26, seed 1", "zap_n19_nom_s1", ""))
 
 
 def stars(p):
@@ -115,7 +120,7 @@ def local_from(per, sc, vfull=None, per_neuron=False):
     return r if per_neuron else (r.mean(-1), vp)
 
 
-def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None):
+def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None, tag=""):
     global RAW, SUF
     if raw is not None:
         RAW, SUF = raw, ("_raw" if raw else "")
@@ -210,7 +215,8 @@ def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None):
     doc["raw"] = RAW
     doc["law_order"] = [k for k, _, _ in LAWS_]
     doc["test_pairs"] = [list(t) for t in tests]
-    json.dump(doc, open(os.path.join(exp_dir, "data", f"meanfield_stats{SUF}.json"), "w"), indent=1)
+    doc["tag"] = tag
+    json.dump(doc, open(os.path.join(exp_dir, "data", f"meanfield_stats{tag}{SUF}.json"), "w"), indent=1)
     draw(doc, exp_dir)
 
 
@@ -250,7 +256,7 @@ def draw(doc, exp_dir=EXP):
         for s_ in ("top", "right"):
             ax.spines[s_].set_visible(False)
     fig.tight_layout()
-    path = os.path.join(exp_dir, "presentation", "figs", f"meanfield_stats{'_raw' if doc.get('raw') else ''}.png")
+    path = os.path.join(exp_dir, "presentation", "figs", f"meanfield_stats{doc.get('tag', '')}{'_raw' if doc.get('raw') else ''}.png")
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
     if os.path.isdir(os.path.join(exp_dir, "png")):
@@ -259,7 +265,10 @@ def draw(doc, exp_dir=EXP):
 
 
 if __name__ == "__main__":
+    tag_ = "_n19" if "--n19" in sys.argv else ""
     if "--draw" in sys.argv:
-        draw(json.load(open(os.path.join(EXP, "data", f"meanfield_stats{SUF}.json"))))
+        draw(json.load(open(os.path.join(EXP, "data", f"meanfield_stats{tag_}{SUF}.json"))))
+    elif tag_:
+        main(LAWS_N19, TESTS, SEEDS_N19, tag=tag_)
     else:
         main()
