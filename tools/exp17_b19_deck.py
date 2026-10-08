@@ -826,6 +826,33 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
     return out
 
 
+def flow_slides(S, run, num, law_txt, msg_txt, dt):
+    """THE FLOW OF THE PRUNED LAW (Cedric, 2026-10-08: "flow movies like the first deck's slides 21 and 23, after pruning
+    the edges, at two resolutions, coarse and middle"): tools/exp17_flow_pruned.py's two movies, smoothed over 25 um
+    (coarse, the first deck's slide 21) and 10 um (middle, its slide 23), the first deck's layout."""
+    jp_ = os.path.join(EXP, "data", f"prune_{run}.json")
+    if not os.path.exists(jp_):
+        return []
+    J_ = json.load(open(jp_))["joint"]["kept"]
+    kept_ = sum(v for k, v in J_.items() if k not in ("inert", "self"))
+    out = []
+    for sg_, suf_, res_ in ((25, "", "coarse"), (10, "_sigma10", "middle")):
+        mv_ = f"Movies/flow_views_{run}_pruned_combined{suf_}"
+        if not os.path.exists(os.path.join(PRES, mv_ + ".mp4")):
+            continue
+        cap_ = (f"the flow of {num} after pruning, smoothed over {sg_} \\textmu m ({res_}): one map per view -- from above, "
+                "oblique from 45 deg above, from the side; " + msg_txt + f" on the {kept_:,} kept edges as wind, excitatory "
+                "particles red, inhibitory cyan, on the RECORDED dF/F in grey; the activity is the pruned law's own free "
+                "rollout, the curve below its brain mean (white) against the recording's (green); "
+                f"tools/exp17\\_flow\\_pruned.py {run.replace('_', chr(92) + '_')} --sigma {sg_}")
+        body_ = ("\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.82\\textwidth]{" + mv_ + "}\\par\\vspace{2pt}"
+                 "{\\fontsize{5.5}{6.5}\\selectfont\\color{gray} " + cap_ + "\\par}")
+        out.append((f"{num.split('.')[0]}_flow_pruned{suf_}", S.frame_wide(f"the flow of {num}, pruned, {sg_} um", body_,
+                                                                          f"tools/exp17_flow_pruned.py {run} --sigma {sg_}",
+                                                                          deck_title=dt + f" $\\cdot$ the flow, pruned, {res_} ({sg_} \\textmu m)")))
+    return out
+
+
 def centred_movie(stem, right, left_w=0.58):
     """A movie left and its text right, both centred in the slide's height (Cedric, 2026-10-08: "move the movie to the
     centre of the slide") -- S.frame top-aligns them."""
@@ -1599,6 +1626,8 @@ def write_slides():
                                                        centred_movie("Movies/b19_fish_prune", right_pf),
                                                        "tools/exp17_b19_deck.py --prune-movie",
                                                        deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the whole fish, pruned")))
+        deck += flow_slides(S, "zap_n19_nom", "19.25", "", "each kept edge's message $W_{ji}\\tanh z_j\\,\\Omega_i$",
+                            "batch 19.25 $\\cdot$ zap\\_n19\\_nom")
         je_ = os.path.join(EXP, "data", "ei_dale_n19.json")   # Cedric, 2026-10-08: excitatory / inhibitory under Dale
         if os.path.exists(je_) and os.path.exists(os.path.join(PRES, "figs", "ei_dale_n19.png")):
             EI_ = json.load(open(je_))
@@ -1753,6 +1782,10 @@ def write_slides():
                                                        centred_movie("Movies/b20_grid_fish_prune", right_gf),
                                                        "tools/exp17_b19_deck.py --prune-grid",
                                                   deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ the whole fish, pruned")))
+        new_ += flow_slides(S, "zap_n20_markall", "20.3", "",
+                            "each kept grid hop's message $w_{kl}\\,c_k\\,\\Omega_l\\,g_l$ (corner $k$ to corner $l$; $c_k$ the "
+                            "mean $a_j\\tanh z_j$ of the neurons encoded into $k$)",
+                            "batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid")
         if os.path.exists(os.path.join(PRES, "figs", "prune_zap_n20_markall.png")):
             new_.append(("20_prune_dist", S.frame_narrow("the learned grid weights, level by level", "figs/prune_zap_n20_markall.png",
                                                          S.head("which grid weights can go?")
@@ -1822,7 +1855,8 @@ def write_slides():
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
     ed_ = [n for n in nm_ if n.startswith("19_edges_")]
     if ed_:
-        for k_, nb_ in enumerate(("19_prune_window", "19_prune_fish", "19_prune_dist", "19_ei_dale")):   # detail, then the fish   # the fish first (2026-10-08)
+        for k_, nb_ in enumerate(("19_prune_window", "19_prune_fish", "19_flow_pruned", "19_flow_pruned_sigma10",
+                                  "19_prune_dist", "19_ei_dale")):   # detail, then the fish   # the fish first (2026-10-08)
             if nb_ in [n for n, _ in deck]:
                 it_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert([n for n, _ in deck].index(ed_[0]) + 1 + k_, it_)
