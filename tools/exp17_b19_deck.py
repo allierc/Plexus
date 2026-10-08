@@ -904,7 +904,16 @@ def write_slides():
             col2_ = lambda fig_, txt_: col_(fig_, txt_).replace("{0.72\\textwidth}", "{0.78\\textwidth}").replace(   # noqa: E731
                 "{0.26\\textwidth}", "{0.20\\textwidth}").replace(   # the template's margins kept (Cedric, 2026-10-07)
                 "\\vspace*{0.03\\textheight}", "\\vspace*{0.09\\textheight}")   # blank lines under the title band
-            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", col2_("atlas_regions_raster.png", tA_),
+            # Cedric, 2026-10-07: a small movie of the block's visual stimulus (tools/exp17_stim_movies.py) at the top of
+            # the right column
+            stim_ = lambda body_, b_, w_="\\linewidth": (body_.replace("\\begin{column}{0.20\\textwidth}\\centering\\fitcol{%",   # noqa: E731
+                                                     "\\begin{column}[t]{0.20\\textwidth}\\centering\\playmovie[" + w_ + "]"
+                                                     "{Movies/stim_" + b_ + "}\\par\\vspace{8pt}"
+                                                     # the text fitted to what the movie leaves of the column (local)
+                                                     "\\setlength{\\colheight}{" + ("0.56" if w_ == "\\linewidth" else "0.40")
+                                                     + "\\textheight}\\fitcol{%")
+                                       if os.path.exists(os.path.join(PRES, "Movies", f"stim_{b_}.mp4")) else body_)
+            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all", "0.5\\linewidth"),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
             # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
@@ -931,7 +940,7 @@ def write_slides():
                            + "{\\scriptsize\\raggedright Only the block's frames, every one; each neuron's dF/F z-scored "
                              "within the block; rows by region as on the atlas slide, within a region by the correlation "
                              "with the brain mean (green, top).\\par}")
-                    deck.insert(at_, (f"00j_block_{b_.replace(' ', '_')}", S.frame_wide(f"the {b_} block", col2_(f_, tB_), "tools/exp17_atlas.py "
+                    deck.insert(at_, (f"00j_block_{b_.replace(' ', '_')}", S.frame_wide(f"the {b_} block", stim_(col2_(f_, tB_), b_.replace(' ', '_')), "tools/exp17_atlas.py "
                                       f"summary --block '{b_}'{' --lr' if lr_ else ''}",
                                       deck_title=f"in the Z-Brain atlas $\\cdot$ the {b_} block")))
                     at_ += 1
