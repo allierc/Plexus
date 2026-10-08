@@ -739,7 +739,24 @@ def _task_circuit_panel_class():
 
         def __init__(self, *a, drive_set=None, drive_block=None, **k):
             super().__init__(*a, **k)
-            self.drive_set, self.drive_block, self.tr = drive_set, drive_block, None
+            self.drive_set, self.drive_block, self.tr, self.plant = drive_set, drive_block, None, None
+
+        def set_plant(self, beta, muscles, pairs, K, C, pose, pose_target, drives, axes=("θ", "φ", "ψ")):
+            """THE EYE PLANT, a Hammerstein cascade (muscle_ops): the STATIC stage, `muscle_pose_map` -- the six
+            drives m expanded to the 27 features [m, m^2, m_i m_j over the 15 pairs] times `beta` (27 x 3), the
+            command u_inf (theta, phi, psi) -- and the SECOND-ORDER stage, `organ_mechanics`, u'' = K (u_inf - u)
+            - C u', the gaze u. `pose`, `pose_target` [T, 3], `drives` [T, 6]."""
+            d = np.asarray(drives, np.float64)
+            cross = np.stack([d[:, i] * d[:, j] for i, j in pairs], 1) if len(pairs) else np.zeros((len(d), 0))
+            feat = np.concatenate([d, d ** 2, cross], 1)                              # [T, 27]
+            beta = np.asarray(beta, np.float64)
+            labels = list(muscles) + [f"{m}²" for m in muscles] + [f"{muscles[i]}·{muscles[j]}" for i, j in pairs]
+            K, C = np.asarray(K, np.float64), np.asarray(C, np.float64)
+            wn = np.sqrt(np.clip(np.linalg.eigvalsh(0.5 * (K + K.T)), 0, None))      # rad/s, no mass term
+            zeta = np.linalg.eigvalsh(0.5 * (C + C.T)) / (2 * np.maximum(wn, 1e-9))
+            self.plant = dict(feat=feat, beta=beta, contrib=feat[:, :, None] * beta[None], labels=labels,
+                              muscles=list(muscles), drives=d, pose=np.asarray(pose, np.float64),
+                              target=np.asarray(pose_target, np.float64), axes=list(axes), wn=wn, zeta=zeta)
 
         def set_traces(self, t, drive, target, obs, cmd=None, muscles=None, muscle_names=(), unit="", label=""):
             f = lambda x: None if x is None or not len(x) else np.asarray(x, np.float64)   # noqa: E731
@@ -766,10 +783,18 @@ def _task_circuit_panel_class():
         def _figure(self):
             import matplotlib.pyplot as plt
             from matplotlib.gridspec import GridSpec
-            fig = plt.figure(figsize=(19.2, 9.6), facecolor=BG, dpi=100)
-            gs = GridSpec(2, 3, width_ratios=[0.85, 1.75, 0.85], height_ratios=[1.0, 0.52], hspace=0.16,
-                          wspace=0.10, left=0.07, right=0.985, top=0.93, bottom=0.07)
-            self.ax_tr, self.ax_eye = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 2])
+            if self.plant is None:
+                fig = plt.figure(figsize=(19.2, 9.6), facecolor=BG, dpi=100)
+                gs = GridSpec(2, 3, width_ratios=[0.85, 1.75, 0.85], height_ratios=[1.0, 0.52], hspace=0.16,
+                              wspace=0.10, left=0.07, right=0.985, top=0.93, bottom=0.07)
+                self.ax_tr, self.ax_eye, self.ax_pl = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 2]), None
+                return fig, fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, :])
+            # the plant between the circuit and the eye, in the order the signal flows
+            fig = plt.figure(figsize=(24.0, 9.6), facecolor=BG, dpi=100)
+            gs = GridSpec(2, 4, width_ratios=[0.78, 1.55, 1.45, 0.62], height_ratios=[1.0, 0.52], hspace=0.16,
+                          wspace=0.08, left=0.055, right=0.99, top=0.93, bottom=0.07)
+            self.ax_tr, self.ax_pl, self.ax_eye = (fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 2]),
+                                                   fig.add_subplot(gs[0, 3]))
             return fig, fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, :])
 
         def _build_extra(self, fig):
@@ -777,7 +802,7 @@ def _task_circuit_panel_class():
             tr = self.tr
             if tr is None:
                 return
-            self.txt.set_position((0.0, 1.045))               # the circuit's header above its column labels
+            self.txt.set_visible(False)                       # no header line across the top (Cedric, 2026-10-08)
             a, t = self.ax_tr, tr["t"]
             a.set_facecolor(BG)
             for k_, sp in a.spines.items():
@@ -818,7 +843,9 @@ def _task_circuit_panel_class():
                 e.text(-1.15, 1.15, "-", color="#bbb", fontsize=12, ha="center", va="center")
                 self.txt_eye = e.text(0.0, -1.15, "", color="#ddd", fontsize=10, ha="center", va="top")
             self.bars = None
-            if tr["mus"] is not None:                         # the muscles' drives, under the eye
+            if self.plant is not None:
+                self._build_plant(fig)
+            elif tr["mus"] is not None:                       # the muscles' drives, under the eye
                 live = np.flatnonzero(np.nanmax(np.abs(tr["mus"]), 0) > 1e-6)   # a muscle never driven: no bar
                 names = tr["names"] if len(tr["names"]) == tr["mus"].shape[1] else [str(i) for i in range(tr["mus"].shape[1])]
                 self.mus_live = live if live.size else np.arange(tr["mus"].shape[1])
@@ -826,12 +853,12 @@ def _task_circuit_panel_class():
                 M = len(self.mus_live)
                 am = e.inset_axes([0.18, 0.03, 0.72, min(0.06 * M + 0.04, 0.26)])
                 am.set_facecolor(BG)
-                # THE DRIVES' OWN RANGE, not 0 to the maximum: a motor pair co-contracts (both drives high, the gaze
-                # set by their difference), so on a 0..max axis the push-pull that moves the eye is a few pixels
+                # THE AXIS STARTS AT ZERO (Cedric, 2026-10-08: an axis from the drives' minimum made MR look far
+                # larger than LR when the two co-contract at about the same level), in the drive's own units
                 mv = tr["mus"][:, self.mus_live]
-                lo_, hi_ = float(np.nanmin(mv)), float(np.nanmax(mv))
-                pad_ = 0.08 * max(hi_ - lo_, 1e-9)
-                self.mus_lo = max(lo_ - pad_, 0.0)
+                hi_ = float(np.nanmax(mv))
+                pad_ = 0.05 * max(hi_, 1e-9)
+                self.mus_lo = 0.0
                 self.bars = am.barh(np.arange(M), np.zeros(M), left=self.mus_lo, color="#e0a040", height=0.65)
                 am.set_yticks(np.arange(M)); am.set_yticklabels(names, color="#ddd", fontsize=9)
                 am.set_xlim(self.mus_lo, hi_ + pad_); am.set_ylim(M - 0.5, -0.5)
@@ -840,8 +867,89 @@ def _task_circuit_panel_class():
                     sp.set_color("#666")
                 am.set_title("muscle drive", color="#ddd", fontsize=9, loc="left", pad=3)
 
+        def _build_plant(self, fig):
+            """drives -> the 27-feature static map -> the command -> the second-order body -> the gaze, left to right."""
+            import matplotlib.pyplot as plt
+            from matplotlib.colors import LinearSegmentedColormap
+            pl, a = self.plant, self.ax_pl
+            a.set_facecolor(BG); a.axis("off"); a.set_xlim(0, 1); a.set_ylim(0, 1)
+            bkr = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])
+            lo, hi = 0.06, 0.92
+            M, F = len(pl["muscles"]), pl["feat"].shape[1]
+            # the drives
+            self.p_drv = a.imshow(np.zeros((M, 1)), cmap="magma", vmin=0, vmax=float(pl["drives"].max()) or 1.0,
+                                  extent=(0.06, 0.10, lo + 0.25, hi - 0.25), aspect="auto", interpolation="nearest")
+            for k_, m_ in enumerate(pl["muscles"]):
+                a.text(0.055, hi - 0.25 - (hi - lo - 0.5) * (k_ + 0.5) / M, m_, color="#ddd", fontsize=9,
+                       ha="right", va="center")
+            a.text(0.08, hi - 0.23, "muscle\ndrive m", color="#fff", fontsize=9, ha="center", va="bottom")
+            # the static map: each feature's contribution to each axis, f_k(m) beta_k
+            self.c_lim = float(np.percentile(np.abs(pl["contrib"]), 99.5)) or 1.0
+            self.p_map = a.imshow(np.zeros((F, 3)), cmap=bkr, vmin=-self.c_lim, vmax=self.c_lim,
+                                  extent=(0.27, 0.42, lo, hi), aspect="auto", interpolation="nearest")
+            for k_, lab in enumerate(pl["labels"]):
+                a.text(0.265, hi - (hi - lo) * (k_ + 0.5) / F, lab, color="#ccc", fontsize=6.5, ha="right", va="center")
+            for j_, ax_n in enumerate(pl["axes"]):
+                a.text(0.27 + 0.05 * (j_ + 0.5), hi + 0.01, ax_n, color="#fff", fontsize=10, ha="center", va="bottom")
+            a.text(0.345, hi + 0.06, "static map: 27 features x beta", color="#fff", fontsize=9.5, ha="center",
+                   va="bottom")
+            a.text(0.345, lo - 0.015, f"f(m) beta, deg (up to {self.c_lim:.2g})", color="#bbb", fontsize=8,
+                   ha="center", va="top")
+            # the command u_inf
+            t_lim = float(np.percentile(np.abs(pl["target"]), 99.5)) or 1.0
+            self.p_cmd = a.imshow(np.zeros((3, 1)), cmap=bkr, vmin=-t_lim, vmax=t_lim,
+                                  extent=(0.50, 0.54, 0.5 - 0.09, 0.5 + 0.09), aspect="auto", interpolation="nearest")
+            a.text(0.52, 0.5 + 0.10, "command\nu∞", color="#fff", fontsize=9, ha="center", va="bottom")
+            self.p_cmd_txt = [a.text(0.545, 0.5 + 0.09 - 0.06 * (j_ + 0.5), "", color="#ddd", fontsize=8.5, ha="left",
+                                     va="center") for j_ in range(3)]
+            for x0, x1 in ((0.11, 0.19), (0.43, 0.49), (0.60, 0.635)):
+                a.annotate("", xy=(x1, 0.5), xytext=(x0, 0.5), arrowprops=dict(arrowstyle="-|>", color="#fff", lw=1.0))
+            # the second-order stage: command and gaze in the theta-phi plane
+            b = a.inset_axes([0.69, 0.30, 0.30, 0.52])
+            b.set_facecolor(BG)
+            for sp in b.spines.values():
+                sp.set_color("#666")
+            b.tick_params(colors="#bbb", labelsize=8)
+            th = np.concatenate([pl["target"][:, 0], pl["pose"][:, 0]])
+            ph = np.concatenate([pl["target"][:, 1], pl["pose"][:, 1]])
+            tl = 1.1 * float(np.percentile(np.abs(th), 99.5)) or 1.0
+            pp = max(1.3 * float(np.percentile(np.abs(ph), 99.5)), 1.0)
+            b.set_xlim(tl, -tl); b.set_ylim(-pp, pp)              # theta increasing to the left, as the reference
+            b.axhline(0, color="#444", lw=0.6); b.axvline(0, color="#444", lw=0.6)
+            b.set_xlabel(f"{pl['axes'][0]} horizontal (deg)", color="#ddd", fontsize=9)
+            b.set_ylabel(f"{pl['axes'][1]} vertical (deg)", color="#ddd", fontsize=9)
+            self.p_tr_cmd = b.plot([], [], color="#ff4d4d", lw=1.0, alpha=0.6)[0]
+            self.p_tr_gz = b.plot([], [], color="#4a9bff", lw=1.4, alpha=0.8)[0]
+            self.p_cmd_pt = b.plot([], [], "o", color="#ff4d4d", ms=7)[0]
+            self.p_gz_pt = b.plot([], [], "o", color="#4a9bff", ms=9, mec="white", mew=0.8)[0]
+            self.p_tg_pt = b.plot([], [], "o", mfc="none", mec="#5fd08a", ms=12, mew=1.5)[0]
+            b.set_title("second order: u'' = K (u∞ - u) - C u'", color="#fff", fontsize=9.5, pad=4)
+            a.text(0.84, 0.12, f"natural frequencies {pl['wn'].min() / (2 * np.pi):.2f}-{pl['wn'].max() / (2 * np.pi):.2f} Hz, "
+                   f"damping ratio {pl['zeta'].min():.2f}-{pl['zeta'].max():.2f}", color="#bbb", fontsize=8,
+                   ha="center", va="top")
+            a.text(0.84, 0.07, "red: command u∞   blue: gaze u   green: target", color="#bbb", fontsize=8,
+                   ha="center", va="top")
+
+        def _draw_plant(self, k):
+            pl = self.plant
+            k = int(np.clip(k, 0, len(pl["drives"]) - 1))
+            self.p_drv.set_data(pl["drives"][k][:, None])
+            self.p_map.set_data(pl["contrib"][k])
+            self.p_cmd.set_data(pl["target"][k][:, None])
+            for j_, tx in enumerate(self.p_cmd_txt):
+                tx.set_text(f"{pl['axes'][j_]} {pl['target'][k, j_]:+.1f}")
+            w0 = max(0, k - 120)                                  # the last 2 s at 60 Hz
+            self.p_tr_cmd.set_data(pl["target"][w0:k + 1, 0], pl["target"][w0:k + 1, 1])
+            self.p_tr_gz.set_data(pl["pose"][w0:k + 1, 0], pl["pose"][w0:k + 1, 1])
+            self.p_cmd_pt.set_data([pl["target"][k, 0]], [pl["target"][k, 1]])
+            self.p_gz_pt.set_data([pl["pose"][k, 0]], [pl["pose"][k, 1]])
+            if self.tr is not None:
+                self.p_tg_pt.set_data([self.tr["target"][min(k, len(self.tr["target"]) - 1)]], [0.0])
+
         def _draw_extra(self, idx: int):
             tr = self.tr
+            if self.plant is not None:
+                self._draw_plant(int(self.hist[idx][0]))
             if tr is None:
                 return
             t = tr["t"]
@@ -913,12 +1021,21 @@ def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, strid
                   dt=dt, time_s=1.0, name=spec["name"], fps=fps, max_frames=int(u.shape[0]) + 1, stills=0,
                   drive_set=task["drive"]["set"], drive_block=task["drive"]["block"])
     obs_set, obs_block = task["observe"]["set"], task["observe"]["block"]
-    rec, tick = {"cmd": [], "mus": [], "mus_names": []}, [0]
+    rec, tick = {"cmd": [], "mus": [], "mus_names": [], "pose": [], "pose_target": [], "plant": None}, [0]
 
     def watch(H):                                       # once per engine frame, frame 0 (the seeded state) first
         panel.capture(H, tick[0])
         tick[0] += 1
+        if rec["plant"] is None:                        # the eye plant's two operators, when the model has them
+            ops = dict(zip(getattr(H, "operator_names", []), getattr(H, "operators", [])))
+            pm, om = ops.get("muscle_pose_map"), ops.get("organ_mechanics")
+            rec["plant"] = ((pm._beta.detach().cpu().numpy(), om._K.detach().cpu().numpy(), om._C.detach().cpu().numpy())
+                            if pm is not None and om is not None else False)
         lv = H.level(obs_set)
+        if rec["plant"]:
+            rec["pose"].append(lv.get(obs_block).detach().float().cpu().numpy().reshape(int(lv.n), -1)[0, :3])
+            if f"{obs_block}_target" in lv.state_schema:
+                rec["pose_target"].append(lv.get(f"{obs_block}_target").detach().float().cpu().numpy().reshape(int(lv.n), -1)[0, :3])
         if f"{obs_block}_target" in lv.state_schema:
             rec["cmd"].append(float(lv.get(f"{obs_block}_target").detach().float().cpu().numpy().reshape(int(lv.n), -1)[0, ch]))
         m = next((n for n, l_ in H.levels.items() if "drive" in getattr(l_, "state_schema", {})
@@ -936,6 +1053,12 @@ def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, strid
                      cmd=(rec["cmd"][:n_] or None), muscles=(np.stack(rec["mus"][:n_]) if rec["mus"] else None),
                      muscle_names=rec["mus_names"], unit=task["observe"].get("unit") or "",
                      label=f"{obs_set}.{obs_block}")
+    if rec["plant"] and rec["mus"] and rec["pose_target"]:
+        from plexus.operators.muscle_ops import MUSCLES, PAIRS
+        beta, K_, C_ = rec["plant"]
+        mus = np.stack(rec["mus"][:n_])
+        panel.set_plant(beta, (rec["mus_names"] or list(MUSCLES))[:mus.shape[1]], PAIRS, K_, C_,
+                        np.stack(rec["pose"][:n_]), np.stack(rec["pose_target"][:n_]), mus)
     idxs = list(range(stride - 1, n_, stride)) or [n_ - 1]
     w = iio.get_writer(path, fps=fps, codec="libx264", quality=8, macro_block_size=1)
     for i in idxs:
