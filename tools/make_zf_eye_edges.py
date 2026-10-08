@@ -159,11 +159,16 @@ def build2(seed: int = 0, spec_path=SPEC2) -> dict:
     """The two-eye maps on `zf_eyeG2_285` (types split by side): eye 0 the LEFT eye, eye 1 the RIGHT, muscle index
     6 x eye + MUSCLE_INDEX. The abducens circuit: AMN_L -> the left LR, AMN_R -> the right LR; the internuclear
     neurons cross -- AIN_L -> the right MR, AIN_R -> the left MR (through the MLF to the contralateral oculomotor
-    nucleus, folded here into one edge). The 2 retina cells drive every AF5 cell, both sides."""
+    nucleus, folded here into one edge). The retinas cross too: retina 0 (left eye) -> the right AF5 cells,
+    retina 1 (right eye) -> the left ones."""
     rng = np.random.default_rng(seed)
     r = type_ranges(spec_path)
-    af5 = np.concatenate([np.arange(*r[k]) for k in ("AF5_ipsi_L", "AF5_ipsi_R", "AF5_contra_L", "AF5_contra_R")])
-    win = _all_to_all(np.arange(N_RETINA), af5)
+    # THE TWO RETINAS, CROSSED (Cedric, 2026-10-08: "fix the input neurons for the two eyes"): retina cell 0 is the
+    # LEFT eye, cell 1 the RIGHT; the larval zebrafish retina projects only contralaterally, so the left eye reaches
+    # the right AF5 cells and the right eye the left ones -- 41 edges, one per AF5 cell
+    af5_R = np.concatenate([np.arange(*r[k]) for k in ("AF5_ipsi_R", "AF5_contra_R")])
+    af5_L = np.concatenate([np.arange(*r[k]) for k in ("AF5_ipsi_L", "AF5_contra_L")])
+    win = np.concatenate([_all_to_all([0], af5_R), _all_to_all([1], af5_L)], 1)
     m = lambda eye, mu: 6 * eye + MUSCLE_INDEX[mu]                       # noqa: E731
     lr = np.concatenate([_all_to_all(np.arange(*r["AMN_L"]), [m(0, "LR")]),
                          _all_to_all(np.arange(*r["AMN_R"]), [m(1, "LR")])], 1)
@@ -174,7 +179,7 @@ def build2(seed: int = 0, spec_path=SPEC2) -> dict:
                            rng.uniform(-1, 1, r["AMN_R"][1] - r["AMN_R"][0]) / fan("AMN_R")])
     w_mr = np.concatenate([rng.uniform(-1, 1, r["AIN_L"][1] - r["AIN_L"][0]) / fan("AIN_L"),
                            rng.uniform(-1, 1, r["AIN_R"][1] - r["AIN_R"][0]) / fan("AIN_R")])
-    return {"win": (win, rng.uniform(-1, 1, win.shape[1]) / np.sqrt(N_RETINA) * 0.5), "lr": (lr, w_lr), "mr": (mr, w_mr)}
+    return {"win": (win, rng.uniform(-1, 1, win.shape[1]) * 0.5), "lr": (lr, w_lr), "mr": (mr, w_mr)}   # fan-in 1
 
 
 def check_sides(spec_path=SPEC2):
