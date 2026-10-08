@@ -1631,6 +1631,15 @@ def write_slides():
             if nb_ in [n for n, _ in deck]:
                 it_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert([n for n, _ in deck].index(ed_[0]) + 1 + k_, it_)
+    # Cedric, 2026-10-08: section dividers in the appendix's look, before the graph, the input stimuli and the model
+    for nm_d, ttl_d, before_ in (("00y_sec_graph", "the graph", "01_grid_3d"),
+                                 ("04y_sec_input", "input stimuli", "05_input_neurons"),
+                                 ("05y_sec_model", "known-ODE model", "06b_model_all")):
+        if before_ in [n for n, _ in deck]:
+            deck.insert([n for n, _ in deck].index(before_), (nm_d, S.frame_wide(
+                ttl_d, "\\vspace*{0.30\\textheight}\\centering{\\Huge " + ttl_d + "}\\par", "Cedric, 2026-10-08",
+                deck_title="multi-level GNN on fish 2 $\\cdot$ " + ttl_d)))
+            open(os.path.join(SL, nm_d + ".tex"), "w").write(deck[[n for n, _ in deck].index(nm_d)][1])
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
              "00i_classic_circuits", "00d_brain_mean_spread", "06_model"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
     deck = [(n, b) for n, b in deck if n != "00j_lateral"]   # Cedric, 2026-10-07: "delete slide 7" (left against right)
