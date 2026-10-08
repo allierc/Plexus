@@ -413,10 +413,11 @@ def _movie_frames(ks):
     Ps = d["Ps"]
     if d["side"]:                                   # from above over from the side, one scale: heights by the extents
         ey, ez = np.ptp(P[:, 1]), np.ptp(Ps[:, 1])
-        H_ = 0.88 - top
+        GAP = 0.05                                  # two blank lines between the side view and the curves' labels
+        H_ = 0.88 - top - GAP                       # (Cedric, 2026-10-08: the label overprinted the side view)
         h_t, h_s = 0.97 * H_ * ey / (ey + ez), 0.97 * H_ * ez / (ey + ez)
     for j, lab in enumerate((f"recorded ({d['rec_name']})", f"learned ({d['law']})")):
-        ax = fig.add_axes([0.5 * j, top + h_s + 0.03 * H_, 0.5, h_t] if d["side"] else [0.5 * j, top, 0.5, 0.88 - top])
+        ax = fig.add_axes([0.5 * j, top + GAP + h_s + 0.03 * H_, 0.5, h_t] if d["side"] else [0.5 * j, top, 0.5, 0.88 - top])
         ax.set_facecolor("black")
         ax.axis("off")
         sc.append(ax.scatter(P[:, 0], P[:, 1], c=np.zeros(len(P)), s=0.5, cmap="inferno", vmin=0, vmax=vmax,
@@ -425,7 +426,7 @@ def _movie_frames(ks):
         if d["side"]:
             ax.set_xlim(P[:, 0].min(), P[:, 0].max())
             ax.set_ylim(P[:, 1].min(), P[:, 1].max())
-            ax2 = fig.add_axes([0.5 * j, top, 0.5, h_s])
+            ax2 = fig.add_axes([0.5 * j, top + GAP, 0.5, h_s])
             ax2.set_facecolor("black")
             ax2.axis("off")
             sc_s.append(ax2.scatter(Ps[:, 0], Ps[:, 1], c=np.zeros(len(Ps)), s=0.5, cmap="inferno", vmin=0, vmax=vmax,
