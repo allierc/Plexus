@@ -131,7 +131,10 @@ def build_split(spec, split, verbose=True):
     # The teacher is applied PER CELL, in one call, because a cell may override a teacher
     # parameter (a different tau per condition) and because vectorising over trials is what
     # makes an lsim-based law affordable at these counts.
-    Y = np.empty((N, spec.T, spec.channels), np.float64)
+    # THE TARGET HAS `general.targets` COLUMNS, not `channels`: a law may map C inputs to K outputs (`statespace`,
+    # the two-eye gaze task's one drive onto two eyes); the default `targets` is `channels`, so a per-channel law
+    # writes what it always did.
+    Y = np.empty((N, spec.T, spec.targets), np.float64)
     for c, cell in enumerate(cells):
         idx = np.where(cond == c)[0]
         tp = {**spec.teacher, **{k: v for k, v in cell.items() if k not in _proc_keys(proc, spec)}}
@@ -139,7 +142,11 @@ def build_split(spec, split, verbose=True):
         # is the cell's label and no law's parameter, so it is dropped before the call.
         law = get_teacher(tp.pop("law", spec.law_name))
         tp.pop("name", None)
-        Y[idx] = law(U[idx], spec.dt, **tp)
+        y_ = law(U[idx], spec.dt, **tp)
+        if y_.shape[-1] != spec.targets:
+            raise ValueError(f"{spec.name}: the teacher writes {y_.shape[-1]} output(s) per frame but "
+                             f"`general.targets` is {spec.targets}")
+        Y[idx] = y_
     if verbose:
         print(f"  [{split}] {N} trials x {spec.T} frames  "
               f"|u| rms {U.std():.4f}  |y| rms {Y.std():.4f}")
