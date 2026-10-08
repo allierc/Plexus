@@ -103,65 +103,54 @@ REGIONS = [("Telencephalon - Olfactory Bulb", "olfactory bulb"), ("Telencephalon
            ("Rhombencephalon - X Vagus motorneuron cluster", "vagus motor neurons"), ("Spinal Cord", "spinal cord")]
 
 
-def iso_images(rlist, rfull, rcol, names, sizes=((1640, 1000), (1800, 620))):
-    """THE REGIONS AS SURFACES (Cedric, 2026-10-07: "a twin with VTK isosurfaces, as the Plexus watcher"): each table
-    region's Z-Brain mask, halved in x and y, contoured at 0.5 and smoothed, in its table colour, semi-opaque; the brain
-    (the union of the division masks) a faint grey shell. Shown head left as the scatter (x' = y, y' = (W-1) dx - x), from
-    above and from the side, parallel projection on black, each render the shape of its panel. Returns the two images."""
-    import h5py
+def iso_from_dots(P, lab, rlist, rcol, ins, boxes, px_per_um=2.0, vox=5.0, sigma_um=7.0, level=0.3):
+    """THE REGIONS AS SURFACES, FROM THE NEURONS (Cedric, 2026-10-07: "the isosurface on the dots, not on the atlas, so
+    the surfaces are aligned by structure"; the registration untouched): each region's neurons (lab == k) in the plotted
+    frame P [n, 3] = (x', y', z) um, counted on a vox-um grid, Gaussian-smoothed (sigma_um), normalised by its own 99th
+    percentile inside the region and contoured at `level`; the brain (every neuron inside) a faint grey shell. Rendered
+    from above and from the side with the camera framed on EXACTLY the dot panels' boxes {view: (x0, x1, y0, y1)}, at
+    px_per_um, parallel projection -- so drawn with imshow(extent=box) a surface sits on its own neurons. -> {view: img}."""
     import pyvista as pv
-    from scipy.sparse import csc_matrix
+    from scipy.ndimage import gaussian_filter
     pv.OFF_SCREEN = True
-    with h5py.File(os.path.join(ZB, "MaskDatabase.mat")) as h:
-        H, W, Z = int(h["height"][0, 0]), int(h["width"][0, 0]), int(h["Zs"][0, 0])
-        g = h["MaskDatabase"]
-        S = csc_matrix((g["data"][:], g["ir"][:], g["jc"][:]), shape=(H * W * Z, len(names)))
+    lo = P[ins].min(0) - 4 * sigma_um
+    hi = P[ins].max(0) + 4 * sigma_um
+    shape = np.ceil((hi - lo) / vox).astype(int) + 1
 
-    def volume(col):
-        v = np.zeros(H * W * Z, np.float32)
-        a, b = S.indptr[col], S.indptr[col + 1]
-        v[S.indices[a:b]] = 1.0
-        return v.reshape((Z, W, H)).transpose(2, 1, 0)[::2, ::2, :]       # column-major (y, x, z) -> [y, x, z], halved
-
-    def surface(vol):
-        img = pv.ImageData(dimensions=vol.shape, spacing=(2 * ZVOX[1], 2 * ZVOX[0], ZVOX[2]))
-        img.point_data["m"] = vol.ravel(order="F")
-        srf = img.contour([0.5], scalars="m")
-        if srf.n_points == 0:
+    def surface(m):
+        if m.sum() < 30:
             return None
-        srf = srf.smooth(n_iter=30)
-        P = np.asarray(srf.points)                                      # (y, x, z) um -> head left (x', y', z)
-        srf.points = np.column_stack([P[:, 0], (W - 1) * ZVOX[0] - P[:, 1], P[:, 2]])
-        return srf
-    brain = None
-    for key in ("Telencephalon -", "Diencephalon -", "Mesencephalon -", "Rhombencephalon -", "Spinal Cord"):
-        if key in names:
-            v_ = volume(names.index(key))
-            brain = v_ if brain is None else np.maximum(brain, v_)
-    out = []
-    for view, size in zip(("top", "side"), sizes):
+        ix = np.floor((P[m] - lo) / vox).astype(int)
+        v = np.zeros(shape, np.float32)
+        np.add.at(v, (ix[:, 0], ix[:, 1], ix[:, 2]), 1.0)
+        v = gaussian_filter(v, sigma_um / vox)
+        top = float(np.percentile(v[ix[:, 0], ix[:, 1], ix[:, 2]], 99))
+        img = pv.ImageData(dimensions=v.shape, spacing=(vox, vox, vox), origin=tuple(lo))
+        img.point_data["d"] = (v / max(top, 1e-9)).ravel(order="F")
+        srf = img.contour([level], scalars="d")
+        return srf.smooth(n_iter=20) if srf.n_points else None
+    shell = surface(ins)
+    regions = [(r_, surface(lab == k)) for k, r_ in enumerate(rlist)]
+    out = {}
+    for view, (x0, x1, y0, y1) in boxes.items():
+        size = (int(round((x1 - x0) * px_per_um)), int(round((y1 - y0) * px_per_um)))
         pl = pv.Plotter(off_screen=True, window_size=size)
         pl.set_background("black")
-        sb = surface(brain)
-        if sb is not None:
-            pl.add_mesh(sb, color="#8c8c8c", opacity=0.10, smooth_shading=True)
-        for r_ in rlist:
-            sr = surface(volume(names.index(rfull[r_])))
+        if shell is not None:
+            pl.add_mesh(shell, color="#8c8c8c", opacity=0.10, smooth_shading=True)
+        for r_, sr in regions:
             if sr is not None:
                 pl.add_mesh(sr, color=rcol[r_][:3], opacity=0.75, smooth_shading=True, specular=0.3)
         pl.enable_parallel_projection()
-        b = sb.bounds if sb is not None else (0, 1, 0, 1, 0, 1)
-        c = ((b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2)
-        if view == "top":
-            pl.camera.position = (c[0], c[1], c[2] + 3000.0)
-            pl.camera.up = (0.0, 1.0, 0.0)
-            pl.camera.parallel_scale = max((b[3] - b[2]) / 2, (b[1] - b[0]) / 2 * size[1] / size[0]) * 1.06
-        else:
-            pl.camera.position = (c[0], c[1] - 3000.0, c[2])
-            pl.camera.up = (0.0, 0.0, 1.0)
-            pl.camera.parallel_scale = max((b[5] - b[4]) / 2, (b[1] - b[0]) / 2 * size[1] / size[0]) * 1.06
-        pl.camera.focal_point = c
-        out.append(pl.screenshot(return_img=True))
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        zc = float((lo[2] + hi[2]) / 2)
+        if view == "top":                                 # from +z down, y' up: the top dot panel's axes
+            pl.camera.position, pl.camera.focal_point, pl.camera.up = (cx, cy, zc + 3000.0), (cx, cy, zc), (0.0, 1.0, 0.0)
+        else:                                             # from -y' toward +y', z up: the side dot panel's axes
+            yc = float((lo[1] + hi[1]) / 2)
+            pl.camera.position, pl.camera.focal_point, pl.camera.up = (cx, yc - 3000.0, cy), (cx, yc, cy), (0.0, 0.0, 1.0)
+        pl.camera.parallel_scale = (y1 - y0) / 2
+        out[view] = pl.screenshot(return_img=True)
         pl.close()
     return out
 
@@ -249,19 +238,23 @@ def summary(iso=False):
         panels = [("dots", [-0.03, 0.37, 0.62, 0.62], "top", "in Z-Brain, from above, head left"),
                   ("dots", [-0.03, 0.02, 0.62, 0.34], "side", "from the side")]
 
-    def trim(im, pad=6):                                  # a render cut to the brain
-        on = np.argwhere(im[:, :, :3].max(2) > 12)
-        (y0, x0), (y1, x1) = on.min(0), on.max(0)
-        return im[max(y0 - pad, 0):y1 + pad, max(x0 - pad, 0):x1 + pad]
-    imgs = ({k: trim(v) for k, v in zip(("top", "side"), iso_images(rlist, rfull, rcol, names))}
+    # the panels' boxes (the dots' own extent), shared by the dots and the surfaces built from them
+    boxes = {"top": (np.percentile(xd[ins_], 0.1), np.percentile(xd[ins_], 99.9),
+                     np.percentile(yd[ins_], 0.1), np.percentile(yd[ins_], 99.9)),
+             "side": (np.percentile(xd[ins_], 0.1), np.percentile(xd[ins_], 99.9),
+                      np.percentile(A[ins_, 2], 0.1) - 40.0, np.percentile(A[ins_, 2], 99.9))}
+    imgs = (iso_from_dots(np.column_stack([xd, yd, A[:, 2]]), lab_, rlist, rcol, ins_, boxes)
             if any(k == "iso" for k, *_ in panels) else {})
     for kind, rect, view, ttl in panels:
         ax = fig.add_axes(rect)
         ax.axis("off")
         ax.set_title(ttl + ("" if mg else " -- the colours of the table's names"), fontsize=9.5, loc="left",
                      x=0.06, pad=2)
-        if kind == "iso":
-            ax.imshow(imgs[view], aspect="auto" if mg else "equal")
+        if kind == "iso":                                 # on the dots' box: a surface on its own neurons
+            bx = boxes[view]
+            ax.imshow(imgs[view], extent=(bx[0], bx[1], bx[2], bx[3]), aspect="auto" if mg else "equal")
+            ax.set_xlim(bx[0], bx[1])
+            ax.set_ylim(bx[2], bx[3])
             continue
         Y = yd if view == "top" else A[:, 2]
         ax.scatter(xd[~ins_], Y[~ins_], s=0.15, color="0.25", lw=0, rasterized=True)
@@ -274,8 +267,8 @@ def summary(iso=False):
             m = lab_ == k
             ax.scatter(xd[m], Y[m], s=0.35 if not mg else 0.25, color=rcol[r_], lw=0, rasterized=True)
         if mg:                                                               # the brain's own extent, the panel's
-            ax.set_xlim(np.percentile(xd[ins_], 0.1), np.percentile(xd[ins_], 99.9))
-            ax.set_ylim(np.percentile(Y[ins_], 0.1) - (40.0 if view == "side" else 0.0), np.percentile(Y[ins_], 99.9))
+            ax.set_xlim(boxes[view][0], boxes[view][1])
+            ax.set_ylim(boxes[view][2], boxes[view][3])
             ax.set_aspect("auto")
         else:
             ax.set_aspect("equal")
