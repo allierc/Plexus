@@ -70,7 +70,8 @@ def main(run):
         m = (lab == k_) & reads
         if m.sum() < 100:
             continue
-        per[r_] = {"neurons": int(m.sum()), "dV_mean": dV[m].mean(0).tolist(), "dV_sd": dV[m].std(0).tolist()}
+        per[r_] = {"neurons": int(m.sum()), "dV_mean": dV[m].mean(0).tolist(), "dV_sd": dV[m].std(0).tolist(),
+                   "Veff_mean": Veff[m].mean(0).tolist()}
     kmax = int(np.argmax(dV[reads].std(0)))
     doc = {"run": run, "blocks": bn, "neurons_reading_markers": int(reads.sum()), "norm_mu_sd": [mu, sd],
            "global": {"Veff_mean": Veff[reads].mean(0).tolist(), "Veff_sd": Veff[reads].std(0).tolist(),
@@ -81,74 +82,93 @@ def main(run):
     print(json.dumps({k: v for k, v in doc.items() if k != "per_region"}, indent=1))
 
     plt.style.use("dark_background")
-    fig = plt.figure(figsize=(15, 8.4), facecolor="black")
-    # a: over time
-    a = fig.add_axes([0.05, 0.62, 0.42, 0.30])
+    # Cedric, 2026-10-08: "too messy -- keep the time course without the SD, the regions' mean V_rest as traces in one
+    # shared plot, delete the heatmap and the scatter"
+    fig = plt.figure(figsize=(10.5, 8.4), facecolor="black")
     t = np.arange(len(X)) * DT / 60
-    bm = X.mean(1)
-    step_m = np.concatenate([np.full(off[k + 1] - off[k], doc["global"]["Veff_mean"][k]) for k in range(len(bn))])
-    step_s = np.concatenate([np.full(off[k + 1] - off[k], doc["global"]["Veff_sd"][k]) for k in range(len(bn))])
-    a.fill_between(t, step_m - step_s, step_m + step_s, color="#ff9e1a", alpha=0.25, lw=0)
-    a.plot(t, step_m, color="#ff9e1a", lw=1.6, label="learned V$_{rest}$, brain mean $\\pm$ SD")
-    a.plot(t, bm, color="#4dd94d", lw=0.6, alpha=0.8, label="recorded dF/F, brain mean")
-    for k in range(len(bn)):
-        a.axvline(off[k] * DT / 60, color="0.35", lw=0.5)
-        a.text((off[k] + off[k + 1]) / 2 * DT / 60, 1.01, bn[k].replace("open loop", "open"), transform=a.get_xaxis_transform(),
-               fontsize=8, ha="center", va="bottom")
-    a.set_xlim(0, t[-1])
-    a.set_xlabel("time, min", fontsize=9)
-    a.set_ylabel("dF/F", fontsize=9)
-    a.legend(fontsize=8, frameon=False, loc="upper right")
-    a.set_title("a  over time", fontsize=10, loc="left", pad=14)
-    # b: region x block heatmap of the mean offset, mean +- SD written
-    rs = list(per)
-    Hm = np.array([per[r]["dV_mean"] for r in rs])
-    Hs = np.array([per[r]["dV_sd"] for r in rs])
-    b = fig.add_axes([0.665, 0.08, 0.30, 0.86])
-    vm = float(np.percentile(np.abs(Hm), 98))
-    im = b.imshow(Hm, aspect="auto", cmap="RdBu_r", norm=TwoSlopeNorm(0, -vm, vm))
-    for i in range(len(rs)):
+
+    def steps(vals):
+        return np.concatenate([np.full(off[k + 1] - off[k], vals[k]) for k in range(len(bn))])
+
+    def blocks_axis(ax_, labels_=True):
         for k in range(len(bn)):
-            b.text(k, i, f"{1000 * Hm[i, k]:+.0f}\n$\\pm${1000 * Hs[i, k]:.0f}", fontsize=5.2, ha="center", va="center",
-                   color="black" if abs(Hm[i, k]) > 0.45 * vm else "white")
-    b.set_yticks(range(len(rs)))
-    b.set_yticklabels([f"{r} ({per[r]['neurons']:,})" for r in rs], fontsize=8)
-    b.set_xticks(range(len(bn)))
-    b.set_xticklabels(bn, rotation=35, ha="right", fontsize=8.5)
-    b.set_title("b  per region: the mean offset dV, 10$^{-3}$ dF/F (mean $\\pm$ SD)", fontsize=10, loc="left")
-    cb = fig.colorbar(im, ax=b, fraction=0.03, pad=0.01)
-    cb.ax.tick_params(labelsize=7)
-    # c: learned offset against the recorded block shift, per block
-    c = fig.add_axes([0.05, 0.08, 0.20, 0.42])
-    cols = plt.get_cmap("tab10")(np.arange(len(bn)))
-    g = np.random.default_rng(0)
-    sub = g.choice(np.flatnonzero(reads), min(6000, int(reads.sum())), replace=False)
-    for k in range(len(bn)):
-        c.scatter(shift[sub, k], dV[sub, k], s=1.0, color=cols[k], lw=0, alpha=0.5, rasterized=True)
-    lim = float(np.percentile(np.abs(np.r_[shift[sub].ravel(), dV[sub].ravel()]), 99))
-    c.set_xlim(-lim, lim)
-    c.set_ylim(-lim, lim)
-    c.axhline(0, color="0.4", lw=0.5)
-    c.axvline(0, color="0.4", lw=0.5)
-    c.set_xlabel("recorded: block mean - recording mean, dF/F", fontsize=8.5)
-    c.set_ylabel("learned offset dV, dF/F", fontsize=8.5)
-    c.tick_params(labelsize=7.5)
-    c.set_title("c  learned against recorded, per block", fontsize=10, loc="left")
-    c.text(1.04, 0.98, "r over the neurons\n" + "\n".join(f"{bn[k]:<10} {rk[k]:+.2f}" for k in range(len(bn))),
-           transform=c.transAxes, fontsize=7.5, family="monospace", va="top")
-    # d: one block's offsets on the fish (atlas frame), from above and the side
-    xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
-    vk = dV[:, kmax]
-    vmk = float(np.percentile(np.abs(vk[reads]), 98))
-    for rect, Y, ttl in (([0.33, 0.30, 0.17, 0.20], yd, "from above"), ([0.33, 0.08, 0.17, 0.15], A[:, 2], "from the side")):
-        d = fig.add_axes(rect)
-        o = np.argsort(np.abs(vk))
-        d.scatter(xd[o], Y[o], c=vk[o], s=0.15, cmap="RdBu_r", norm=TwoSlopeNorm(0, -vmk, vmk), lw=0, rasterized=True)
-        d.set_aspect("equal")
-        d.axis("off")
-        d.set_title(f"d  {bn[kmax]}: each neuron's offset\n    {ttl}" if ttl == "from above" else ttl, fontsize=9, loc="left")
+            ax_.axvline(off[k] * DT / 60, color="0.3", lw=0.5)
+            if labels_:
+                ax_.text((off[k] + off[k + 1]) / 2 * DT / 60, 1.01, bn[k].replace("open loop", "open"),
+                         transform=ax_.get_xaxis_transform(), fontsize=8.5, ha="center", va="bottom")
+        ax_.set_xlim(0, t[-1])
+    # a: the brain mean of V_rest, one value per block, beside the recorded brain mean
+    a = fig.add_axes([0.08, 0.60, 0.68, 0.30])
+    a.plot(t, X.mean(1), color="#4dd94d", lw=0.6, alpha=0.8, label="recorded dF/F, brain mean")
+    a.plot(t, steps(doc["global"]["Veff_mean"]), color="#ff9e1a", lw=2.0, label="learned V$_{rest}$, brain mean")
+    blocks_axis(a)
+    a.set_ylabel("dF/F", fontsize=9)
+    a.tick_params(labelsize=8)
+    a.set_xticklabels([])
+    a.legend(fontsize=8, frameon=False, loc="upper right")
+    a.set_title("a  the whole brain", fontsize=10, loc="left", pad=16)
+    # b: each region's mean V_rest per block, all regions on one plot, in the atlas slide's colours
+    bx = fig.add_axes([0.08, 0.08, 0.68, 0.46])
+    jc = os.path.join(EXP, "data", "atlas_subregions.json")
+    rcol = {k: v["colour"] for k, v in json.load(open(jc)).items()} if os.path.exists(jc) else {}
+    for r in per:
+        bx.plot(t, steps(per[r]["Veff_mean"]), color=rcol.get(r, "0.7"), lw=1.3, label=r)
+    blocks_axis(bx, labels_=False)
+    bx.set_xlabel("time, min", fontsize=9)
+    bx.set_ylabel("learned V$_{rest}$, region mean, dF/F", fontsize=9)
+    bx.tick_params(labelsize=8)
+    bx.legend(fontsize=6.8, frameon=False, loc="upper left", bbox_to_anchor=(1.005, 1.0), ncol=1, handlelength=1.2)
+    bx.set_title("b  per region", fontsize=10, loc="left")
     fig.savefig(os.path.join(EXP, "presentation", "figs", f"vrest_blocks_{run}.png"), dpi=130, facecolor="black")
     plt.close(fig)
+    movie(run, A, dV, reads, bn)
+
+
+def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
+    """THE OFFSETS, BLOCK BY BLOCK (Cedric, 2026-10-08: "a movie of the fish, from above and from the side, instead of the
+    one block; no white dots"): one still per block held hold_s, every neuron coloured by its offset dV in that block on a
+    blue-black-red scale and its opacity |dV| (a near-zero offset invisible), the atlas frame. -> Movies/vrest_blocks_<run>.mp4"""
+    import shutil
+    import subprocess
+    import tempfile
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+    from plexus.tasks.trace_recording import _ffmpeg
+    bkr = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])
+    xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
+    vm = float(np.percentile(np.abs(dV[reads]), 98))
+    nrm = TwoSlopeNorm(0, -vm, vm)
+    ii = np.flatnonzero(reads)
+    ext = lambda v: (float(np.percentile(v[ii], 0.2)), float(np.percentile(v[ii], 99.8)))      # noqa: E731
+    (x0, x1), (y0, y1), (z0, z1) = ext(xd), ext(yd), ext(A[:, 2])
+    W_ = 6.0
+    ht, hs = W_ * (y1 - y0) / (x1 - x0), W_ * (z1 - z0 + 40) / (x1 - x0)
+    tmp = tempfile.mkdtemp(prefix="vrest_")
+    plt.style.use("dark_background")
+    for k, b in enumerate(bn):
+        fig = plt.figure(figsize=(W_ + 0.4, ht + hs + 1.3), facecolor="black")
+        H = ht + hs + 1.3
+        v = dV[ii, k]
+        o = np.argsort(np.abs(v))
+        rgba = bkr(nrm(v[o]))
+        rgba[:, 3] = np.clip(np.abs(v[o]) / vm, 0.0, 1.0)                       # a near-zero offset invisible
+        for (yb, h, Y, lo, hi) in (((hs + 0.55) / H, ht / H, yd, y0, y1), (0.35 / H, hs / H, A[:, 2], z0 - 40, z1)):
+            ax = fig.add_axes([0.2 / (W_ + 0.4), yb, W_ / (W_ + 0.4), h])
+            ax.scatter(xd[ii][o], Y[ii][o], c=rgba, s=0.6, lw=0, rasterized=True)
+            ax.set_xlim(x0, x1)
+            ax.set_ylim(lo, hi)
+            ax.axis("off")
+        fig.text(0.04, 1 - 0.35 / H, f"{b}: each neuron's offset dV", fontsize=14, va="top", weight="bold")
+        fig.text(0.04, 0.02, "red: rest raised, blue: lowered, black / clear: unchanged", fontsize=10, va="bottom", color="0.8")
+        fig.savefig(os.path.join(tmp, f"{k:03d}.png"), dpi=110, facecolor="black")
+        plt.close(fig)
+    stem = os.path.join(EXP, "presentation", "Movies", f"vrest_blocks_{run}")
+    subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", f"{1 / hold_s:.4f}", "-i", os.path.join(tmp, "%03d.png"),
+                    "-r", str(fps), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                    stem + ".mp4"], check=True)
+    shutil.copy(os.path.join(tmp, "000.png"), stem + ".png")
+    shutil.rmtree(tmp)
+    print(f"[vrest] {stem}.mp4: {len(bn)} blocks, {hold_s} s each")
 
 
 if __name__ == "__main__":
