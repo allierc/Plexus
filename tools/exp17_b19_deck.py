@@ -37,6 +37,8 @@ L0, LEVELS, BIN = 16.0, 3, 16.0           # the grid (batch 21) and the triangul
 GREEN = "#4cbb5e"                         # the MIDDLE level on all four slides (Cedric, 2026-10-06)
 # the levels by RANK, fine / middle / coarse, on both graphs (Cedric, 2026-10-06: by edge scale the triangular mesh's
 # 8 / 16 / 32-um levels were all blue): colour, 3-D line width and opacity, window line width (px)
+# Cedric, 2026-10-08: the square stimulus movies of slides 3-12 off ("they still pull the eye"); the text then centred
+STIM_MOVIES = False
 RANK = [("#9ecae1", 1.0, 0.18, 2.0), (GREEN, 1.8, 0.50, 4.0), ("#fd8d3c", 3.0, 0.85, 6.5)]
 NAMES = ["fine", "middle", "coarse"]
 TRI_SLAB = 8.0                            # um: the triangular window's depth (Cedric, 2026-10-06: limit the projection)
@@ -175,10 +177,11 @@ def build_window(neurons, layers, title, stages, stem, centre, half, hold_s=1.5,
                        [centre[0] + half, centre[1] + half], [centre[0] - half, centre[1] + half]])
         fulls.append((pl.add_mesh(_lines(pv, flat(sq), flat(np.roll(sq, -1, 0))), color="white", line_width=4), nwin))
         for k, L in enumerate(full["layers"]):
+            sk_ = L.get("stage", k)                         # several levels at one stage when they name it
             fulls.append((pl.add_mesh(_lines(pv, flat(L["a"]), flat(L["b"])), color=L["colour"], line_width=L["width"],
-                                      opacity=L.get("opacity", 1.0)), nwin + k))
+                                      opacity=L.get("opacity", 1.0)), nwin + sk_))
             fulls.append((pl.add_text(L["label"], position=(24, 112 - 27 * k), font_size=12, color=L["colour"]),
-                          nwin + k))
+                          nwin + sk_))
         lo_f, hi_f = Pf.min(0), Pf.max(0)
         fb = 100.0
         xb, yb = lo_f[0] + 10.0, lo_f[1] - 12.0
@@ -351,7 +354,7 @@ def prune_window(run="zap_n19_nom"):
     c1 = P[int(top[np.argmin(np.linalg.norm(P[top] - np.median(P, 0), axis=1))])]
     inw = lambda X, d: (np.abs(X[:, 0] - c1[0]) <= half) & (np.abs(X[:, 1] - c1[1]) <= half) & (np.abs(X[:, 2] - c1[2]) < d)  # noqa: E731
     wl, ws = [], ["1  the neurons: every destriped neuron of the slab"]
-    counts = {}
+    counts, kept_rem = {}, {}
     for k, (lab, b, nd, e) in enumerate(ftc):
         st_ = SET_OF[k]
         snd, rcv = (np.asarray(x) for x in sets_[st_])
@@ -364,6 +367,7 @@ def prune_window(run="zap_n19_nom"):
         j = np.clip(np.searchsorted(u, ke), 0, len(u) - 1)
         wmax = np.where(u[j] == ke, mx[j], np.inf)                            # an edge the set lacks: kept
         rem = wmax < th[st_]
+        kept_rem[k] = rem
         counts[st_] = {"edges": int(len(e)), "removed": int(rem.sum()), "threshold": th[st_]}
         col, _, _, px = RANK[k]
         ok = inw(P, TRI_DEPTH[k] / 2)
@@ -383,8 +387,17 @@ def prune_window(run="zap_n19_nom"):
         ws += [f"{s_add + 1}  + the {NAMES[k]} mesh: level {k}, {name}",
                f"{s_mark + 1}  level {k}: the edges with |W| < {th[st_]:.3g} both ways, in red ({100 * rem.mean():.0f} %)",
                f"{s_gone + 1}  level {k}: removed, {len(e) - int(rem.sum()):,} edges left"]
-    build_window(P[inw(P, TRI_SLAB / 2)], wl, f"the {run.replace('_', ' ')} mesh, pruned: a {2 * half:.0f}-µm window "
-                 "from above", ws, os.path.join(PRES, "Movies", "b19_tri_window_prune"), c1, half)
+    # THE WHOLE FISH, PRUNED (Cedric, 2026-10-08: "add one full zebrafish"): one last view, the camera backed out to the
+    # whole brain, the kept edges of levels 1 and 2 together (level 0 is a solid block at this scale)
+    fl_ = {"neurons": P, "layers": [], "stages": [f"{len(ws) + 1}  the whole fish, pruned: the kept edges of levels 1 and 2"]}
+    for k in (1, 2):
+        lab, b, nd, e = ftc[k]
+        ek = e[~kept_rem[k]]
+        fl_["layers"].append({"a": P[ek[:, 0]], "b": P[ek[:, 1]], "colour": RANK[k][0], "width": 1.0 + 0.5 * k,
+                              "opacity": 0.6 if k == 1 else 0.9, "stage": 0,
+                              "label": f"level {k}: {lab.replace(' um', '-µm')}, {len(ek):,} of {len(e):,} edges kept"})
+    build_window(P[inw(P, TRI_SLAB / 2)], wl, f"19.25's mesh, pruned: a {2 * half:.0f}-µm window, then the whole fish", ws, os.path.join(PRES, "Movies", "b19_tri_window_prune"), c1, half,
+                 full=fl_)
     json.dump({"run": run, "thresholds": th, "levels": counts, "joint": PR["joint"]},
               open(os.path.join(EXP, "data", f"prune_window_{run}.json"), "w"), indent=1)
 
@@ -614,7 +627,9 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
         srt = sorted(pr_.items(), key=lambda kv: kv[1]["median"])
         right_t = (S.head("$\\tau$ by brain region")
                    + "{\\scriptsize each neuron's learned leak time constant $\\tau$ (bounded to [1, 100] s), grouped by "
-                     "its atlas region (the most specific of the table's), head to tail\\par}\\vspace{6pt}\n"
+                     "its atlas region (the most specific of the table's), head to tail. Left, as on the atlas slide: the neurons "
+                     "by their own $\\tau$, the regions' surfaces by their neurons' mean $\\tau$ (on the log scale), one "
+                     "colour scale\\par}\\vspace{6pt}\n"
                    + S.head("what it shows")
                    + "{\\scriptsize\\raggedright The regions differ: they explain " + f"{100 * T_['eta2_log_tau_by_region']:.0f}"
                    + " \\% of the variance of log $\\tau$ (shuffled labels: " + f"{100 * T_['eta2_shuffled_max']:.2f}" + " \\%). "
@@ -626,9 +641,13 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
                    + "{\\scriptsize\\raggedright The input neurons are fast (median " + f"{T_['median_input_neurons']:.1f}"
                    + " s against " + f"{T_['median_other_neurons']:.1f}" + " s for the others): a region full of input "
                      "neurons (the pretectum) is fast partly for that.\\par}")
-        out.append((f"19_tau_{run}", S.frame_narrow("the learned time constants, region by region", f"figs/tau_regions_{run}.png",
-                                                    right_t, f"tools/exp17_tau_regions.py {run}", left=0.74,
-                                                    deck_title=dt + " $\\cdot$ tau by region")))
+        # Cedric, 2026-10-08: the figure and the text centred in height, filling the slide
+        body_t = ("\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.77\\textwidth}\\centering"
+                  "\\includegraphics[width=\\linewidth,height=0.80\\textheight,keepaspectratio]{figs/tau_regions_" + run
+                  + ".png}\\end{column}\n\\begin{column}{0.21\\textwidth}\\fitcol{%\n" + right_t
+                  + "}\\end{column}\n\\end{columns}\\vspace*{\\fill}")
+        out.append((f"19_tau_{run}", S.frame_wide("the learned time constants, region by region", body_t,
+                                                  f"tools/exp17_tau_regions.py {run}", deck_title=dt + " $\\cdot$ tau by region")))
     # the edge weights on one scale (tools/exp17_edges.py --amplitude)
     ja_ = os.path.join(PRES, "figs", f"edges_amp_{run}.json")
     if os.path.exists(ja_):
@@ -983,12 +1002,13 @@ def write_slides():
             # Cedric, 2026-10-07: a small movie of the block's visual stimulus (tools/exp17_stim_movies.py) at the top of
             # the right column, half the column wide ("x2 smaller")
             stim_ = lambda body_, b_, w_="0.5\\linewidth": (body_.replace("\\begin{column}{0.20\\textwidth}\\centering\\fitcol{%",   # noqa: E731
-                                                     "\\begin{column}[t]{0.20\\textwidth}\\centering\\playmovie[" + w_ + "]"
+                                                     "\\begin{column}[t]{0.20\\textwidth}\\centering\\playonce[" + w_ + "]"
                                                      "{Movies/stim_" + b_ + "}\\par\\vspace{8pt}"
                                                      # the text fitted to what the movie leaves of the column (local)
                                                      "\\setlength{\\colheight}{" + ("0.68" if w_ == "0.5\\linewidth" else "0.40")
                                                      + "\\textheight}\\fitcol{%")
-                                       if os.path.exists(os.path.join(PRES, "Movies", f"stim_{b_}.mp4")) else body_)
+                                       if STIM_MOVIES and os.path.exists(os.path.join(PRES, "Movies", f"stim_{b_}.mp4"))
+                                       else body_)
             deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all"),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
@@ -1326,6 +1346,21 @@ def write_slides():
         body21 = ("\\vspace*{2\\baselineskip}\\fitcol{%\n"
                   + "\\vspace{14pt}\n".join("{\\Large\\textbf{" + h + "}}\\\\[4pt]\n{\\Large " + e + "}\\\\[4pt]\n"
                                              "{\\small\\raggedright " + t_ + "\\par}\n" for h, e, t_ in mods21) + "}")
+        # Cedric, 2026-10-08: a right column with exp18's toy model -- one fixed wiring, six circuits, one angle each
+        # (tools/exp17_exp18_toy.py: held-out traces, the angles on the circle), black
+        if all(os.path.exists(os.path.join(PRES, "figs", f_)) for f_ in ("exp18_toy_traces.png", "exp18_toy_circle.png")):
+            body21 = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.56\\textwidth}\n" + body21
+                      + "\\end{column}\n\\begin{column}{0.42\\textwidth}\\vspace*{2\\baselineskip}\n"
+                        "{\\small\\textbf{exp18: one wiring, six circuits}}\\\\[3pt]\n"
+                        "{\\tiny\\raggedright The 285-cell zebrafish oculomotor integrator, its wiring fixed; six laws "
+                        "(1 integrate, 2 delay, 3 low-pass, 4 high-pass, 5 resonator, 6 differentiate), each selected by one "
+                        "angle $\\alpha_k$, $\\varphi$ learned from random. Left: one held-out trial per law, the target "
+                        "(white) and the circuit (dashed, the law's colour). Right: the six angles, the held-out error over "
+                        "the law's own variance.\\par}\\vspace{6pt}\n"
+                        "\\begin{minipage}[t]{0.52\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.56\\textheight,"
+                        "keepaspectratio]{figs/exp18_toy_traces.png}\\end{minipage}\\hfill"
+                        "\\begin{minipage}[t]{0.46\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.48\\textheight,"
+                        "keepaspectratio]{figs/exp18_toy_circle.png}\\end{minipage}\n\\end{column}\n\\end{columns}")
         deck.append(("07b_angle", S.frame_wide("the angular modulation", body21,
                                                "cell_ops: neuron_graph_phase; Allier 2026, GNN_Transformer note, Eq. 27",
                                                deck_title="the model $\\cdot$ batch 21: the angle that switches the circuit")))
@@ -1340,14 +1375,21 @@ def write_slides():
     if os.path.exists(jw_) and os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "Movies", "b19_tri_window_prune.mp4")):
         PW_, PR_ = json.load(open(jw_)), json.load(open(jp_))
         J_ = PR_["joint"]
-        lab_ = {"short": "0, every neuron", "mid": "1, 32-\\textmu m cubes", "long": "2, 64-\\textmu m cubes"}
-        rows_ = "".join(f"{lab_[s_]} & {c_['threshold']:.3g} & {c_['edges']:,} & {100 * c_['removed'] / c_['edges']:.0f} \\% \\\\\n"
-                        for s_, c_ in PW_["levels"].items())
+        lab_ = {"short": "level 0 (every neuron)", "mid": "level 1 (32-\\textmu m cubes)", "long": "level 2 (64-\\textmu m cubes)"}
+        # ONE LINE PER LEVEL (Cedric, 2026-10-08): its threshold and the DIRECTED weights it keeps, from its own ladder row
+        lines_ = ""
+        for s_, P_ in PR_["per_set"].items():
+            row_ = next((r for r in P_["ladder"] if abs(r["thresholds"][s_] - P_["threshold"]) < 1e-12), None)
+            kept_ = row_["kept"][s_] if row_ else int(round(P_["n"] * (1 - P_["removed_share"])))
+            lines_ += ("{\\scriptsize\\raggedright \\textbf{" + lab_[s_] + "}: at the " + f"{P_['threshold']:.2g}"
+                       + " threshold it keeps \\textbf{" + f"{100 * kept_ / P_['n']:.0f}" + " \\%} of its edges: "
+                       + f"{kept_:,} of its {P_['n']:,} directed weights (the other {100 * (1 - kept_ / P_['n']):.0f} \\% "
+                       "are dropped)" + (" -- the ladder's top: more may go" if P_["threshold"] >= max(
+                           r["thresholds"][s_] for r in P_["ladder"]) - 1e-12 else "") + ".\\par}\\vspace{4pt}\n")
         right_pw = (S.head("the mesh, pruned: 19.25")
                     + "{\\scriptsize\\raggedright Slide 18's window, level by level; after each level, its edges whose learned "
                       "weight is below the level's threshold in both directions marked red, then removed.\\par}\\vspace{6pt}\n"
-                    + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
-                      "level & $|W|$ below & edges & removed \\\\\n\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                    + lines_ + "\\vspace{2pt}\n"
                     + S.head("the check")
                     + "{\\scriptsize\\raggedright The three levels cut at once, the 2 h free rollout rerun: "
                       f"{100 * J_['kept_share']:.0f} \\% of the directed weights kept, brain-mean r {J_['d_brain_mean_r']:+.4f}, "
