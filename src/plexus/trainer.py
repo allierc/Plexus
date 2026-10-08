@@ -92,7 +92,7 @@ _KEYS = {
                   "recording", "beats", "field_recording", "coarsen", "points", "split", "normalise",
                   "trace_recording", "test_stride"},
     "drive": {"set", "block", "prescribe", "width", "window"},
-    "observe": {"set", "block", "channel", "unit", "measure", "grid", "of", "field", "alive"},
+    "observe": {"set", "block", "channel", "unit", "measure", "grid", "of", "field", "alive", "elements"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
                  "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
                  "iters", "save_every", "anneal", "select", "init_from", "circuit_movie"},
@@ -458,6 +458,9 @@ def load(path_or_name) -> dict:
         raise ValueError(f"{path}: `select` is read by a trace_recording task only")
     elif any(k in tr for k in ("stages", "render", "lr_min")):
         raise ValueError(f"{path}: `stages`, `render` and `lr_min` belong to a shape task's scheme")
+    if (s.get("task") or {}).get("observe", {}).get("elements", "all") != "all":
+        raise ValueError(f"{path}: task.observe.elements is `all` (every element of the observed set, one column each) "
+                         f"or absent (element 0)")
     if "circuit_movie" in tr:                       # the circuit at work (plot_trainer.circuit_movie), a corpus run's
         cm = tr["circuit_movie"]
         if kind != "corpus":
@@ -745,6 +748,7 @@ def rollout(sim, learn, u, task, device="cpu", grad=True, watch=None):
     more of the state than the observable (the analysis reads the voltages).
     """
     drv, obs = task["drive"], task["observe"]
+    ch_all = int(obs.get("channel", 0)) if obs.get("elements") == "all" else None
     batch = int(u.shape[0]) if u.dim() == 3 else 1
     if u.dim() == 3 and batch == 1:                        # the engine runs unbatched at B = 1
         u = u[0]
@@ -752,7 +756,10 @@ def rollout(sim, learn, u, task, device="cpu", grad=True, watch=None):
 
     def hook(H, frame):
         write_drive(H, frame, u, drv["set"], drv["block"])
-        trace.append(H.level(obs["set"]).get(obs["block"])[..., 0, :].clone())
+        v_ = H.level(obs["set"]).get(obs["block"])
+        # `observe.elements: all` (the two-eye task, Cedric 2026-10-08): channel `channel` of EVERY element, one
+        # column per element, scored column for column against the corpus's targets; otherwise element 0, all channels
+        trace.append(v_[..., :, ch_all].clone() if ch_all is not None else v_[..., 0, :].clone())
         if watch is not None:
             watch(H)
 
@@ -773,6 +780,9 @@ def _mse(y, target, ch):
     [B, T, w] against [B, T, 1] are the same call.
     """
     n = min(y.shape[-2], target.shape[-2])
+    if target.shape[-1] > 1:                       # several targets (`observe.elements: all`): column for column
+        K = target.shape[-1]
+        return ((y[..., :n, :K] - target[..., :n, :K]) ** 2).mean()
     return ((y[..., :n, ch] - target[..., :n, 0]) ** 2).mean()
 
 
@@ -915,10 +925,12 @@ def train(spec, device="cpu", root=None):
             _, y = rollout(sim, learn, U[idx], task, device, grad=True)
             Yb = Y[idx]
             nf = min(y.shape[-2], Yb.shape[-2])
-            r = y[..., :nf, ch] - Yb[..., :nf, 0]
+            if Yb.shape[-1] > 1:                       # several targets: one column per observed element
+                r, ref_ = y[..., :nf, :Yb.shape[-1]] - Yb[..., :nf, :], Yb[..., :nf, :]
+            else:
+                r, ref_ = y[..., :nf, ch] - Yb[..., :nf, 0], Yb[..., :nf, 0]
             parts = {}
-            loss = _objective(spec, learn, {"mse": lambda red: _reduce(r, red, Yb[..., :nf, 0])},
-                              ep, parts)
+            loss = _objective(spec, learn, {"mse": lambda red: _reduce(r, red, ref_)}, ep, parts)
             for kk, vv in parts.items():
                 terms[kk] = terms.get(kk, 0.0) + vv
             if not torch.isfinite(loss) and guard == "restore_and_halve":

@@ -1,0 +1,26 @@
+name: zf_eye2_rig
+model: config/neural/zf_eyeG2_285.yaml
+learnable:
+- {block: w, of: synapse}
+- {block: w, of: afferent}
+- {block: w, of: junction_lr}
+- {block: w, of: junction_mr}
+- {block: tau, of: neuron}
+- {block: bias, of: neuron}
+- {block: bias, of: muscle}
+task:
+  reference: {corpus: t6_binocular_gaze, n_train: 3600, n_val: 128, n_test: 256}
+  drive: {set: retina, block: signal}
+  observe: {set: eye, block: pose, channel: 0, unit: deg, elements: all}
+  loss: mse
+training:
+  optimizer: adam
+  lr: 0.002
+  schedule: cosine
+  clip: 1.0
+  epochs: 150
+  batch: 128
+  seed: 0
+  horizon: [0.25, 0.5, 0.75, 1.0]
+  horizon_min: 60
+  circuit_movie: {trials: 2}

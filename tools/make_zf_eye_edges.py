@@ -2,6 +2,7 @@
 
     python tools/make_zf_eye_edges.py             # report, write nothing
     python tools/make_zf_eye_edges.py --write
+    python tools/make_zf_eye_edges.py --eyes 2 --write      # the two-eye maps (config/neural/zf_eyeG2_285.yaml)
 
 WHAT THIS ADDS TO THE CONNECTOME. `neural/zebrafish_om_285_edges.npz` is the measured thing: 5,013
 synapses among 285 cells, already 100% consistent with the type table's Dale assignment (checked:
@@ -98,13 +99,116 @@ def build(seed: int = 0, spec_path=SPEC) -> dict:
     }
 
 
+# ============================================================================== two eyes
+SPEC2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "config", "neural", "zf_eyeG2_285.yaml")
+EM_REGION = ("neural_regions", "zf_oculomotor_285")
+
+
+def sides() -> np.ndarray:
+    """Each model row's side, 'left' or 'right', from the EM annotation (Cedric, 2026-10-08: "a two-eye system").
+
+    `neural/zebrafish_om_285_edges.npz` and the EM files (`neural_regions/zf_oculomotor_285/region.npz`,
+    `neurons.npz`: type, hemi, body id per cell) hold THE SAME GRAPH UNDER A RELABELLING of the cells -- not the same
+    order. The relabelling is recovered here as a graph isomorphism within the type blocks: each cell's fingerprint
+    (type, out-degree, in-degree, its targets' and sources' types) is unique for 279 of the 285; the 3 pairs left
+    are settled by requiring every one of the 5,013 edges to land on an EM edge. Two of those pairs (AMN) are
+    automorphic -- either assignment is an isomorphism -- and are taken in the order that keeps each type's sides
+    contiguous, which is the order the rows were written in (every type: its left cells, then its right)."""
+    import itertools
+    from collections import Counter, defaultdict
+    e = np.load(graphs_data_path("neural", "zebrafish_om_285_edges.npz"))["edge_index"]
+    r = np.load(graphs_data_path(*EM_REGION, "region.npz"), allow_pickle=True)["edge_index"]
+    nz = np.load(graphs_data_path(*EM_REGION, "neurons.npz"), allow_pickle=True)
+    t_em, hemi = nz["type_id"], nz["hemi"]
+    t_mod = np.repeat(np.arange(len(nz["type_names"])), [int((t_em == k).sum()) for k in range(len(nz["type_names"]))])
+    n = len(t_mod)
+
+    def fp(ei, t):
+        pre, post = ei
+        return [(int(t[i]), int((pre == i).sum()), int((post == i).sum()),
+                 tuple(sorted(Counter(t[post[pre == i]]).items())), tuple(sorted(Counter(t[pre[post == i]]).items())))
+                for i in range(n)]
+    ga, gb = defaultdict(list), defaultdict(list)
+    for i, f in enumerate(fp(e, t_mod)):
+        ga[f].append(i)
+    for i, f in enumerate(fp(r, t_em)):
+        gb[f].append(i)
+    if Counter({k: len(v) for k, v in ga.items()}) != Counter({k: len(v) for k, v in gb.items()}):
+        raise SystemExit("the model's synapse graph is not the EM graph relabelled -- no side can be read")
+    base = {ga[f][0]: gb[f][0] for f in ga if len(ga[f]) == 1}
+    amb = [(ga[f], gb[f]) for f in ga if len(ga[f]) > 1]
+    em = set(map(tuple, r.T))
+    found = []
+    for combo in itertools.product(*[list(itertools.permutations(b_)) for _, b_ in amb]):
+        p_ = dict(base)
+        for (a_, _), perm in zip(amb, combo):
+            p_.update(zip(a_, perm))
+        if set((p_[a], p_[b]) for a, b in e.T) == em:
+            found.append(np.array([p_[i] for i in range(n)]))
+    if not found:
+        raise SystemExit("no relabelling maps every model edge onto an EM edge")
+    for perm in found:                                   # the side-contiguous one (see the docstring)
+        h = hemi[perm]
+        if all(np.all(np.diff((h[t_mod == k] == "right").astype(int)) >= 0) for k in range(int(t_mod.max()) + 1)):
+            return h.astype(str)
+    raise SystemExit("no relabelling keeps every type's sides contiguous")
+
+
+def build2(seed: int = 0, spec_path=SPEC2) -> dict:
+    """The two-eye maps on `zf_eyeG2_285` (types split by side): eye 0 the LEFT eye, eye 1 the RIGHT, muscle index
+    6 x eye + MUSCLE_INDEX. The abducens circuit: AMN_L -> the left LR, AMN_R -> the right LR; the internuclear
+    neurons cross -- AIN_L -> the right MR, AIN_R -> the left MR (through the MLF to the contralateral oculomotor
+    nucleus, folded here into one edge). The 2 retina cells drive every AF5 cell, both sides."""
+    rng = np.random.default_rng(seed)
+    r = type_ranges(spec_path)
+    af5 = np.concatenate([np.arange(*r[k]) for k in ("AF5_ipsi_L", "AF5_ipsi_R", "AF5_contra_L", "AF5_contra_R")])
+    win = _all_to_all(np.arange(N_RETINA), af5)
+    m = lambda eye, mu: 6 * eye + MUSCLE_INDEX[mu]                       # noqa: E731
+    lr = np.concatenate([_all_to_all(np.arange(*r["AMN_L"]), [m(0, "LR")]),
+                         _all_to_all(np.arange(*r["AMN_R"]), [m(1, "LR")])], 1)
+    mr = np.concatenate([_all_to_all(np.arange(*r["AIN_L"]), [m(1, "MR")]),
+                         _all_to_all(np.arange(*r["AIN_R"]), [m(0, "MR")])], 1)
+    fan = lambda k: np.sqrt(len(np.arange(*r[k])))                       # noqa: E731
+    w_lr = np.concatenate([rng.uniform(-1, 1, r["AMN_L"][1] - r["AMN_L"][0]) / fan("AMN_L"),
+                           rng.uniform(-1, 1, r["AMN_R"][1] - r["AMN_R"][0]) / fan("AMN_R")])
+    w_mr = np.concatenate([rng.uniform(-1, 1, r["AIN_L"][1] - r["AIN_L"][0]) / fan("AIN_L"),
+                           rng.uniform(-1, 1, r["AIN_R"][1] - r["AIN_R"][0]) / fan("AIN_R")])
+    return {"win": (win, rng.uniform(-1, 1, win.shape[1]) / np.sqrt(N_RETINA) * 0.5), "lr": (lr, w_lr), "mr": (mr, w_mr)}
+
+
+def check_sides(spec_path=SPEC2):
+    """The two-eye spec's _L / _R type blocks against the EM sides, row by row."""
+    h, r = sides(), type_ranges(spec_path)
+    bad = [k for k, (a_, b_) in r.items() if set(h[a_:b_]) != {"left" if k.endswith("_L") else "right"}]
+    if bad:
+        raise SystemExit(f"{spec_path}: these types' rows are not all on their side: {bad}")
+    print(f"[sides] {os.path.basename(spec_path)}: every _L / _R block is on its EM side ({len(h)} cells)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--eyes", type=int, default=1, choices=[1, 2],
+                    help="2: the two-eye maps zf_eyeG2_285_{win,lr,mr}.npz on config/neural/zf_eyeG2_285.yaml")
     a = ap.parse_args()
+    if a.eyes == 2:
+        check_sides()
+        base = graphs_data_path("neural")
+        for key, (ei, w) in build2(a.seed).items():
+            p = os.path.join(base, f"zf_eyeG2_285_{key}.npz")
+            line = (f"{os.path.basename(p):26s} {ei.shape[1]:5d} edges  pre {ei[0].min()}..{ei[0].max()}  "
+                    f"post {sorted(set(ei[1].tolist()))[:12]}  |w|max {np.abs(w).max():.4f}")
+            if not a.write:
+                print(f"[dry] {line}"); continue
+            if os.path.exists(p) and not a.force:
+                raise SystemExit(f"{p} exists; pass --force to overwrite.")
+            np.savez(p, edge_index=ei, weights=w.astype(np.float32))
+            print(f"[write] {line}")
+        return
 
     r = type_ranges()
     print("[cells] " + "  ".join(f"{k} [{v[0]}, {v[1]})" for k, v in r.items()))
