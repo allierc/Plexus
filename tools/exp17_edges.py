@@ -42,7 +42,8 @@ def edges_of(name):
            "mid_um": op.get("mid_um", 32.0), "long_um": op.get("long_um", 128.0),
            # the graph's own options (a mesh, turned or random reaches): without them a mesh run would be drawn on
            # the default axes graph (2026-10-05)
-           **{k: op[k] for k in ("graph", "mesh_levels", "mesh_bin_um", "reach_dirs", "reach_rotation_deg", "graph_seed")
+           **{k: op[k] for k in ("graph", "mesh_levels", "mesh_bin_um", "mesh_fine_um", "mesh_mid_max_um", "reach_dirs",
+                                 "reach_rotation_deg", "graph_seed")
               if k in op}})
     fit = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location="cpu")["fitted"]
     W = {s: fit[f"state_diffuse.W_{s}"].float().numpy() for s in SETS if f"state_diffuse.W_{s}" in fit}
