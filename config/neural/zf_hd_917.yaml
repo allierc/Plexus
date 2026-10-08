@@ -1,0 +1,122 @@
+general:
+  name: zf_hd_917
+  seed: 0
+  n_frames: 1000
+  dt: 0.01
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+sets:
+  brain: {n: 1}
+  selfmotion:
+    parent: brain
+    per_parent: 3
+    state:
+      signal: {width: 1, integration: none, boundary: free}
+  neuron:
+    parent: brain
+    per_parent: 917
+    type_layout: ordered
+    types:
+      ARTR_L:
+        count: 35
+        sign: E
+        role: afferent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      ARTR_R:
+        count: 41
+        sign: E
+        role: afferent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      ptIPN1_L:
+        count: 23
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      ptIPN1_R:
+        count: 28
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      motor_L:
+        count: 36
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      motor_R:
+        count: 29
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      other_L:
+        count: 15
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      other_R:
+        count: 10
+        sign: E
+        role: recurrent
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      dIPN_L:
+        count: 210
+        sign: I
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      dIPN_R:
+        count: 198
+        sign: I
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      IPN12_L:
+        count: 53
+        sign: I
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      IPN12_R:
+        count: 55
+        sign: I
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      IPNcore_L:
+        count: 88
+        sign: I
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+      IPNcore_R:
+        count: 96
+        sign: I
+        role: output
+        p: [10.0, 0.0, 10.0, 0.0, 1.0, 0.0]
+    state:
+      pos: {width: 3, role: geometry, integration: none, boundary: world}
+      voltage: {width: 1, role: coordinate, integration: first_order, boundary: free}
+      omega: {width: 1, role: modulation, integration: none, boundary: free, record: false}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  heading:
+    parent: brain
+    per_parent: 2
+    type_layout: ordered
+    types:
+      cos: {count: 1}
+      sin: {count: 1}
+    state:
+      value: {width: 1, integration: none, boundary: free}
+      bias: {width: 1, integration: none, boundary: free, record: false}
+  synapse: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: neuron, edges_file: neural/zf_hd_917_edges.npz}
+  omega_L: {parent: brain, edge_set: true, entity: connection, pre: selfmotion, post: neuron, edges_file: neural/zf_hd_917_omegaL.npz}
+  omega_R: {parent: brain, edge_set: true, entity: connection, pre: selfmotion, post: neuron, edges_file: neural/zf_hd_917_omegaR.npz}
+  cue: {parent: brain, edge_set: true, entity: connection, pre: selfmotion, post: neuron, edges_file: neural/zf_hd_917_cue.npz}
+  readout: {parent: brain, edge_set: true, entity: connection, pre: neuron, post: heading, edges_file: neural/zf_hd_917_out.npz}
+fields: {}
+seed:
+- {op: seed_state_random, at: neuron, block: bias, lo: 10.0, hi: 10.0}
+- {op: seed_state_random, at: heading, block: bias, lo: 0.0, hi: 0.0}
+operators:
+- {op: project, at: neuron, edge_set: omega_L, block: signal, gain: 10.0}
+- {op: project, at: neuron, edge_set: omega_R, block: signal, gain: 10.0}
+- {op: project, at: neuron, edge_set: cue, block: signal, gain: 10.0, bias: bias}
+- {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.0}
+- {op: neuron_signal, at: neuron, model: shared, edge_set: synapse, activation: sigmoid, dale: true}
+- {op: readout, at: heading, edge_set: readout, block: voltage, into: value, send: sigmoid, bias: bias}
+schedule: [project, project, project, neuron_update, neuron_signal, readout]

@@ -1,0 +1,26 @@
+name: zf_hd_heading
+model: config/neural/zf_hd_917.yaml
+learnable:
+- {block: w, of: synapse, lr: 0.0005}
+- {block: w, of: omega_L, bounds: [null, 0.0]}
+- {block: w, of: omega_R, bounds: [0.0, null]}
+- {block: w, of: cue}
+- {block: bias, of: neuron}
+- {block: w, of: readout}
+- {block: bias, of: heading}
+task:
+  reference: {corpus: t8_hd_heading, n_train: 10000, n_val: 128, n_test: 256}
+  drive: {set: selfmotion, block: signal}
+  observe: {set: heading, block: value, channel: 0, elements: all}
+  loss: mse
+training:
+  optimizer: adam
+  lr: 0.002
+  schedule: cosine
+  clip: 2.5
+  epochs: 30
+  batch: 64
+  seed: 0
+  horizon: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
+  horizon_min: 100
+  circuit_movie: {trials: 1, fps: 25, stride: 2}
