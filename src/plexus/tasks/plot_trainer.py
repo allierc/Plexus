@@ -5,6 +5,7 @@
 
     python -m plexus.tasks.plot_trainer --all              # every run under log/task/
     python -m plexus.tasks.plot_trainer eye_rig zf_eye_rig
+    python -m plexus.tasks.plot_trainer --circuit config/training/neural_eye/zf_eye_rig.yaml   # circuit_movie
 
 THREE PANELS ARE THE CLAIM AND THREE ARE THE EVIDENCE. The top row is the run as it happened --
 the stimulus, the ground truth, the model's answer -- and the bottom row is what a reader needs to
@@ -716,6 +717,238 @@ def montage(name, *, root=None, device="cpu", out=None, cols=3, n_show=1, second
     return out
 
 
+# ============================================================================== the circuit at work
+def _task_circuit_panel_class():
+    """`TaskCircuitPanel`, built on first use so importing this module does not import the panel."""
+    from plexus.neural_panel import BG, NeuralPanel
+
+    class TaskCircuitPanel(NeuralPanel):
+        """THE CIRCUIT AT WORK ON ITS TASK (Cedric, 2026-10-08: "add this plotter to the codebase so that we can
+        regenerate the circuit + kinograph + eye movies in Plexus"). `NeuralPanel` in the middle -- the message on
+        the connectivity matrix, the input / rate / output columns -- and the kinograph across the bottom, with
+        what the circuit is FOR on either side:
+          left    the task's trace swept in time: the target (green), the model's observable (white), the command
+                  (red) when the observed block has a `<block>_target` beside it, the drive (grey, its own scale)
+          right   when the observable is an angle (`unit: deg`), the eye from above turning with it, the target
+                  dashed; under it, each muscle's drive as a bar (a level with a `drive` block and no edges)
+        The INPUT COLUMN is the afferent current each neuron receives, sum_e w_e x_pre(e), over the edge-sets that
+        run from the task's drive set onto the neurons -- a circuit driven through afferent synapses never writes
+        the drive field or the `omega` block `NeuralPanel` reads otherwise. The circuit is captured tick by tick
+        from the engine and the traces are handed in afterwards (`set_traces`); every frame is drawn after the
+        rollout, so all of them share the final colour limits."""
+
+        def __init__(self, *a, drive_set=None, drive_block=None, **k):
+            super().__init__(*a, **k)
+            self.drive_set, self.drive_block, self.tr = drive_set, drive_block, None
+
+        def set_traces(self, t, drive, target, obs, cmd=None, muscles=None, muscle_names=(), unit="", label=""):
+            f = lambda x: None if x is None or not len(x) else np.asarray(x, np.float64)   # noqa: E731
+            self.tr = dict(t=f(t), drive=f(drive), target=f(target), obs=f(obs), cmd=f(cmd), mus=f(muscles),
+                           names=list(muscle_names), unit=str(unit or ""), label=str(label or ""))
+
+        def _read(self, H):
+            r, om = super()._read(H)
+            if self.drive_set is None or self.drive_set not in H.levels:
+                return r, om
+            src_l = H.level(self.drive_set)
+            src = src_l.get(self.drive_block).detach().float().cpu().numpy().reshape(int(src_l.n), -1)[:, 0]
+            cur, hit = np.zeros(self.N, np.float64), False
+            for lv in H.levels.values():
+                if (getattr(lv, "pre_name", None) == self.drive_set and getattr(lv, "post_name", None) == self.nset
+                        and "w" in getattr(lv, "state_schema", {})):
+                    pre, post = lv.pre.detach().cpu().numpy(), lv.post.detach().cpu().numpy()
+                    w = lv.get("w").detach().float().cpu().numpy().reshape(-1)
+                    ok = lv.occ.detach().cpu().numpy() > 0
+                    np.add.at(cur, post[ok], w[ok] * src[pre[ok]])
+                    hit = True
+            return r, (cur.astype(np.float32) if hit else om)
+
+        def _figure(self):
+            import matplotlib.pyplot as plt
+            from matplotlib.gridspec import GridSpec
+            fig = plt.figure(figsize=(19.2, 9.6), facecolor=BG, dpi=100)
+            gs = GridSpec(2, 3, width_ratios=[0.85, 1.75, 0.85], height_ratios=[1.0, 0.52], hspace=0.16,
+                          wspace=0.10, left=0.07, right=0.985, top=0.93, bottom=0.07)
+            self.ax_tr, self.ax_eye = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 2])
+            return fig, fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, :])
+
+        def _build_extra(self, fig):
+            import matplotlib.pyplot as plt
+            tr = self.tr
+            if tr is None:
+                return
+            self.txt.set_position((0.0, 1.045))               # the circuit's header above its column labels
+            a, t = self.ax_tr, tr["t"]
+            a.set_facecolor(BG)
+            for k_, sp in a.spines.items():
+                sp.set_visible(k_ in ("left", "bottom")); sp.set_color("#888")
+            a.tick_params(colors="#bbb", labelsize=9)
+            ys = [x for x in (tr["target"], tr["obs"], tr["cmd"]) if x is not None]
+            lo, hi = np.percentile(np.concatenate(ys), [0.5, 99.5])
+            pad = 0.12 * max(hi - lo, 1e-9)
+            if tr["drive"] is not None:                       # the drive, dotted, on its own scale
+                ad = a.twinx()
+                ad.plot(t, tr["drive"], color="#9aa0a6", lw=0.6, ls=":", alpha=0.7)
+                ad.set_yticks([]); [sp.set_visible(False) for sp in ad.spines.values()]
+                a.plot([], [], color="#9aa0a6", lw=0.8, ls=":", label="drive (own scale)")
+            self.ln = {"target": a.plot([], [], color="#5fd08a", lw=2.2, label="target")[0],
+                       "obs": a.plot([], [], color="#ffffff", lw=1.3, label="model")[0]}
+            if tr["cmd"] is not None:
+                self.ln["cmd"] = a.plot([], [], color="#ff4d4d", lw=0.9, alpha=0.85, label="command")[0]
+            self.cur = a.axvline(t[0], color="#ff7f0e", lw=1.0)
+            a.set_xlim(t[0], t[-1]); a.set_ylim(lo - pad, hi + pad)
+            a.set_xlabel("time (s)", color="#ddd", fontsize=11)
+            a.set_ylabel(f"{tr['label']}" + (f" ({tr['unit']})" if tr["unit"] else ""), color="#ddd", fontsize=11)
+            leg = a.legend(loc="upper left", fontsize=9, frameon=False, ncol=2)
+            for tx in leg.get_texts():
+                tx.set_color("#ddd")
+            self.txt_tr = a.text(0.0, 1.02, "", transform=a.transAxes, color="#ddd", fontsize=10, va="bottom")
+            e = self.ax_eye
+            e.set_facecolor(BG); e.axis("off"); e.set_aspect("equal")
+            e.set_xlim(-1.7, 1.7); e.set_ylim(-2.75, 1.85)          # the lower third holds the muscle bars
+            self.eye_on = tr["unit"] in ("deg", "rad") and tr["obs"] is not None
+            if self.eye_on:
+                e.add_patch(plt.Circle((0, 0), 1.0, fc="#1b1b1b", ec="#bbbbbb", lw=1.5))
+                self.eye_tgt = e.plot([], [], color="#5fd08a", lw=1.4, ls="--")[0]
+                self.eye_ln = e.plot([], [], color="#ffffff", lw=2.2)[0]
+                self.pupil = plt.Circle((0, 0.85), 0.17, fc="#4a9bff", ec="white", lw=0.8)
+                e.add_patch(self.pupil)
+                e.text(0.0, 1.75, "the eye, from above", color="#ddd", fontsize=11, ha="center", va="top")
+                e.text(1.15, 1.15, "+", color="#bbb", fontsize=12, ha="center", va="center")
+                e.text(-1.15, 1.15, "-", color="#bbb", fontsize=12, ha="center", va="center")
+                self.txt_eye = e.text(0.0, -1.15, "", color="#ddd", fontsize=10, ha="center", va="top")
+            self.bars = None
+            if tr["mus"] is not None:                         # the muscles' drives, under the eye
+                live = np.flatnonzero(np.nanmax(np.abs(tr["mus"]), 0) > 1e-6)   # a muscle never driven: no bar
+                names = tr["names"] if len(tr["names"]) == tr["mus"].shape[1] else [str(i) for i in range(tr["mus"].shape[1])]
+                self.mus_live = live if live.size else np.arange(tr["mus"].shape[1])
+                names = [names[i] for i in self.mus_live]
+                M = len(self.mus_live)
+                am = e.inset_axes([0.18, 0.03, 0.72, min(0.06 * M + 0.04, 0.26)])
+                am.set_facecolor(BG)
+                # THE DRIVES' OWN RANGE, not 0 to the maximum: a motor pair co-contracts (both drives high, the gaze
+                # set by their difference), so on a 0..max axis the push-pull that moves the eye is a few pixels
+                mv = tr["mus"][:, self.mus_live]
+                lo_, hi_ = float(np.nanmin(mv)), float(np.nanmax(mv))
+                pad_ = 0.08 * max(hi_ - lo_, 1e-9)
+                self.mus_lo = max(lo_ - pad_, 0.0)
+                self.bars = am.barh(np.arange(M), np.zeros(M), left=self.mus_lo, color="#e0a040", height=0.65)
+                am.set_yticks(np.arange(M)); am.set_yticklabels(names, color="#ddd", fontsize=9)
+                am.set_xlim(self.mus_lo, hi_ + pad_); am.set_ylim(M - 0.5, -0.5)
+                am.tick_params(axis="x", colors="#bbb", labelsize=8)
+                for sp in am.spines.values():
+                    sp.set_color("#666")
+                am.set_title("muscle drive", color="#ddd", fontsize=9, loc="left", pad=3)
+
+        def _draw_extra(self, idx: int):
+            tr = self.tr
+            if tr is None:
+                return
+            t = tr["t"]
+            k = int(np.clip(self.hist[idx][0], 0, len(t) - 1))          # tick j = engine frame j = trace sample j
+            for key, ln in self.ln.items():
+                ln.set_data(t[:k + 1], tr[key][:k + 1])
+            self.cur.set_xdata([t[k]] * 2)
+            u_ = tr["unit"]
+            self.txt_tr.set_text(f"t = {t[k]:5.2f} s   target {tr['target'][k]:+.2f}   model {tr['obs'][k]:+.2f}"
+                                 + (f"   command {tr['cmd'][k]:+.2f}" if tr["cmd"] is not None else "") + f" {u_}")
+            if self.eye_on:
+                to = (np.deg2rad if u_ == "deg" else float)
+                th, tg = to(tr["obs"][k]), to(tr["target"][k])
+                self.eye_ln.set_data([0, 1.6 * np.sin(th)], [0, 1.6 * np.cos(th)])
+                self.eye_tgt.set_data([0, 1.6 * np.sin(tg)], [0, 1.6 * np.cos(tg)])
+                self.pupil.center = (0.85 * np.sin(th), 0.85 * np.cos(th))
+                self.txt_eye.set_text(f"gaze {tr['obs'][k]:+.1f} {u_}   target {tr['target'][k]:+.1f} {u_}")
+            if self.bars is not None:
+                for b, v in zip(self.bars, tr["mus"][k][self.mus_live]):
+                    b.set_width(max(float(v) - self.mus_lo, 0.0))
+
+    return TaskCircuitPanel
+
+
+def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, stride=None, out=None, quiet=False):
+    """A trained corpus run's circuit at work on held-out trials -> results/movie_circuit.mp4 (+ .png).
+
+    `trials` consecutive held-out trials of the first trial's condition cell are joined into one drive (the target
+    re-run by that cell's teacher law across the joins, `_teacher_on_cell`); the model is rolled out once with the
+    panel capturing every tick (`trainer.rollout(..., watch=)`); every `stride`-th tick is drawn, at `fps`. The
+    defaults come from the training spec's `training.circuit_movie: {trials, fps, stride}` (2, 30, 2: a 60-Hz
+    model then plays in real time). Read by `trainer.analyse` (`Plexus_Main.py -o plot`) when the spec declares it,
+    and by `python -m plexus.tasks.plot_trainer --circuit <training spec>`."""
+    import torch
+    import imageio.v2 as iio
+    from plexus import engine
+    from plexus import trainer as T
+    from plexus.tasks.generate import task_dir
+    cfg = dict((spec.get("training") or {}).get("circuit_movie") or {})
+    trials = max(1, int(trials or cfg.get("trials", 2)))
+    fps = float(fps or cfg.get("fps", 30))
+    stride = max(1, int(stride or cfg.get("stride", 2)))
+    engine.quiet(True)
+    sim, learn, ck, out_d = T._restore(spec, device, root)
+    task, corpus = spec["task"], T._corpus(spec)
+    split = "test" if os.path.isdir(os.path.join(task_dir(corpus), "test")) else "train"
+    U, Y, cond = T._data(spec, split, int(ck.get("n_cond", 1)), device)
+    c = np.asarray(cond.cpu() if hasattr(cond, "cpu") else cond).reshape(-1).astype(int)
+    pick = np.flatnonzero(c == c[0])[:trials]
+    u = torch.cat([U[i] for i in pick], 0)                                  # [T, C]
+    ch = int(task["observe"].get("channel", 0))
+    dt = float(sim.dt)
+    if len(pick) == 1:
+        y = Y[pick[0], :, ch].cpu().numpy()
+    else:
+        y = np.asarray(_teacher_on_cell(corpus, u[None, :, :1].cpu().numpy(), c[pick[:1]])).reshape(len(u), -1)[:, 0]
+    path = out or os.path.join(out_d, "results", "movie_circuit.mp4")
+    # THE INPUT AND OUTPUT COLUMNS FROM THE TYPES' DECLARED ROLES (`role: afferent | output` on a neuron type), so the
+    # output column shows the motor pools rather than every population
+    pcfg = {"kino_frames": min(int(u.shape[0]), 600)}
+    for st in (getattr(sim, "sets", None) or {}).values():
+        roles = {k_: (v_ or {}).get("role") for k_, v_ in ((st or {}).get("types") or {}).items()}
+        if any(roles.values()):
+            pcfg["input"] = [k_ for k_, r_ in roles.items() if r_ == "afferent"] or None
+            pcfg["output"] = [k_ for k_, r_ in roles.items() if r_ == "output"] or None
+            break
+    Panel = _task_circuit_panel_class()
+    panel = Panel(out=path, n_frames=int(u.shape[0]), sim=sim, style={"panel": pcfg},
+                  dt=dt, time_s=1.0, name=spec["name"], fps=fps, max_frames=int(u.shape[0]) + 1, stills=0,
+                  drive_set=task["drive"]["set"], drive_block=task["drive"]["block"])
+    obs_set, obs_block = task["observe"]["set"], task["observe"]["block"]
+    rec, tick = {"cmd": [], "mus": [], "mus_names": []}, [0]
+
+    def watch(H):                                       # once per engine frame, frame 0 (the seeded state) first
+        panel.capture(H, tick[0])
+        tick[0] += 1
+        lv = H.level(obs_set)
+        if f"{obs_block}_target" in lv.state_schema:
+            rec["cmd"].append(float(lv.get(f"{obs_block}_target").detach().float().cpu().numpy().reshape(int(lv.n), -1)[0, ch]))
+        m = next((n for n, l_ in H.levels.items() if "drive" in getattr(l_, "state_schema", {})
+                  and getattr(l_, "pre_name", None) is None and int(l_.n) <= 16), None)   # a node set (no edges)
+        if m is not None:
+            rec["mus"].append(H.level(m).get("drive").detach().float().cpu().numpy().reshape(-1))
+            if not rec["mus_names"]:
+                rec["mus_names"] = list(getattr(H.level(m), "type_names", []) or [])
+    sim.n_frames = int(u.shape[0])                      # the joined trials' length, as training sets T_full
+    with torch.no_grad():
+        _, Yp = T.rollout(sim, learn, u, task, device, grad=False, watch=watch)
+    obs = Yp[:, ch].cpu().numpy()                       # [frames + 1, w]: aligned with the target at frame 0
+    n_ = min(len(obs), len(y), len(panel.hist))
+    panel.set_traces(np.arange(n_) * dt, u[:n_, 0].cpu().numpy(), y[:n_], obs[:n_],
+                     cmd=(rec["cmd"][:n_] or None), muscles=(np.stack(rec["mus"][:n_]) if rec["mus"] else None),
+                     muscle_names=rec["mus_names"], unit=task["observe"].get("unit") or "",
+                     label=f"{obs_set}.{obs_block}")
+    idxs = list(range(stride - 1, n_, stride)) or [n_ - 1]
+    w = iio.get_writer(path, fps=fps, codec="libx264", quality=8, macro_block_size=1)
+    for i in idxs:
+        w.append_data(panel.frame_at(i))
+    w.close()
+    iio.imwrite(path[:-4] + ".png", panel.frame_at(idxs[len(idxs) // 2]))
+    panel.close()
+    if not quiet:
+        print(f"[circuit-movie] {path}: {len(idxs)} frames at {fps:g} fps, {len(pick)} held-out trial(s) of "
+              f"{split}, {panel.N} neurons, {panel.pre.size:,} synapses", flush=True)
+    return path
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -730,7 +963,16 @@ def main():
     ap.add_argument("--what", nargs="+", default=["movie"],
                     choices=["movie", "figure", "montage"])
     ap.add_argument("--montage-seconds", type=float, default=None)
+    ap.add_argument("--circuit", nargs="+", default=None, metavar="SPEC",
+                    help="training specs (config/training/...): the circuit at work on held-out trials, "
+                         "results/movie_circuit.mp4 (circuit_movie)")
+    ap.add_argument("--trials", type=int, default=None, help="--circuit: held-out trials joined end to end")
     a = ap.parse_args()
+    if a.circuit:
+        from plexus import trainer as T
+        for n_ in a.circuit:
+            circuit_movie(T.load(n_), device=a.device, root=a.root, trials=a.trials)
+        return
     from plexus.tasks.trainer import log_dir
     names = list(a.names)
     if a.all or not names:

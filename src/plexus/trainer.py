@@ -95,7 +95,7 @@ _KEYS = {
     "observe": {"set", "block", "channel", "unit", "measure", "grid", "of", "field", "alive"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
                  "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
-                 "iters", "save_every", "anneal", "select", "init_from"},
+                 "iters", "save_every", "anneal", "select", "init_from", "circuit_movie"},
     "term": {"term", "weight", "reduction"},
     "stage": {"resolution", "iters", "horizon"},
 }
@@ -458,6 +458,12 @@ def load(path_or_name) -> dict:
         raise ValueError(f"{path}: `select` is read by a trace_recording task only")
     elif any(k in tr for k in ("stages", "render", "lr_min")):
         raise ValueError(f"{path}: `stages`, `render` and `lr_min` belong to a shape task's scheme")
+    if "circuit_movie" in tr:                       # the circuit at work (plot_trainer.circuit_movie), a corpus run's
+        cm = tr["circuit_movie"]
+        if kind != "corpus":
+            raise ValueError(f"{path}: `training.circuit_movie` is read by a corpus task only")
+        if not isinstance(cm, dict) or set(cm) - {"trials", "fps", "stride"}:
+            raise ValueError(f"{path}: training.circuit_movie is {{trials, fps, stride}} (any of them, or {{}})")
     s["_kind"] = kind
     for k, allowed in (("optimizer", OPTIMIZERS), ("schedule", SCHEDULES), ("guard", GUARDS)):
         if k in tr and tr[k] not in allowed:
@@ -1203,6 +1209,14 @@ def analyse(spec, device="cpu", root=None):
                       title=f"{spec['name']}  ({split}, one trial per condition cell)")
     except Exception as exc:                                       # noqa: BLE001
         print(f"[analyse] movie not written: {type(exc).__name__}: {exc}")
+    if "circuit_movie" in spec["training"]:
+        # THE CIRCUIT AT WORK (Cedric, 2026-10-08): the connectivity matrix, the kinograph, the task's trace and, for
+        # an angle, the eye -- results/movie_circuit.mp4. Printed, not raised, like the movie above.
+        try:
+            from plexus.tasks.plot_trainer import circuit_movie
+            circuit_movie(spec, device=device, root=root)
+        except Exception as exc:                                   # noqa: BLE001
+            print(f"[analyse] circuit movie not written: {type(exc).__name__}: {exc}")
     if poles is not None:
         res["poles"] = {"max_re_at_op": float(max(p.real for p in poles[0])),
                         "max_re_at_origin": float(max(p.real for p in poles[1])),
