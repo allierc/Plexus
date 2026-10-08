@@ -62,7 +62,16 @@ def render(name):
     from matplotlib.colors import LogNorm, Normalize, TwoSlopeNorm
     from exp17_ablation import _brain_view
     c = constants(name)
-    P = _brain_view(c["pos"])
+    # IN THE ATLAS FRAME (Cedric, 2026-10-08: "the atlas slides' fish are elongated against slide 2; this slide is not:
+    # fix it"): the neurons' Z-Brain positions (tools/exp17_atlas.py, the BigWarp registration) drawn as the atlas, block
+    # and tau slides draw them -- head left, x' = atlas y, y' = (621 - 1) 0.798 - atlas x, dorsal up; the recording's own
+    # frame when no registration exists
+    fa = os.path.join(EXP, "data", "atlas_destripe.npz")
+    if os.path.exists(fa):
+        A_ = np.load(fa)["atlas_um"].astype(np.float64)
+        P = np.stack([A_[:, 1], (621 - 1) * 0.798 - A_[:, 0], A_[:, 2]], 1)
+    else:
+        P = _brain_view(c["pos"])
     order = np.argsort(P[:, 2])
     P = P[order]
     m = c["mask"][order]
