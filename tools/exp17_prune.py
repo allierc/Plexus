@@ -85,13 +85,14 @@ def grid_edges(spec):
             "pos": np.asarray(pos, np.float64)}
 
 
-def grid_w_in(E, fit, th=None):
+def grid_w_in(E, fit, th=None, absolute=False):
     """Each neuron's SUMMED EFFECTIVE INCOMING WEIGHT through the lattice grid (Cedric, 2026-10-08: "panel c computed after
     edge removal"): the law's message into neuron i is g_i (1/8) sum_{l in cube(i)} sum_{k -> l} w_kl (1/n_k) sum_{j -> k}
     a_j tanh z_j, so its weight on neuron j is W_ij = g_i (1/8) sum_l sum_k w_kl a_j / n_k over the paths j -> k -> l -> i,
     and sum_j W_ij = g_i (1/8) sum_l sum_k w_kl abar_k, abar_k the mean a_j of corner k's neurons -- the grid's twin of the
     mesh's summed W_ij. With `th` (data/prune_<run>.json's thresholds) the inert edges and those below their set's
-    threshold are zeroed first. a = A_send, w = W_grid^2, g = G_recv^2 under sign: neuron (a = 1, w = W_grid: sign grid)."""
+    threshold are zeroed first. a = A_send, w = W_grid^2, g = G_recv^2 under sign: neuron (a = 1, w = W_grid: sign grid).
+    `absolute`: sum_j |W_ij| instead (|a_j|, |w_kl|): the coupling's strength into the neuron, signs not cancelling."""
     op = E["op"]
     gs, gr = (t.numpy() for t in op._grid["g2m"])
     cs, cr = (t.numpy() for t in op._grid["m2g"])
@@ -100,6 +101,8 @@ def grid_w_in(E, fit, th=None):
     neu = op.sign == "neuron"
     a = fit["state_diffuse.A_send"].float().numpy().astype(np.float64) if neu else np.ones(N)
     w = wg ** 2 if neu else wg
+    if absolute:
+        a, w = np.abs(a), np.abs(w)
     if th is not None:
         eff = np.abs(w)
         thv = np.array([th.get(s, 0.0) for s in E["set"]])           # each entry its set's threshold

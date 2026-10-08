@@ -38,6 +38,7 @@ def constants(name):
     op = neuron_graph_op(spec, "cpu")
     N = op.n_elements
     w_in = np.zeros(N)
+    w_abs = np.zeros(N)                         # sum_j |W_ij| (Cedric, 2026-10-08: "panel c: plot |W|")
     jp = os.path.join(EXP, "data", f"prune_{name}.json")       # the per-level thresholds of tools/exp17_prune.py
     prune_th = json.load(open(jp)).get("thresholds", {}) if os.path.exists(jp) else {}
     for e in spec["learnable"]:
@@ -48,6 +49,7 @@ def constants(name):
             if p[2:] in prune_th:                       # AFTER PRUNING (Cedric, 2026-10-08): the near-0 edges removed
                 w_ = np.where(np.abs(w_) < prune_th[p[2:]], 0.0, w_)
             np.add.at(w_in, rcv, w_)
+            np.add.at(w_abs, rcv, np.abs(w_))
     m_ = op.input_mask.cpu().numpy() if op.input_mask is not None else np.ones(N, bool)
     mask = (m_.reshape(N, -1) != 0).any(1)        # a per-feature mask [N, F] (mask_by_input): an input on any feature
     # tau through the law's own rate: the bound [rate_min, rate_max] when the run declares one (15.18, 2026-10-06)
@@ -61,9 +63,11 @@ def constants(name):
         # the lattice grid (Cedric, 2026-10-08: "panel c computed after edge removal"): the summed EFFECTIVE weight into
         # each neuron through encode, one hop and decode (exp17_prune.grid_w_in), the pruned grid edges zeroed
         from exp17_prune import grid_edges, grid_w_in
-        w_in = grid_w_in(grid_edges(spec), fit, prune_th or None)
+        E_ = grid_edges(spec)
+        w_in = grid_w_in(E_, fit, prune_th or None)
+        w_abs = grid_w_in(E_, fit, prune_th or None, absolute=True)
         w_lab = "effective W in, via the grid" + (", pruned" if prune_th else "")
-    return {"w_label": w_lab, "tau_s": tau_s, "tau_bounds": bounds,
+    return {"w_label": w_lab, "W_abs": w_abs, "tau_s": tau_s, "tau_bounds": bounds,
             "V": fit["neuron.rest"].float().numpy().reshape(-1) * sd + mu, "W_in": w_in,
             "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask,
             "pos": np.asarray(rec["pos_um"], np.float64)}
@@ -100,12 +104,17 @@ def render(name):
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
     lo_t, hi_t = c["tau_bounds"] or np.percentile(c["tau_s"], [2, 98])   # a bounded tau: the colour bar IS the bound
     wl = np.percentile(np.abs(c["W_in"]), 95)
+    wp_ = c["W_abs"][c["W_abs"] > 0]
+    w_rng = (max(float(np.percentile(wp_, 2)), float(np.percentile(wp_, 98)) / 1e3), float(np.percentile(wp_, 98)))
     from matplotlib.colors import LinearSegmentedColormap
     BKR = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])
     panels = [("a   leak time constant $\\tau$, s", c["tau_s"], "RdBu", Normalize(lo_t, hi_t)),   # linear, red fast / blue slow (Cedric, 2026-10-08)
               ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
-              ("c   " + c["w_label"] + " (blue < 0 < red, 0 black)", c["W_in"], BKR,
-               TwoSlopeNorm(0, -max(wl, 1e-6), max(wl, 1e-6))),   # zero black on the black slide (Cedric, 2026-10-08)
+              # Cedric, 2026-10-08: "panel c is not very informative: plot |W|, and a LUT that shows the differences" --
+              # the summed |W_ij| into each neuron (after pruning), log scale over its 2nd-98th percentile (positive
+              # values), viridis; a neuron with no incoming weight left in grey
+              ("c   " + c["w_label"].replace("summed W into", "summed |W| into").replace("effective W in", "effective |W| in")
+               + " (log; grey: none left)", c["W_abs"], "viridis", LogNorm(*w_rng)),
               ("d   stimulus weight $|B|$ (input neurons; grey: outside the mask)", c["B_norm"], "inferno",
                Normalize(*np.percentile(c["B_norm"][c["mask"]], [2, 98])))]
     stats = {}
@@ -121,7 +130,11 @@ def render(name):
             ax.axis("off")
             o_ = np.arange(len(P)) if view == "top" else so
             X_, Y_ = P[:, 0], P[:, ys]
-            if i == 3:
+            if i == 2:                                                   # |W|: the neurons with none left, grey
+                z_ = vv[o_] <= 0
+                ax.scatter(X_[o_][z_], Y_[o_][z_], c="0.25", s=0.25, linewidths=0)
+                sc = ax.scatter(X_[o_][~z_], Y_[o_][~z_], c=vv[o_][~z_], s=0.4, cmap=cm, norm=nrm, linewidths=0)
+            elif i == 3:
                 mo, mi = o_[~m[o_]], o_[m[o_]]
                 ax.scatter(X_[mo], Y_[mo], c="0.25", s=0.25, linewidths=0)
                 sc = ax.scatter(X_[mi], Y_[mi], c=vv[mi], s=0.6, cmap=cm, norm=nrm, linewidths=0)
@@ -133,8 +146,8 @@ def render(name):
         cax = fig.add_axes([(x0 + CW + 0.08) / FW, (ytop - LB - th) / FH, 0.10 / FW, th / FH])
         cb = fig.colorbar(sc, cax=cax)
         cb.ax.tick_params(colors="0.8", labelsize=9)
-        key = ["tau_s", "V", "W_in", "B_norm"][i]
-        vs = v[c["mask"]] if i == 3 else v
+        key = ["tau_s", "V", "W_abs", "B_norm"][i]
+        vs = v[c["mask"]] if i == 3 else (v[v > 1e-9] if i == 2 else v)     # |W|: over the neurons with input left
         stats[key] = {"median": float(np.median(vs)), "p2": float(np.percentile(vs, 2)), "p98": float(np.percentile(vs, 98))}
     path = os.path.join(EXP, "presentation", "figs", f"param_maps_{name}.png")
     fig.savefig(path, dpi=110, facecolor="black", bbox_inches="tight", pad_inches=0.03)   # no margins (Cedric, 2026-10-04)
@@ -146,6 +159,7 @@ def render(name):
         stats["frac_tau_at_floor"] = float((c["tau_s"] < 1.05 * c["tau_bounds"][0]).mean())
         stats["frac_tau_at_ceiling"] = float((c["tau_s"] > 0.95 * c["tau_bounds"][1]).mean())
     stats["frac_W_in_negative"] = float((c["W_in"] < 0).mean())
+    stats["frac_W_abs_zero"] = float((c["W_abs"] <= 0).mean())          # no incoming weight left after pruning
     json.dump(stats, open(os.path.join(EXP, "data", f"param_maps_{name}.json"), "w"), indent=1)
     print("[maps]", path, json.dumps(stats))
     return path

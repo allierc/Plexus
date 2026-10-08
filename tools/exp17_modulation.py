@@ -64,14 +64,29 @@ def _frames(ks):
     P, order, tm = d["P"], d["order"], d["tm"]
     fig = plt.figure(figsize=(12, 6.6), facecolor="black")
     sc = []
+    sc_s, Ps = [], d.get("Ps")
+    if d.get("side"):                       # from above over from the side, one scale (Cedric, 2026-10-08)
+        ey, ez = np.ptp(P[:, 1]), np.ptp(Ps[:, 1])
+        h_t, h_s = 0.54 * ey / (ey + ez), 0.54 * ez / (ey + ez)
     for j, (lab, cm, lo, hi) in enumerate((("recorded dF/F", "inferno", 0, d["vmax"]),
                                            ("learned modulation $\\Omega_i(t)$ of the messages (1 = none)", "coolwarm",
                                             1 - d["half"], 1 + d["half"]))):
-        ax = fig.add_axes([0.5 * j, 0.36, 0.5, 0.56])
+        ax = fig.add_axes([0.5 * j, 0.36 + h_s + 0.02, 0.5, h_t] if d.get("side") else [0.5 * j, 0.36, 0.5, 0.56])
         ax.set_facecolor("black")
         ax.axis("off")
         sc.append(ax.scatter(P[:, 0], P[:, 1], c=np.zeros(len(P)), s=0.5, cmap=cm, vmin=lo, vmax=hi, linewidths=0))
         ax.set_aspect("equal")
+        if d.get("side"):
+            ax.set_xlim(P[:, 0].min(), P[:, 0].max())
+            ax.set_ylim(P[:, 1].min(), P[:, 1].max())
+            ax2 = fig.add_axes([0.5 * j, 0.36, 0.5, h_s])
+            ax2.set_facecolor("black")
+            ax2.axis("off")
+            sc_s.append(ax2.scatter(Ps[:, 0], Ps[:, 1], c=np.zeros(len(Ps)), s=0.5, cmap=cm, vmin=lo, vmax=hi,
+                                    linewidths=0))
+            ax2.set_aspect("equal")
+            ax2.set_xlim(P[:, 0].min(), P[:, 0].max())
+            ax2.set_ylim(Ps[:, 1].min(), Ps[:, 1].max())
         fig.text(0.5 * j + 0.03, 0.985, lab, color="white", fontsize=12, va="top")
         if j == 1:
             cax = fig.add_axes([0.80, 0.36, 0.15, 0.015])
@@ -105,6 +120,9 @@ def _frames(ks):
     for k in ks:
         sc[0].set_array(d["X"][k][order])
         sc[1].set_array(d["om"][k][order].astype(np.float32))
+        if sc_s:
+            sc_s[0].set_array(d["X"][k][d["order_s"]])
+            sc_s[1].set_array(d["om"][k][d["order_s"]].astype(np.float32))
         t_txt.set_text(f"{d['names'][d['cond'][k]]}   t = {tm[k]:5.1f} min")
         for c_ in curs:
             c_.set_xdata([tm[k]] * 2)
@@ -112,13 +130,22 @@ def _frames(ks):
     plt.close(fig)
 
 
-def render(name, device="cuda:0", workers=16):
+def render(name, device="cuda:0", workers=16, atlas=False):
+    """`atlas` (Cedric, 2026-10-08: "the fish not elongated as in the other slides; add the side view"): every neuron at
+    its atlas position (exp17_flow_pruned.atlas_frame) and the side view under each panel -> results/movie_omega_atlas.mp4."""
     from plexus.tasks import trace_recording as TR
     from exp17_ablation import _brain_view
     spec, out, fr, om = omega_of(name, device)
     rec = TR.load(spec["task"]["reference"]["trace_recording"])
-    pos = _brain_view(np.asarray(rec["pos_um"], np.float64))
+    if atlas:
+        from exp17_flow_pruned import atlas_frame
+        pos = atlas_frame(np.load(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "experiments",
+                                               "exp17_zapbench_graphcast", "data", "atlas_destripe.npz"))["atlas_um"]
+                          .astype(np.float64))
+    else:
+        pos = _brain_view(np.asarray(rec["pos_um"], np.float64))
     order = np.argsort(pos[:, 2])
+    order_s = np.argsort(-pos[:, 1])
     X = rec["dff"][fr].astype(np.float32)
     cond = rec["condition"][fr]
     tm = fr * FRAME_S / 60
@@ -127,7 +154,8 @@ def render(name, device="cuda:0", workers=16):
     omf = om.astype(np.float32)
     half = float(np.percentile(np.abs(omf - 1), 98))
     _M.clear()
-    _M.update(P=pos[order], order=order, vmax=float(np.percentile(X, 97)), tm=tm, X=X, om=om, cond=cond,
+    _M.update(P=pos[order], order=order, Ps=pos[order_s][:, [0, 2]], order_s=order_s, side=atlas,
+              vmax=float(np.percentile(X, 97)), tm=tm, X=X, om=om, cond=cond,
               names=[str(s) for s in rec["names"]], blocks=[(tm[a], tm[b], cond[a]) for a, b in zip(st, en)],
               half=max(half, 1e-3), mean_rec=X.mean(1), om_mean=omf.mean(1), om_lo=np.percentile(omf, 5, 1),
               om_hi=np.percentile(omf, 95, 1), tmp=tempfile.mkdtemp(prefix="omega_"))
@@ -135,7 +163,7 @@ def render(name, device="cuda:0", workers=16):
     chunks = [c for c in np.array_split(ks, min(workers, len(os.sched_getaffinity(0)))) if len(c)]
     with mp.get_context("fork").Pool(len(chunks)) as pool:
         pool.map(_frames, chunks)
-    path = os.path.join(out, "results", "movie_omega.mp4")
+    path = os.path.join(out, "results", "movie_omega_atlas.mp4" if atlas else "movie_omega.mp4")
     subprocess.run([TR._ffmpeg(), "-y", "-loglevel", "error", "-framerate", "25", "-i",
                     os.path.join(_M["tmp"], "%05d.png"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt",
                     "yuv420p", "-c:v", "libx264", path], check=True)
@@ -148,5 +176,5 @@ def render(name, device="cuda:0", workers=16):
 
 
 if __name__ == "__main__":
-    for n_ in sys.argv[1:]:
-        render(n_)
+    for n_ in [a for a in sys.argv[1:] if not a.startswith("--")]:
+        render(n_, atlas="--atlas" in sys.argv)
