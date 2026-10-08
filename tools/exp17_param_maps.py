@@ -57,9 +57,12 @@ def constants(name):
     # the lattice grid has no per-neuron incoming W (its weights sit on grid edges): its per-neuron coupling is the signed
     # output a_j (A_send), drawn in W's place (Cedric, 2026-10-08: the panel was all white)
     w_lab = "summed W into the neuron" + (", after pruning" if prune_th else "")
-    if not w_in.any() and "state_diffuse.A_send" in fit:
-        w_in = fit["state_diffuse.A_send"].float().numpy().reshape(-1)
-        w_lab = "each neuron's signed output a$_j$ (lattice grid)"
+    if not w_in.any() and "state_diffuse.W_grid" in fit:
+        # the lattice grid (Cedric, 2026-10-08: "panel c computed after edge removal"): the summed EFFECTIVE weight into
+        # each neuron through encode, one hop and decode (exp17_prune.grid_w_in), the pruned grid edges zeroed
+        from exp17_prune import grid_edges, grid_w_in
+        w_in = grid_w_in(grid_edges(spec), fit, prune_th or None)
+        w_lab = "effective W in, via the grid" + (", pruned" if prune_th else "")
     return {"w_label": w_lab, "tau_s": tau_s, "tau_bounds": bounds,
             "V": fit["neuron.rest"].float().numpy().reshape(-1) * sd + mu, "W_in": w_in,
             "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask,
