@@ -904,7 +904,16 @@ def write_slides():
             col2_ = lambda fig_, txt_: col_(fig_, txt_).replace("{0.72\\textwidth}", "{0.78\\textwidth}").replace(   # noqa: E731
                 "{0.26\\textwidth}", "{0.20\\textwidth}").replace(   # the template's margins kept (Cedric, 2026-10-07)
                 "\\vspace*{0.03\\textheight}", "\\vspace*{0.09\\textheight}")   # blank lines under the title band
-            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", col2_("atlas_regions_raster.png", tA_),
+            # Cedric, 2026-10-07: a small movie of the block's visual stimulus (tools/exp17_stim_movies.py) at the top of
+            # the right column
+            stim_ = lambda body_, b_, w_="\\linewidth": (body_.replace("\\begin{column}{0.20\\textwidth}\\centering\\fitcol{%",   # noqa: E731
+                                                     "\\begin{column}[t]{0.20\\textwidth}\\centering\\playmovie[" + w_ + "]"
+                                                     "{Movies/stim_" + b_ + "}\\par\\vspace{8pt}"
+                                                     # the text fitted to what the movie leaves of the column (local)
+                                                     "\\setlength{\\colheight}{" + ("0.56" if w_ == "\\linewidth" else "0.40")
+                                                     + "\\textheight}\\fitcol{%")
+                                       if os.path.exists(os.path.join(PRES, "Movies", f"stim_{b_}.mp4")) else body_)
+            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all", "0.5\\linewidth"),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
             # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
@@ -931,7 +940,7 @@ def write_slides():
                            + "{\\scriptsize\\raggedright Only the block's frames, every one; each neuron's dF/F z-scored "
                              "within the block; rows by region as on the atlas slide, within a region by the correlation "
                              "with the brain mean (green, top).\\par}")
-                    deck.insert(at_, (f"00j_block_{b_.replace(' ', '_')}", S.frame_wide(f"the {b_} block", col2_(f_, tB_), "tools/exp17_atlas.py "
+                    deck.insert(at_, (f"00j_block_{b_.replace(' ', '_')}", S.frame_wide(f"the {b_} block", stim_(col2_(f_, tB_), b_.replace(' ', '_')), "tools/exp17_atlas.py "
                                       f"summary --block '{b_}'{' --lr' if lr_ else ''}",
                                       deck_title=f"in the Z-Brain atlas $\\cdot$ the {b_} block")))
                     at_ += 1
@@ -1212,6 +1221,38 @@ def write_slides():
         deck.append(("07_variants", S.frame_wide("the variants of the law", body9, "cell_ops: neuron_graph, "
                                                  "neuron_graph_mlp_leak, neuron_graph_mlp",
                                                  deck_title="the model $\\cdot$ the variants: two known ODEs and two GNN-MLPs")))
+        # Cedric, 2026-10-07: batch 21's law, the angular modulation (exp18's phase_rotated on the neuron graph; the
+        # GNN_Transformer note, Eq. 27), in the variants slide's look
+        mods21 = [("known ODE, the angular modulation",
+                   "$\\tau_i\\dfrac{dz_i}{dt} = -z_i + V_i + \\sum_j W_{ij}\\tanh z_j\\,\\cos\\!\\big(\\varphi_{t(j)\\,t(i)} - "
+                   "\\alpha(t)\\big) + B_i\\cdot u(t)$",
+                   "each edge's message turned by one broadcast angle: the factor is 1 when $\\alpha$ sits on the pair's "
+                   "phase, 0 at a quarter turn, $-1$ half a turn away (the edge changes sign); no $\\Omega$. Learned: "
+                   "$W_{ij}$, $\\tau_i$, $V_i$, $B_i$, $\\varphi$, $\\alpha$'s SIREN"),
+                  ("the phase $\\varphi$",
+                   "$\\varphi_{ab}$, \\; $a = t(j)$ the sender's type, $b = t(i)$ the receiver's",
+                   "one phase per ordered pair of cell types, a 25 $\\times$ 25 table: the types are the Z-Brain atlas "
+                   "regions (24 + other) until a learned type exists (the MLP embedding); started at random, since at "
+                   "$\\varphi = \\alpha = 0$ both gradients vanish. 21.9--21.10 learn the full $\\varphi_{ij}$, one per edge"),
+                  ("the angle $\\alpha(t)$",
+                   "$\\alpha(t) = f_\\theta(t)$, \\; or $f_\\theta(t, \\mathrm{block})$, \\; or $\\alpha_k$ per block $k$",
+                   "one angle for the whole brain at each frame, a SIREN of the time (0 untrained), with the block's "
+                   "one-hot, or one learned angle per block (exp18's one angle per context). When the block changes the "
+                   "angle turns, and with it which pairs excite, fall silent or inhibit: a different circuit per block on "
+                   "the same wiring. Trained with a 0.1-rad jitter per rollout (exp18: without it, a 3$^\\circ$ error "
+                   "breaks the circuits)"),
+                  ("batch 21",
+                   "21.1 no $\\Omega$, no angle \\; $\\cdot$ \\; 21.2 the angle \\; $\\cdot$ \\; 21.3 seed 1 \\; $\\cdot$ \\; "
+                   "21.4 + block \\; $\\cdot$ \\; 21.5 $\\alpha_k$ per block",
+                   "21.6 no jitter; 21.7 gain only, $(1 + \\cos)/2$: an edge silenced, never reversed; 21.8 $\\varphi$ "
+                   "fixed at random; 21.9 per-edge $\\varphi_{ij}$; 21.10 per-edge + block (H100). Base: the new nominal "
+                   "19.25 without $\\Omega$")]
+        body21 = ("\\vspace*{2\\baselineskip}\\fitcol{%\n"
+                  + "\\vspace{14pt}\n".join("{\\Large\\textbf{" + h + "}}\\\\[4pt]\n{\\Large " + e + "}\\\\[4pt]\n"
+                                             "{\\small\\raggedright " + t_ + "\\par}\n" for h, e, t_ in mods21) + "}")
+        deck.append(("07b_angle", S.frame_wide("the angular modulation", body21,
+                                               "cell_ops: neuron_graph_phase; Allier 2026, GNN_Transformer note, Eq. 27",
+                                               deck_title="the model $\\cdot$ batch 21: the angle that switches the circuit")))
     # Cedric, 2026-10-07: an appendix, its title slide as the first deck's slide 66, then the first deck's slide-8 look
     # (the forecast error step by step, panel a) for the held-out runs against ZAPBench (batch 20) that have landed
     deck += slides_run19(S)                  # Cedric, 2026-10-07: 19.20's results, the first deck's slides 12-17
