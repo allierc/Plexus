@@ -6,8 +6,8 @@ The ARTR (Dunn et al. 2016, Neuron) is defined by its activity: two bilateral hi
 (periods > 16 s here, Allier 2026 note, papers/Allier_2026_note_zebrafish_hindbrain_self_motion_ARTR.pdf) alternates
 left against right, also in darkness. So:
 
-  1. CANDIDATES: every neuron inside Z-Brain rhombomeres 1-3 (the ARTR is anterior by definition), side from Z-Brain's
-     midline.
+  1. CANDIDATES: every neuron inside Z-Brain rhombomeres 1-3 (the ARTR is anterior by definition) and outside every
+     cerebellar mask (the ARTR is ventral), side from Z-Brain's midline.
   2. THE ARTR BAND: dF/F band-passed to periods of CUT_S-HI_S s (Butterworth, order 4, forward-backward) over the
      continuous recording; each block's first SKIP_S s are dropped from selection and test (filtering block by block
      put an edge transient at every onset, and the dark selection latched onto it). The upper edge drops the minutes-long drifts, which in the 600-frame
@@ -67,7 +67,10 @@ def main():
     for k, n in enumerate(rh):
         rlab[reg[:, names.index(n)] & (rlab == 0)] = k + 1
     Xall = np.asarray(z["dff"], np.float32)
-    cand = np.flatnonzero(za["inside"] & (rlab > 0) & (rlab <= 3) & (Xall.std(0) > 1e-6))   # anterior hindbrain
+    # the cerebellum is rhombomere 1's dorsal part and Z-Brain's masks overlap; the ARTR is ventral, so every cerebellar
+    # mask is cut out (Cedric, 2026-10-07: 106 of the first selection's 394 cells were cerebellar)
+    cereb = reg[:, [k for k, n in enumerate(names) if "erebell" in n]].any(1)
+    cand = np.flatnonzero(za["inside"] & (rlab > 0) & (rlab <= 3) & ~cereb & (Xall.std(0) > 1e-6))   # anterior hindbrain
     X = Xall[:, cand]
     del Xall
     side = np.where(A[cand, 0] < MID, 0, 1)             # 0 left, 1 right
@@ -217,7 +220,7 @@ def twin_figure(A, ins, cells, rgb, t, traces, stim, marks, caption, Z=None, row
         scs.append(a.scatter(xd[cells], Y[cells], s=3 if len(cells) > 2000 else 9, c=rgb, lw=0, rasterized=True))
         a.set_aspect("equal")
         a.axis("off")
-        a.text(0.02, 0.97, ttl, transform=a.transAxes, fontsize=11)
+        fig.text(rect[0] + 0.01, 0.975, ttl, fontsize=11, va="top")       # both titles on one line
     a.plot([np.percentile(xd, 99) - 100, np.percentile(xd, 99)], [np.percentile(A[:, 2], 0.5) - 20] * 2, color="w", lw=2)
     a.text(np.percentile(xd, 99) - 50, np.percentile(A[:, 2], 0.5) - 28, "100 µm", ha="center", va="top", fontsize=9)
     if caption:                                          # none on the deck's twins (Cedric, 2026-10-07: it overlays the names)
@@ -280,7 +283,7 @@ def twin_figure(A, ins, cells, rgb, t, traces, stim, marks, caption, Z=None, row
 
 def movie(build, scs_rgb, Zc, n, name="artr", start_min=10.0, fps=30, workers=12, dpi=100):
     """A fish figure as a movie: one frame per recorded frame, each cell's colour scaled by its activity Zc [n, cells]
-    (z 2.5 = full, below -0.5 = dim), the bar at the frame. build() -> (fig, scatters, bar). The movie starts
+    (its opacity: z 2.5 = opaque, -0.5 and below = transparent), the bar at the frame. build() -> (fig, scatters, bar). The movie starts
     start_min minutes into the window (Cedric, 2026-10-07: "start at t = 10", 5 min before the rotation block).
     -> presentation/Movies/<name>.mp4 (+ .png, the first frame). Also used by tools/exp17_phase.py."""
     import multiprocessing as mp
@@ -296,9 +299,9 @@ def movie(build, scs_rgb, Zc, n, name="artr", start_min=10.0, fps=30, workers=12
         for b_ in bars:
             b_.set_visible(True)
         for i in ids:
-            g = np.clip((Zc[i] + 0.5) / 3.0, 0.08, 1.0)[:, None]
+            g = np.clip((Zc[i] + 0.5) / 3.0, 0.0, 1.0)      # a quiet cell transparent, not a black dot
             for sc in scs:
-                sc.set_facecolors(np.c_[scs_rgb * g, np.ones(len(g))])
+                sc.set_facecolors(np.c_[scs_rgb, g])
             for b_ in bars:
                 b_.set_xdata([i * DT / 60] * 2)
             fig.savefig(os.path.join(tmp, f"{i - i0:05d}.png"), dpi=dpi, facecolor="black")

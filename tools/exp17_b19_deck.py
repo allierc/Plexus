@@ -805,7 +805,7 @@ def write_slides():
                           "swim toward that side: a left / right turn selector.\\par}\\vspace{6pt}\n"
                         + head("the cells")                          # Cedric, 2026-10-07: the twin of the next slide
                         + "{\\scriptsize\\raggedright A small, strict set, found from the activity alone: in rhombomeres "
-                          "1-3 only, the " + f"{AR_['k_side']}" + " cells per side whose slow activity (" + f"{lo_s:g}-{hi_s:g}"
+                          "1-3 only, the cerebellum excluded, the " + f"{AR_['k_side']}" + " cells per side whose slow activity (" + f"{lo_s:g}-{hi_s:g}"
                         + " s) best follows left $-$ right, picked once on the dark block and once on the rotation block. "
                           "Red the left side, blue the right.\\par}\\vspace{6pt}\n"
                         + head("what it shows")
