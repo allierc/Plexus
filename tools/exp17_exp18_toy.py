@@ -7,10 +7,11 @@ six laws (integrate, delay, low-pass, high-pass, resonator, differentiate), each
 in cos(phi_{t(j)t(i)} - alpha_k), phi learned from random (the GNN_Transformer note, Fig. 2 c). Two figures, black:
     traces  one held-out trial per law: the target output (white) and the circuit's (the law's colour)
     circle  the six learned angles alpha_k on the unit circle, each in its law's colour, numbered, with its held-out error
+    W       the one fixed wiring W_ij (Dale signs applied), the cells ordered by type, the type boundaries drawn
             (the error over the law's own variance, results/<run>_test.json)
 
     PYTHONPATH=src:tools python tools/exp17_exp18_toy.py
--> experiments/exp17_zapbench_graphcast/presentation/figs/exp18_toy_traces.png, exp18_toy_circle.png
+-> experiments/exp17_zapbench_graphcast/presentation/figs/exp18_toy_traces.png, exp18_toy_circle.png, exp18_toy_W.png
 """
 import os
 import sys
@@ -92,6 +93,41 @@ def main(device="cpu"):
                  color=COLS_DARK.get(names[k], "w"), va="bottom")
     fig.subplots_adjust(bottom=0.30, top=0.98, left=0.02, right=0.98)
     fig.savefig(os.path.join(FIGS, "exp18_toy_circle.png"), dpi=170, facecolor="black")
+    plt.close(fig)
+    # THE CONNECTIVITY MATRIX (Cedric, 2026-10-08): the one fixed wiring W_ij (Dale signs applied), the cells ordered by
+    # type, the type boundaries drawn; the same W runs all six circuits, only cos(phi - alpha_k) changes
+    op = _phase_op(H)
+    lvl, es = H.level("neuron"), H.level(op.edge_set)
+    n = lvl.n
+    E = es.pre.numel()
+    w = es.get("w").detach().reshape(-1, E)[0]             # a batched rollout: every trial holds the same wiring
+    if op.dale:
+        w = w.abs() * op._dale_sign(lvl, es).reshape(-1, E)[0].to(w.dtype)
+    Wm = np.zeros((n, n))
+    Wm[es.post.cpu().numpy(), es.pre.cpu().numpy()] = w.cpu().numpy()
+    nt = lvl.node_type.reshape(-1)[:n].cpu().numpy()
+    o_ = np.argsort(nt, kind="stable")
+    Wo = Wm[np.ix_(o_, o_)]
+    vm = float(np.percentile(np.abs(Wo[Wo != 0]), 98)) if (Wo != 0).any() else 1.0
+    fig, ax = plt.subplots(figsize=(4.2, 4.4), facecolor="black")
+    from matplotlib.colors import LinearSegmentedColormap
+    bkr = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])   # zero black, on the black slide
+    im = ax.imshow(Wo, cmap=bkr, vmin=-vm, vmax=vm, interpolation="nearest")
+    cuts = np.flatnonzero(np.diff(nt[o_])) + 0.5
+    for c_ in cuts:
+        ax.axhline(c_, color="0.35", lw=0.4)
+        ax.axvline(c_, color="0.35", lw=0.4)
+    ax.set_xlabel("from cell j (by type)", fontsize=9)
+    ax.set_ylabel("to cell i (by type)", fontsize=9)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(f"the wiring $W_{{ij}}$: {n} cells, {int((Wm != 0).sum()):,} synapses, {len(cuts) + 1} types",
+                 fontsize=9, loc="left")
+    cb = fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+    cb.ax.tick_params(labelsize=7)
+    cb.set_label("W (red excitatory, blue inhibitory)", fontsize=7.5)
+    fig.tight_layout()
+    fig.savefig(os.path.join(FIGS, "exp18_toy_W.png"), dpi=170, facecolor="black")
     plt.close(fig)
     print("[toy]", {names[k]: (round(float(alpha[k]), 3), round(float(per[str(k)]), 4)) for k in range(K)})
 

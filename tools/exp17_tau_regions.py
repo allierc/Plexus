@@ -39,7 +39,7 @@ def main(run):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.colors import LogNorm
+    from matplotlib.colors import Normalize
     from exp17_param_maps import constants
     c = constants(run)
     tau, mask = np.asarray(c["tau_s"], np.float64), np.asarray(c["mask"]).astype(bool).reshape(-1)
@@ -83,8 +83,8 @@ def main(run):
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
     xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
     o = np.argsort(tau)
-    norm = LogNorm(lo, hi)
-    cmap = plt.get_cmap("viridis")
+    norm = Normalize(lo, hi)                               # linear (Cedric, 2026-10-08)
+    cmap = plt.get_cmap("RdBu")                            # red fast, blue slow (Cedric, 2026-10-08)
     # LEFT, the atlas slide's four panels at ONE scale (Cedric, 2026-10-08: "the atlas surfaces from above and from the
     # side, as slide 11, coloured by the region's mean tau, the same scale as the other fish"): the neurons by their
     # own tau, then each region's Z-Brain surface by its neurons' mean tau (on the log scale), one colour scale for all
@@ -123,7 +123,7 @@ def main(run):
                 a.imshow(trim(imgs[view]), aspect="auto")
                 continue
             Y = yd if view == "top" else A[:, 2]
-            sc = a.scatter(xd[o], Y[o], c=tau[o], s=0.2, cmap="viridis", norm=norm, lw=0, rasterized=True)
+            sc = a.scatter(xd[o], Y[o], c=tau[o], s=0.2, cmap="RdBu", norm=norm, lw=0, rasterized=True)
             a.set_xlim(lo_(xd), hi_(xd))
             a.set_ylim(lo_(Y) - (40.0 if view == "side" else 0.0), hi_(Y))
     y_bot = y_top - gh
@@ -144,8 +144,7 @@ def main(run):
         ar.add_patch(plt.Rectangle((p["p25"], i - 0.32), p["p75"] - p["p25"], 0.64, color=cmap(norm(p["median"])), lw=0))
         ar.plot([p["median"]] * 2, [i - 0.36, i + 0.36], color="white", lw=1.6)
     ar.axvline(doc["brain_median"], color="0.75", ls="--", lw=0.8)
-    ar.set_xscale("log")
-    ar.set_xlim(lo * 0.9, hi * 1.1)
+    ar.set_xlim(0, hi * 1.02)
     ar.set_ylim(len(ks) - 0.5, -0.5)
     ar.set_yticks(range(len(ks)))
     ar.set_yticklabels([f"{short[k]} ({per[short[k]]['n']:,})" for k in ks], fontsize=8.5)

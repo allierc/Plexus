@@ -21,7 +21,8 @@ left against right, also in darkness. So:
      the selection block is circular, every other one held out. CONTROL: as many random candidates per side, from
      the same rhombomeres in the same proportion, 50 draws. CHECK: the two selections' overlap against chance.
 
-    PYTHONPATH=src:tools python tools/exp17_artr.py [--movie]
+    PYTHONPATH=src:tools python tools/exp17_artr.py [--movie] [--model zap_n19_nom]
+--model: the twin on the learned law's traces (tools/exp17_model_traces.py), the recording's ARTR cells, files *_model.
 -> presentation/figs/artr.png, data/artr.json, data/artr_cells.npz [, presentation/Movies/artr.mp4]
 """
 import json
@@ -52,6 +53,10 @@ def corr(a, b):
     return float(np.corrcoef(a, b)[0, 1])
 
 
+MODEL = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+SUF = "_model" if MODEL else ""
+
+
 def main():
     import matplotlib
     matplotlib.use("Agg")
@@ -73,6 +78,11 @@ def main():
     cand = np.flatnonzero(za["inside"] & (rlab > 0) & (rlab <= 3) & ~cereb & (Xall.std(0) > 1e-6))   # anterior hindbrain
     X = Xall[:, cand]
     del Xall
+    if MODEL:
+        # THE MODEL'S TWIN (Cedric, 2026-10-08): the same candidates, their traces from the learned law's free rollout of
+        # the whole recording (tools/exp17_model_traces.py), the cells those the RECORDING selected (data/artr_cells.npz)
+        from exp17_model_traces import path as mpath
+        X = np.asarray(np.load(mpath(MODEL), mmap_mode="r")[:, cand], np.float32)
     side = np.where(A[cand, 0] < MID, 0, 1)             # 0 left, 1 right
     blocks = {b: (int(off[k]), int(off[k + 1])) for k, b in enumerate(bnames)}
     S = lowpass(X)                       # the band, over the continuous recording (the blocks are back to back in time)
@@ -92,7 +102,11 @@ def main():
             kR[np.flatnonzero(side == 1)[np.argsort(r[side == 1])[:K_SIDE]]] = True
             d = Sd[:, kL].mean(1) - Sd[:, kR].mean(1)
         return kL, kR, r
-    sel = {"dark": select(d0, d1), "rotation": select(*blocks["rotation"])}
+    if MODEL:
+        rc = np.load(os.path.join(EXP, "data", "artr_cells.npz"))
+        sel = {k_: (np.isin(cand, rc[f"{k_}_left"]), np.isin(cand, rc[f"{k_}_right"]), None) for k_ in ("dark", "rotation")}
+    else:
+        sel = {"dark": select(d0, d1), "rotation": select(*blocks["rotation"])}
     keepL, keepR, _ = sel["dark"]
     L, R = cand[keepL], cand[keepR]
     rng = np.random.default_rng(0)
@@ -135,9 +149,11 @@ def main():
     doc["overlap_dark_rotation"] = [int(oL), int(oR)]
     # chance overlap of two random K_SIDE draws from one side's candidates
     doc["overlap_chance"] = [round(K_SIDE * K_SIDE / int((side == 0).sum()), 2), round(K_SIDE * K_SIDE / int((side == 1).sum()), 2)]
-    json.dump(doc, open(os.path.join(EXP, "data", "artr.json"), "w"), indent=1)
-    np.savez(os.path.join(EXP, "data", "artr_cells.npz"), **{f"{sb}_{lr_}": cand[k_] for sb, (kL_, kR_, _) in sel.items()
-                                                             for lr_, k_ in (("left", kL_), ("right", kR_))})
+    doc["model"] = MODEL
+    json.dump(doc, open(os.path.join(EXP, "data", f"artr{SUF}.json"), "w"), indent=1)
+    if not MODEL:
+        np.savez(os.path.join(EXP, "data", "artr_cells.npz"), **{f"{sb}_{lr_}": cand[k_] for sb, (kL_, kR_, _) in sel.items()
+                                                                 for lr_, k_ in (("left", kL_), ("right", kR_))})
     print(json.dumps(doc, indent=1))
 
     # the figure: where they are (from above, from the side), L/R r per block, the traces over open loop -> rotation -> dark.
@@ -163,10 +179,10 @@ def main():
         return twin_figure(A, za["inside"], cells, base, t, tr, stim, marks, Z=Zc, rows=rows_,
                            caption="")
     fig, scs, _ = build()
-    fig.savefig(os.path.join(EXP, "presentation", "figs", "artr.png"), dpi=130, facecolor="black")
+    fig.savefig(os.path.join(EXP, "presentation", "figs", f"artr{SUF}.png"), dpi=130, facecolor="black")
     plt.close(fig)
     if "--movie" in sys.argv:
-        movie(build, scs_rgb=base, Zc=Zc, n=f1 - f0)
+        movie(build, scs_rgb=base, Zc=Zc, n=f1 - f0, name=f"artr{SUF}")
 
 
 def smooth3(Z):

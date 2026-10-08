@@ -43,6 +43,18 @@ def fit(X, period):
     return r2, np.arctan2(B[3], B[2])                  # x ~ cos(w - phi), phi = atan2(c, a)
 
 
+MODEL = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+SUF = "_model" if MODEL else ""
+
+
+def traces(z):
+    """[T, N] dF/F: the recording, or with --model the learned law's free rollout (tools/exp17_model_traces.py)."""
+    if MODEL:
+        from exp17_model_traces import path as mpath
+        return np.load(mpath(MODEL), mmap_mode="r")
+    return z["dff"]
+
+
 def main():
     import matplotlib
     matplotlib.use("Agg")
@@ -55,7 +67,7 @@ def main():
     off, bn = z["offsets"], [str(x) for x in z["names"]]
     k = bn.index("rotation")
     f0, f1 = int(off[k]) + int(round(SKIP_S / DT)), int(off[k + 1])
-    X = np.asarray(z["dff"][f0:f1], np.float64)
+    X = np.asarray(traces(z)[f0:f1], np.float64)
     ok = X.std(0) > 1e-6
     r2s, phs = fit(z["stimulus"][f0:f1, COL:COL + 1].astype(np.float64), P_S)
     r2, ph = fit(X, P_S)
@@ -84,8 +96,18 @@ def main():
            "red_blue_phase_gap_deg": float(np.degrees(np.abs(np.angle(np.exp(1j * dphi[red]).mean()
                                                                       / np.exp(1j * dphi[blue]).mean())))),
            "per_region": per_region}
-    json.dump(doc, open(os.path.join(EXP, "data", "phase_rotation.json"), "w"), indent=1)
-    np.savez_compressed(os.path.join(EXP, "data", "phase_rotation.npz"), r2=r2.astype(np.float32),
+    if MODEL:
+        # THE TWIN'S AGREEMENT with the recording's map: of the neurons oscillating in both, the share in the same group
+        rp = np.load(os.path.join(EXP, "data", "phase_rotation.npz"))
+        both = rp["sig"] & sig
+        same = (np.cos(rp["dphi"]) < 0) == (np.cos(dphi) < 0)
+        doc["model"] = MODEL
+        doc["agreement"] = {"oscillating_in_both": int(both.sum()), "recording_only": int((rp["sig"] & ~sig).sum()),
+                            "model_only": int((~rp["sig"] & sig).sum()),
+                            "same_group_share": float(same[both].mean()) if both.any() else None}
+        print("[agree]", doc["agreement"])
+    json.dump(doc, open(os.path.join(EXP, "data", f"phase_rotation{SUF}.json"), "w"), indent=1)
+    np.savez_compressed(os.path.join(EXP, "data", f"phase_rotation{SUF}.npz"), r2=r2.astype(np.float32),
                         dphi=dphi.astype(np.float32), sig=sig, thr=thr)
     print(json.dumps({k_: v for k_, v in doc.items() if k_ != "per_region"}, indent=1))
 
@@ -98,7 +120,7 @@ def main():
     base = np.where(np.cos(dphi[ii])[:, None] < 0, [[1.0, 0.19, 0.19]], [[0.23, 0.42, 1.0]])
     g0, g1 = int(off[bn.index("open loop")]), int(off[bn.index("dark") + 1])
     t = (np.arange(g0, g1) - g0) * DT / 60
-    Xg = np.asarray(z["dff"][g0:g1][:, ii], np.float32)
+    Xg = np.asarray(traces(z)[g0:g1][:, ii], np.float32)
 
     from exp17_artr import twin_figure, smooth3, zs, region_rows
     Zm = smooth3(zs(Xg))                                 # each neuron's dF/F over the window, z, the 3-frame mean
@@ -114,11 +136,11 @@ def main():
         return twin_figure(A, ins, ii, base, t, tr, stim, marks, Z=Zm, rows=rows_,
                            caption="")
     fig, _, _ = build()
-    fig.savefig(os.path.join(EXP, "presentation", "figs", "phase_rotation.png"), dpi=130, facecolor="black")
+    fig.savefig(os.path.join(EXP, "presentation", "figs", f"phase_rotation{SUF}.png"), dpi=130, facecolor="black")
     plt.close(fig)
     if "--movie" in sys.argv:
         from exp17_artr import movie
-        movie(build, scs_rgb=base, Zc=Zm, n=g1 - g0, name="phase_rotation")
+        movie(build, scs_rgb=base, Zc=Zm, n=g1 - g0, name=f"phase_rotation{SUF}")
 
 if __name__ == "__main__":
     main()
