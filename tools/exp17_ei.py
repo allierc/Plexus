@@ -9,9 +9,8 @@ sender to one sign; the five folds are the same spec from five seeds (19.29-19.3
   agreement   of the neurons signed (not silent) in every fold: the share with the same sign in all five, against
               chance (each fold's own excitatory share, independent)
   per region  per atlas table region: the inhibitory share of its signed neurons, mean and SD over the folds
-  the atlas   the same share from the Z-Brain transmitter labels (Randlett et al. 2015): of a region's neurons in a
-              Gad1b or Glyt2 mask (inhibitory) or a Vglut2 mask (excitatory), the inhibitory share -- an independent
-              anatomical reference, correlated with the learned one across regions
+(The Z-Brain transmitter masks are no reference for it -- Cedric, 2026-10-08: they mark a specific cell type, not every
+cell of a region -- so the share they give is still written to the json, but not drawn.)
 
     PYTHONPATH=src:tools python tools/exp17_ei.py
 -> presentation/figs/ei_dale_n19.png, data/ei_dale_n19.json
@@ -78,72 +77,64 @@ def main():
                        "silent": float((s == 0).mean()), "minority_mass": mm, **sc}
                       for r, s, mm, sc in zip(FOLDS, sg, minority, score)],
            "signed_in_all_folds": int(signed_all.sum()), "unanimous_share": float(unanimous), "unanimous_chance": chance,
+           "sure_excitatory_share": float((sg[:, signed_all].sum(0) == len(FOLDS)).sum()
+                                          / max(int((np.abs(sg[:, signed_all].sum(0)) == len(FOLDS)).sum()), 1)),
            "atlas_global_inhibitory_share": float((inh_m & ~exc_m & ins).sum() / max(int(((inh_m ^ exc_m) & ins).sum()), 1)),
            "r_learned_vs_atlas_across_regions": r_atlas, "per_region": per}
     json.dump(doc, open(os.path.join(EXP, "data", "ei_dale_n19.json"), "w"), indent=1)
     print(json.dumps({k: v for k, v in doc.items() if k not in ("per_region",)}, indent=1))
 
     plt.style.use("dark_background")
-    fig = plt.figure(figsize=(15, 8.4), facecolor="black")
-    RED, BLUE, GREY = "#ff4a3a", "#4a9bff", "0.45"
-    # a: per fold, the shares
-    a = fig.add_axes([0.05, 0.60, 0.25, 0.32])
-    for i, g in enumerate(doc["global"]):
-        a.bar(i, 100 * g["excitatory"], color=RED, width=0.7)
-        a.bar(i, 100 * g["inhibitory"], bottom=100 * g["excitatory"], color=BLUE, width=0.7)
-        a.bar(i, 100 * g["silent"], bottom=100 * (g["excitatory"] + g["inhibitory"]), color=GREY, width=0.7)
-    a.set_xticks(range(len(FOLDS)))
-    a.set_xticklabels([f"fold {k}" for k in range(len(FOLDS))], fontsize=9)
-    a.set_ylabel("neurons, %", fontsize=10)
-    a.set_ylim(0, 100)
-    a.set_title("a  per fold: excitatory (red), inhibitory (blue), silent (grey)", fontsize=10, loc="left")
-    # b: the fold agreement and the sign map (consensus) from above
+    FW, FH = 15.0, 8.4
+    fig = plt.figure(figsize=(FW, FH), facecolor="black")
+    RED, BLUE = "#ff4a3a", "#4a9bff"
+    # LEFT, as the tau map (Cedric, 2026-10-08: "the top and side zebrafish as in the tau map, one above the other, the
+    # same size"): every neuron by the sign all five folds agree on -- red excitatory, blue inhibitory, grey otherwise
     xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
     cons = np.where(signed_all & (sg.sum(0) == len(FOLDS)), 1, np.where(signed_all & (sg.sum(0) == -len(FOLDS)), -1, 0))
-    b = fig.add_axes([0.02, 0.06, 0.32, 0.44])
-    b.scatter(xd[ins & (cons == 0)], yd[ins & (cons == 0)], s=0.1, color="0.25", lw=0, rasterized=True)
-    b.scatter(xd[cons == 1], yd[cons == 1], s=0.25, color=RED, lw=0, rasterized=True)
-    b.scatter(xd[cons == -1], yd[cons == -1], s=0.25, color=BLUE, lw=0, rasterized=True)
-    b.set_aspect("equal")
-    b.axis("off")
-    b.set_title(f"b  the sign all five folds agree on, from above: {100 * doc['unanimous_share']:.0f} % of the "
-                f"{doc['signed_in_all_folds']:,} signed\n    in every fold (chance {100 * chance:.0f} %); grey: disagree or silent",
-                fontsize=9.5, loc="left")
-    # c: per region, the learned inhibitory share (mean +- SD over folds) and the atlas's
+    ins_ = lab >= 0
+    lo_ = lambda v: float(np.percentile(v[ins_], 0.1))                   # noqa: E731
+    hi_ = lambda v: float(np.percentile(v[ins_], 99.9))                  # noqa: E731
+    ex, ey, ez = hi_(xd) - lo_(xd), hi_(yd) - lo_(yd), hi_(A[:, 2]) - lo_(A[:, 2]) + 40.0
+    TT = 0.26
+    scl = min(0.56 * FW / ex, (0.86 * FH - 2 * TT) / (ey + ez))
+    wf = ex * scl / FW
+    gh = (2 * TT + (ey + ez) * scl) / FH
+    ycur = 0.5 + gh / 2 + 0.02
+    for view, ttl in (("top", "from above, head left"), ("side", "from the side")):
+        hv = (ey if view == "top" else ez) * scl / FH
+        ycur -= TT / FH + hv
+        a = fig.add_axes([0.01, ycur, wf, hv])
+        a.axis("off")
+        a.set_title(ttl + ": the cells all five folds sign alike", fontsize=10, loc="left", x=0.0, pad=2)
+        Y = yd if view == "top" else A[:, 2]
+        a.scatter(xd[ins & (cons == 0)], Y[ins & (cons == 0)], s=0.08, color="0.13", lw=0, rasterized=True)   # the outline only
+        a.scatter(xd[cons == 1], Y[cons == 1], s=0.35, color=RED, lw=0, rasterized=True)
+        a.scatter(xd[cons == -1], Y[cons == -1], s=0.35, color=BLUE, lw=0, rasterized=True)
+        a.set_xlim(lo_(xd), hi_(xd))
+        a.set_ylim(lo_(Y) - (40.0 if view == "side" else 0.0), hi_(Y))
+    nE, nI = int((cons == 1).sum()), int((cons == -1).sum())
+    fig.text(0.01, ycur - 0.045, f"only the {nE + nI:,} cells all five folds sign alike ({100 * doc['unanimous_share']:.0f} %, chance "
+             f"{100 * chance:.0f} %): {nE:,} excitatory (red, {100 * nE / max(nE + nI, 1):.0f} %), {nI:,} inhibitory (blue)",
+             fontsize=9.5, color="0.85")
+    # RIGHT: per region, the inhibitory share of its signed neurons, mean +- SD over the folds; the global share dashed
     rs = list(per)
-    c = fig.add_axes([0.50, 0.08, 0.22, 0.86])
+    bx0 = 0.01 + wf + 0.17
+    c = fig.add_axes([bx0, 0.10, 0.985 - bx0, 0.85])
     y = np.arange(len(rs))
     c.barh(y, [100 * per[r]["inhibitory_share_mean"] for r in rs], xerr=[100 * per[r]["inhibitory_share_sd"] for r in rs],
            color=BLUE, height=0.65, error_kw={"ecolor": "white", "lw": 0.8})
-    at = [(i, 100 * per[r]["atlas_inhibitory_share"]) for i, r in enumerate(rs) if per[r]["atlas_inhibitory_share"] is not None]
-    if at:
-        c.scatter([v for _, v in at], [i for i, _ in at], marker="D", s=26, color="#ffd24a", zorder=3,
-                  label="atlas: Gad1b / Glyt2 share of labelled")
+    gI = 100 * np.mean([g["inhibitory"] / max(g["inhibitory"] + g["excitatory"], 1e-9) for g in doc["global"]])
+    c.axvline(gI, color="0.7", ls="--", lw=0.8)
+    c.text(gI, -0.9, f"whole brain {gI:.0f} %", fontsize=8.5, ha="center", va="bottom", color="0.8")
     c.set_yticks(y)
     c.set_yticklabels([f"{r} ({per[r]['neurons']:,})" for r in rs], fontsize=8.5)
     c.set_ylim(len(rs) - 0.5, -0.5)
     c.set_xlim(0, 100)
-    c.set_xlabel("inhibitory, % of the signed neurons", fontsize=9.5)
-    c.axvline(100 * np.mean([g["inhibitory"] / max(g["inhibitory"] + g["excitatory"], 1e-9) for g in doc["global"]]),
-              color="0.7", ls="--", lw=0.8)
-    c.legend(fontsize=8, frameon=False, loc="upper right")
-    c.set_title("c  per region: learned (blue, mean $\\pm$ SD over the folds)", fontsize=10, loc="left")
-    # d: learned vs atlas across regions
-    d = fig.add_axes([0.78, 0.55, 0.20, 0.37])
-    if at:
-        xs_ = [per[rs[i]]["inhibitory_share_mean"] * 100 for i, _ in at]
-        d.scatter([v for _, v in at], xs_, s=22, color="white")
-        for (i, v), x_ in zip(at, xs_):
-            d.text(v, x_, " " + rs[i].split(" (")[0][:12], fontsize=6.5, color="0.75", va="center")
-        d.plot([0, 100], [0, 100], color="0.4", lw=0.7, ls=":")
-    d.set_xlim(0, 100)
-    d.set_ylim(0, 100)
-    d.set_xlabel("atlas inhibitory share, %", fontsize=9)
-    d.set_ylabel("learned inhibitory share, %", fontsize=9)
-    d.set_title(f"d  across regions, r = {r_atlas:+.2f}" if r_atlas is not None else "d  across regions", fontsize=10, loc="left")
-    fig.savefig(os.path.join(EXP, "presentation", "figs", "ei_dale_n19.png"), dpi=130, facecolor="black")
+    c.set_xlabel("inhibitory, % of the signed neurons\n(mean $\\pm$ SD over the five folds)", fontsize=9)
+    fig.savefig(os.path.join(EXP, "presentation", "figs", "ei_dale_n19.png"), dpi=130, facecolor="black",
+                bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
-
 
 if __name__ == "__main__":
     main()
