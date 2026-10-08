@@ -1821,6 +1821,30 @@ def write_slides():
         deck += new_                                   # after 20.3's V_rest slides (Cedric, 2026-10-08: "after 41")
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
+    # THE EYE CIRCUIT, TRAINED ON A TASK (Cedric, 2026-10-08: "add slides in the appendix, starting with the circuit eye
+    # simulation"): connectome-gnn-cx's dot-tracking run, the movie of prototype/dot_tracking/test_eyeG.py
+    if os.path.exists(os.path.join(PRES, "Movies", "eye_circuit_cv0.mp4")):
+        J_e = [json.load(open(f"/groups/saalfeld/home/allierc/GraphData/log/zebrafish/zebrafish_om_intg_285_both_XL_cv{k}/results/"
+                              f"zebrafish_om_intg_285_both_XL_cv{k}_test.json"))["err_theta_mean_deg"] for k in range(5)]
+        cap_e = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.32\\textwidth}\\raggedright"
+                 + "{\\footnotesize\\textbf{the task}}\\\\[2pt]" + "{\\tiny Follow a moving dot horizontally with both eyes. The circuit's input is "
+                 "the dot's velocity, its output the drives of each eye's lateral and medial rectus, through a fitted model of "
+                 "the eye and its muscles (Plexus prototype/eye, eye G).\\par}\\end{column}\n"
+                 "\\begin{column}{0.32\\textwidth}\\raggedright" + "{\\footnotesize\\textbf{the circuit}}\\\\[2pt]"
+                 + "{\\tiny The 285-cell zebrafish oculomotor connectome (EM): 41 AF5 input cells, 117 integrator cells "
+                 "(INTG), 127 abducens motor and internuclear neurons (AMN, AIN), then the muscles; trained on the "
+                 "connectome's wiring.\\par}\\end{column}\n"
+                 "\\begin{column}{0.32\\textwidth}\\raggedright" + "{\\footnotesize\\textbf{the movie}}\\\\[2pt]"
+                 + "{\\tiny Left: the target (white), the command (red), the gaze (blue). Middle: the messages on the "
+                 "connectivity matrix. Right: the eye and its muscles. Below: the 285 cells' activity. Smooth pursuit, then "
+                 "stop-and-go: mean gaze error " + f"{J_e[0]:.2f}" + "$^\\circ$ (fold 0; the five folds "
+                 + f"{min(J_e):.2f}-{max(J_e):.2f}" + "$^\\circ$).\\par}\\end{column}\n\\end{columns}")
+        body_e = ("\\centering\\playmovie[0.96\\textwidth]{Movies/eye_circuit_cv0}\\par"
+                  "\\vspace{1pt}" + cap_e)
+        deck.append(("90b_eye_circuit", S.frame_wide("the eye circuit, trained on a task", body_e,
+                                                     "connectome-gnn-cx prototype/dot_tracking/test_eyeG.py, "
+                                                     "zebrafish_om_intg_285_both_XL_cv0",
+                                                     deck_title="appendix $\\cdot$ the oculomotor circuit, trained on a task")))
     from PIL import Image
     recs_ = {r_["name"]: r_ for r_ in S.results_rows()}
     for n_ in APPENDIX_CURVES:
