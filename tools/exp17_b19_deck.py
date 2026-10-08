@@ -449,6 +449,173 @@ def input_fish(path, size=(700, 1150)):
     pl.close()
 
 
+def slides_run19(S, run="zap_b19_x1_bal20all", num="19.20", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf")):
+    """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
+    slide, and prepare slide 17; the no-W and mean-field controls run on the new nominal, blank until they land"):
+    the free rollout with the network test, the modulation Omega, the learned constants, tau by region, the edge
+    weights, and the mean-field control. -> [(name, tex)]."""
+    from plexus.tasks import trace_recording as TR_
+    GD_ = os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
+    res = os.path.join(GD_, "log", "training", "zapbench", run, "results")
+    rt = S._tex(run)
+    dt = f"batch {num} $\\cdot$ {rt}"
+    out = []
+    if not os.path.exists(os.path.join(res, "movie.mp4")):
+        return out
+    shutil.copy(os.path.join(res, "movie.mp4"), os.path.join(PRES, "Movies", f"{run}.mp4"))
+    shutil.copy(os.path.join(res, "movie.png"), os.path.join(PRES, "Movies", f"{run}.png"))
+    rep = json.load(open(os.path.join(res, "report.json")))
+
+    def ctrl(n_):                                        # a control's movie npz once it has landed, else None
+        f_ = os.path.join(GD_, "log", "training", "zapbench", n_, "results", f"{n_}_movie.npz")
+        return f_ if os.path.exists(f_) else None
+    lines = [("full model", os.path.join(res, f"{run}_movie.npz")),
+             ("W = 0 at inference", os.path.join(res, f"{run}_W0_movie.npz")),
+             ("no stimulus", os.path.join(res, f"{run}_no_stimulus_movie.npz")),
+             (f"no W ({now_[0]})", ctrl(now_[1])), (f"mean field ({mf_[0]})", ctrl(mf_[1]))]
+    bm_, loc_ = "", ""
+    for lab, f_ in lines:
+        big_ = lab == "full model"
+        lab_t = (f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{lab}}}}}" if big_ else lab)
+        m_ = S.bm_metrics(f_) if f_ else None
+        l_ = S.local_r(f_, "zapbench_destripe") if f_ else None
+        bm_ += lab_t + (f" & {S.qv(m_['r'], big=big_)} & {m_['rmse']:.4f} \\\\\n" if m_ else " & & \\\\\n")
+        loc_ += lab_t + (f" & {S.qv(l_['mean'], big=big_)} $\\pm$ {l_['sd']:.3f} \\\\\n" if l_ else " & \\\\\n")
+    stg = rep.get("stages") or []
+    right = (S.head(f"batch {num}: {rt}")
+             + "{\\scriptsize the balanced 20 \\% input mask, every input neuron reading all 22 stimulus columns (13 "
+               "features + 9 condition markers); known ODE on the neuron graph, SIREN $\\Omega$, $\\tau$ in [1, 100] s, "
+               "x1 updates\\par}" + S.SEC_GAP
+             + S.head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+               "& r & RMSE \\\\\n\\hline\n" + bm_ + "\\end{tabular}\\par}" + S.SEC_GAP
+             + S.head("per-neuron r, brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
+               "& mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + loc_ + "\\end{tabular}\\par}\\vspace{2pt}\n"
+             + "{\\tiny\\color{gray} the two controls blank until they land: trained on the new nominal 19.25 (the new "
+               "mesh), with no W (" + now_[0] + ") and with the mean field in place of the graph (" + mf_[0] + ")\\par}" + S.SEC_GAP
+             + S.head("training") + S.rows([("updates", f"{rep.get('iters', 0):,} (horizons {stg[0][0]}..{stg[-1][0]})" if stg else "--"),
+                                         ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"),
+                                         ("weights", f"{rep.get('n_params', 0):,}")]))
+    out.append((f"19_run_{run}", S.frame(f"batch {num}: the free rollout of the whole 2 h, recorded left, learned right",
+                                         f"\\playmovie{{Movies/{run}}}", right, f"log/training/zapbench/{run}",
+                                         left_gap=True, deck_title=dt)))
+    # the modulation Omega_i(t) beside the recorded activity, x4 (tools/exp17_modulation.py)
+    if os.path.exists(os.path.join(res, "movie_omega.mp4")):
+        subprocess.run([TR_._ffmpeg(), "-y", "-loglevel", "error", "-i", os.path.join(res, "movie_omega.mp4"), "-vf",
+                        "setpts=PTS/4", "-r", "25", "-an", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                        os.path.join(PRES, "Movies", f"{run}_omega.mp4")], check=True)
+        shutil.copy(os.path.join(res, "movie_omega.png"), os.path.join(PRES, "Movies", f"{run}_omega.png"))
+        O_ = np.load(os.path.join(res, f"{run}_omega.npz"))["omega"].astype(np.float32)
+        mt_ = O_.mean(1)
+        right_om = (S.head("the learned modulation $\\Omega_i(t)$")
+                    + "{\\scriptsize each neuron's message sum is multiplied by $\\Omega_i(t) = 1 + f(x_i, y_i, z_i, t)$, "
+                      "$f$ a SIREN of the position and the absolute time; 1 = no modulation, 0 = no input from the "
+                      "network at that frame\\par}\\vspace{6pt}\n"
+                    + S.rows([("mean over all", f"{O_.mean():.2f}"),
+                              ("5th-95th pct", f"{np.percentile(O_, 5):.2f} .. {np.percentile(O_, 95):.2f}"),
+                              ("brain mean over time", f"{mt_.min():.2f} .. {mt_.max():.2f}"),
+                              ("below 1", f"{100 * (O_ < 1).mean():.1f} \\% of neuron-frames")])
+                    + "{\\tiny\\color{gray} the movie's 800 frames over the 2 h, 4x; left the recorded dF/F, right "
+                      "$\\Omega$ per neuron, one colour scale centred on 1\\par}\n")
+        out.append((f"19_omega_{run}", S.frame("the learned modulation of the messages", f"\\playmovie{{Movies/{run}_omega}}",
+                                               right_om, "tools/exp17_modulation.py", left_gap=True,
+                                               deck_title=dt + " $\\cdot$ modulation")))
+    # the learned constants on the brain (tools/exp17_param_maps.py)
+    jm_ = os.path.join(EXP, "data", f"param_maps_{run}.json")
+    if os.path.exists(jm_):
+        P_ = json.load(open(jm_))
+
+        def r3(k_, f_="{:.3g}"):
+            return f"{f_.format(P_[k_]['median'])} ({f_.format(P_[k_]['p2'])} .. {f_.format(P_[k_]['p98'])})"
+        tb_ = P_["tau_bounds"]
+        right_pm = (S.head("the learned constants")
+                    + "{\\scriptsize each neuron coloured by its own learned value, from above and from the side; median "
+                      "(2nd .. 98th percentile)\\par}\\vspace{4pt}\n"
+                    + S.rows([("$\\tau$, s", r3("tau_s")),
+                              (f"$\\tau$ at {tb_[0]:.0f} s", f"{100 * P_['frac_tau_at_floor']:.1f} \\%"),
+                              (f"$\\tau$ at {tb_[1]:.0f} s", f"{100 * P_['frac_tau_at_ceiling']:.1f} \\%"),
+                              ("rest $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
+                              ("W in $<$ 0", f"{100 * P_['frac_W_in_negative']:.1f} \\%"),
+                              ("inputs", f"{P_['n_masked']:,} of {P_['n']:,}")])
+                    + "{\\tiny\\color{gray} $\\tau$ bounded to [" + f"{tb_[0]:.0f}, {tb_[1]:.0f}" + "] s; $V$ in dF/F; W "
+                      "the signed sum over the edge sets into the neuron (the messages then scaled by $\\Omega$); $B$ used "
+                      "only inside the input mask\\par}\n")
+        out.append((f"19_params_{run}", S.frame_narrow("the learned constants on the brain", f"figs/param_maps_{run}.png",
+                                                       right_pm, f"tools/exp17_param_maps.py {run}", left=0.76,
+                                                       deck_title=dt + " $\\cdot$ tau, V, W, B")))
+    # tau by region (tools/exp17_tau_regions.py)
+    jt_ = os.path.join(EXP, "data", f"tau_regions_{run}.json")
+    if os.path.exists(jt_):
+        T_ = json.load(open(jt_))
+        pr_ = T_["per_region"]
+        srt = sorted(pr_.items(), key=lambda kv: kv[1]["median"])
+        right_t = (S.head("$\\tau$ by brain region")
+                   + "{\\scriptsize each neuron's learned leak time constant $\\tau$ (bounded to [1, 100] s), grouped by "
+                     "its atlas region (the most specific of the table's), head to tail\\par}\\vspace{6pt}\n"
+                   + S.head("what it shows")
+                   + "{\\scriptsize\\raggedright The regions differ: they explain " + f"{100 * T_['eta2_log_tau_by_region']:.0f}"
+                   + " \\% of the variance of log $\\tau$ (shuffled labels: " + f"{100 * T_['eta2_shuffled_max']:.2f}" + " \\%). "
+                     "Fastest: " + ", ".join(f"{k} ({v['median']:.1f} s)" for k, v in srt[:3])
+                   + "; slowest: " + ", ".join(f"{k} ({v['median']:.0f} s)" for k, v in srt[::-1][:3])
+                   + "; the brain's median " + f"{T_['brain_median']:.1f}" + " s. The hindbrain is fast, the diencephalon "
+                     "and the torus slow.\\par}\\vspace{6pt}\n"
+                   + S.head("a caveat")
+                   + "{\\scriptsize\\raggedright The input neurons are fast (median " + f"{T_['median_input_neurons']:.1f}"
+                   + " s against " + f"{T_['median_other_neurons']:.1f}" + " s for the others): a region full of input "
+                     "neurons (the pretectum) is fast partly for that.\\par}")
+        out.append((f"19_tau_{run}", S.frame_narrow("the learned time constants, region by region", f"figs/tau_regions_{run}.png",
+                                                    right_t, f"tools/exp17_tau_regions.py {run}", left=0.74,
+                                                    deck_title=dt + " $\\cdot$ tau by region")))
+    # the edge weights on one scale (tools/exp17_edges.py --amplitude)
+    ja_ = os.path.join(PRES, "figs", f"edges_amp_{run}.json")
+    if os.path.exists(ja_):
+        A_ = json.load(open(ja_))
+        c_ = A_["counts"]
+        sk_ = [k for k in ("short", "mid", "long") if k + "+" in c_ and c_[k + "+"] + c_[k + "-"] > 0]
+        lbl_ = {"short": "short (6 nearest)", "mid": "mid ($\\pm$32 \\textmu m)", "long": "long ($\\pm$128 \\textmu m)"}
+        right_e = (S.head("strongest edges: one |W| cut for all sets")
+                   + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
+                     "edge set & W $>$ 0 & W $<$ 0 & W $>$ 0 share \\\\\n\\hline\n"
+                   + "".join(f"{lbl_[k]} & {c_[k + '+']:,} & {c_[k + '-']:,} & "
+                             f"{100 * c_[k + '+'] / max(c_[k + '+'] + c_[k + '-'], 1):.0f} \\% \\\\\n" for k in sk_)
+                   + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                   + f"{{\\tiny\\color{{gray}} the {A_['pooled_top']:,} largest |W| of all {A_['n_edges']:,} edges, "
+                     f"$|W| \\geq$ {A_['cut']:.3g}; one colour range for every panel; rows: W $>$ 0 from above and from the "
+                     "side, W $<$ 0 from above and from the side\\par}\n")
+        out.append((f"19_edges_{run}", S.frame_narrow("edge weights on one scale", f"figs/edges_amp_{run}.png", right_e,
+                                                      "tools/exp17_edges.py --amplitude", left=0.69,
+                                                      deck_title=dt + " $\\cdot$ edge weights")))
+    # the mean-field control, PREPARED (Cedric, 2026-10-07): the table's controls blank until 19.40 / 19.41 land
+    m_full = S.bm_metrics(lines[0][1])
+    l_full = S.local_r(lines[0][1], "zapbench_destripe")
+    m_w0 = S.bm_metrics(lines[1][1])
+    l_w0 = S.local_r(lines[1][1], "zapbench_destripe")
+    rows_mf = (f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{num} graph}}}} & {S.qv(m_full['r'], big=True)} & "
+               f"{S.qv(l_full['mean'], big=True)} $\\pm$ {l_full['sd']:.2f} \\\\\n"
+               f"{num}, W = 0 at inference & {S.qv(m_w0['r'])} & {S.qv(l_w0['mean'])} $\\pm$ {l_w0['sd']:.2f} \\\\\n"
+               f"{mf_[0]} mean field & -- & -- \\\\\n{now_[0]} no W & -- & -- \\\\\n")
+    right_mf = (S.head("the mean-field control, 2 h free rollout")
+                + "{\\scriptsize\\raggedright\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
+                  "& brain-mean r & per-neuron r, removed, mean $\\pm$ SD \\\\\n\\hline\n" + rows_mf
+                + "\\end{tabular}\\par}\\vspace{3pt}\n"
+                + "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$, one weight per edge; mean field: "
+                  "$m_i = a_i\\,\\langle\\tanh z\\rangle$, one gain per neuron; no W: $m_i = 0$, so $\\Omega$ (which "
+                  "scales $m_i$) has nothing to act on.\\par}" + S.SEC_GAP
+                + S.head("pending")
+                + "{\\scriptsize\\raggedright The two controls train on the new nominal 19.25 (the new mesh): " + now_[0]
+                + " (no W) and " + mf_[0] + " (mean field), submitted 2026-10-07, about 10 h each. Then the bars and the "
+                  "paired block-bootstrap tests (tools/exp17\\_meanfield\\_stats.py), as batch 15.17's slide.\\par}")
+    out.append((f"19_meanfield_{run}", S.frame_wide("the mean-field control",
+                                                   "\\vspace*{0.04\\textheight}\\begin{columns}[t,onlytextwidth]\n"
+                                                   "\\begin{column}{0.50\\textwidth}\\centering\\vspace*{0.22\\textheight}"
+                                                   "{\\large\\color{gray} the bars and the tests,\\\\ once " + now_[0] + " and "
+                                                   + mf_[0] + " land}\\par\\end{column}\n"
+                                                   "\\begin{column}{0.46\\textwidth}\\fitcol{%\n" + right_mf
+                                                   + "}\\end{column}\n\\end{columns}",
+                                                   "tools/exp17_meanfield_stats.py (pending)",
+                                                   deck_title=dt + " $\\cdot$ the mean-field control: is the coupling network dynamics?")))
+    return out
+
+
 def write_slides():
     """slides_b19/*.tex and all.tex from data/b19_graphs.json and the movies (the first deck's frames and fonts)."""
     import exp17_slides as S
@@ -1046,6 +1213,7 @@ def write_slides():
                                                  deck_title="the model $\\cdot$ the variants: two known ODEs and two GNN-MLPs")))
     # Cedric, 2026-10-07: an appendix, its title slide as the first deck's slide 66, then the first deck's slide-8 look
     # (the forecast error step by step, panel a) for the held-out runs against ZAPBench (batch 20) that have landed
+    deck += slides_run19(S)                  # Cedric, 2026-10-07: 19.20's results, the first deck's slides 12-17
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     from PIL import Image
