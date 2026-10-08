@@ -653,15 +653,16 @@ def write_slides():
                "\\par}\\vspace{8pt}\n")
     cap3 = ("{\\tiny\\color{gray} built up: the neurons, then level by level: fine light blue, middle green, "
             "coarse orange, the coarser wider\\par}")
+    # Cedric, 2026-10-07: the 3-D build movies (slides 15, 17) moved down to the middle of the slide
     deck = [("01_grid_3d", S.frame("the lattice grid on the destriped neurons, built up",
-                                   "\\playmovie{Movies/b19_grid_3d_build}", tot_g + right_g + cap3,
+                                   "\\vspace*{0.16\\textheight}\\playmovie{Movies/b19_grid_3d_build}", tot_g + right_g + cap3,
                                    "tools/exp17_b19_deck.py (StateDiffuseGraphCast.mesh)",
                                    deck_title="the lattice grid, 3 levels")),
             ("02_grid_window", S.frame("the lattice grid in a 256-um window, built up",
                                        "\\playmovie{Movies/b19_grid_window_build}", tot_g + right_g + cap3,
                                        "tools/exp17_b19_deck.py", deck_title="the lattice grid, a window")),
             ("03_tri_3d", S.frame("the triangular multi-level mesh on the destriped neurons, built up",
-                                  "\\playmovie{Movies/b19_tri_3d_build}", tot_t + right_t + cap3,
+                                  "\\vspace*{0.16\\textheight}\\playmovie{Movies/b19_tri_3d_build}", tot_t + right_t + cap3,
                                   "tools/exp17_b19_deck.py (cell_ops.neuron_mesh_levels)",
                                   deck_title="the triangular mesh, 3 levels")),
             ("04_tri_window", S.frame("the triangular mesh in a 256-um window, built up",
