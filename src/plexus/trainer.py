@@ -746,6 +746,21 @@ def rollout(sim, learn, u, task, device="cpu", grad=True, watch=None):
     The trace is the observed set's element 0 at the end of every tick, trial-major like the
     corpus: [T, w] or [B, T, w]. `watch(H)` is called at the same moment, for a caller that needs
     more of the state than the observable (the analysis reads the voltages).
+
+    THE CLOCK IS A RECURRENT NETWORK'S: h_k = f(h_{k-1}, u_k), y_k = g(h_k) -- trace frame k has seen
+    the drive up to and including u_k, and no further. Two engine facts make that take care:
+      - `on_frame` fires at the END of a tick, after its step, so a drive written there is read by
+        the NEXT tick. u_0 is therefore written at `on_ready` (after the batch axis exists, before
+        tick 0) and u_{k+1} at the end of tick k. Writing u_k at the end of tick k -- as this did
+        until 2026-10-08 -- made tick 0 step on the seeded drive (0) and every later tick on the
+        previous frame's input.
+      - a block the engine does not integrate (`integration: none`, e.g. `readout`'s `into:`) is
+        written IN PLACE during the tick, from the state BEFORE that tick's step: at the end of tick
+        k it describes the state of frame k-1. Its trace is read one hook later (frame 0 dropped),
+        so that it describes the same step as the integrated blocks of frame k.
+    The cost of the old clock was measured on the HD twin with the reference's trained weights
+    transplanted (tools/hd_transplant_check.py): heading RMSE 2.09 deg instead of the reference's
+    1.50 deg over 512 held-out trials -- the input two 10-ms frames late, at turns of ~150 deg/s.
     """
     drv, obs = task["drive"], task["observe"]
     ch_all = int(obs.get("channel", 0)) if obs.get("elements") == "all" else None
@@ -754,23 +769,36 @@ def rollout(sim, learn, u, task, device="cpu", grad=True, watch=None):
         u = u[0]
     trace = []
 
+    def ready(H):
+        learn.ready(H)
+        write_drive(H, 0, u, drv["set"], drv["block"])     # u_0, read by tick 0
+
     def hook(H, frame):
-        write_drive(H, frame, u, drv["set"], drv["block"])
         v_ = H.level(obs["set"]).get(obs["block"])
         # `observe.elements: all` (the two-eye task, Cedric 2026-10-08): channel `channel` of EVERY element, one
         # column per element, scored column for column against the corpus's targets; otherwise element 0, all channels
         trace.append(v_[..., :, ch_all].clone() if ch_all is not None else v_[..., 0, :].clone())
         if watch is not None:
             watch(H)
+        write_drive(H, frame + 1, u, drv["set"], drv["block"])   # u_{k+1}, read by tick k+1
 
     # `on_ready` hands every {param:, op:} learnable to its operator instance (`Learnables.ready`), as
     # the recording trainer does; a spec with none is unaffected (exp18's broadcast angles needed it).
     H, _ = engine.run(sim, device=device, progress=False, grad=grad, on_frame=hook,
-                      batch=batch, on_seeded=learn.inject, on_ready=learn.ready)
+                      batch=batch, on_seeded=learn.inject, on_ready=ready)
     if not trace:
         return H, None
     y = torch.stack(trace)
+    if _written_in_place(H, obs):
+        y = y[1:]
     return H, y.transpose(0, 1) if batch > 1 else y
+
+
+def _written_in_place(H, obs) -> bool:
+    """True when the observed block is not engine-integrated, so its value at the end of tick k was computed from the
+    state before tick k's step (`rollout`)."""
+    blk = next((b for b in H.level(obs["set"]).state_schema.blocks if b.name == obs["block"]), None)
+    return blk is not None and blk.integration == "none"
 
 
 def _mse(y, target, ch):

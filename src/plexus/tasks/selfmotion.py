@@ -53,3 +53,4 @@ def heading(u, dt, **_):
 
 
 heading.n_targets = lambda channels, **_: 2
+heading.poles = lambda dt, **_: np.array([0.0])                      # theta is the integral of omega: one pole at s = 0

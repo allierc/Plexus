@@ -5,7 +5,9 @@ The reference's trained network (connectome-gnn-cx run zebrafish_hd_si_ipn_917_v
 checkpoint; its own test: 2.08 +- 1.15 deg heading RMSE over 512 trials) is copied into the Plexus model
 config/neural/zf_hd_917.yaml, parameter for parameter, and both are rolled out on the same held-out trials of the
 Plexus corpus t8_hd_heading. If the twin is the same law, the two decoded headings agree to float precision and both
-score ~2 deg against the corpus's teacher.
+score ~2 deg against the corpus's teacher. (The first run, 2026-10-08, found trainer.rollout feeding the drive two
+frames late: 2.09 deg for the twin against 1.50 deg for the reference; fixed in trainer.rollout the same day, and the
+two now agree to float precision -- the tool stops if they differ by more than 1e-4.)
 
 THE REFERENCE LAW (connectome-gnn-cx models/zebrafish_hd_task_rnn.py, `forward`), written out here, not imported:
     h <- h + (dt / tau) (-h + W_rec sigma(h) + W_in u_t + b),   y_t = W_out sigma(h)[ring] + b_out,   h_0 = 0
@@ -144,26 +146,13 @@ def main(n=512, device="cuda:0"):
     W_in[:, 0] = gate
     b, W_out, b_out = sd["b"].to(dev), sd["W_out"].to(dev), sd["b_out"].to(dev)
 
-    def ref_law(plexus_timing):
-        """The reference law -> [n, T, 2]. Its own timing: h_{t+1} = step(h_t, u_t), y_t = readout(h_{t+1}). The
-        Plexus corpus timing (trainer.rollout): the drive is written at the END of tick k (`on_frame`), so tick 0
-        steps on the seeded drive (0) and tick k on u_{k-1}; the readout runs inside the tick, on the state before
-        that tick's integration, so trace frame k = readout(x_k)."""
-        h = torch.zeros(n, N, device=dev)
-        ys = []
-        with torch.no_grad():
-            for t in range(U.shape[1] + (1 if plexus_timing else 0)):
-                if plexus_timing:
-                    ys.append(torch.sigmoid(h[:, :N_RING]) @ W_out.T + b_out)
-                    u_t = U[:, t - 1] if t >= 1 else torch.zeros_like(U[:, 0])
-                else:
-                    u_t = U[:, t]
-                h = h + (0.01 / TAU) * (-h + torch.sigmoid(h) @ W_rec.T + u_t @ W_in.T + b)
-                if not plexus_timing:
-                    ys.append(torch.sigmoid(h[:, :N_RING]) @ W_out.T + b_out)
-        return torch.stack(ys, 1).cpu().numpy()
-
-    y_ref, y_emu = ref_law(False), ref_law(True)
+    h = torch.zeros(n, N, device=dev)
+    y_ref = []
+    with torch.no_grad():                               # the reference's clock: h_{t+1} = step(h_t, u_t), y_t = g(h_{t+1})
+        for t in range(U.shape[1]):
+            h = h + (0.01 / TAU) * (-h + torch.sigmoid(h) @ W_rec.T + U[:, t] @ W_in.T + b)
+            y_ref.append(torch.sigmoid(h[:, :N_RING]) @ W_out.T + b_out)
+    y_ref = torch.stack(y_ref, 1).cpu().numpy()
 
     # --- the twin with the transplanted parameters, through the trainer's own rollout
     sim = T._model(spec, train=False)
@@ -173,20 +162,18 @@ def main(n=512, device="cuda:0"):
         _, Yp = T.rollout(sim, learn, U, spec["task"], device, grad=False)
     y_pl = Yp.cpu().numpy()                                                 # [n, T(+1), 2]
 
-    Tn = min(y_pl.shape[1], y_emu.shape[1])
-    d_emu = float(np.abs(y_pl[:, :Tn] - y_emu[:, :Tn]).max())
     T0 = theta.shape[1]
-    r_ref, r_emu, r_pl = rmse_deg(y_ref, theta), rmse_deg(y_emu[:, :T0], theta), rmse_deg(y_pl[:, :T0], theta)
-    print(f"[the law] twin vs the reference law run with the trainer's timing: max |y_twin - y_ref| over (cos, sin), "
-          f"all {n} trials x {Tn} frames = {d_emu:.2e}")
+    d = float(np.abs(y_pl[:, :T0] - y_ref).max())
+    r_ref, r_pl = rmse_deg(y_ref, theta), rmse_deg(y_pl[:, :T0], theta)
+    print(f"[the law] max |y_twin - y_ref| over (cos, sin), all {n} trials x {T0} frames = {d:.2e}")
     print(f"[heading RMSE, {n} held-out trials of t8_hd_heading, wrapped, after {WARMUP} frames]")
-    print(f"  reference law, its own timing           {r_ref.mean():.2f} +- {r_ref.std():.2f} deg   "
+    print(f"  reference law                         {r_ref.mean():.2f} +- {r_ref.std():.2f} deg   "
           f"(its own test: 2.08 +- 1.15 deg over 512 trials of its corpus)")
-    print(f"  reference law, the trainer's timing     {r_emu.mean():.2f} +- {r_emu.std():.2f} deg")
-    print(f"  twin, transplanted (trainer.rollout)    {r_pl.mean():.2f} +- {r_pl.std():.2f} deg")
-    out = {"n_trials": n, "max_abs_diff_twin_vs_ref_trainer_timing": d_emu,
-           "rmse_ref_own_timing_deg": [float(r_ref.mean()), float(r_ref.std())],
-           "rmse_ref_trainer_timing_deg": [float(r_emu.mean()), float(r_emu.std())],
+    print(f"  twin, transplanted (trainer.rollout)  {r_pl.mean():.2f} +- {r_pl.std():.2f} deg")
+    if d > 1e-4:
+        raise SystemExit(f"the twin is not the reference law: max |y_twin - y_ref| = {d:.2e}")
+    out = {"n_trials": n, "max_abs_diff_twin_vs_ref": d,
+           "rmse_ref_deg": [float(r_ref.mean()), float(r_ref.std())],
            "rmse_twin_deg": [float(r_pl.mean()), float(r_pl.std())], "gate_per_deg_s": [gl, gr]}
     res = os.path.join(T.out_dir(spec), "results")
     os.makedirs(res, exist_ok=True)
