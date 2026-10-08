@@ -38,18 +38,29 @@ def constants(name):
     op = neuron_graph_op(spec, "cpu")
     N = op.n_elements
     w_in = np.zeros(N)
+    jp = os.path.join(EXP, "data", f"prune_{name}.json")       # the per-level thresholds of tools/exp17_prune.py
+    prune_th = json.load(open(jp)).get("thresholds", {}) if os.path.exists(jp) else {}
     for e in spec["learnable"]:
         p = str(e.get("param", ""))
         if p.startswith("W_") and p[2:] in getattr(op, "_E", {}):   # the lattice grid's W_grid is on grid edges: no W in
             snd, rcv = (t.cpu().numpy() for t in op._E[p[2:]])
-            np.add.at(w_in, rcv, fit[T.Learnables.key(e)].float().numpy().reshape(-1))
+            w_ = fit[T.Learnables.key(e)].float().numpy().reshape(-1)
+            if p[2:] in prune_th:                       # AFTER PRUNING (Cedric, 2026-10-08): the near-0 edges removed
+                w_ = np.where(np.abs(w_) < prune_th[p[2:]], 0.0, w_)
+            np.add.at(w_in, rcv, w_)
     m_ = op.input_mask.cpu().numpy() if op.input_mask is not None else np.ones(N, bool)
     mask = (m_.reshape(N, -1) != 0).any(1)        # a per-feature mask [N, F] (mask_by_input): an input on any feature
     # tau through the law's own rate: the bound [rate_min, rate_max] when the run declares one (15.18, 2026-10-06)
     tau_s = FRAME_S / op._rate(fit["neuron.tau"].float()).detach().numpy().reshape(-1)
     lo_, hi_ = getattr(op, "rate_min", None), getattr(op, "rate_max", None)
     bounds = (FRAME_S / hi_, FRAME_S / lo_) if lo_ and hi_ else None          # tau's allowed range, s
-    return {"tau_s": tau_s, "tau_bounds": bounds,
+    # the lattice grid has no per-neuron incoming W (its weights sit on grid edges): its per-neuron coupling is the signed
+    # output a_j (A_send), drawn in W's place (Cedric, 2026-10-08: the panel was all white)
+    w_lab = "summed W into the neuron" + (", after pruning" if prune_th else "")
+    if not w_in.any() and "state_diffuse.A_send" in fit:
+        w_in = fit["state_diffuse.A_send"].float().numpy().reshape(-1)
+        w_lab = "each neuron's signed output a$_j$ (lattice grid)"
+    return {"w_label": w_lab, "tau_s": tau_s, "tau_bounds": bounds,
             "V": fit["neuron.rest"].float().numpy().reshape(-1) * sd + mu, "W_in": w_in,
             "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask,
             "pos": np.asarray(rec["pos_um"], np.float64)}
@@ -85,10 +96,13 @@ def render(name):
     FH = 2 * RH
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
     lo_t, hi_t = c["tau_bounds"] or np.percentile(c["tau_s"], [2, 98])   # a bounded tau: the colour bar IS the bound
-    wl = np.percentile(np.abs(c["W_in"]), 98)
+    wl = np.percentile(np.abs(c["W_in"]), 95)
+    from matplotlib.colors import LinearSegmentedColormap
+    BKR = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])
     panels = [("a   leak time constant $\\tau$, s", c["tau_s"], "RdBu", Normalize(lo_t, hi_t)),   # linear, red fast / blue slow (Cedric, 2026-10-08)
               ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
-              ("c   summed W into the neuron (blue < 0 < red)", c["W_in"], "RdBu_r", TwoSlopeNorm(0, -max(wl, 1e-6), max(wl, 1e-6))),   # all 0 on the lattice grid
+              ("c   " + c["w_label"] + " (blue < 0 < red, 0 black)", c["W_in"], BKR,
+               TwoSlopeNorm(0, -max(wl, 1e-6), max(wl, 1e-6))),   # zero black on the black slide (Cedric, 2026-10-08)
               ("d   stimulus weight $|B|$ (input neurons; grey: outside the mask)", c["B_norm"], "inferno",
                Normalize(*np.percentile(c["B_norm"][c["mask"]], [2, 98])))]
     stats = {}
