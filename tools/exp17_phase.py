@@ -100,7 +100,7 @@ def main():
     t = (np.arange(g0, g1) - g0) * DT / 60
     Xg = np.asarray(z["dff"][g0:g1][:, ii], np.float32)
 
-    from exp17_artr import twin_figure, smooth3, zs
+    from exp17_artr import twin_figure, smooth3, zs, region_rows
     Zm = smooth3(zs(Xg))                                 # each neuron's dF/F over the window, z, the 3-frame mean
     is_red = np.cos(dphi[ii]) < 0
     stim = np.asarray(z["stimulus"][g0:g1, COL], np.float32)
@@ -108,10 +108,11 @@ def main():
           (Zm[:, ~is_red].mean(1), "#3a6bff", f"blue, mostly right ({int((~is_red).sum()):,})")]
     marks = [(0.0, "open loop")] + [((int(off[bn.index(b)]) - g0) * DT / 60, b) for b in ("rotation", "dark")]
 
+    rows_ = region_rows(reg, names, ii, is_red)
+
     def build():
-        return twin_figure(A, ins, ii, base, t, tr, stim, marks,
-                           f"every neuron whose dF/F follows the rotation's 60-s period: {sig.sum():,} of the whole brain, "
-                           "coloured by its phase")
+        return twin_figure(A, ins, ii, base, t, tr, stim, marks, Z=Zm, rows=rows_,
+                           caption="")
     fig, _, _ = build()
     fig.savefig(os.path.join(EXP, "presentation", "figs", "phase_rotation.png"), dpi=130, facecolor="black")
     plt.close(fig)

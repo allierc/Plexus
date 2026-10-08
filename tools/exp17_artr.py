@@ -154,11 +154,12 @@ def main():
           (Zc[:, len(cL):].mean(1), "#3a6bff", f"blue, ARTR right ({len(cR)})")]
     marks = [(0.0, "open loop")] + [((blocks[b][0] - int(round(SKIP_S / DT)) - f0) * DT / 60, b) for b in ("rotation", "dark")]
 
+    rows_ = region_rows(reg, names, cells, np.arange(len(cells)) < len(cL))
+
     def build():
-        return twin_figure(A, za["inside"], cells, base, t, tr, stim, marks,
-                           f"the ARTR: {len(cL) + len(cR)} cells of rhombomeres 1-3, the 100 per side that best follow left - "
-                           "right, picked on the dark and on the rotation block")
-    fig, scs, bar = build()
+        return twin_figure(A, za["inside"], cells, base, t, tr, stim, marks, Z=Zc, rows=rows_,
+                           caption="")
+    fig, scs, _ = build()
     fig.savefig(os.path.join(EXP, "presentation", "figs", "artr.png"), dpi=130, facecolor="black")
     plt.close(fig)
     if "--movie" in sys.argv:
@@ -172,44 +173,110 @@ def smooth3(Z):
     return np.r_[m[:1], m, m[-1:]]
 
 
-def twin_figure(A, ins, cells, rgb, t, traces, stim, marks, caption, t0=10.0):
+def region_rows(reg, names, cells, is_red, nbin=600):
+    """The raster's rows (Cedric, 2026-10-07: "a raster of the selected cells, partitioned by region"): each cell's most
+    specific atlas table region (exp17_atlas.REGIONS, the fewest neurons), regions head to tail, red cells before blue
+    within a region, unplaced cells last ('other'). Returns the order (into cells), the [(region, first row, end row)]
+    segments, and the bin size (rows averaged in bins of that many consecutive cells when there are more than nbin)."""
+    from exp17_atlas import REGIONS
+    rl = [(f, s_) for f, s_ in REGIONS if f in names]
+    lab = np.full(len(cells), len(rl))
+    best = np.full(len(cells), np.inf)
+    for k, (full, _) in enumerate(rl):
+        m = reg[cells, names.index(full)]
+        nk = reg[:, names.index(full)].sum()
+        upd = m & (nk < best)
+        lab[upd], best[upd] = k, nk
+    order = np.lexsort((~is_red, lab))
+    shorts = [s_ for _, s_ in rl] + ["other"]
+    segs, k0 = [], 0
+    for k in range(len(shorts)):
+        n_ = int((lab == k).sum())
+        if n_:
+            segs.append((shorts[k], k0, k0 + n_))
+            k0 += n_
+    return order, segs, max(1, int(np.ceil(len(cells) / nbin)))
+
+
+def twin_figure(A, ins, cells, rgb, t, traces, stim, marks, caption, Z=None, rows=None, t0=10.0):
     """The twin layout of the deck's ARTR and phase slides (Cedric, 2026-10-07: "just the oscillation traces, the two
-    slides twins"): top row the fish from above (head left) and from the side (dorsal up), the cells drawn in rgb over
-    every neuron in grey; bottom, full width, the traces [(y, colour, label)] against t (min), the rotation direction in
-    orange on top, from t0 min. -> (fig, [the two cell scatters], the time bar, hidden)."""
+    slides twins", then "add a raster of the selected cells, by region"): top row the fish from above (head left) and
+    from the side (dorsal up), the cells drawn in rgb over every neuron in grey; middle the raster of the cells (Z [T, cells],
+    rows = region_rows(...)), a red / blue strip for each row's group and the regions' names at its left; bottom the
+    traces [(y, colour, label)] against t (min), the rotation direction in orange on top; time from t0 min.
+    -> (fig, [the two cell scatters], [the time bars, hidden])."""
     import matplotlib.pyplot as plt
     plt.style.use("dark_background")
     fig = plt.figure(figsize=(15, 8.4), facecolor="black")
     xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
     scs = []
-    for rect, Y, ttl in (([0.01, 0.42, 0.49, 0.53], yd, "from above, head left"),
-                         ([0.51, 0.42, 0.48, 0.53], A[:, 2], "from the side")):
+    for rect, Y, ttl in (([0.01, 0.62, 0.49, 0.37], yd, "from above, head left"),
+                         ([0.51, 0.62, 0.48, 0.37], A[:, 2], "from the side")):
         a = fig.add_axes(rect)
         a.scatter(xd[ins], Y[ins], s=0.08, color="0.22", lw=0, rasterized=True)
         scs.append(a.scatter(xd[cells], Y[cells], s=3 if len(cells) > 2000 else 9, c=rgb, lw=0, rasterized=True))
         a.set_aspect("equal")
         a.axis("off")
-        a.text(0.02, 0.95, ttl, transform=a.transAxes, fontsize=11)
+        a.text(0.02, 0.97, ttl, transform=a.transAxes, fontsize=11)
     a.plot([np.percentile(xd, 99) - 100, np.percentile(xd, 99)], [np.percentile(A[:, 2], 0.5) - 20] * 2, color="w", lw=2)
     a.text(np.percentile(xd, 99) - 50, np.percentile(A[:, 2], 0.5) - 28, "100 µm", ha="center", va="top", fontsize=9)
-    fig.text(0.02, 0.405, caption, fontsize=10, color="0.85")
-    at = fig.add_axes([0.06, 0.08, 0.92, 0.27])
+    if caption:                                          # none on the deck's twins (Cedric, 2026-10-07: it overlays the names)
+        fig.text(0.02, 0.605, caption, fontsize=10, color="0.85")
+    X0, X1 = 0.17, 0.98
+    bars = []
+    on = t >= t0
+    if Z is not None:
+        order, segs, kb = rows
+        Zo = Z[:, order][on]
+        nb = int(np.ceil(Zo.shape[1] / kb))
+        img = np.nanmean(np.pad(Zo, ((0, 0), (0, nb * kb - Zo.shape[1])), constant_values=np.nan)
+                         .reshape(len(Zo), nb, kb), 2).T
+        ar = fig.add_axes([X0, 0.30, X1 - X0, 0.28])
+        vm = float(np.percentile(img, 99))
+        ar.imshow(img, aspect="auto", cmap="gray", vmin=-0.3 * vm, vmax=vm, extent=(t0, t[-1], nb, 0),
+                  interpolation="nearest")
+        ar.set_xticklabels([])
+        ar.set_yticks([])
+        gs = fig.add_axes([X0 - 0.008, 0.30, 0.006, 0.28])
+        gr = np.asarray(rgb)[order][::kb][:nb]
+        gs.imshow(gr[:, None, :3], aspect="auto", extent=(0, 1, nb, 0), interpolation="nearest")
+        gs.axis("off")
+        H = 0.28
+        want = np.array([0.30 + H * (1 - (r0 + r1) / 2 / kb / nb) for _, r0, r1 in segs])
+        ys = want.copy()
+        gap_ = min(0.019, (H - 0.012) / max(len(segs) - 1, 1))
+        for _ in range(300):                              # the names spread where small regions crowd (as exp17_atlas)
+            for k in range(1, len(ys)):
+                if ys[k - 1] - ys[k] < gap_:
+                    mid = (ys[k - 1] + ys[k]) / 2
+                    ys[k - 1], ys[k] = mid + gap_ / 2, mid - gap_ / 2
+        ys += min(0.0, 0.30 + H - 0.005 - ys.max())     # kept beside the raster: first under its top,
+        ys += max(0.0, 0.30 + 0.005 - ys.min())          # then above its bottom
+        for (name, r0, r1), y_, w_ in zip(segs, ys, want):
+            ar.axhline(r0 / kb, color="0.55", lw=0.4)
+            fig.text(X0 - 0.03, y_, f"{name} ({r1 - r0:,})", fontsize=7.5 if gap_ > 0.015 else 6.5, ha="right", va="center", color="0.85")
+            fig.add_artist(plt.Line2D([X0 - 0.028, X0 - 0.010], [y_, w_], color="0.6", lw=0.5, transform=fig.transFigure))
+        bars.append(ar.axvline(t0, color="white", lw=1.4))
+    at = fig.add_axes([X0, 0.06, X1 - X0, 0.21])
     for y, c, lab in traces:
         at.plot(t, y, color=c, lw=0.9, label=lab)
-    top = max(float(np.max(y[t >= t0])) for y, _, _ in traces)
+    top = max(float(np.max(y[on])) for y, _, _ in traces)
     at.plot(t, top + 0.5 + 0.35 * stim, color="orange", lw=0.9, label="rotation direction")
     for x_, name in marks:
         if x_ >= t0:
             at.axvline(x_, color="0.6", ls="--", lw=0.7)
-        at.text(max(x_, t0) + 0.15, 1.02, name, transform=at.get_xaxis_transform(), fontsize=10)
+            if Z is not None:
+                ar.axvline(x_, color="0.6", ls="--", lw=0.7)
+        (ar if Z is not None else at).text(max(x_, t0) + 0.15, 1.02, name, transform=(ar if Z is not None else at)
+                                           .get_xaxis_transform(), fontsize=10)
     at.set_xlim(t0, t[-1])
     at.set_xlabel("time from the open-loop onset, min", fontsize=10)
-    at.set_ylabel("dF/F, z (group mean)", fontsize=10)
-    at.legend(fontsize=9, frameon=False, loc="lower left", ncol=len(traces) + 1)
-    bar = at.axvline(t0, color="white", lw=1.4)
-    bar.set_visible(False)
-    return fig, scs, bar
-
+    at.set_ylabel("dF/F, z\n(group mean)", fontsize=9)
+    at.legend(fontsize=8.5, frameon=False, loc="lower left", ncol=len(traces) + 1)
+    bars.append(at.axvline(t0, color="white", lw=1.4))
+    for b_ in bars:
+        b_.set_visible(False)
+    return fig, scs, bars
 
 def movie(build, scs_rgb, Zc, n, name="artr", start_min=10.0, fps=30, workers=12, dpi=100):
     """A fish figure as a movie: one frame per recorded frame, each cell's colour scaled by its activity Zc [n, cells]
@@ -225,13 +292,15 @@ def movie(build, scs_rgb, Zc, n, name="artr", start_min=10.0, fps=30, workers=12
     tmp = tempfile.mkdtemp(prefix=f"{name}_movie_")
 
     def run(ids):
-        fig, scs, bar = build()
-        bar.set_visible(True)
+        fig, scs, bars = build()
+        for b_ in bars:
+            b_.set_visible(True)
         for i in ids:
             g = np.clip((Zc[i] + 0.5) / 3.0, 0.08, 1.0)[:, None]
             for sc in scs:
                 sc.set_facecolors(np.c_[scs_rgb * g, np.ones(len(g))])
-            bar.set_xdata([i * DT / 60] * 2)
+            for b_ in bars:
+                b_.set_xdata([i * DT / 60] * 2)
             fig.savefig(os.path.join(tmp, f"{i - i0:05d}.png"), dpi=dpi, facecolor="black")
         plt.close(fig)
     ctx = mp.get_context("fork")
