@@ -541,7 +541,8 @@ def input_fish(path, size=(700, 1150)):
     pl.close()
 
 
-def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf")):
+def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf"), desc=None,
+                 label=None):
     """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
     slide, and prepare slide 17"; 2026-10-08: "make all the slides with 19.25", the new nominal, its controls landed):
     the free rollout with the network test, the modulation Omega, the learned constants, tau by region, the edge
@@ -549,7 +550,7 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
     from plexus.tasks import trace_recording as TR_
     GD_ = os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
     res = os.path.join(GD_, "log", "training", "zapbench", run, "results")
-    rt = S._tex(run)
+    rt = label or S._tex(run)                       # a label in place of the spec name (20.3: not "markall", Cedric)
     dt = f"batch {num} $\\cdot$ {rt}"
     out = []
     if not os.path.exists(os.path.join(res, "movie.mp4")):
@@ -564,7 +565,7 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
     lines = [("full model", os.path.join(res, f"{run}_movie.npz")),
              ("W = 0 at inference", os.path.join(res, f"{run}_W0_movie.npz")),
              ("no stimulus", os.path.join(res, f"{run}_no_stimulus_movie.npz")),
-             (f"no W ({now_[0]})", ctrl(now_[1])), (f"mean field ({mf_[0]})", ctrl(mf_[1]))]
+             ] + ([(f"no W ({now_[0]})", ctrl(now_[1])), (f"mean field ({mf_[0]})", ctrl(mf_[1]))] if now_ else [])
     bm_, loc_ = "", ""
     for lab, f_ in lines:
         big_ = lab == "full model"
@@ -575,16 +576,16 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
         loc_ += lab_t + (f" & {S.qv(l_['mean'], big=big_)} $\\pm$ {l_['sd']:.3f} \\\\\n" if l_ else " & \\\\\n")
     stg = rep.get("stages") or []
     right = (S.head(f"batch {num}: {rt}")
-             + "{\\scriptsize the new nominal: the balanced 20 \\% input mask, every input neuron reading all 22 "
-               "stimulus columns (13 features + 9 condition markers); known ODE on the new mesh (level 0 every neuron, "
+             + "{\\scriptsize " + (desc or "the new nominal: the balanced 20 \\% input mask, every input neuron reading "
+               "all 22 stimulus columns (13 features + 9 condition markers); known ODE on the new mesh (level 0 every neuron, "
                "edges up to 16 \\textmu m; level 1 the 32-\\textmu m cubes; level 2 the 64-\\textmu m cubes), SIREN "
-               "$\\Omega$, $\\tau$ in [1, 100] s, x1 updates\\par}" + S.SEC_GAP
+               "$\\Omega$, $\\tau$ in [1, 100] s, x1 updates") + "\\par}" + S.SEC_GAP
              + S.head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
                "& r & RMSE \\\\\n\\hline\n" + bm_ + "\\end{tabular}\\par}" + S.SEC_GAP
              + S.head("per-neuron r, brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
                "& mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + loc_ + "\\end{tabular}\\par}\\vspace{2pt}\n"
-             + "{\\tiny\\color{gray} the two controls: the new nominal trained from scratch with no W (" + now_[0]
-             + ") and with the mean field in place of the graph (" + mf_[0] + ")\\par}" + S.SEC_GAP
+             + ("{\\tiny\\color{gray} the two controls: the new nominal trained from scratch with no W (" + now_[0]
+                + ") and with the mean field in place of the graph (" + mf_[0] + ")\\par}" if now_ else "") + S.SEC_GAP
              + S.head("training") + S.rows([("updates", f"{rep.get('iters', 0):,} (horizons {stg[0][0]}..{stg[-1][0]})" if stg else "--"),
                                          ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"),
                                          ("weights", f"{rep.get('n_params', 0):,}")]))
@@ -687,7 +688,7 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
     # the mean-field control (Cedric, 2026-10-07; filled 2026-10-08 once 19.40 / 19.41 landed): the bars and the paired
     # block-bootstrap tests from tools/exp17_meanfield_stats.py --n19, in batch 15.17's slide's words
     jm_ = os.path.join(EXP, "data", "meanfield_stats_n19.json")
-    if os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "meanfield_stats_n19.png")):
+    if run == "zap_n19_nom" and os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "meanfield_stats_n19.png")):
         ST_ = json.load(open(jm_))
         L_ = ST_["laws"]
         T_ = {(t["a"], t["b"]): t for t in ST_["tests"]}
@@ -1539,6 +1540,13 @@ def write_slides():
         deck.append(("19_prune_dist", S.frame_narrow("the learned weights, level by level", "figs/prune_zap_n19_nom.png",
                                                      right_pd, "tools/exp17_prune.py zap_n19_nom", left=0.74,
                                                      deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the weights near 0")))
+    # Cedric, 2026-10-08: 20.3's slides -- the lattice grid with each neuron's V_rest per block (the 9 condition markers
+    # read by every neuron, "markall"), its run, modulation, constants and tau by region
+    deck += [x for x in slides_run19(S, run="zap_n20_markall", num="20.3", now_=None, desc=(
+        "the lattice grid (20.1's law) with each neuron's V$_{rest}$ PER BLOCK: every neuron reads the 9 condition "
+        "markers, so its rest gains a learned offset per stimulus block (the 20 \\% input neurons read all 22 "
+        "columns); SIREN $\\Omega$, $\\tau$ in [1, 100] s, x1 updates"),
+        label="V$_{rest}$ per block, lattice grid") if not x[0].startswith("19_edges_")]
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     from PIL import Image

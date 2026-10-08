@@ -2040,6 +2040,18 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
         dz = Fnn.softplus(nb["tau"]) * (-z + nb["rest"] + nb["gain"] * mi + drive - Fnn.softplus(nb["adapt_gain"]) * ad)
         return sd * dz, Fnn.softplus(nb["adapt_rate"]) * (z - ad)
 
+    def _rest_now(self, nb):
+        """V_REST PER BLOCK: nb with `rest` the element's V_i plus its offset for the block playing at self.frame (the
+        `rest_block` column of that block), `rest_block` consumed."""
+        import numpy as np
+        nb_ = len(self._rb_offsets) - 1
+        k_ = min(max(int(np.searchsorted(self._rb_offsets, int(self.frame), side="right") - 1), 0), nb_ - 1)
+        if nb["rest_block"].shape[1] != nb_:
+            raise ValueError(f"state_diffuse: `rest_block` is {nb['rest_block'].shape[1]} wide, the recording has {nb_} blocks")
+        nb = dict(nb)
+        nb["rest"] = nb["rest"] + nb.pop("rest_block")[:, k_:k_ + 1]
+        return nb
+
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         b0, b1 = lvl.state_schema[self.block]
@@ -2054,6 +2066,8 @@ class StateDiffuseKnownODE(StateDiffuseConnectome):
             for k, name in {"adapt": self.adapt, **self.adapt_blocks}.items():
                 c0, c1 = lvl.state_schema[name]
                 nb[k] = lvl.state[:, c0:c1]
+        if getattr(self, "_rb_offsets", None) is not None:    # V_rest per block: the frame's block's offset on the rest
+            nb = self._rest_now(nb)
         u = None
         if self.forcing:
             fl = H.level(self.forcing[0])
@@ -2217,6 +2231,9 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
                    "w_init_sd": "a Gaussian spread added to every edge weight's start, drawn from the op's seed (0 = "
                                 "none): seeds then start from different W, not only a different sampling order",
                    "mod_context": "none (default) or block: the SIREN also reads a one-hot of the stimulus block",
+                   "rest_per_block": "true: each element's rest V_i gains its own learned offset per stimulus block "
+                                     "(the state block `rest_block`, one column per block of the positions file's offsets)",
+                   "rest_block": "the per-block rest offsets' state block (default rest_block)",
                    "modulation": "none (default), hash or siren: Omega_i(t) = 1 + f(x_i, y_i, z_i, t) scales each "
                                  "element's message sum (Allier et al. 2026, arXiv 2602.13325, eq. 3)",
                    "mod_levels": "hash: levels (12)", "mod_features": "hash: features per level (2)",
@@ -2338,6 +2355,19 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
             raise ValueError("state_diffuse[neuron_graph] `modulation:` none (default), hash or siren")
         self.FRAME_CLOCK = self.modulation != "none"
         self.frame, self.n_frames_ref = 0, 1
+        # V_REST PER BLOCK (exp17, Cedric 2026-10-08: "not the markers to every neuron, a learnable V_rest per block"): the
+        # element's rest is V_i + dV_{i,k} while block k plays, dV a state block of one column per block (0 at the start:
+        # the plain law); the frame's block from the positions file's `offsets` -- the markall runs' per-neuron per-block
+        # offset, as its own term
+        self._rb_offsets = None
+        if bool(params.get("rest_per_block", False)):
+            import numpy as np
+            from plexus.paths import graphs_data_path
+            pf_ = str(params.get("positions_file", ""))
+            pf_ = pf_ if os.path.isabs(pf_) else graphs_data_path(*pf_.split("/"))
+            self._rb_offsets = np.asarray(np.load(pf_)["offsets"], dtype=np.int64)
+            self.blocks["rest_block"] = str(params.get("rest_block", "rest_block"))
+            self.FRAME_CLOCK = True
         self._mod_params = {k: params[k] for k in ("mod_levels", "mod_features", "mod_log2_table", "mod_res_space",
                                                    "mod_res_time", "mod_hidden", "mod_layers", "siren_omega", "mod_context")
                             if k in params}

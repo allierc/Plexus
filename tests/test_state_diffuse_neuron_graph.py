@@ -402,3 +402,19 @@ def test_mod_context_block_onehot(tmp_path):
     for bad in ({**base, "mod_context": "hour"}, {**base, "mod_context": "block", "modulation": "none"}):
         with pytest.raises(ValueError):
             CLS(bad)
+
+
+def test_rest_per_block_adds_the_playing_blocks_offset(tmp_path):
+    """rest_per_block: the rest is V_i plus the offset of the block playing at the frame; offsets 0 = the plain law."""
+    g = np.random.default_rng(0)
+    P = (g.uniform(0, 1, (500, 3)) * [300.0, 400.0, 120.0]).astype(np.float32)
+    f = os.path.join(str(tmp_path), "pos.npz")
+    np.savez(f, pos_um=P, offsets=np.array([0, 10, 25, 40]))
+    o = CLS({"_at": "neuron", "block": "dff", "positions": "xyz", "positions_file": f, "inputs": 1, "short_k": 6,
+             "mid_um": 32.0, "long_um": 128.0, "rest_per_block": True})
+    assert o.FRAME_CLOCK and o.blocks["rest_block"] == "rest_block"
+    rb = torch.arange(3, dtype=torch.float32).repeat(500, 1) + 1.0      # block k's offset = k + 1
+    for frame, k in ((0, 0), (12, 1), (39, 2)):
+        o.frame = frame
+        nb = o._rest_now({"rest": torch.full((500, 1), 0.5), "rest_block": rb})
+        assert "rest_block" not in nb and torch.allclose(nb["rest"], torch.full((500, 1), 0.5 + k + 1.0))

@@ -40,10 +40,11 @@ def constants(name):
     w_in = np.zeros(N)
     for e in spec["learnable"]:
         p = str(e.get("param", ""))
-        if p.startswith("W_"):
+        if p.startswith("W_") and p[2:] in getattr(op, "_E", {}):   # the lattice grid's W_grid is on grid edges: no W in
             snd, rcv = (t.cpu().numpy() for t in op._E[p[2:]])
             np.add.at(w_in, rcv, fit[T.Learnables.key(e)].float().numpy().reshape(-1))
-    mask = op.input_mask.cpu().numpy().reshape(-1).astype(bool) if op.input_mask is not None else np.ones(N, bool)
+    m_ = op.input_mask.cpu().numpy() if op.input_mask is not None else np.ones(N, bool)
+    mask = (m_.reshape(N, -1) != 0).any(1)        # a per-feature mask [N, F] (mask_by_input): an input on any feature
     # tau through the law's own rate: the bound [rate_min, rate_max] when the run declares one (15.18, 2026-10-06)
     tau_s = FRAME_S / op._rate(fit["neuron.tau"].float()).detach().numpy().reshape(-1)
     lo_, hi_ = getattr(op, "rate_min", None), getattr(op, "rate_max", None)
@@ -78,7 +79,7 @@ def render(name):
     wl = np.percentile(np.abs(c["W_in"]), 98)
     panels = [("a   leak time constant $\\tau$, s", c["tau_s"], "RdBu", Normalize(lo_t, hi_t)),   # linear, red fast / blue slow (Cedric, 2026-10-08)
               ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
-              ("c   summed W into the neuron (blue < 0 < red)", c["W_in"], "RdBu_r", TwoSlopeNorm(0, -wl, wl)),
+              ("c   summed W into the neuron (blue < 0 < red)", c["W_in"], "RdBu_r", TwoSlopeNorm(0, -max(wl, 1e-6), max(wl, 1e-6))),   # all 0 on the lattice grid
               ("d   stimulus weight $|B|$ (input neurons; grey: outside the mask)", c["B_norm"], "inferno",
                Normalize(*np.percentile(c["B_norm"][c["mask"]], [2, 98])))]
     stats = {}
