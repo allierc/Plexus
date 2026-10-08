@@ -1134,16 +1134,16 @@ def write_slides():
                 # the table is drawn on the figure, on slide 3's canvas, so the fish sit exactly where slide 3 has them
                 tS_ = (head("the regions, explained")
                        + "{\\scriptsize\\raggedright The 24 regions of slide 3, head to tail, in their colours: what each "
-                         "does, in plain words, its neurons in parentheses, and in grey the Z-Brain masks inside it (80 \\% "
-                         "of their voxels or more).\\par}\\vspace{\\baselineskip}\n"
+                         "does, in plain words, its neurons in parentheses, its reference, and in grey the two largest "
+                         "Z-Brain masks inside it (80 \\% of their voxels or more).\\par}\\vspace{\\baselineskip}\n"
                        + head("the atlas")
                        + "{\\scriptsize\\raggedright Randlett et al. 2015, Nature Methods 12:1039: the Z-Brain larval "
                          "zebrafish reference brain, 294 masks -- anatomical divisions, nuclei and transgene-labelled "
                          "clusters (Gad1b inhibitory, Vglut2 excitatory, Isl1 motor neurons, Vmat2 monoaminergic).\\par}"
                          "\\vspace{\\baselineskip}\n"
                        + head("the roles")
-                       + "{\\scriptsize\\raggedright Textbook summaries of the larval zebrafish brain, one line each; "
-                         "the ARTR as on slides 14-15.\\par}")
+                       + "{\\scriptsize\\raggedright What each region holds and does in the larval zebrafish, with a "
+                         "reference under it in grey; the ARTR as on slides 14-15.\\par}")
                 body_s = col2_("atlas_regions_fish.png", tS_)
                 deck.insert(at_, ("00j_atlas_sub", S.frame_wide("the regions of the atlas", body_s,
                                                                "tools/exp17_atlas.py summary --fish (data/atlas_subregions.json)",
