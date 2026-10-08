@@ -905,15 +905,15 @@ def write_slides():
                 "{0.26\\textwidth}", "{0.20\\textwidth}").replace(   # the template's margins kept (Cedric, 2026-10-07)
                 "\\vspace*{0.03\\textheight}", "\\vspace*{0.09\\textheight}")   # blank lines under the title band
             # Cedric, 2026-10-07: a small movie of the block's visual stimulus (tools/exp17_stim_movies.py) at the top of
-            # the right column
-            stim_ = lambda body_, b_, w_="\\linewidth": (body_.replace("\\begin{column}{0.20\\textwidth}\\centering\\fitcol{%",   # noqa: E731
+            # the right column, half the column wide ("x2 smaller")
+            stim_ = lambda body_, b_, w_="0.5\\linewidth": (body_.replace("\\begin{column}{0.20\\textwidth}\\centering\\fitcol{%",   # noqa: E731
                                                      "\\begin{column}[t]{0.20\\textwidth}\\centering\\playmovie[" + w_ + "]"
                                                      "{Movies/stim_" + b_ + "}\\par\\vspace{8pt}"
                                                      # the text fitted to what the movie leaves of the column (local)
-                                                     "\\setlength{\\colheight}{" + ("0.56" if w_ == "\\linewidth" else "0.40")
+                                                     "\\setlength{\\colheight}{" + ("0.68" if w_ == "0.5\\linewidth" else "0.40")
                                                      + "\\textheight}\\fitcol{%")
                                        if os.path.exists(os.path.join(PRES, "Movies", f"stim_{b_}.mp4")) else body_)
-            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all", "0.5\\linewidth"),
+            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all", "0.25\\linewidth"),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
             # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
