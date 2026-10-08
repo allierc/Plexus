@@ -324,7 +324,7 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
                  silenced_all: np.ndarray | None = None, mean_obs_all: np.ndarray | None = None,
                  mean_pred_all: np.ndarray | None = None, cond_all: np.ndarray | None = None,
                  split_all: np.ndarray | None = None, split_name: str = "all", mean_obs=None, mean_pred=None,
-                 metric: str = "cells"):
+                 metric: str = "cells", side: bool = False, pos_is_view: bool = False):
     """TWO PANELS, recorded LEFT and learned RIGHT: every neuron a point at its position (dorsal view, deeper
     drawn first, the brain vertical and head up) coloured by dF/F on one scale; black background, labels above.
     `frames` sample the FREE ROLLOUT of the whole recording (Cedric, 2026-10-02: the full 2 h, ~800 movie frames, not
@@ -334,25 +334,33 @@ def render_movie(obs: np.ndarray, pred: np.ndarray, frames: np.ndarray, pos: np.
     PC1-PC2 by cluster, PCA as RGB on the brain, the clusters on the brain, the stimulus input map.
     `metric` "brain_mean" (exp20, Cedric 2026-10-04: "the main metric is the brain-mean dF/F R2"; needs mean_obs_all and
     mean_pred_all): top right the brain-mean R2 and RMSE of the free rollout up to the cursor, and under the learned
-    panel the brain-mean R2 in a 5-min window centred on each frame, in place of the per-cell R2 and its divergence."""
+    panel the brain-mean R2 in a 5-min window centred on each frame, in place of the per-cell R2 and its divergence.
+    `side` (exp17, Cedric 2026-10-08: "add the side view to the two main panels"): each panel from above AND, under it,
+    from the side (x against depth z), one scale; `pos_is_view`: `pos` is already the display frame (head left, x along
+    the body, z dorsal) -- the transforms below are skipped (exp17's atlas frame)."""
     import os
     import shutil
     import subprocess
     import tempfile
     import multiprocessing as mp
     ffmpeg = ffmpeg or _ffmpeg()
-    if np.ptp(pos[:, 0]) > np.ptp(pos[:, 1]):
+    if pos_is_view:
+        pass
+    elif np.ptp(pos[:, 0]) > np.ptp(pos[:, 1]):
         # head up first (zap-inr's anatomy frame has its long axis along x: drawn as (y, -x), the destriped slides'
         # mapping; ZAPBench's long axis is already along y, head up) ...
         pos = np.stack([pos[:, 1], -pos[:, 0], pos[:, 2]], 1)
     # ... then THE BRAIN HORIZONTAL, HEAD LEFT (Cedric, 2026-10-02: a vertical brain left most of each panel blank)
-    pos = np.stack([-pos[:, 1], pos[:, 0], pos[:, 2]], 1)
+    if not pos_is_view:
+        pos = np.stack([-pos[:, 1], pos[:, 0], pos[:, 2]], 1)
     order = np.argsort(pos[:, 2])
+    order_s = np.argsort(-pos[:, 1])                  # the side view: the far side drawn first
     if r2_t is None:                                # no whole-rollout trace: the sampled frames' own R2
         r2_t, r2_raw_all, r2_den_all = frames, r2_raw, r2_den
     tmp = tempfile.mkdtemp(prefix="trace_movie_")
     _MOVIE.clear()
-    _MOVIE.update(dict(obs=obs, pred=pred, frames=np.asarray(frames), P=pos[order], order=order,
+    _MOVIE.update(dict(obs=obs, pred=pred, frames=np.asarray(frames), P=pos[order], order=order, side=side,
+                       Ps=pos[order_s][:, [0, 2]], order_s=order_s,
                        vmax=float(np.percentile(obs, 97)), frame_s=frame_s, cond_of=cond_of, names=list(names),
                        emb=emb, labels=labels, emb_name=emb_name, law=law, inputs=inputs, rec_name=rec_name,
                        r2_t=np.asarray(r2_t), r2r=np.asarray(r2_raw_all, float), r2d=np.asarray(r2_den_all, float),
@@ -401,14 +409,30 @@ def _movie_frames(ks):
         inp_title = "stimulus input: every neuron\n(no per-neuron input weights)"
     fig = plt.figure(figsize=(12, 8.6 if ins else 7.0), facecolor="black")
     top = 0.40 if ins else 0.16
-    sc = []
+    sc, sc_s = [], []
+    Ps = d["Ps"]
+    if d["side"]:                                   # from above over from the side, one scale: heights by the extents
+        ey, ez = np.ptp(P[:, 1]), np.ptp(Ps[:, 1])
+        H_ = 0.88 - top
+        h_t, h_s = 0.97 * H_ * ey / (ey + ez), 0.97 * H_ * ez / (ey + ez)
     for j, lab in enumerate((f"recorded ({d['rec_name']})", f"learned ({d['law']})")):
-        ax = fig.add_axes([0.5 * j, top, 0.5, 0.88 - top])           # the labels sit above, never on the brain
+        ax = fig.add_axes([0.5 * j, top + h_s + 0.03 * H_, 0.5, h_t] if d["side"] else [0.5 * j, top, 0.5, 0.88 - top])
         ax.set_facecolor("black")
         ax.axis("off")
         sc.append(ax.scatter(P[:, 0], P[:, 1], c=np.zeros(len(P)), s=0.5, cmap="inferno", vmin=0, vmax=vmax,
                              linewidths=0))
         ax.set_aspect("equal")
+        if d["side"]:
+            ax.set_xlim(P[:, 0].min(), P[:, 0].max())
+            ax.set_ylim(P[:, 1].min(), P[:, 1].max())
+            ax2 = fig.add_axes([0.5 * j, top, 0.5, h_s])
+            ax2.set_facecolor("black")
+            ax2.axis("off")
+            sc_s.append(ax2.scatter(Ps[:, 0], Ps[:, 1], c=np.zeros(len(Ps)), s=0.5, cmap="inferno", vmin=0, vmax=vmax,
+                                    linewidths=0))
+            ax2.set_aspect("equal")
+            ax2.set_xlim(P[:, 0].min(), P[:, 0].max())
+            ax2.set_ylim(Ps[:, 1].min(), Ps[:, 1].max())
         fig.text(0.5 * j + 0.03, 0.985, lab, color="white", fontsize=12, va="top")
     t_txt = fig.text(0.03, 0.945, "", color="0.7", fontsize=9, va="top")
     r_txt = fig.text(0.97, 0.955, "", color="white", fontsize=9, va="top", ha="right")
@@ -519,6 +543,9 @@ def _movie_frames(ks):
         f = frames[k]
         sc[0].set_array(np.asarray(d["obs"][k], np.float32)[order])
         sc[1].set_array(np.asarray(d["pred"][k], np.float32)[order])
+        if sc_s:
+            sc_s[0].set_array(np.asarray(d["obs"][k], np.float32)[d["order_s"]])
+            sc_s[1].set_array(np.asarray(d["pred"][k], np.float32)[d["order_s"]])
         t_txt.set_text(f"{d['names'][d['cond_of'][k]]}   t = {f * d['frame_s'] / 60:5.1f} min")
         upto = r2t <= f
         nsil = int(d["sil"][upto][-1]) if d["sil"] is not None and upto.any() else 0

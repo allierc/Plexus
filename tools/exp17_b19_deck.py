@@ -674,15 +674,19 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
              + S.head("training") + S.rows([("updates", f"{rep.get('iters', 0):,} (horizons {stg[0][0]}..{stg[-1][0]})" if stg else "--"),
                                          ("time", f"{rep.get('seconds', 0) / 3600:.1f} h"),
                                          ("weights", f"{rep.get('n_params', 0):,}")]))
+    # the atlas frame with the side views when tools/exp17_run_movie.py has drawn it (Cedric, 2026-10-08)
+    mvr_ = f"{run}_atlas" if os.path.exists(os.path.join(PRES, "Movies", f"{run}_atlas.mp4")) else run
     out.append((f"19_run_{run}", S.frame(f"batch {num}: the free rollout of the whole 2 h, recorded left, learned right",
-                                         f"\\playmovie{{Movies/{run}}}", right, f"log/training/zapbench/{run}",
+                                         f"\\playmovie{{Movies/{mvr_}}}", right, f"log/training/zapbench/{run}",
                                          left_gap=True, deck_title=dt)))
     # the modulation Omega_i(t) beside the recorded activity, x4 (tools/exp17_modulation.py)
     if os.path.exists(os.path.join(res, "movie_omega.mp4")):
-        subprocess.run([TR_._ffmpeg(), "-y", "-loglevel", "error", "-i", os.path.join(res, "movie_omega.mp4"), "-vf",
+        # the atlas frame with the side views when tools/exp17_modulation.py --atlas has drawn it (Cedric, 2026-10-08)
+        om_src = "movie_omega_atlas" if os.path.exists(os.path.join(res, "movie_omega_atlas.mp4")) else "movie_omega"
+        subprocess.run([TR_._ffmpeg(), "-y", "-loglevel", "error", "-i", os.path.join(res, om_src + ".mp4"), "-vf",
                         "setpts=PTS/4", "-r", "25", "-an", "-pix_fmt", "yuv420p", "-c:v", "libx264",
                         os.path.join(PRES, "Movies", f"{run}_omega.mp4")], check=True)
-        shutil.copy(os.path.join(res, "movie_omega.png"), os.path.join(PRES, "Movies", f"{run}_omega.png"))
+        shutil.copy(os.path.join(res, om_src + ".png"), os.path.join(PRES, "Movies", f"{run}_omega.png"))
         O_ = np.load(os.path.join(res, f"{run}_omega.npz"))["omega"].astype(np.float32)
         mt_ = O_.mean(1)
         # ragged, the law on two explicit lines: justified in the narrow column it stretched its spaces (2026-10-08)
@@ -717,11 +721,13 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
                     + S.rows([("$\\tau$, s", r3("tau_s")),
                               (f"$\\tau$ at {tb_[0]:.0f} s", f"{100 * P_['frac_tau_at_floor']:.1f} \\%"),
                               (f"$\\tau$ at {tb_[1]:.0f} s", f"{100 * P_['frac_tau_at_ceiling']:.1f} \\%"),
-                              ("rest $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
-                              ("W in $<$ 0", f"{100 * P_['frac_W_in_negative']:.1f} \\%"),
+                              ("rest $V$", r3("V")), ("$|W|$ in", r3("W_abs" if "W_abs" in P_ else "W_in")),
+                              ("$|B|$", r3("B_norm")),
+                              ("no $|W|$ left", f"{100 * P_.get('frac_W_abs_zero', 0.0):.1f} \\%"),
                               ("inputs", f"{P_['n_masked']:,} of {P_['n']:,}")])
                     + "{\\tiny\\color{gray} $\\tau$ bounded to [" + f"{tb_[0]:.0f}, {tb_[1]:.0f}" + "] s; $V$ in dF/F; W "
-                      "the signed sum over the edge sets into the neuron (the messages then scaled by $\\Omega$); $B$ used "
+                      "$|W|$ the summed absolute weight into the neuron over the kept edges, after pruning (the messages then scaled by "
+                      "$\\Omega$); $B$ used "
                       "only inside the input mask\\par}\n")
         out.append((f"19_params_{run}", S.frame_narrow("the learned constants on the brain", f"figs/param_maps_{run}.png",
                                                        right_pm, f"tools/exp17_param_maps.py {run}", left=0.76,
@@ -1874,7 +1880,7 @@ def write_slides():
                 deck_title="multi-level GNN on fish 2 $\\cdot$ " + ttl_d)))
             open(os.path.join(SL, nm_d + ".tex"), "w").write(deck[[n for n, _ in deck].index(nm_d)][1])
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
-             "00i_classic_circuits", "00d_brain_mean_spread", "06_model", "19_prune_dist", "20_prune_dist"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
+             "00i_classic_circuits", "00d_brain_mean_spread", "06_model", "19_prune_dist", "20_prune_dist", "19_flow_pruned_sigma10", "20_flow_pruned_sigma10"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
     deck = [(n, b) for n, b in deck if n != "00j_lateral"]   # Cedric, 2026-10-07: "delete slide 7" (left against right)
     deck = [(n, b) for n, b in deck if n != "00l_atlas_raster"]   # Cedric, 2026-10-07: "delete slide 5" (the mean traces)                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
     deck = [(n, b) for n, b in deck if n not in ("00g_classic_regressors", "00h_classic_reliability", "00i_classic_circuits")]  # Cedric, 2026-10-07: "slide 3 in comments", then "slide 13 in comments"
