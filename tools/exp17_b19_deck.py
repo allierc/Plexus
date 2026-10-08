@@ -1830,10 +1830,10 @@ def write_slides():
     if "19_vrest_regions_zap_n20_markall" in nm_ and "19_vrest_zap_n20_markall" in nm_:
         it_ = deck.pop(nm_.index("19_vrest_regions_zap_n20_markall"))
         deck.insert([n for n, _ in deck].index("19_vrest_zap_n20_markall"), it_)
-    # Cedric, 2026-10-08: section dividers in the appendix's look, before the graph, the input stimuli and the model
+    # Cedric, 2026-10-08: section dividers in the appendix's look, before the graph, the input neurons and the model (renamed 2026-10-08)
     for nm_d, ttl_d, before_ in (("00y_sec_graph", "the graph", "01_grid_3d"),
-                                 ("04y_sec_input", "input stimuli", "05_input_neurons"),
-                                 ("05y_sec_model", "known-ODE model", "06b_model_all")):
+                                 ("04y_sec_input", "the input neurons", "05_input_neurons"),
+                                 ("05y_sec_model", "the model", "06b_model_all")):
         if before_ in [n for n, _ in deck]:
             deck.insert([n for n, _ in deck].index(before_), (nm_d, S.frame_wide(
                 ttl_d, "\\vspace*{0.30\\textheight}\\centering{\\Huge " + ttl_d + "}\\par", "Cedric, 2026-10-08",
