@@ -127,7 +127,8 @@ def build_window(neurons, layers, title, stages, stem, centre, half, hold_s=1.5,
     """THE WINDOW, FROM ABOVE, BUILT UP (Cedric, 2026-10-06: "use vtk for slides 3 and 5", the first deck's slide 4 as
     VTK): a parallel projection straight down onto a 2 `half` um square around `centre` (x, y, z um); `neurons` [n, 3]
     the dots (`point` px); `layers` [{a, b, colour, width (px), stage, nodes, node_px, label}] shown from their `stage`
-    on, every edge straight, the coarser drawn wider and later (on top); `title` the line above, `stages` the line
+    on (and before their `until`, when set: an edge set that is removed), every edge straight, the coarser drawn wider
+    and later (on top); `title` the line above, `stages` the line
     naming each stage, the legend under the picture (no note under it: Cedric); a `bar_um` scale bar in the lower
     left. One still per stage held `hold_s` s (the last `last_s` s) -> <stem>.mp4, its poster the first still."""
     import pyvista as pv
@@ -143,11 +144,13 @@ def build_window(neurons, layers, title, stages, stem, centre, half, hold_s=1.5,
     for k, L in enumerate(layers):
         if len(L["a"]):
             m_ = pl.add_mesh(_lines(pv, flat(L["a"]), flat(L["b"])), color=L["colour"], line_width=L["width"])
-            acts.append((m_, L["stage"]))
+            acts.append((m_, L["stage"], L.get("until", 10 ** 9)))
         if L.get("nodes") is not None and len(L["nodes"]):
             acts.append((pl.add_mesh(pv.PolyData(flat(L["nodes"])), color=L["colour"], point_size=L.get("node_px", 12.0),
-                                     render_points_as_spheres=True), L["stage"]))
-        acts.append((pl.add_text(L["label"], position=(24, 112 - 27 * k), font_size=12, color=L["colour"]), L["stage"]))
+                                     render_points_as_spheres=True), L["stage"], L.get("until", 10 ** 9)))
+        if L.get("label"):
+            acts.append((pl.add_text(L["label"], position=(24, 112 - 27 * L.get("row", k)), font_size=12,
+                                     color=L.get("label_colour", L["colour"])), L["stage"], L.get("label_until", 10 ** 9)))
     x0, y0 = centre[0] - half + 6.0, centre[1] - half + 6.0
     bar_a = pl.add_mesh(_lines(pv, np.array([[x0, y0, cz]]), np.array([[x0 + bar_um, y0, cz]])), color="white", line_width=7)
     bar_t = pl.add_point_labels(np.array([[x0 + bar_um / 2, y0 + 3.0, cz]]), [f"{bar_um:g} µm"], font_size=40, bold=True,
@@ -192,8 +195,8 @@ def build_window(neurons, layers, title, stages, stem, centre, half, hold_s=1.5,
     frames = []
     for st in range(len(stages)):
         whole = full is not None and st >= nwin
-        for a_, s_ in acts:
-            a_.SetVisibility(s_ <= st and not whole)
+        for a_, s_, u_ in acts:                   # a layer shows from its `stage` until (before) its `until`
+            a_.SetVisibility(s_ <= st < u_ and not whole)
         for a_, s_ in ((win_neur, 0), (bar_a, 0), (bar_t, 0)):
             a_.SetVisibility(not whole)
         for a_, s_ in fulls:
@@ -324,6 +327,66 @@ def main():
               open(os.path.join(EXP, "data", "b19_graphs.json"), "w"), indent=1)
     write_slides()
 
+
+def prune_window(run="zap_n19_nom"):
+    """THE MESH, PRUNED (Cedric, 2026-10-08: "a twin of slide 18 for 19.25, inserting between the levels the removal of the
+    W ~ 0 edges"): slide 18's 256-um window from above, level by level, and after each level its edges whose learned
+    weight is below the level's threshold in BOTH directions (tools/exp17_prune.py, data/prune_<run>.json) first marked
+    red, then removed. -> Movies/b19_tri_window_prune.mp4, data/prune_window_<run>.json (the counts, whole brain)."""
+    import torch
+    from plexus.operators.cell_ops import neuron_mesh_levels, _neuron_mesh_edges
+    from plexus.tasks import trace_recording as TR
+    from plexus import trainer as T
+    P = TR.load("zapbench_destripe")["pos_um"].astype(np.float64)
+    N = len(P)
+    PR = json.load(open(os.path.join(EXP, "data", f"prune_{run}.json")))
+    th = PR["thresholds"]
+    fit = torch.load(os.path.join(T.out_dir(T.load(run), None), "models", "best.pt"), weights_only=False,
+                     map_location="cpu")["fitted"]
+    sets_ = _neuron_mesh_edges(P, LEVELS, TRI_BIN, TRI_FINE, TRI_MID_MAX)
+    ftc = neuron_mesh_levels(P, LEVELS, TRI_BIN, TRI_FINE)[::-1]            # fine to coarse, as slide 18
+    SET_OF = ("short", "mid", "long")                                         # level 0, 1, 2 -> the law's edge sets
+    half = 128.0
+    top = ftc[-1][2]
+    c1 = P[int(top[np.argmin(np.linalg.norm(P[top] - np.median(P, 0), axis=1))])]
+    inw = lambda X, d: (np.abs(X[:, 0] - c1[0]) <= half) & (np.abs(X[:, 1] - c1[1]) <= half) & (np.abs(X[:, 2] - c1[2]) < d)  # noqa: E731
+    wl, ws = [], ["1  the neurons: every destriped neuron of the slab"]
+    counts = {}
+    for k, (lab, b, nd, e) in enumerate(ftc):
+        st_ = SET_OF[k]
+        snd, rcv = (np.asarray(x) for x in sets_[st_])
+        w = np.abs(fit[f"state_diffuse.W_{st_}"].float().numpy())
+        key = np.minimum(snd, rcv) * N + np.maximum(snd, rcv)                 # an undirected pair
+        u, inv = np.unique(key, return_inverse=True)
+        mx = np.zeros(len(u))
+        np.maximum.at(mx, inv, w)                                             # the larger of its two directions
+        ke = np.minimum(e[:, 0], e[:, 1]) * N + np.maximum(e[:, 0], e[:, 1])
+        j = np.clip(np.searchsorted(u, ke), 0, len(u) - 1)
+        wmax = np.where(u[j] == ke, mx[j], np.inf)                            # an edge the set lacks: kept
+        rem = wmax < th[st_]
+        counts[st_] = {"edges": int(len(e)), "removed": int(rem.sum()), "threshold": th[st_]}
+        col, _, _, px = RANK[k]
+        ok = inw(P, TRI_DEPTH[k] / 2)
+        inn = ok[e[:, 0]] & ok[e[:, 1]]
+        lw_ = px if k else 1.6
+        s_add, s_mark, s_gone = 1 + 3 * k, 2 + 3 * k, 3 + 3 * k
+        name = lab.replace(" um", "-µm")
+        er, ek = e[inn & rem], e[inn & ~rem]
+        wl.append({"a": P[er[:, 0]], "b": P[er[:, 1]], "colour": col, "width": lw_, "stage": s_add, "until": s_mark,
+                   "label": f"level {k}: {name}, {len(e):,} edges in the brain", "row": k, "label_until": s_gone})
+        wl.append({"a": P[er[:, 0]], "b": P[er[:, 1]], "colour": "#ff3030", "width": lw_, "stage": s_mark, "until": s_gone})
+        wl.append({"a": P[ek[:, 0]], "b": P[ek[:, 1]], "colour": col, "width": lw_, "stage": s_add,
+                   "nodes": P[nd[ok[nd]]] if k else None, "node_px": 10.0 + 6.0 * k})
+        wl.append({"a": np.zeros((0, 3)), "b": np.zeros((0, 3)), "colour": col, "width": 1, "stage": s_gone, "row": k,
+                   "label": f"level {k}: {name}, {len(e) - int(rem.sum()):,} of {len(e):,} edges kept "
+                            f"(|W| >= {th[st_]:.3g} one way at least)"})
+        ws += [f"{s_add + 1}  + the {NAMES[k]} mesh: level {k}, {name}",
+               f"{s_mark + 1}  level {k}: the edges with |W| < {th[st_]:.3g} both ways, in red ({100 * rem.mean():.0f} %)",
+               f"{s_gone + 1}  level {k}: removed, {len(e) - int(rem.sum()):,} edges left"]
+    build_window(P[inw(P, TRI_SLAB / 2)], wl, f"the {run.replace('_', ' ')} mesh, pruned: a {2 * half:.0f}-µm window "
+                 "from above", ws, os.path.join(PRES, "Movies", "b19_tri_window_prune"), c1, half)
+    json.dump({"run": run, "thresholds": th, "levels": counts, "joint": PR["joint"]},
+              open(os.path.join(EXP, "data", f"prune_window_{run}.json"), "w"), indent=1)
 
 APPENDIX_CURVES = {"zap_b20_x1": "held out against ZAPBench, x1 updates"}  # (Cedric, 2026-10-07; 20.1's slide removed)
 
@@ -909,20 +972,11 @@ def write_slides():
                    + f"{AT_['loo_um_median']:.0f} \\textmu m); {100 * AT_['inside_share'][AT_['rotation_used']]:.0f} \\% land "
                      "inside the brain. Each neuron gets the Z-Brain regions its voxel lies in.\\par}\\vspace{6pt}\n"
                    + head("the stimulus blocks")                    # Cedric, 2026-10-07: in place of the per-region notes
-                   + "{\\scriptsize\\raggedright What the fish sees in each block (ZAPBench, Lueckmann et al. 2025, A.4), "
-                     "the raster's columns:\\par}\\vspace{2pt}\n"
-                   + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}>{\\raggedright\\arraybackslash}p{10em}@{}}\n"
-                   + "".join(f"\\rule{{0pt}}{{2.1ex}}\\textbf{{{b_}}} & {d_} \\\\\n" for b_, d_ in (
-                       ("gain", "forward grating; feedback gain low / high every 30 s"),
-                       ("dots", "random dots; 3 x 20 s all moving right"),
-                       ("flash", "whole field light / dark every 30 s"),
-                       ("taxis", "left / right half-fields light or dark, 20 s"),
-                       ("turning", "grating forward, left, right, back; 30 s on, 30 s still"),
-                       ("position", "1-s forward pulse, 3 / 6 / 9-s delay, 30 s forward"),
-                       ("open loop", "forward grating, swims change nothing (15 min)"),
-                       ("rotation", "grating rotating clockwise / counter-clockwise, 30 s"),
-                       ("dark", "nothing shown: spontaneous activity")))
-                   + "\\end{tabular}\\par}")
+                   # Cedric, 2026-10-08: the nine-row table dropped (each block has its own slide, its description there),
+                   # so the text and the movie keep the block slides' size
+                   + "{\\scriptsize\\raggedright The raster's columns are the nine stimulus blocks (ZAPBench, Lueckmann et al. "
+                     "2025, A.4): gain, dots, flash, taxis, turning, position, open loop, rotation, dark -- the movie runs "
+                     "through them in order, each block its own slide next.\\par}")
             col2_ = lambda fig_, txt_: col_(fig_, txt_).replace("{0.72\\textwidth}", "{0.78\\textwidth}").replace(   # noqa: E731
                 "{0.26\\textwidth}", "{0.20\\textwidth}").replace(   # the template's margins kept (Cedric, 2026-10-07)
                 "\\vspace*{0.03\\textheight}", "\\vspace*{0.09\\textheight}")   # blank lines under the title band
@@ -935,7 +989,7 @@ def write_slides():
                                                      "\\setlength{\\colheight}{" + ("0.68" if w_ == "0.5\\linewidth" else "0.40")
                                                      + "\\textheight}\\fitcol{%")
                                        if os.path.exists(os.path.join(PRES, "Movies", f"stim_{b_}.mp4")) else body_)
-            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all", "0.25\\linewidth"),
+            deck.insert(at_, ("00j_atlas_regions", S.frame_wide("the atlas", stim_(col2_("atlas_regions_raster.png", tA_), "all"),
                               "tools/exp17_atlas.py", deck_title="in the Z-Brain atlas $\\cdot$ every analysis per region")))
             at_ += 1                                         # Cedric, 2026-10-07: the raster by region, after the atlas
             # Cedric, 2026-10-07: the atlas raster's twins, one stimulus block each, every frame of the block shown
@@ -1278,6 +1332,44 @@ def write_slides():
     # Cedric, 2026-10-07: an appendix, its title slide as the first deck's slide 66, then the first deck's slide-8 look
     # (the forecast error step by step, panel a) for the held-out runs against ZAPBench (batch 20) that have landed
     deck += slides_run19(S)                  # Cedric, 2026-10-07: the nominal's results (19.25 since 2026-10-08), the first deck's slides 12-17
+    # Cedric, 2026-10-08: the learned W's distribution per level, a threshold per level below which an edge is removable
+    # (tools/exp17_prune.py), and slide 18's window with those edges removed level by level (prune_window); they replace
+    # the edge-weights slide
+    jw_ = os.path.join(EXP, "data", "prune_window_zap_n19_nom.json")
+    jp_ = os.path.join(EXP, "data", "prune_zap_n19_nom.json")
+    if os.path.exists(jw_) and os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "Movies", "b19_tri_window_prune.mp4")):
+        PW_, PR_ = json.load(open(jw_)), json.load(open(jp_))
+        J_ = PR_["joint"]
+        lab_ = {"short": "0, every neuron", "mid": "1, 32-\\textmu m cubes", "long": "2, 64-\\textmu m cubes"}
+        rows_ = "".join(f"{lab_[s_]} & {c_['threshold']:.3g} & {c_['edges']:,} & {100 * c_['removed'] / c_['edges']:.0f} \\% \\\\\n"
+                        for s_, c_ in PW_["levels"].items())
+        right_pw = (S.head("the mesh, pruned: 19.25")
+                    + "{\\scriptsize\\raggedright Slide 18's window, level by level; after each level, its edges whose learned "
+                      "weight is below the level's threshold in both directions marked red, then removed.\\par}\\vspace{6pt}\n"
+                    + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                      "level & $|W|$ below & edges & removed \\\\\n\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{6pt}\n"
+                    + S.head("the check")
+                    + "{\\scriptsize\\raggedright The three levels cut at once, the 2 h free rollout rerun: "
+                      f"{100 * J_['kept_share']:.0f} \\% of the directed weights kept, brain-mean r {J_['d_brain_mean_r']:+.4f}, "
+                      f"per-neuron r {J_['d_per_neuron_r']:+.4f} against the unpruned law -- "
+                    + ("within" if J_["removable"] else "beyond") + " the seed spread (19.25 against 19.26: 0.009 and "
+                      "0.005).\\par}")
+        deck.append(("19_prune_window", S.frame("the mesh, the weights near 0 removed",
+                                                "\\playmovie{Movies/b19_tri_window_prune}", right_pw,
+                                                "tools/exp17_b19_deck.py --prune-movie; tools/exp17_prune.py",
+                                                deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the mesh, pruned")))
+        right_pd = (S.head("which weights are near 0?")
+                    + "{\\scriptsize\\raggedright Per level, $\\log_{10}|W|$ is bimodal: a dead mode near $10^{-3}$, the L1 "
+                      "prior's floor (edges training never used), and a live mode near 0.05. Two Gaussians fitted per level "
+                      "(blue, red).\\par}\\vspace{6pt}\n"
+                    + S.head("the threshold, per level")
+                    + "{\\scriptsize\\raggedright Not where the two modes cross: there the per-neuron r already falls. "
+                      "Each level's edges below $t$ zeroed, the other levels intact, the 2 h free rollout rerun for a ladder "
+                      "of $t$ (bottom); the threshold (yellow) is the largest $t$ that moves both r by less than the seed "
+                      "spread (grey band).\\par}")
+        deck.append(("19_prune_dist", S.frame_narrow("the learned weights, level by level", "figs/prune_zap_n19_nom.png",
+                                                     right_pd, "tools/exp17_prune.py zap_n19_nom", left=0.74,
+                                                     deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the weights near 0")))
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     from PIL import Image
@@ -1317,8 +1409,27 @@ def write_slides():
     if "00e_brain_mean_lag" in nm_ and "05_input_neurons" in nm_:
         it_ = deck.pop(nm_.index("00e_brain_mean_lag"))
         deck.insert([n for n, _ in deck].index("05_input_neurons") + 1, it_)
+    # Cedric, 2026-10-08: batch 21's law (slide 22) just before the appendix; the mean-field control right after the
+    # nominal's run slide
+    nm_ = [n for n, _ in deck]
+    if "07b_angle" in nm_ and "90_appendix" in nm_:
+        it_ = deck.pop(nm_.index("07b_angle"))
+        deck.insert([n for n, _ in deck].index("90_appendix"), it_)
+    nm_ = [n for n, _ in deck]
+    mf_i = [i for i, n in enumerate(nm_) if n.startswith("19_meanfield_")]
+    run_i = [i for i, n in enumerate(nm_) if n.startswith("19_run_")]
+    if mf_i and run_i:
+        it_ = deck.pop(mf_i[0])
+        deck.insert([n for n, _ in deck].index(nm_[run_i[0]]) + 1, it_)
+    nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
+    ed_ = [n for n in nm_ if n.startswith("19_edges_")]
+    if ed_:
+        for k_, nb_ in enumerate(("19_prune_window", "19_prune_dist")):
+            if nb_ in [n for n, _ in deck]:
+                it_ = deck.pop([n for n, _ in deck].index(nb_))
+                deck.insert([n for n, _ in deck].index(ed_[0]) + 1 + k_, it_)
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
-             "00i_classic_circuits", "00d_brain_mean_spread", "06_model"}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
+             "00i_classic_circuits", "00d_brain_mean_spread", "06_model"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
     deck = [(n, b) for n, b in deck if n != "00j_lateral"]   # Cedric, 2026-10-07: "delete slide 7" (left against right)
     deck = [(n, b) for n, b in deck if n != "00l_atlas_raster"]   # Cedric, 2026-10-07: "delete slide 5" (the mean traces)                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
     deck = [(n, b) for n, b in deck if n not in ("00g_classic_regressors", "00h_classic_reliability", "00i_classic_circuits")]  # Cedric, 2026-10-07: "slide 3 in comments", then "slide 13 in comments"
@@ -1328,7 +1439,9 @@ def write_slides():
 
 
 if __name__ == "__main__":
-    if "--slides-only" in sys.argv:
+    if "--prune-movie" in sys.argv:                 # Cedric, 2026-10-08: slide 18's twin, the mesh pruned
+        prune_window()
+    elif "--slides-only" in sys.argv:
         write_slides()
     else:
         main()
