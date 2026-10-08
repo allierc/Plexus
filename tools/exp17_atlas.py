@@ -103,6 +103,65 @@ REGIONS = [("Telencephalon - Olfactory Bulb", "olfactory bulb"), ("Telencephalon
            ("Rhombencephalon - X Vagus motorneuron cluster", "vagus motor neurons"), ("Spinal Cord", "spinal cord")]
 
 
+# THE TABLE REGIONS IN PLAIN WORDS (Cedric, 2026-10-08: "explain each region"): textbook summaries of the larval zebrafish
+# brain, for the atlas slides; the atlas itself is Randlett et al. 2015 (Nature Methods 12:1039)
+REGION_ROLE = {"olfactory bulb": "the first relay of smell",
+               "pallium": "dorsal forebrain, homologue of cortex, hippocampus and amygdala: learning, memory",
+               "subpallium": "ventral forebrain, homologue of the basal ganglia: action selection",
+               "habenula": "links the forebrain to the midbrain's monoamine nuclei: aversion, coping",
+               "dorsal thalamus": "relays sensory input to the forebrain",
+               "ventral thalamus": "the prethalamus, inhibitory: gates the thalamic relay",
+               "pretectum": "direction-selective optic flow: drives the optomotor and optokinetic responses",
+               "preoptic area": "neuroendocrine: stress, homeostasis",
+               "hypothalamus (intermediate)": "neuroendocrine: feeding, arousal",
+               "posterior tuberculum": "dopaminergic neurons projecting to the hindbrain and spinal cord",
+               "tectum (periventricular)": "the optic tectum's cell layer: vision, prey capture",
+               "torus semicircularis": "the midbrain's hearing and lateral-line centre",
+               "tegmentum": "midbrain motor centres (nMLF, oculomotor nucleus): swimming, eye movements",
+               "cerebellum": "motor coordination and learning, e.g. visuomotor gain adaptation",
+               "rhombomere 1": "anterior hindbrain, the cerebellum's base: locus coeruleus, raphe",
+               "rhombomere 2": "the ARTR (turn direction); reticulospinal neurons",
+               "rhombomere 3": "the ARTR's back; trigeminal motor neurons",
+               "rhombomere 4": "the Mauthner cells: the escape",
+               "rhombomere 5": "vestibular nuclei; abducens (eye movements)",
+               "rhombomere 6": "facial motor neurons, reticulospinal neurons",
+               "rhombomere 7": "caudal hindbrain: the eye-position integrator, rhythms of swimming and breathing",
+               "noradrenergic (IFN, vagal)": "noradrenergic cluster of the caudal medulla",
+               "vagus motor neurons": "vagal motor nucleus: gut, heart, gills",
+               "spinal cord": "motor neurons and the swim rhythm generator"}
+
+
+_SUB_CACHE = {}
+
+
+def subregions(full, names, reg, frac=0.8, top=6):
+    """The Z-Brain masks lying (>= frac of their voxels) inside the table region `full`: its sub-regions (Randlett et al.
+    2015's 294 masks nest: anatomical subdivisions, nuclei and transgene-labelled clusters). Each with its neurons among
+    the destriped ones; the `top` largest by neurons. Voxels from MaskDatabase.mat, read once."""
+    import h5py
+    from scipy.sparse import csc_matrix
+    if "S" not in _SUB_CACHE:
+        with h5py.File(os.path.join(ZB, "MaskDatabase.mat")) as h:
+            H, W, Z = int(h["height"][0, 0]), int(h["width"][0, 0]), int(h["Zs"][0, 0])
+            g = h["MaskDatabase"]
+            _SUB_CACHE["S"] = csc_matrix((g["data"][:], g["ir"][:], g["jc"][:]), shape=(H * W * Z, len(names)))
+            _SUB_CACHE["n"] = H * W * Z
+    S = _SUB_CACHE["S"]
+    c = names.index(full)
+    inside = np.zeros(_SUB_CACHE["n"], bool)
+    inside[S.indices[S.indptr[c]:S.indptr[c + 1]]] = True
+    table = {f for f, _ in REGIONS}
+    out = []
+    for j, nm in enumerate(names):
+        if j == c or nm in table or nm.count(" - ") == 0:
+            continue
+        v = S.indices[S.indptr[j]:S.indptr[j + 1]]
+        if len(v) and inside[v].mean() >= frac and len(v) < S.indptr[c + 1] - S.indptr[c]:
+            out.append({"name": nm.split(" - ", 1)[1], "neurons": int(reg[:, j].sum()), "voxels": int(len(v))})
+    out.sort(key=lambda d: -d["neurons"])
+    return {"count": len(out), "top": out[:top]}
+
+
 def iso_images(rlist, rfull, rcol, names, sizes=((1640, 1000), (1800, 620))):
     """THE REGIONS AS SURFACES (Cedric, 2026-10-07: "a twin with VTK isosurfaces, as the Plexus watcher"): each table
     region's Z-Brain mask, halved in x and y, contoured at 0.5 and smoothed, in its table colour, semi-opaque; the brain
@@ -203,9 +262,9 @@ def summary(iso=False):
     json.dump(out, open(os.path.join(EXP, "data", "atlas_regions.json"), "w"), indent=1)
     plt.style.use("dark_background")
     blkv = str(iso).startswith("block:")                 # a block raster beside the fish (Cedric, 2026-10-07)
-    mg = iso in ("merged", "merged_raster") or blkv
+    mg = iso in ("merged", "merged_raster", "fish") or blkv
     FH = 12.4 if mg else 8.6                  # taller: the slide's free height filled (Cedric, 2026-10-07)
-    FW = 21.0 if (iso == "merged_raster" or str(iso).startswith("block:")) else 14.0      # wide: fish, a large raster, three panels (Cedric, 2026-10-07)
+    FW = 21.0 if (iso in ("merged_raster", "fish") or str(iso).startswith("block:")) else 14.0      # wide: fish, a large raster, three panels (Cedric, 2026-10-07)
     fig = plt.figure(figsize=(FW, FH), facecolor="black")
     # the neurons in the atlas, head left (the reference turned as Cedric turned it), each coloured by its TABLE region
     # (Cedric, 2026-10-07: "only 5 regions in the fish, many more in the table"): of the table's regions it lies in, the
@@ -230,11 +289,12 @@ def summary(iso=False):
         ext = lambda v: float(np.percentile(v[ins_], 99.9) - np.percentile(v[ins_], 0.1))     # noqa: E731
         ex, ey, ez = ext(xd), ext(yd), ext(A[:, 2]) + 40.0
         TT = 0.28                                          # a title line, inches
-        sc = min((0.30 if (iso == "merged_raster" or blkv) else 0.60) * FW / ex, (0.97 * FH - 4 * TT) / (2 * ey + 2 * ez))
+        sc = min((0.30 if (iso in ("merged_raster", "fish") or blkv) else 0.60) * FW / ex,
+                 (0.97 * FH - 4 * TT) / (2 * ey + 2 * ez))
         wf = ex * sc / FW
         tot_ = (4 * TT + (2 * ey + 2 * ez) * sc) / FH          # the stack's height, figure fraction
         # centred on the raster's height (Cedric, 2026-10-07: "the fish a bit lower, centred with the raster")
-        panels, ycur = [], (min(0.985, 0.54 + tot_ / 2) if (iso == "merged_raster" or blkv) else 0.985)
+        panels, ycur = [], (min(0.985, 0.54 + tot_ / 2) if (iso in ("merged_raster", "fish") or blkv) else 0.985)
         for kind, view, ttl in (("dots", "top", "from above, head left: the neurons"),
                                 ("iso", "top", "from above: the regions as surfaces (atlas)"),
                                 ("dots", "side", "from the side: the neurons"),
@@ -305,6 +365,47 @@ def summary(iso=False):
             a_.imshow(mpimg.imread(f_))
             a_.axis("off")
             a_.set_title(ttl_, fontsize=8.5, loc="left", pad=2)
+    elif iso == "fish":
+        # THE FISH ALONE (Cedric, 2026-10-08: "slide 3's fishes, and each region's sub-regions of the atlas explained"):
+        # the four panels, and each table region's colour and its Z-Brain sub-masks for the slide's table
+        SUB = {r_: subregions(rfull[r_], names, reg) for r_ in rlist}
+        json.dump({r_: {"colour": [float(c_) for c_ in rcol[r_][:3]], "full": rfull[r_], "neurons": int((lab_ == k).sum()),
+                        "subregions": SUB[r_], "role": REGION_ROLE.get(r_, "")} for k, r_ in enumerate(rlist)},
+                  open(os.path.join(EXP, "data", "atlas_subregions.json"), "w"), indent=1)
+        # THE TABLE ON SLIDE 3'S CANVAS (Cedric, 2026-10-08: "the fishes aligned to slide 3, the text larger"): where slide 3
+        # has its raster, the regions head to tail in two columns, each a block -- its name in its colour, its role, and
+        # its Z-Brain sub-masks in grey -- with a blank line between blocks
+        import textwrap
+        x0_, cw_ = wf + 0.035, (0.985 - wf - 0.035) / 2
+        h_ = (len(rlist) + 1) // 2
+        blocks_ = []
+        for k, r_ in enumerate(rlist):
+            tops = [x["name"].strip() for x in SUB[r_]["top"][:3] if x["neurons"] > 0]
+            more = SUB[r_]["count"] - len(tops)
+            sub = ("atlas: " + ", ".join(tops) + (f" (+{more} more)" if more > 0 else "")) if tops else ""
+            blocks_.append((r_, f"{r_} ({int((lab_ == k).sum()):,})", textwrap.fill(REGION_ROLE.get(r_, ""), 60),
+                            textwrap.fill(sub, 74) if sub else ""))
+        # FLOWED top-down from the lines each block holds (no overlap), one font scale so the fuller column fits
+        lh = lambda pt: pt * 1.22 / 72 / FH                                  # noqa: E731   one line, figure fraction
+        F0 = (16.0, 13.5, 11.5)
+        gap = 0.012
+
+        def col_h(bl, f):
+            return sum(lh(f * F0[0]) + lh(f * F0[1]) * (r.count("\n") + 1) + (lh(f * F0[2]) * (sb.count("\n") + 1)
+                       if sb else 0) + gap for _, _, r, sb in bl)
+        f_ = min(1.0, 0.95 / max(col_h(blocks_[:h_], 1.0), col_h(blocks_[h_:], 1.0)))
+        for c_, bl in enumerate((blocks_[:h_], blocks_[h_:])):
+            y = 0.5 + col_h(bl, f_) / 2                                      # centred in height
+            cx = x0_ + c_ * cw_
+            for r_, nm, role, sb in bl:
+                fig.text(cx, y, nm, color=rcol[r_], fontsize=f_ * F0[0], weight="bold", va="top")
+                y -= lh(f_ * F0[0])
+                fig.text(cx, y, role, color="white", fontsize=f_ * F0[1], va="top", linespacing=1.1)
+                y -= lh(f_ * F0[1]) * (role.count("\n") + 1)
+                if sb:
+                    fig.text(cx, y, sb, color="0.6", fontsize=f_ * F0[2], va="top", linespacing=1.1)
+                    y -= lh(f_ * F0[2]) * (sb.count("\n") + 1)
+                y -= gap
     elif iso == "merged":
         # right: THE REGIONS' MEAN TRACES (Cedric, 2026-10-07: "instead of the table, average the traces of each region,
         # compared to the brain mean in green; the region's name at the right with its neurons in parentheses"): per table
@@ -378,7 +479,7 @@ def summary(iso=False):
         ax.set_ylim(0, nr + 2.6)
     fout = (f"atlas_regions_block_{iso.split(':')[1].replace(' ', '_')}{'_lr' if iso.endswith(':lr') else ''}.png" if blkv
             else None)
-    fig.savefig(os.path.join(EXP, "presentation", "figs", fout or {"merged": "atlas_regions_merged.png", "merged_raster": "atlas_regions_raster.png", True: "atlas_regions_iso.png",
+    fig.savefig(os.path.join(EXP, "presentation", "figs", fout or {"merged": "atlas_regions_merged.png", "merged_raster": "atlas_regions_raster.png", "fish": "atlas_regions_fish.png", True: "atlas_regions_iso.png",
                                                            False: "atlas_regions.png"}[iso]), dpi=130, facecolor="black")
     plt.close(fig)
 
@@ -537,6 +638,7 @@ if __name__ == "__main__":
         if "--block" in sys.argv:                          # summary --block gain [--lr]
             summary(iso=f"block:{sys.argv[sys.argv.index('--block') + 1]}:{'lr' if '--lr' in sys.argv else ''}")
         else:
-            summary(iso="merged_raster" if "--raster" in sys.argv else ("merged" if "--merged" in sys.argv else ("--iso" in sys.argv)))
+            summary(iso="merged_raster" if "--raster" in sys.argv else ("merged" if "--merged" in sys.argv else
+                    ("fish" if "--fish" in sys.argv else ("--iso" in sys.argv))))
     elif len(sys.argv) == 1:
         main()
