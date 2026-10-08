@@ -127,7 +127,12 @@ def main(run):
 def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
     """THE OFFSETS, BLOCK BY BLOCK (Cedric, 2026-10-08: "a movie of the fish, from above and from the side, instead of the
     one block; no white dots"): one still per block held hold_s, every neuron coloured by its offset dV in that block on a
-    blue-black-red scale and its opacity |dV| (a near-zero offset invisible), the atlas frame. -> Movies/vrest_blocks_<run>.mp4"""
+    blue-black-red scale and its opacity |dV| (a near-zero offset invisible), the atlas frame. -> Movies/vrest_blocks_<run>.mp4
+
+    AGAINST THE FIRST BLOCK (Cedric, 2026-10-08: "the blue does not change, subtract the first block's offset"): the rest is
+    V_i + dV_ik, so the part of dV_ik shared by all 9 blocks is V_i's own and only the CHANGE between blocks is the
+    per-block rest; drawn raw, that shared part held the same blue in every frame. Each block is drawn as dV_ik - dV_i1,
+    the first block (gain) the reference, all 0; the poster is the second block."""
     import shutil
     import subprocess
     import tempfile
@@ -136,7 +141,12 @@ def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
     from plexus.tasks.trace_recording import _ffmpeg
     bkr = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])
     xd, yd = A[:, 1], (621 - 1) * 0.798 - A[:, 0]
-    vm = float(np.percentile(np.abs(dV[reads]), 98))
+    d_ = dV[reads]
+    shared = float((d_.mean(1) ** 2).sum() * d_.shape[1] / max(float((d_ ** 2).sum()), 1e-30))
+    print(f"[vrest] the part of dV shared by all {d_.shape[1]} blocks: {100 * shared:.0f} % of its sum of squares; "
+          f"{100 * float((d_ < 0).all(1).mean()):.0f} % of the neurons below 0 in every block")
+    dV = dV - dV[:, :1]                                                       # against the first block
+    vm = float(np.percentile(np.abs(dV[reads][:, 1:]), 98))
     nrm = TwoSlopeNorm(0, -vm, vm)
     ii = np.flatnonzero(reads)
     ext = lambda v: (float(np.percentile(v[ii], 0.2)), float(np.percentile(v[ii], 99.8)))      # noqa: E731
@@ -158,15 +168,17 @@ def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
             ax.set_xlim(x0, x1)
             ax.set_ylim(lo, hi)
             ax.axis("off")
-        fig.text(0.04, 1 - 0.35 / H, f"{b}: each neuron's offset dV", fontsize=14, va="top", weight="bold")
-        fig.text(0.04, 0.02, "red: rest raised, blue: lowered, black / clear: unchanged", fontsize=10, va="bottom", color="0.8")
+        fig.text(0.04, 1 - 0.35 / H, (f"{b}: the reference, 0" if k == 0 else f"{b}: each neuron's offset minus its {bn[0]} one"),
+                 fontsize=14, va="top", weight="bold")
+        fig.text(0.04, 0.02, f"red: rest raised against the {bn[0]} block, blue: lowered, clear: unchanged", fontsize=10,
+                 va="bottom", color="0.8")
         fig.savefig(os.path.join(tmp, f"{k:03d}.png"), dpi=110, facecolor="black")
         plt.close(fig)
     stem = os.path.join(EXP, "presentation", "Movies", f"vrest_blocks_{run}")
     subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", f"{1 / hold_s:.4f}", "-i", os.path.join(tmp, "%03d.png"),
                     "-r", str(fps), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264",
                     stem + ".mp4"], check=True)
-    shutil.copy(os.path.join(tmp, "000.png"), stem + ".png")
+    shutil.copy(os.path.join(tmp, "001.png"), stem + ".png")                 # the first block is the reference: blank
     shutil.rmtree(tmp)
     print(f"[vrest] {stem}.mp4: {len(bn)} blocks, {hold_s} s each")
 

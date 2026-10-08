@@ -417,6 +417,91 @@ def prune_window(run="zap_n19_nom"):
     json.dump({"run": run, "thresholds": th, "levels": counts, "joint": PR["joint"]},
               open(os.path.join(EXP, "data", f"prune_window_{run}.json"), "w"), indent=1)
 
+def prune_grid(run="zap_n20_markall"):
+    """THE LATTICE GRID, PRUNED (Cedric, 2026-10-08: "a twin of the pruned-mesh slides for 20.3"): the lattice grid's
+    window from above (the graph section's, around the coarsest corner nearest the brain's median, one 16-um cube deep),
+    level by level; after each level its removable edges -- inert (no neuron feeds the sender or reads the receiver) or
+    below the level's threshold on the coupling W_grid^2, in BOTH directions (tools/exp17_prune.py, data/prune_<run>.json)
+    -- marked red, then removed; then the whole fish, levels 1 and 2. The edges are the op's own (exp17_prune.grid_edges).
+    -> Movies/b20_grid_window_prune.mp4, Movies/b20_grid_fish_prune.mp4, data/prune_window_<run>.json."""
+    import torch
+    from plexus import trainer as T
+    from exp17_prune import grid_edges
+    spec = T.load(run)
+    PR = json.load(open(os.path.join(EXP, "data", f"prune_{run}.json")))
+    th = PR["thresholds"]
+    fit = torch.load(os.path.join(T.out_dir(spec, None), "models", "best.pt"), weights_only=False, map_location="cpu")["fitted"]
+    E = grid_edges(spec)
+    P, C, ms, mr, G = E["pos"], E["G"]["centre_um"], E["ms"], E["mr"], E["G"]
+    wg = fit["state_diffuse.W_grid"].float().numpy()
+    eff = wg ** 2 if E["op"].sign == "neuron" else np.abs(wg)
+    gone = E["inert"] | np.array([eff[i] < th.get(E["set"][i], 0.0) for i in range(len(eff))])   # per directed entry
+    nm = int(E["G"]["n_mesh"])
+    half = 128.0
+    top_ = G["level_nodes"][-1]
+    c0 = C[int(top_[np.argmin(np.linalg.norm(C[top_] - np.median(P, 0), axis=1))])]
+    reach = half + 0.25 * L0
+    inn = (np.abs(C[:, 0] - c0[0]) <= reach) & (np.abs(C[:, 1] - c0[1]) <= reach) & (np.abs(C[:, 2] - c0[2]) < 0.55 * L0)
+    sp = (np.abs(P[:, 0] - c0[0]) <= half) & (np.abs(P[:, 1] - c0[1]) <= half) & (np.abs(P[:, 2] - c0[2]) < 0.55 * L0)
+    per = {}
+    for k, name in enumerate(("fine", "middle", "coarse")):
+        d = np.flatnonzero(E["set"] == name)
+        key = np.minimum(ms[d], mr[d]) * nm + np.maximum(ms[d], mr[d])          # an undirected pair
+        u, inv = np.unique(key, return_inverse=True)
+        allg = np.ones(len(u), bool)
+        np.logical_and.at(allg, inv, gone[d])                                   # removed: gone in every direction
+        per[name] = {"a": u // nm, "b": u % nm, "rem": allg, "inert": int(E["inert"][d].sum()), "directed": int(len(d)),
+                     "directed_removed": int(gone[d].sum())}
+    wl, ws = [], ["1  the neurons: every destriped neuron of the slab"]
+    for k, name in enumerate(("fine", "middle", "coarse")):
+        a, b, rem = per[name]["a"], per[name]["b"], per[name]["rem"]
+        col, _, _, px = RANK[k]
+        ok = inn[a] & inn[b]
+        nk = G["level_nodes"][k]
+        s_add, s_mark, s_gone = 1 + 3 * k, 2 + 3 * k, 3 + 3 * k
+        bu = int(L0 * 2 ** k)
+        wl.append({"a": C[a[ok & rem]], "b": C[b[ok & rem]], "colour": col, "width": px, "stage": s_add, "until": s_mark,
+                   "label": f"level {k}: {bu}-µm edges, {len(a):,} in the brain", "row": k, "label_until": s_gone})
+        wl.append({"a": C[a[ok & rem]], "b": C[b[ok & rem]], "colour": "#ff3030", "width": px, "stage": s_mark, "until": s_gone})
+        wl.append({"a": C[a[ok & ~rem]], "b": C[b[ok & ~rem]], "colour": col, "width": px, "stage": s_add,
+                   "nodes": C[nk[inn[nk]]] if k else None, "node_px": 10.0 + 6.0 * k})
+        wl.append({"a": np.zeros((0, 3)), "b": np.zeros((0, 3)), "colour": col, "width": 1, "stage": s_gone, "row": k,
+                   "label": f"level {k}: {bu}-µm edges, {int((~rem).sum()):,} of {len(a):,} kept"})
+        ws += [f"{s_add + 1}  + the {NAMES[k]} grid: level {k}, {bu}-µm edges",
+               f"{s_mark + 1}  level {k}: inert or coupling < {th[name]:.2g} both ways, in red ({100 * rem.mean():.0f} %)",
+               f"{s_gone + 1}  level {k}: removed, {int((~rem).sum()):,} edges left"]
+    build_window(P[sp], wl, f"20.3's lattice grid, pruned: a {2 * half:.0f}-µm window, one 16-µm cube deep", ws,
+                 os.path.join(PRES, "Movies", "b20_grid_window_prune"), c0, half)
+    fw, fs = [], ["1  the neurons: all 100,759"]
+    for j, k in enumerate((1, 2)):
+        name = ("fine", "middle", "coarse")[k]
+        a, b, rem = per[name]["a"], per[name]["b"], per[name]["rem"]
+        col = RANK[k][0]
+        lw_ = 1.0 + 0.6 * j
+        s_add, s_mark, s_gone = 1 + 3 * j, 2 + 3 * j, 3 + 3 * j
+        bu = int(L0 * 2 ** k)
+        fw.append({"a": C[a[rem]], "b": C[b[rem]], "colour": col, "width": lw_, "stage": s_add, "until": s_mark,
+                   "label": f"level {k}: {bu}-µm edges, {len(a):,}", "row": j, "label_until": s_gone})
+        fw.append({"a": C[a[rem]], "b": C[b[rem]], "colour": "#ff3030", "width": lw_, "stage": s_mark, "until": s_gone})
+        fw.append({"a": C[a[~rem]], "b": C[b[~rem]], "colour": col, "width": lw_, "stage": s_add})
+        fw.append({"a": np.zeros((0, 3)), "b": np.zeros((0, 3)), "colour": col, "width": 1, "stage": s_gone, "row": j,
+                   "label": f"level {k}: {bu}-µm edges, {int((~rem).sum()):,} of {len(a):,} kept"})
+        fs += [f"{s_add + 1}  + the {NAMES[k]} grid: level {k}, {bu}-µm edges",
+               f"{s_mark + 1}  level {k}: inert or coupling < {th[name]:.2g} both ways, in red ({100 * rem.mean():.0f} %)",
+               f"{s_gone + 1}  level {k}: removed, {int((~rem).sum()):,} edges left"]
+    cf = (P.min(0) + P.max(0)) / 2
+    build_window(P, fw, "20.3's lattice grid, pruned: the whole fish from above, levels 1 and 2", fs,
+                 os.path.join(PRES, "Movies", "b20_grid_fish_prune"), cf, float((P.max(0) - P.min(0))[0] / 2 * 1.04),
+                 point=2.0, bar_um=100.0, size=(1600, 1040))
+    json.dump({"run": run, "thresholds": th, "grid": PR["grid"], "joint": PR["joint"],
+               "levels": {n_: {"edges": int(len(v["a"])), "removed": int(v["rem"].sum()), "inert_directed": v["inert"],
+                               "directed": v["directed"], "directed_removed": v["directed_removed"], "threshold": th[n_]}
+                          for n_, v in per.items()},
+               "self": {"directed": int((E["set"] == "self").sum()),
+                        "removed": int(gone[E["set"] == "self"].sum()), "threshold": th["self"]}},
+              open(os.path.join(EXP, "data", f"prune_window_{run}.json"), "w"), indent=1)
+
+
 APPENDIX_CURVES = {"zap_b20_x1": "held out against ZAPBench, x1 updates"}  # (Cedric, 2026-10-07; 20.1's slide removed)
 
 
@@ -616,6 +701,7 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
                       "$\\Omega$ per neuron, one colour scale centred on 1\\par}\n")
         out.append((f"19_omega_{run}", S.frame("the learned modulation of the messages", f"\\playmovie{{Movies/{run}_omega}}",
                                                right_om, "tools/exp17_modulation.py", left_gap=True,
+                                               widths=(0.50, 0.48) if law else (0.58, 0.4),   # 20.3's longer law (Cedric, 2026-10-08)
                                                deck_title=dt + " $\\cdot$ modulation")))
     # the learned constants on the brain (tools/exp17_param_maps.py)
     jm_ = os.path.join(EXP, "data", f"param_maps_{run}.json")
@@ -738,6 +824,14 @@ def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"
                                                           deck_title=dt + " $\\cdot$ the mean-field control: is the coupling network dynamics?",
                                                           left=0.50, height=0.70, img_top="0.12\\textheight")))
     return out
+
+
+def centred_movie(stem, right, left_w=0.58):
+    """A movie left and its text right, both centred in the slide's height (Cedric, 2026-10-08: "move the movie to the
+    centre of the slide") -- S.frame top-aligns them."""
+    return ("\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{" + f"{left_w}" + "\\textwidth}\\centering"
+            "\\playmovie{" + stem + "}\\end{column}\n\\begin{column}{" + f"{0.98 - left_w:.2f}" + "\\textwidth}\\fitcol{%\n"
+            + right + "}\\end{column}\n\\end{columns}\\vspace*{\\fill}")
 
 
 def write_slides():
@@ -1501,10 +1595,10 @@ def write_slides():
                           "level added, its edges below the level's threshold in both directions marked red, then removed. "
                           "Level 0 (every neuron's own edges) is a solid block at this scale: its pruning is on the previous "
                           "slide's window.\\par}\\vspace{6pt}\n" + lvf_)
-            deck.append(("19_prune_fish", S.frame("the whole fish, the weights near 0 removed",
-                                                  "\\playmovie{Movies/b19_fish_prune}", right_pf,
-                                                  "tools/exp17_b19_deck.py --prune-movie",
-                                                  deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the whole fish, pruned")))
+            deck.append(("19_prune_fish", S.frame_wide("the whole fish, the weights near 0 removed",
+                                                       centred_movie("Movies/b19_fish_prune", right_pf),
+                                                       "tools/exp17_b19_deck.py --prune-movie",
+                                                       deck_title="batch 19.25 $\\cdot$ zap\\_n19\\_nom $\\cdot$ the whole fish, pruned")))
         je_ = os.path.join(EXP, "data", "ei_dale_n19.json")   # Cedric, 2026-10-08: excitatory / inhibitory under Dale
         if os.path.exists(je_) and os.path.exists(os.path.join(PRES, "figs", "ei_dale_n19.png")):
             EI_ = json.load(open(je_))
@@ -1571,8 +1665,9 @@ def write_slides():
                      "regions' means move more, each its own way. Each neuron's offset follows its own recorded block "
                      "shift: r " + f"{min(rk_.values()):+.2f}" + " to " + f"{max(rk_.values()):+.2f}" + " over the neurons -- the "
                      "offsets fit each neuron's slow baseline per block, much of this run's per-neuron r. Middle: the "
-                     "fish from above and from the side, one block after the other, each neuron coloured by its offset in "
-                     "that block (red: the block raises its rest V$_i$, blue: lowers it), the small offsets faded out.\\par}")
+                     "fish from above and from the side, one block after the other, each neuron coloured by its offset minus its "
+                     "offset in the first block, gain (red: raised against gain, blue: lowered), the small changes faded "
+                     "out. The part of dV shared by all 9 blocks is V$_i$'s own, so only the change is drawn.\\par}")
         # Cedric, 2026-10-08: panels a and b, and the offsets as a movie of the fish beside them (no white dots)
         mvv_ = os.path.join(PRES, "Movies", "vrest_blocks_zap_n20_markall.mp4")
         body_v = ("\\vspace*{0.04\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.50\\textwidth}\\centering"
@@ -1607,6 +1702,66 @@ def write_slides():
             deck.append(("19_vrest_regions_zap_n20_markall", S.frame_wide("the learned rest, region by region", body_vr,
                                                                          "tools/exp17_tau_regions.py zap_n20_markall --vrest",
                                                                          deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ V$_{rest}$ by region")))
+    # Cedric, 2026-10-08: "add twin of 33 34 for 20.3" -- the lattice grid pruned (tools/exp17_prune.py zap_n20_markall,
+    # tools/exp17_b19_deck.py --prune-grid), after 20.3's tau by region
+    jg_ = os.path.join(EXP, "data", "prune_window_zap_n20_markall.json")
+    jq_ = os.path.join(EXP, "data", "prune_zap_n20_markall.json")
+    if os.path.exists(jg_) and os.path.exists(jq_) and os.path.exists(os.path.join(PRES, "Movies", "b20_grid_window_prune.mp4")):
+        GW_, GP_ = json.load(open(jg_)), json.load(open(jq_))
+        J2_, I2_, gg_ = GP_["joint"], GP_["grid"]["inert_only"], GP_["grid"]
+        lab2_ = {"self": "self edges (each corner to itself)", "fine": "level 0 (16-\\textmu m edges)",
+                 "middle": "level 1 (32-\\textmu m edges)", "coarse": "level 2 (64-\\textmu m edges)"}
+        lines2_ = ""
+        for s_, P_ in GP_["per_set"].items():
+            n_all_ = P_["n"] + gg_["inert_per_set"][s_]
+            kept_ = int(round(P_["n"] * (1 - P_["removed_share"])))
+            lines2_ += ("{\\scriptsize\\raggedright \\textbf{" + lab2_[s_] + "}: keeps \\textbf{" + f"{100 * kept_ / n_all_:.0f}"
+                        + " \\%}, " + f"{kept_:,} of {n_all_:,}" + " directed weights: " + f"{gg_['inert_per_set'][s_]:,}"
+                        + " inert, " + f"{P_['n'] - kept_:,}" + " live below " + f"{P_['threshold']:.2g}"
+                        + (" -- the ladder's top: more may go" if P_["threshold"] > 0 and P_["threshold"] >= max(
+                            r["thresholds"][s_] for r in P_["ladder"]) - 1e-12 else "") + ".\\par}\\vspace{3pt}\n")
+        right_gw = (S.head("the lattice grid, pruned: 20.3")
+                    + "{\\scriptsize\\raggedright The lattice grid's window, level by level; after each level, its "
+                      "removable edges marked red, then removed. An edge goes when it is \\textbf{inert} -- no neuron feeds "
+                      "its sending corner or reads its receiving one, so training never moved it from its start, 1.0 -- or "
+                      "its coupling $W_{grid}^2$ is below the level's threshold, in both directions. Its live weights have "
+                      "no mode near 0: the threshold ladder is their own quantiles.\\par}\\vspace{5pt}\n"
+                    + lines2_ + "\\vspace{2pt}\n"
+                    + S.head("the check")
+                    + "{\\scriptsize\\raggedright The 2 h free rollout rerun. The " + f"{gg_['inert']:,}"
+                      " inert edges alone: brain-mean r " + f"{I2_['d_brain_mean_r']:+.4f}" + ", per-neuron r "
+                    + f"{I2_['d_per_neuron_r']:+.4f}" + ". Every set cut at once: " + f"{100 * J2_['kept_share']:.0f}"
+                    + " \\% of the " + f"{gg_['edges']:,}" + " weights kept, brain-mean r " + f"{J2_['d_brain_mean_r']:+.4f}"
+                    + ", per-neuron r " + f"{J2_['d_per_neuron_r']:+.4f}" + " -- "
+                    + ("within" if J2_["removable"] else "beyond") + " 19.25's seed spread (0.009 and 0.005; 20.3 has no "
+                      "seed twin).\\par}")
+        new_ = [("20_prune_window", S.frame("the lattice grid, the weights near 0 removed",
+                                            "\\playmovie{Movies/b20_grid_window_prune}", right_gw,
+                                            "tools/exp17_b19_deck.py --prune-grid; tools/exp17_prune.py zap_n20_markall",
+                                            deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ the grid, pruned"))]
+        if os.path.exists(os.path.join(PRES, "Movies", "b20_grid_fish_prune.mp4")):
+            lvf2_ = "".join("{\\scriptsize\\raggedright \\textbf{level " + str(k_) + "}: " + f"{c_['edges'] - c_['removed']:,}"
+                            + " of its " + f"{c_['edges']:,}" + " edges kept (" + f"{100 * (1 - c_['removed'] / c_['edges']):.0f}"
+                            + " \\%): inert, or $W_{grid}^2 <$ " + f"{c_['threshold']:.2g}" + ", both ways.\\par}\\vspace{4pt}\n"
+                            for k_, (s_, c_) in enumerate(GW_["levels"].items()) if k_ > 0)
+            right_gf = (S.head("the whole fish, pruned")
+                        + "{\\scriptsize\\raggedright Levels 1 and 2 of 20.3's lattice grid over every neuron, from above: "
+                          "each level added, its removable edges marked red, then removed. Level 0 (16-\\textmu m edges) is a "
+                          "solid block at this scale: its pruning is on the previous slide's window.\\par}\\vspace{6pt}\n"
+                        + lvf2_)
+            new_.append(("20_prune_fish", S.frame_wide("the whole fish, the weights near 0 removed",
+                                                       centred_movie("Movies/b20_grid_fish_prune", right_gf),
+                                                       "tools/exp17_b19_deck.py --prune-grid",
+                                                  deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ the whole fish, pruned")))
+        if os.path.exists(os.path.join(PRES, "figs", "prune_zap_n20_markall.png")):
+            new_.append(("20_prune_dist", S.frame_narrow("the learned grid weights, level by level", "figs/prune_zap_n20_markall.png",
+                                                         S.head("which grid weights can go?")
+                                                         + "{\\scriptsize\\raggedright Per level, the live edges' coupling "
+                                                           "$W_{grid}^2$ (top) and the change of both r as each level's edges "
+                                                           "below $t$ are zeroed, the inert edges always (bottom).\\par}",
+                                                         "tools/exp17_prune.py zap_n20_markall", left=0.74,
+                                                         deck_title="batch 20.3 $\\cdot$ the grid weights near 0")))
+        deck += new_                                   # after 20.3's V_rest slides (Cedric, 2026-10-08: "after 41")
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     from PIL import Image
@@ -1671,6 +1826,10 @@ def write_slides():
             if nb_ in [n for n, _ in deck]:
                 it_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert([n for n, _ in deck].index(ed_[0]) + 1 + k_, it_)
+    nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: "swap slide 40 and 41" -- V_rest by region first
+    if "19_vrest_regions_zap_n20_markall" in nm_ and "19_vrest_zap_n20_markall" in nm_:
+        it_ = deck.pop(nm_.index("19_vrest_regions_zap_n20_markall"))
+        deck.insert([n for n, _ in deck].index("19_vrest_zap_n20_markall"), it_)
     # Cedric, 2026-10-08: section dividers in the appendix's look, before the graph, the input stimuli and the model
     for nm_d, ttl_d, before_ in (("00y_sec_graph", "the graph", "01_grid_3d"),
                                  ("04y_sec_input", "input stimuli", "05_input_neurons"),
@@ -1681,7 +1840,7 @@ def write_slides():
                 deck_title="multi-level GNN on fish 2 $\\cdot$ " + ttl_d)))
             open(os.path.join(SL, nm_d + ".tex"), "w").write(deck[[n for n, _ in deck].index(nm_d)][1])
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
-             "00i_classic_circuits", "00d_brain_mean_spread", "06_model", "19_prune_dist"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
+             "00i_classic_circuits", "00d_brain_mean_spread", "06_model", "19_prune_dist", "20_prune_dist"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
     deck = [(n, b) for n, b in deck if n != "00j_lateral"]   # Cedric, 2026-10-07: "delete slide 7" (left against right)
     deck = [(n, b) for n, b in deck if n != "00l_atlas_raster"]   # Cedric, 2026-10-07: "delete slide 5" (the mean traces)                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
     deck = [(n, b) for n, b in deck if n not in ("00g_classic_regressors", "00h_classic_reliability", "00i_classic_circuits")]  # Cedric, 2026-10-07: "slide 3 in comments", then "slide 13 in comments"
@@ -1693,6 +1852,8 @@ def write_slides():
 if __name__ == "__main__":
     if "--prune-movie" in sys.argv:                 # Cedric, 2026-10-08: slide 18's twin, the mesh pruned
         prune_window()
+    elif "--prune-grid" in sys.argv:                # Cedric, 2026-10-08: its twin for 20.3, the lattice grid pruned
+        prune_grid()
     elif "--slides-only" in sys.argv:
         write_slides()
     else:
