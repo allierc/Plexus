@@ -88,6 +88,10 @@ class NeuralPanel:
         self.rate_lim = float(self.cfg.get("rate_lim", 0.0)) or None
         self.kino_w = int(self.cfg.get("kino_frames", 300))
         self.gamma = float(self.cfg.get("rate_gamma", 0.35))
+        # the generic input and output columns; a subclass that draws its own (plot_trainer.TaskCircuitPanel: the
+        # drive box -> the afferent cells, the muscle grid) turns them off
+        self.show_input = bool(self.cfg.get("input_column", True))
+        self.show_output = bool(self.cfg.get("output_column", True))
         self._ready = False
 
     # ------------------------------------------------------------------ the circuit, read once
@@ -187,6 +191,8 @@ class NeuralPanel:
         import matplotlib.pyplot as plt
         self.cmap = _ei_cmap()
         N = self.N
+        # the type labels shrink when the bands are many and thin (a spec split by side: 16 types, bands of 6 rows)
+        self._fs_lab = FS_TICK if len(self.blocks) <= 10 else 7.0
         fig, ax, ax_k = self._figure()
         ax.set_facecolor(BG); ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
         mid_l, mid_r, lo, hi = 0.30, 0.72, 0.06, 0.96
@@ -199,7 +205,7 @@ class NeuralPanel:
                 ax.plot([mid_l, mid_r], [y, y], color="#777", lw=0.4, alpha=0.5, zorder=4)
                 ax.plot([x, x], [lo, hi], color="#777", lw=0.4, alpha=0.5, zorder=4)
             yc = hi - (hi - lo) * 0.5 * (a0 + a1) / N
-            ax.text(mid_l - 0.006, yc, f"{nm} ({a1 - a0})", color="#ccc", fontsize=FS_TICK, ha="right", va="center")
+            ax.text(mid_l - 0.006, yc, f"{nm} ({a1 - a0})", color="#ccc", fontsize=self._fs_lab, ha="right", va="center")
         ax.text(0.5, lo - 0.02, "presynaptic", color="#ddd", fontsize=FS_AXIS, ha="center", va="top")
         ax.text(0.135, 0.5 * (lo + hi), "postsynaptic", color="#ddd", fontsize=FS_AXIS, ha="center", va="center", rotation=90)
 
@@ -208,20 +214,30 @@ class NeuralPanel:
                            aspect="auto", zorder=3, interpolation="nearest")
             ax.add_patch(plt.Rectangle((x0, lo), x1 - x0, hi - lo, fill=False, ec="#777", lw=0.5, zorder=5))
             return im
-        im_in = _col(0.075, 0.105, N)
-        ax.text(0.09, hi + 0.012, "input", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
+        im_in = None
+        if self.show_input:
+            im_in = _col(0.075, 0.105, N)
+            ax.text(0.09, hi + 0.012, "input", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
         im_rate = _col(0.735, 0.765, N)
         ax.text(0.75, hi + 0.012, "r = tanh v", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
-        k_out = max(1, len(self.out_groups))
-        oy0, oy1 = 0.5 * (lo + hi) - 0.03 * k_out, 0.5 * (lo + hi) + 0.03 * k_out
-        im_out = ax.imshow(np.zeros((k_out, 1)), cmap=self.cmap, vmin=-1, vmax=1, extent=(0.86, 0.90, oy0, oy1),
-                           aspect="auto", zorder=3, interpolation="nearest")
-        ax.add_patch(plt.Rectangle((0.86, oy0), 0.04, oy1 - oy0, fill=False, ec="#777", lw=0.5, zorder=5))
-        ax.text(0.88, oy1 + 0.012, "output", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
-        for k, (nm, _) in enumerate(self.out_groups):
-            ax.text(0.905, oy1 - (oy1 - oy0) * (k + 0.5) / k_out, nm, color="#fff", fontsize=FS_NOTE, ha="left", va="center")
-        for x0, x1, yy in ((0.11, 0.128, 0.5 * (lo + hi)), (mid_r + 0.004, 0.73, 0.5 * (lo + hi)), (0.77, 0.855, 0.5 * (lo + hi))):
+        im_out = None
+        if self.show_output:
+            k_out = max(1, len(self.out_groups))
+            oy0, oy1 = 0.5 * (lo + hi) - 0.03 * k_out, 0.5 * (lo + hi) + 0.03 * k_out
+            im_out = ax.imshow(np.zeros((k_out, 1)), cmap=self.cmap, vmin=-1, vmax=1, extent=(0.86, 0.90, oy0, oy1),
+                               aspect="auto", zorder=3, interpolation="nearest")
+            ax.add_patch(plt.Rectangle((0.86, oy0), 0.04, oy1 - oy0, fill=False, ec="#777", lw=0.5, zorder=5))
+            ax.text(0.88, oy1 + 0.012, "output", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
+            for k, (nm, _) in enumerate(self.out_groups):
+                ax.text(0.905, oy1 - (oy1 - oy0) * (k + 0.5) / k_out, nm, color="#fff", fontsize=FS_NOTE, ha="left", va="center")
+        arrows = [(mid_r + 0.004, 0.73, 0.5 * (lo + hi))]
+        if self.show_input:
+            arrows.append((0.11, 0.128, 0.5 * (lo + hi)))
+        if self.show_output:
+            arrows.append((0.77, 0.855, 0.5 * (lo + hi)))
+        for x0, x1, yy in arrows:
             ax.annotate("", xy=(x1, yy), xytext=(x0, yy), arrowprops=dict(arrowstyle="-|>", color="#ffffff", lw=1.0))
+        self.geom = dict(mid_l=mid_l, mid_r=mid_r, lo=lo, hi=hi)          # for a subclass drawing beside the matrix
         self.txt = ax.text(0.0, 1.0, "", transform=ax.transAxes, color="#fff", fontsize=FS_NOTE, ha="left", va="bottom")
         ax_k.set_facecolor(BG)
         im_kino = ax_k.imshow(np.full((N, self.kino_w), np.nan, np.float32), cmap=self.cmap, vmin=-1, vmax=1,
@@ -233,7 +249,7 @@ class NeuralPanel:
             if a0:
                 ax_k.axhline(a0 - 0.5, color="#777", lw=0.5, alpha=0.6)
             ax_k.text(-0.004, 1.0 - (a0 + a1) / (2 * N), nm, transform=ax_k.transAxes, color="#ccc",
-                      fontsize=FS_TICK, ha="right", va="center")
+                      fontsize=self._fs_lab, ha="right", va="center")
         ax_k.set_xlabel(f"time  (last {self.kino_w} rendered frames)", color="#ddd", fontsize=FS_AXIS, labelpad=4)
         self.fig, self.art = fig, dict(im_rec=im_rec, im_in=im_in, im_rate=im_rate, im_out=im_out, im_kino=im_kino)
         self._build_extra(fig)
@@ -276,17 +292,21 @@ class NeuralPanel:
             pass
         self.art["im_rec"].set_data(np.clip(mag, 0.0, 1.0) * self.col_sign[None, :])
         vin = om[self.order].astype(np.float32)
-        if self.in_types:
+        if self.art["im_in"] is None:
+            pass
+        elif self.in_types:
             nt_sorted = np.zeros(self.N, bool)
             for nm, a0, a1 in self.blocks:
                 if nm in [self._names()[t] for t in self.in_types]:
                     nt_sorted[a0:a1] = True
             vin = np.where(nt_sorted, vin, np.nan)
         lim_in = float(np.nanmax(np.abs(vin))) if np.isfinite(vin).any() else 1.0
-        self.art["im_in"].set_data((vin / max(lim_in, 1e-9))[:, None])
+        if self.art["im_in"] is not None:
+            self.art["im_in"].set_data((vin / max(lim_in, 1e-9))[:, None])
         self.art["im_rate"].set_data(self._rate_disp(rs)[:, None])
-        outs = np.array([[float(np.mean(r[g])) if g.size else 0.0] for _, g in self.out_groups] or [[0.0]], np.float32)
-        self.art["im_out"].set_data(self._rate_disp(outs))
+        if self.art["im_out"] is not None:
+            outs = np.array([[float(np.mean(r[g])) if g.size else 0.0] for _, g in self.out_groups] or [[0.0]], np.float32)
+            self.art["im_out"].set_data(self._rate_disp(outs))
         lo_i = max(0, idx + 1 - self.kino_w)
         buf = np.full((self.N, self.kino_w), np.nan, np.float32)
         seg = np.stack([self._rate_disp(h[1][self.order]) for h in self.hist[lo_i:idx + 1]], 1)
