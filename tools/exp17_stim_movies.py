@@ -12,7 +12,7 @@ optomotor stimulus the fish swims against). The drift and the dots move at a fix
 the STATE (which grating, which direction, light or dark) follows the recording at SPEED x real time.
 
     PYTHONPATH=src:tools python tools/exp17_stim_movies.py
--> presentation/Movies/stim_<block>.mp4 (+ .png) and stim_all.mp4 (the nine blocks in order)
+-> presentation/Movies/stim_<block>.mp4 (+ .png) and stim_all.mp4 (the nine blocks in order), DUR_S each
 """
 import os
 import shutil
@@ -27,6 +27,8 @@ sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 MOV = os.path.join(EXP, "presentation", "Movies")
 DT, SPEED, FPS, PX, PERIOD = 0.914, 30.0, 25, 256, 48.0
+DUR_S, LEAD_S = 2.0, 30.0      # each movie 2 s, played once (Cedric, 2026-10-08: "they draw too much attention"),
+                               # from 30 s of recording before the block's first stimulus change
 
 
 def fish_mask(px=PX):
@@ -112,21 +114,17 @@ def frame_of(block, u, phase, dots, t_block):
     return np.zeros((PX, PX), np.float32), "dark"
 
 
-def render(block, rows, stem, label_block=False):
-    """rows: the block's stimulus rows [T, 22] at DT; one movie frame every SPEED / FPS s of recording."""
+def render(seq, stem, label_block=False):
+    """seq: one (block, stimulus row [22]) per movie frame, at FPS -> <stem>.mp4, its poster the first frame."""
     from PIL import Image, ImageDraw
     from plexus.tasks.trace_recording import _ffmpeg
     body, eyes = fish_mask()
     dots = Dots()
-    n = int(len(rows) * DT / (SPEED / FPS))
     tmp = tempfile.mkdtemp(prefix="stim_")
     phase = 0.0
-    for i in range(n):
-        t = i * SPEED / FPS
-        r = rows[min(int(t / DT), len(rows) - 1)]
-        blk = block[min(int(t / DT), len(rows) - 1)] if isinstance(block, np.ndarray) else block
+    for i, (blk, r) in enumerate(seq):
         phase += 3.0                                                # the drift, px per movie frame
-        im, lab = frame_of(blk, r, phase, dots, t)
+        im, lab = frame_of(blk, r, phase, dots, i / FPS)
         g = (0.12 + 0.76 * im)                                      # the projector's grey range
         rgb = np.stack([g, g, g], -1)
         rgb[body] = (1.0, 0.55, 0.15)                               # the fish, orange
@@ -138,9 +136,17 @@ def render(block, rows, stem, label_block=False):
         img.save(os.path.join(tmp, f"{i:05d}.png"))
     subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", os.path.join(tmp, "%05d.png"),
                     "-pix_fmt", "yuv420p", "-c:v", "libx264", stem + ".mp4"], check=True)
-    shutil.copy(os.path.join(tmp, f"{min(n - 1, int(n * 0.15)):05d}.png"), stem + ".png")   # a poster with a stimulus on
+    shutil.copy(os.path.join(tmp, "00000.png"), stem + ".png")
     shutil.rmtree(tmp)
-    print(f"[stim] {stem}.mp4: {n} frames, {n / FPS:.0f} s")
+    print(f"[stim] {stem}.mp4: {len(seq)} frames, {len(seq) / FPS:.1f} s")
+
+
+def window(rows, n):
+    """n movie frames of the block at SPEED x, starting LEAD_S of recording before its first stimulus change (both
+    states shown); a block that never changes from its first frame."""
+    ch = np.flatnonzero(np.abs(np.diff(rows, axis=0)).max(1) > 1e-6)
+    t0 = max(0.0, (ch[0] + 1) * DT - LEAD_S) if len(ch) else 0.0
+    return [rows[min(int((t0 + i * SPEED / FPS) / DT), len(rows) - 1)] for i in range(n)]
 
 
 def main():
@@ -148,15 +154,14 @@ def main():
     z = np.load(graphs_data_path("zebrafish", "zapbench_destripe_recording.npz"))
     U, off, names = np.asarray(z["stimulus"], np.float32), z["offsets"], [str(x) for x in z["names"]]
     os.makedirs(MOV, exist_ok=True)
+    n = int(round(DUR_S * FPS))
     for k, b in enumerate(names):
-        render(b, U[off[k]:off[k + 1]], os.path.join(MOV, f"stim_{b.replace(' ', '_')}"))
-    # the nine blocks in order, each its first 2 min (the atlas slide)
-    rows, blks = [], []
-    for k, b in enumerate(names):
-        m = min(int(120 / DT), off[k + 1] - off[k])
-        rows.append(U[off[k]:off[k] + m])
-        blks += [b] * m
-    render(np.array(blks), np.concatenate(rows), os.path.join(MOV, "stim_all"), label_block=True)
+        render([(b, r) for r in window(U[off[k]:off[k + 1]], n)], os.path.join(MOV, f"stim_{b.replace(' ', '_')}"))
+    # the atlas slide: the nine blocks in order within the same DUR_S, each its share of the frames from its first change
+    seq = []
+    for k, idx in enumerate(np.array_split(np.arange(n), len(names))):
+        seq += [(names[k], r) for r in window(U[off[k]:off[k + 1]], len(idx))]
+    render(seq, os.path.join(MOV, "stim_all"), label_block=True)
 
 
 if __name__ == "__main__":
