@@ -1101,7 +1101,9 @@ def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, strid
     if len(pick) == 1:
         y = Y[pick[0]].cpu().numpy()                                         # [T, K]
     else:
-        y = np.asarray(_teacher_on_cell(corpus, u[None, :, :1].cpu().numpy(), c[pick[:1]])).reshape(len(u), -1)
+        # the teacher reads the corpus's own stimulus channels (any context one-hot is appended after them)
+        nch = int(torch.load(os.path.join(task_dir(corpus), "teacher.pt"), weights_only=False).get("channels", 1))
+        y = np.asarray(_teacher_on_cell(corpus, u[None, :, :nch].cpu().numpy(), c[pick[:1]])).reshape(len(u), -1)
     path = out or os.path.join(out_d, "results", "movie_circuit.mp4")
     Panel = _task_circuit_panel_class()
     panel = Panel(out=path, n_frames=int(u.shape[0]), sim=sim, style={"panel": {"kino_frames": min(int(u.shape[0]), 600)}},

@@ -1,9 +1,9 @@
-general: {name: t6_binocular_gaze, duration_s: 8.0, dt: 0.0166666666666667, channels: 1, targets: 2}
-stimulus: {process: band_limited_noise, f_max_hz: 1.0, amplitude: 7.3672}
+general: {name: t6_binocular_gaze, duration_s: 8.0, dt: 0.0166666666666667, channels: 2, targets: 2}
+stimulus: {process: band_limited_noise, f_max_hz: 1.0, amplitude: 7.3672, independent: false}
 teacher:
   law: statespace
   A: [[-0.125]]
-  B: [[1.0]]
+  B: [[0.5, 0.5]]
   C: [[1.0], [-1.0]]
 splits:
   train: {n_per_cond: 3600, seed0: 0}

@@ -1842,7 +1842,8 @@ def write_slides():
                  "connectivity matrix. Right: the eye from above and the muscle drives. Below: the 285 cells. Held-out "
                  "error " + f"{100 * J_e['normalised_mse']:.2f}" + " \\% of the target's variance; no fast oscillation "
                  "(98 \\% of each cell's activity below 1 Hz).\\par}\\end{column}\n\\end{columns}")
-        body_e = ("\\centering\\playmovie[0.84\\textwidth]{Movies/eye_circuit_zf_eye_rig}\\par\\vspace{1pt}" + cap_e)
+        body_e = ("\\vspace*{0.08\\textheight}\\centering\\playmovie[0.84\\textwidth]{Movies/eye_circuit_zf_eye_rig}\\par"
+                  "\\vspace{1pt}" + cap_e)     # moved down to the slide's centre (Cedric, 2026-10-08)
         deck.append(("90b_eye_circuit", S.frame_wide("the eye circuit, trained on a task", body_e,
                                                      "Plexus: Plexus_Main.py -o analyse zf_eye_rig "
                                                      "(plexus.tasks.plot_trainer.circuit_movie)",
