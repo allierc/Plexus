@@ -1,0 +1,7 @@
+general: {name: t8_hd_heading, duration_s: 10.0, dt: 0.01, channels: 3, targets: 2}
+stimulus: {process: swim_heading, rate_hz: 0.5, event_s: 0.3, fractions: [0.3, 0.3, 0.2, 0.2], dtheta_median_rad: 0.785, dtheta_sigma_log: 0.51}
+teacher: {law: heading}
+splits:
+  train: {n_per_cond: 10000, seed0: 0}
+  val: {n_per_cond: 500, seed0: 5000000}
+  test: {n_per_cond: 1000, seed0: 9000000}

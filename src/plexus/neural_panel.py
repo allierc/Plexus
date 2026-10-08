@@ -92,6 +92,10 @@ class NeuralPanel:
         # drive box -> the afferent cells, the muscle grid) turns them off
         self.show_input = bool(self.cfg.get("input_column", True))
         self.show_output = bool(self.cfg.get("output_column", True))
+        # THE RATE IS THE CIRCUIT'S OWN SENDER NONLINEARITY (`panel.activation`, default tanh): a sigmoid circuit drawn
+        # as tanh(v) saturates everywhere; a sigmoid rate is drawn about its midpoint 0.5
+        self.act_name = str(self.cfg.get("activation", "tanh"))
+        self.r_center = 0.5 if self.act_name == "sigmoid" else 0.0
         self._ready = False
 
     # ------------------------------------------------------------------ the circuit, read once
@@ -159,7 +163,7 @@ class NeuralPanel:
     def _read(self, H):
         lv = H.level(self.nset)
         v = lv.get("voltage").detach().float().cpu().numpy().reshape(-1)
-        r = np.tanh(v)
+        r = 1.0 / (1.0 + np.exp(-v)) if self.act_name == "sigmoid" else np.tanh(v)
         om = None
         if self.input_field is not None:
             try:
@@ -219,7 +223,8 @@ class NeuralPanel:
             im_in = _col(0.075, 0.105, N)
             ax.text(0.09, hi + 0.012, "input", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
         im_rate = _col(0.735, 0.765, N)
-        ax.text(0.75, hi + 0.012, "r = tanh v", color="#fff", fontsize=FS_NOTE, ha="center", va="bottom")
+        ax.text(0.75, hi + 0.012, f"r = {'σ' if self.act_name == 'sigmoid' else 'tanh'}(v)", color="#fff",
+                fontsize=FS_NOTE, ha="center", va="bottom")
         im_out = None
         if self.show_output:
             k_out = max(1, len(self.out_groups))
@@ -257,11 +262,13 @@ class NeuralPanel:
 
     # ------------------------------------------------------------------ the LUTs
     def _rate_disp(self, r):
+        r = r - self.r_center
         lim = self.rate_lim or 1.0
         return np.sign(r) * np.clip(np.abs(r) / lim, 0.0, 1.0) ** self.gamma
 
     def _update_limits(self, r):
-        nz = np.abs(r[np.abs(r) > 0])
+        rc = r - self.r_center
+        nz = np.abs(rc[np.abs(rc) > 0])
         if nz.size:
             p = float(np.percentile(nz, 90.0))
             self.rate_lim = max(self.rate_lim or 0.0, p) if not self.cfg.get("rate_lim") else self.rate_lim

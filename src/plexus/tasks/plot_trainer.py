@@ -759,9 +759,9 @@ def _task_circuit_panel_class():
             self.tr["eyes"] = list(eyes) if eyes and len(eyes) == E else (["L", "R"] if E == 2 else
                                                                          [""] if E == 1 else [str(e) for e in range(E)])
 
-        def set_muscles(self, drives, names):
-            """drives [T, E, M]: each eye's muscle drives."""
-            self.mus = dict(d=np.asarray(drives, np.float64), names=list(names))
+        def set_muscles(self, drives, names, title="muscle drive"):
+            """drives [T, E, M]: each eye's muscle drives (or any effector set's `drive`, one row per member)."""
+            self.mus = dict(d=np.asarray(drives, np.float64), names=list(names), title=str(title))
 
         def set_plant(self, beta, K, C, pose, pose_target, pairs, axes=("θ", "φ", "ψ")):
             """THE EYE PLANT, a Hammerstein cascade (muscle_ops): the STATIC stage `muscle_pose_map` -- each eye's six
@@ -805,13 +805,14 @@ def _task_circuit_panel_class():
             import matplotlib.pyplot as plt
             from matplotlib.gridspec import GridSpec
             wide = self.plant is not None
-            fig = plt.figure(figsize=(25.0 if wide else 20.0, 9.6), facecolor=BG, dpi=100)
-            wr = [0.80, 1.75, 1.45, 0.80] if wide else [0.85, 1.80, 0.90]
+            eye = self.tr is not None and (self.tr["unit"] in ("deg", "rad") or self._compass())  # eyes, or a compass
+            fig = plt.figure(figsize=(25.0 if wide else 20.0 if eye else 17.0, 9.6), facecolor=BG, dpi=100)
+            wr = ([0.80, 1.75, 1.45] if wide else [0.85, 1.80]) + ([0.80 if wide else 0.90] if eye else [])
             gs = GridSpec(2, len(wr), width_ratios=wr, height_ratios=[1.0, 0.52], hspace=0.16, wspace=0.07,
                           left=0.055, right=0.99, top=0.93, bottom=0.07)
             self.ax_tr = fig.add_subplot(gs[0, 0])
             self.ax_pl = fig.add_subplot(gs[0, 2]) if wide else None
-            self.ax_eye = fig.add_subplot(gs[0, len(wr) - 1])
+            self.ax_eye = fig.add_subplot(gs[0, len(wr) - 1]) if eye else None
             self.ax_c = fig.add_subplot(gs[0, 1])
             return fig, self.ax_c, fig.add_subplot(gs[1, :])
 
@@ -870,8 +871,8 @@ def _task_circuit_panel_class():
                 for k_, nm in enumerate(self.mus["names"][:M]):
                     a.text(x0 + 0.035 * E + 0.006, yo + h / 2 - h * (k_ + 0.5) / M, nm, color="#fff", fontsize=9,
                            ha="left", va="center")
-                a.text(x0 + 0.0175 * E, yo - h / 2 - 0.012, "muscle drive", color="#ddd", fontsize=8.5,
-                       ha="center", va="top")
+                a.text(x0 + 0.0175 * E, yo - h / 2 - 0.012, self.mus.get("title", "muscle drive"), color="#ddd",
+                       fontsize=8.5, ha="center", va="top")
                 a.annotate("", xy=(x0 - 0.004, yo), xytext=(0.77, yo),
                            arrowprops=dict(arrowstyle="-|>", color="#fff", lw=1.0))
             if self.tr is not None:
@@ -912,13 +913,34 @@ def _task_circuit_panel_class():
             for tx in leg.get_texts():
                 tx.set_color("#ddd")
             if E == 2:
-                a.text(1.0, -0.13, f"{tr['eyes'][0]} eye solid, {tr['eyes'][1]} eye dashed; each in its own frame",
+                a.text(1.0, -0.13, (f"{tr['eyes'][0]} eye solid, {tr['eyes'][1]} eye dashed; each in its own frame"
+                                    if tr["unit"] in ("deg", "rad") else f"{tr['eyes'][0]} solid, {tr['eyes'][1]} dashed"),
                        transform=a.transAxes, color="#aaa", fontsize=8.5, ha="right", va="top")
             self.txt_tr = a.text(0.0, 1.02, "", transform=a.transAxes, color="#ddd", fontsize=10, va="bottom")
+
+        def _compass(self):
+            """An observed (cos, sin) pair IS a heading: drawn as a compass, true and decoded."""
+            return self.tr is not None and [x.lower() for x in self.tr["eyes"]] == ["cos", "sin"]
 
         def _build_eyes(self):
             import matplotlib.pyplot as plt
             tr, e_ = self.tr, self.ax_eye
+            self.eye_art = []
+            if e_ is None:
+                return
+            if self._compass():
+                e_.set_facecolor(BG); e_.axis("off"); e_.set_aspect("equal")
+                e_.set_xlim(-1.6, 1.6); e_.set_ylim(-1.9, 1.7)
+                e_.add_patch(plt.Circle((0, 0), 1.0, fill=False, ec="#bbbbbb", lw=1.5))
+                for a_ in np.arange(0, 360, 45):
+                    e_.plot([0.92 * np.cos(np.radians(a_)), np.cos(np.radians(a_))],
+                            [0.92 * np.sin(np.radians(a_)), np.sin(np.radians(a_))], color="#777", lw=1.0)
+                self.cmp_t = e_.plot([], [], color="#5fd08a", lw=3.0)[0]
+                self.cmp_m = e_.plot([], [], color="#ffffff", lw=2.0)[0]
+                self.cmp_txt = e_.text(0, -1.25, "", color="#ddd", fontsize=10, ha="center", va="top", linespacing=1.3)
+                e_.text(0, 1.6, "heading: true (green), decoded (white)", color="#ddd", fontsize=11, ha="center", va="top")
+                self.eye_on = False
+                return
             E = tr["obs"].shape[1]
             e_.set_facecolor(BG); e_.axis("off"); e_.set_aspect("equal")
             self.eye_on = tr["unit"] in ("deg", "rad")
@@ -1040,6 +1062,12 @@ def _task_circuit_panel_class():
             parts = [(f"{tr['eyes'][e]}: " if tr["eyes"][e] else "") + f"target {tr['target'][k, e]:+.1f} model "
                      f"{tr['obs'][k, e]:+.1f}" for e in range(tr["obs"].shape[1])]
             self.txt_tr.set_text(f"t = {t[k]:5.2f} s   " + "   ".join(parts) + f" {u_}")
+            if self.ax_eye is not None and self._compass():
+                tm_, mm_ = np.arctan2(tr["target"][k, 1], tr["target"][k, 0]), np.arctan2(tr["obs"][k, 1], tr["obs"][k, 0])
+                self.cmp_t.set_data([0, np.cos(tm_)], [0, np.sin(tm_)])
+                self.cmp_m.set_data([0, 0.9 * np.cos(mm_)], [0, 0.9 * np.sin(mm_)])
+                err = (np.degrees(mm_ - tm_) + 180) % 360 - 180
+                self.cmp_txt.set_text(f"true {np.degrees(tm_):+.0f}°   decoded {np.degrees(mm_):+.0f}°\nerror {err:+.0f}°")
             for e, (x0, tg, ln, pu, tx) in enumerate(self.eye_art):
                 to = np.deg2rad if u_ == "deg" else float
                 th, tg_ = to(tr["obs"][k, e]), to(tr["target"][k, e])
@@ -1106,7 +1134,10 @@ def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, strid
         y = np.asarray(_teacher_on_cell(corpus, u[None, :, :nch].cpu().numpy(), c[pick[:1]])).reshape(len(u), -1)
     path = out or os.path.join(out_d, "results", "movie_circuit.mp4")
     Panel = _task_circuit_panel_class()
-    panel = Panel(out=path, n_frames=int(u.shape[0]), sim=sim, style={"panel": {"kino_frames": min(int(u.shape[0]), 600)}},
+    act_ = next((str(o.params.get("activation", "tanh")) for o in getattr(sim, "operators", [])
+                 if getattr(o, "op", None) == "neuron_signal"), "tanh")
+    panel = Panel(out=path, n_frames=int(u.shape[0]), sim=sim,
+                  style={"panel": {"kino_frames": min(int(u.shape[0]), 600), "activation": act_}},
                   dt=dt, time_s=1.0, name=spec["name"], fps=fps, max_frames=int(u.shape[0]) + 1, stills=0,
                   drive_set=task["drive"]["set"], drive_block=task["drive"]["block"])
     obs_set, obs_block = task["observe"]["set"], task["observe"]["block"]
@@ -1124,6 +1155,7 @@ def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, strid
                                    and getattr(l_, "pre_name", None) is None and int(l_.n) <= 64), None)
             if rec["mus_set"] is not None:
                 rec["mus_names"] = list(getattr(H.level(rec["mus_set"]), "type_names", []) or [])
+            rec["obs_names"] = list(getattr(H.level(obs_set), "type_names", []) or [])
         lv = H.level(obs_set)
         E_ = int(lv.n) if every else 1
         st = lambda b_: lv.get(b_).detach().float().cpu().numpy().reshape(int(lv.n), -1)[:E_]   # noqa: E731
@@ -1143,11 +1175,15 @@ def circuit_movie(spec, device="cpu", root=None, *, trials=None, fps=None, strid
     if rec["mus"]:
         mus = np.stack(rec["mus"][:n_])
         M = mus.shape[1] // max(E, 1) if mus.shape[1] % max(E, 1) == 0 else mus.shape[1]
-        panel.set_muscles(mus.reshape(n_, -1, M)[:, :E] if mus.shape[1] == M * E else mus[:, None, :],
-                          rec["mus_names"] or [str(i) for i in range(M)])
+        names_ = rec["mus_names"] or [str(i) for i in range(M)]
+        if M == 1 and len(names_) == E:                 # one member per observed element (a `turn` set): one row
+            names_ = [rec["mus_set"]]
+        panel.set_muscles(mus.reshape(n_, -1, M)[:, :E] if mus.shape[1] == M * E else mus[:, None, :], names_,
+                          title=("muscle drive" if rec["plant"] else f"{rec['mus_set']} drive"))
     panel.set_traces(np.arange(n_) * dt, u[:n_, 0].cpu().numpy(), y[:n_, :E], obs[:n_],
                      cmd=(np.stack(rec["cmd"][:n_]) if rec["cmd"] else None), unit=task["observe"].get("unit") or "",
-                     label=f"{obs_set}.{obs_block}")
+                     label=f"{obs_set}.{obs_block}",
+                     eyes=(rec.get("obs_names") if len(rec.get("obs_names") or []) == E else None))
     if rec["plant"] and rec["mus"] and rec["pose_target"]:
         from plexus.operators.muscle_ops import PAIRS
         beta, K_, C_ = rec["plant"]
