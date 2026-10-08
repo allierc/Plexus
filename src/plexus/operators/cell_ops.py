@@ -2658,6 +2658,189 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         return sd * (z - z0)
 
 
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_phase",
+                   title="The known ODE on the neuron graph, each edge's message turned by a broadcast angle against the "
+                         "phase of its cell-type pair",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j}
+W^{s}_{ji}\tanh z_j\,\cos(\varphi_{t(j)t(i)}-\alpha(t))+B_i\cdot u\big)/\tau_i$$""")
+class StateDiffuseNeuronGraphPhase(StateDiffuseNeuronGraph):
+    """THE ANGULAR MODULATION ON THE NEURON GRAPH (exp17 batch 21, Cedric 2026-10-07: "the angle that injects context,
+    so a different circuit is at work in each block, learned through a SIREN"; Allier 2026, GNN_Transformer note, Eq. 27,
+    exp18's `neuron_signal[phase_rotated]` ported to the known ODE). Every edge's message is multiplied by
+
+        cos(varphi_{t(j) t(i)} - alpha(t))      t(j), t(i) the sender's and the receiver's cell types
+
+    varphi a learned PHASE per ordered pair of types (`phi`, an [n_types, n_types] table), alpha the broadcast angle,
+    one per frame for the whole brain. Until a learned cell type exists the types are the Z-Brain atlas regions
+    (`types_file`, one index per element). The rest is the known ODE's (leak, rest, stimulus weights and mask,
+    integrator, the tau bounds; the modulation Omega too, if set).
+
+    THE ANGLE, `alpha:`
+        siren     alpha(t) = f(t), a SIREN of the absolute frame time (FRAME_CLOCK), its last layer at 0 (alpha = 0
+                  untrained); `alpha_context: block` adds a one-hot of the stimulus block to its input
+                  (`alpha_mlp`, the SIREN's weights, flat)
+        block     one learned angle per stimulus block (`alpha_table`, [n_blocks]), started at k pi / 6 -- exp18's one
+                  angle per context line, the block the context
+    `phi_init: uniform` (default) draws varphi in [0, 2 pi) from `phi_seed`: at varphi = alpha = 0 both gradients
+    vanish (d cos / d angle = sin 0), and exp18 found varphi from 0 a trap at six laws. `phi_init: zero` for the record.
+    `alpha_jitter: s` (rad) adds one Gaussian offset to alpha per TRAINING rollout (an instance), held for the whole
+    rollout -- exp18 batch 5: circuits trained without it fail at a 3-degree error; none at test (`_train` unset).
+    `nonneg: true` turns the factor into (1 + cos) / 2 in [0, 1]: the angle can silence a pair, not reverse it."""
+    MECHANISM_TAGS = ["known_ode", "proxy_connectome", "leaky_integrator", "phase_modulation"]
+    PARAM_ROLES = {**StateDiffuseNeuronGraph.PARAM_ROLES,
+                   "types_file": "an npz (graphs_data) of each element's cell type, an integer per element",
+                   "types_array": "the array of it (default types)",
+                   "phi": "the learned phase per ordered pair of cell types, rad, [n_types, n_types]",
+                   "phi_init": "uniform (default, in [0, 2 pi) from phi_seed) or zero",
+                   "phi_per": "pair (default: one phase per ordered pair of types, `phi`) or edge (one phase per edge, "
+                              "`phi_short`, `phi_mid`, `phi_long`: the note's full varphi_ij)",
+                   "phi_short": "phi_per: edge -- one phase per short edge, rad", "phi_mid": "... per middle edge",
+                   "phi_long": "... per long edge",
+                   "phi_seed": "the seed of the uniform phase start",
+                   "alpha": "siren (alpha(t) a SIREN of the frame time) or block (one learned angle per stimulus block)",
+                   "alpha_context": "none (default) or block: the angle's SIREN also reads a one-hot of the stimulus block",
+                   "alpha_mlp": "the angle SIREN's weights, flat", "alpha_table": "one angle per stimulus block, rad",
+                   "alpha_hidden": "the angle SIREN's width (64)", "alpha_layers": "its layers, input to output (4)",
+                   "alpha_omega": "omega_0 of its sines (30)",
+                   "alpha_jitter": "one Gaussian angle offset per training rollout, rad (0 = none)",
+                   "nonneg": "(1 + cos) / 2 in place of cos: a gain in [0, 1], no sign reversal",
+                   "_train": "set by the trainer on a training model"}
+
+    def __init__(self, params, device="cpu"):
+        import math
+        import numpy as np
+        from plexus.paths import graphs_data_path
+        super().__init__(params, device)
+        tf = str(params.get("types_file") or "")
+        if not tf:
+            raise ValueError("state_diffuse[neuron_graph_phase] needs `types_file:` (one cell type per element)")
+        tf = tf if os.path.isabs(tf) else graphs_data_path(*tf.split("/"))
+        ty = np.asarray(np.load(tf)[str(params.get("types_array", "types"))], np.int64).reshape(-1)
+        if len(ty) != self.n_elements:
+            raise ValueError(f"state_diffuse[neuron_graph_phase]: {len(ty)} types in `types_file`, {self.n_elements} elements")
+        T = int(ty.max()) + 1
+        self.n_types = T
+        ty_ = torch.as_tensor(ty, device=device)
+        self._pair = {s: ty_[snd] * T + ty_[rcv] for s, (snd, rcv) in self._E.items()}   # each edge's type pair, flat
+        init = str(params.get("phi_init", "uniform"))
+        if init not in ("uniform", "zero"):
+            raise ValueError("state_diffuse[neuron_graph_phase] `phi_init:` uniform (default) or zero")
+        # `phi_per: edge` (Cedric, 2026-10-07: "let it learn the full phi_ij, not a table"): one phase per edge, each set
+        # its own learnable; the types file is then only read for its size check
+        self.phi_per = str(params.get("phi_per", "pair"))
+        if self.phi_per not in ("pair", "edge"):
+            raise ValueError("state_diffuse[neuron_graph_phase] `phi_per:` pair (default) or edge")
+        g = torch.Generator().manual_seed(int(params.get("phi_seed", 0)))
+
+        def start(n_):
+            return (torch.rand(n_, generator=g) * (2.0 * math.pi) if init == "uniform" else torch.zeros(n_)).to(device)
+        if self.phi_per == "pair":
+            self.phi = start(T * T).reshape(T, T)
+        else:
+            for s_ in self.EDGE_SETS:
+                setattr(self, f"phi_{s_}", start(self._E[s_][0].numel()))
+        self.alpha_kind = str(params.get("alpha", "siren"))
+        if self.alpha_kind not in ("siren", "block"):
+            raise ValueError("state_diffuse[neuron_graph_phase] `alpha:` siren or block")
+        self.alpha_context = str(params.get("alpha_context", "none"))
+        if self.alpha_context not in ("none", "block") or (self.alpha_context == "block" and self.alpha_kind != "siren"):
+            raise ValueError("state_diffuse[neuron_graph_phase] `alpha_context:` none (default) or block, with `alpha: siren`")
+        pf_ = str(params["positions_file"])
+        pf_ = pf_ if os.path.isabs(pf_) else graphs_data_path(*pf_.split("/"))
+        need_blocks = self.alpha_kind == "block" or self.alpha_context == "block"
+        self._a_offsets = np.asarray(np.load(pf_)["offsets"], np.int64) if need_blocks else None
+        nb_ = 0 if self._a_offsets is None else len(self._a_offsets) - 1
+        if self.alpha_kind == "block":
+            self.alpha_table = torch.tensor([k * math.pi / 6 for k in range(nb_)], dtype=torch.float32, device=device)
+        else:
+            H, n = int(params.get("alpha_hidden", 64)), int(params.get("alpha_layers", 4))
+            self._a_omega0 = float(params.get("alpha_omega", 30.0))
+            dims = [1 + (nb_ if self.alpha_context == "block" else 0)] + [H] * (n - 1) + [1]
+            self._a_shapes = [s_ for i in range(n) for s_ in ((dims[i], dims[i + 1]), (dims[i + 1],))]
+            g = torch.Generator().manual_seed(self.seed + 104729)
+            parts = []
+            for i, sh in enumerate(self._a_shapes):
+                if i >= len(self._a_shapes) - 2 or len(sh) == 1:
+                    parts.append(torch.zeros(sh))                             # alpha = 0 at the start
+                else:
+                    bnd = 1.0 / sh[0] if i == 0 else math.sqrt(6.0 / sh[0]) / self._a_omega0     # Sitzmann et al.
+                    parts.append((torch.rand(sh, generator=g) * 2 - 1) * bnd)
+            self.alpha_mlp = torch.cat([q.reshape(-1) for q in parts]).to(device)
+        self.FRAME_CLOCK = True                                                # alpha is of the frame
+        self.alpha_jitter = float(params.get("alpha_jitter", 0.0) or 0.0)
+        self._jit = None
+        self._train = bool(params.get("_train", False))
+        self.nonneg = bool(params.get("nonneg", False))
+
+    def _block(self):
+        import numpy as np
+        nb_ = len(self._a_offsets) - 1
+        return min(max(int(np.searchsorted(self._a_offsets, int(self.frame), side="right") - 1), 0), nb_ - 1)
+
+    def angle(self):
+        """alpha at the current frame, a 0-d tensor (radians), the training rollout's jitter included."""
+        if self.alpha_kind == "block":
+            a = self.alpha_table[self._block()]
+        else:
+            ws, o = [], 0
+            for sh in self._a_shapes:
+                n = 1
+                for d in sh:
+                    n *= d
+                ws.append(self.alpha_mlp[o:o + n].reshape(sh))
+                o += n
+            dev = self.alpha_mlp.device
+            t = float(self.frame) / max(self.n_frames_ref - 1, 1)
+            c = torch.tensor([[2.0 * t - 1.0]], device=dev)
+            if self.alpha_context == "block":
+                oh = torch.full((1, len(self._a_offsets) - 1), -1.0, device=dev)
+                oh[0, self._block()] = 1.0                                     # the one-hot, in [-1, 1] as t
+                c = torch.cat([c, oh], 1)
+            h = c
+            for i in range(0, len(ws) - 2, 2):
+                h = torch.sin(self._a_omega0 * (h @ ws[i] + ws[i + 1]))
+            a = (h @ ws[-2] + ws[-1]).reshape(())
+        if self._train and self.alpha_jitter > 0:
+            if self._jit is None:                                              # one draw per rollout (instance)
+                self._jit = float(torch.randn(()) * self.alpha_jitter)
+            a = a + self._jit
+        return a
+
+    def step(self, x, xyz, a=None, u=None, nb=None):
+        if self.synapse == "conductance" or self.adapt:
+            raise ValueError("state_diffuse[neuron_graph_phase]: the current synapse without adaptation only")
+        E = self._E
+        if x.shape[0] != self.n_elements or x.shape[1] != 1:
+            raise ValueError(f"state_diffuse[neuron_graph_phase]: [{self.n_elements}, 1] expected, got {tuple(x.shape)}")
+        mu, sd, _ = self.norm
+        z0 = (x[:, :1] - mu) / sd
+        z = z0
+        rate = self._rate(nb["tau"])
+        drive = self._input_drive(nb, u) if self.forcing_dim else 0.0
+        fz = self._frac(rate)
+        om = self._omega(nb.get("_omega_fs")) if self.modulation != "none" else None
+        al = self.angle()
+
+        def fac(ph):
+            c = torch.cos(ph - al)
+            return 0.5 * (1.0 + c) if self.nonneg else c
+        if self.phi_per == "pair":
+            f = fac(self.phi.to(z.device)).reshape(-1)                         # [T T], one factor per type pair
+            wf = {s: getattr(self, f"W_{s}") * f[self._pair[s]] for s in self.EDGE_SETS if E[s][0].numel()}   # per tick
+        else:
+            wf = {s: getattr(self, f"W_{s}") * fac(getattr(self, f"phi_{s}")) for s in self.EDGE_SETS if E[s][0].numel()}
+        for _ in range(self.substeps):
+            act = self._act(z)
+            agg = torch.zeros_like(z)
+            for s, w in wf.items():
+                snd, rcv = E[s]
+                agg = agg.index_add(0, rcv, w[:, None] * act[snd])
+            if om is not None:
+                agg = om * agg
+            z = z + fz * (-z + nb["rest"] + agg + drive)
+        return sd * (z - z0)
+
+
 @register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_mlp",
                    title="A set's scalar through a learned GNN (MLP message and update, per-element embedding) on the "
                          "multi-scale graph between the elements",

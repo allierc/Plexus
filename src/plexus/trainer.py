@@ -827,6 +827,7 @@ def _model(spec, train=True, resolution=None, n_frames=None):
         for o in sim.operators:
             if o.impl is None and "differentiable" in get_contract(o.op).implementations:
                 o.impl = "differentiable"
+            o.params["_train"] = True       # a law that trains differently from how it tests reads it (exp17 batch 21)
     for blk in sim.schedule:
         if isinstance(blk, dict) and "steps" in blk:
             blk["capture"] = False
