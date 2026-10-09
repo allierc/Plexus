@@ -1819,6 +1819,49 @@ def write_slides():
                                                          "tools/exp17_prune.py zap_n20_markall", left=0.74,
                                                          deck_title="batch 20.3 $\\cdot$ the grid weights near 0")))
         deck += new_                                   # after 20.3's V_rest slides (Cedric, 2026-10-08: "after 41")
+    # THE ANGLE OF 24.9 / 24.10 (Cedric, 2026-10-08: "add slides for the results of 24.9 and 24.10 plotting the angle and
+    # the phi analysis"): tools/exp17_angle.py -> figs/angle_<run>.png, data/angle_<run>.json; the test from the run's
+    # own results/<run>_test.json
+    for run_, num_, what_ in (("zap_n24_ph_edge", "24.9", "one phase per edge, alpha a SIREN of the frame time"),
+                              ("zap_n24_ph_edge_blk", "24.10", "24.9 with the stimulus block's one-hot in alpha's SIREN")):
+        ja_ = os.path.join(EXP, "data", f"angle_{run_}.json")
+        jt_ = os.path.join(S.GD, "log", "training", "zapbench", run_, "results", f"{run_}_test.json")
+        if not (os.path.exists(ja_) and os.path.exists(jt_)):
+            continue
+        A_ = json.load(open(ja_))
+        T_ = json.load(open(jt_))
+        mv_ = os.path.join(S.GD, "log", "training", "zapbench", run_, "results", f"{run_}_movie.npz")
+        pn_ = S.local_r(mv_, "zapbench_destripe")["mean"] if os.path.exists(mv_) else float("nan")
+        am_, bl_ = A_["alpha_block_mean_deg"], A_["blocks"]
+        q_ = A_["dphi_quantiles_deg_10_50_90"]
+        early_ = [am_[k] for k in range(4)]
+        late_ = [am_[k] for k in range(4, len(am_))]
+        right_a = (S.head("the law")
+                   + "{\\scriptsize\\raggedright $\\tau_i\\,\\dot z_i = -z_i + V_{i,k} + \\sum_j W_{ij}\\tanh z_j\\,"
+                     "\\cos(\\varphi_{ij} - \\alpha(t)) + B_i\\cdot u$: " + what_ + "; $\\varphi_{ij}$ started uniform "
+                     f"in $[0, 2\\pi)$. Free rollout: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r "
+                     f"{pn_:.3f}; long skill {T_['skill_long']:.3f}.\\par}}\n"
+                   + S.head("the angle (a)")
+                   + f"{{\\scriptsize\\raggedright $\\alpha$ spans {A_['alpha_session_range_deg'][0]:+.0f} to "
+                     f"{A_['alpha_session_range_deg'][1]:+.0f} deg. Block means {min(early_):+.0f} to "
+                     f"{max(early_):+.0f} deg in the first four ({bl_[0]} to {bl_[3]}), {min(late_):+.0f} to "
+                     f"{max(late_):+.0f} deg in the last five ({bl_[4]} to {bl_[-1]}), drifting within each block "
+                     f"(spread {min(A_['alpha_block_spread_deg']):.0f}--{max(A_['alpha_block_spread_deg']):.0f} deg): "
+                     "an early / late split of the session more than one angle per stimulus.\\par}\n"
+                   + S.head("the phases (b)")
+                   + "{\\scriptsize\\raggedright Median move from the random start "
+                     f"{q_['short'][1]:.0f} / {q_['mid'][1]:.0f} / {q_['long'][1]:.0f} deg (short / mid / long edges); "
+                     f"90 \\% of edges under {q_['short'][2]:.0f} / {q_['mid'][2]:.0f} / {q_['long'][2]:.0f} deg: most "
+                     "phases stay near where they were drawn.\\par}\n"
+                   + S.head("the circuit per block (c, d)")
+                   + "{\\scriptsize\\raggedright Effective weights $W_{ij}\\cos(\\varphi_{ij} - \\alpha_k)$ compared "
+                     f"between blocks: similarity down to {A_['circuit_similarity_offdiag_min']:.2f}, the two halves "
+                     "of the session. (d) Per neuron, the range over blocks of its mean input factor: median "
+                     f"{A_['neuron_input_range']['median']:.2f}, above 0.5 for "
+                     f"{100 * A_['neuron_input_range']['frac_gt_0.5']:.0f} \\% of neurons.\\par}}")
+        deck.append((f"24_angle_{run_}", S.frame_narrow(
+            f"{num_}: the angle and the phases", f"figs/angle_{run_}.png", right_a, "tools/exp17_angle.py " + run_,
+            left=0.68, deck_title=f"batch {num_} $\\cdot$ the angle and the phases")))
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     # THE EYE CIRCUIT ON ZAPBENCH'S 2-H SESSION (Cedric, 2026-10-08: "replace slide 48 with the new 2H data", "rotation
