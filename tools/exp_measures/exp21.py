@@ -240,7 +240,7 @@ def affine_msd(X0, X1, N=None):
     (`affine_residual`) and, given unit normals N [n, 3], the part along each cell's normal removed too: what the
     cells moved AMONG each other, in their own sheet. The salivary bud grows and turns, so a surface nucleus's raw
     displacement carries the tissue's stretch and rotation and its motion off the surface; the model's corral has
-    neither. One function for both sides (exp 21 Finding 29: the gland reads 40 um^2 at 1 h this way, 60 raw)."""
+    neither. One function for both sides (exp 21 Finding 29: the gland reads 37.8 um^2 at 1 h this way, 60 raw)."""
     D = affine_residual(X0, X1)
     if N is not None:
         D = D - (D * N).sum(1)[:, None] * N
@@ -439,7 +439,7 @@ def motion(T, cell_set="cell", point_set="pt", rim=1.5, lags_h=(1.0, 2.0), max_l
       msd_1h_aff_um2, prw_v_aff_um_h, prw_P_aff_h   the MSD at 1 h with the set's affine flow removed per window
                               (`affine_msd`) and the persistent walk (with noise offset) fitted to its curve up to
                               1 h: the cells' own motion among each other, the gland's read the same way
-                              (40 um^2, 11.1 um/h, 0.195 h; Finding 29)
+                              (37.8 um^2, 11.4 um/h, 0.168 h; Finding 29)
       vcorr_len_cells         how far, in cell spacings, the cells' 30-min displacements stay alike (C(r) = 1/e):
                               ~1 for independent walkers, several for a crowd flowing in packs (Park 2015: 7-26 cells)"""
     um, s_per_frame = _units(T)
