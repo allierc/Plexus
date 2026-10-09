@@ -1562,9 +1562,13 @@ def write_slides():
     deck += slides_run19(S)                  # Cedric, 2026-10-07: the nominal's results (19.25 since 2026-10-08), the first deck's slides 12-17
     # Cedric, 2026-10-08: twins of the ARTR and antiphase slides on the LEARNED 19.25 law's free rollout of the 2 h
     # (tools/exp17_model_traces.py; exp17_artr.py / exp17_phase.py --model), right after its run slide
-    def twin_(mv_, txt_):
-        return ("\\vspace*{0.09\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.78\\textwidth}\\centering"
-                "\\playmovie[\\linewidth]{Movies/" + mv_ + "}\\end{column}\n\\begin{column}{0.20\\textwidth}\\centering"
+    def twin_(mv_true, mv_, txt_):
+        # Cedric, 2026-10-09: "draw the comparison with 14 / 15: left column true, middle column learned, right column text"
+        hd_ = lambda s_: "{\\fontsize{6.5}{7.5}\\selectfont\\textbf{" + s_ + "}}\\par\\vspace{2pt}"     # noqa: E731
+        return ("\\vspace*{0.17\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.39\\textwidth}\\centering"
+                + hd_("the recording") + "\\playmovie[\\linewidth]{Movies/" + mv_true + "}\\end{column}\n"
+                "\\begin{column}{0.39\\textwidth}\\centering" + hd_("the learned 19.25 law")
+                + "\\playmovie[\\linewidth]{Movies/" + mv_ + "}\\end{column}\n\\begin{column}{0.20\\textwidth}\\centering"
                 "\\fitcol{%\n" + txt_ + "}\\end{column}\n\\end{columns}")
     ja_m, ja_r = (os.path.join(EXP, "data", f) for f in ("artr_model.json", "artr.json"))
     if os.path.exists(ja_m) and os.path.exists(os.path.join(PRES, "Movies", "artr_model.mp4")):
@@ -1573,8 +1577,9 @@ def write_slides():
         mw_ = AM_["by_selection"]["rotation"]["dark_windows"]
         rw_ = AR_["by_selection"]["rotation"]["dark_windows"]
         t_ = (head("the ARTR, in the learned model")
-              + "{\\scriptsize\\raggedright Slide 13's twin: the same cells (the ARTR picked on the recording), their traces "
-                "now the 19.25 law's free rollout of the 2 h, the recording given only at the start.\\par}\\vspace{6pt}\n"
+              + "{\\scriptsize\\raggedright Left, the recording (slide 14); middle, the same cells (the ARTR picked on "
+                "the recording) in the 19.25 law's free rollout of the 2 h, the recording given only at the start.\\par}"
+                "\\vspace{6pt}\n"
               + head("what it shows")
               + "{\\scriptsize\\raggedright Rotation: the model's two sides take turns as the recording's, r "
               + f"{m_['rotation']['slow_r']:+.2f} between the side means (recording {r_['rotation']['slow_r']:+.2f}). But its "
@@ -1582,7 +1587,7 @@ def write_slides():
               + " (recording " + f"{r_['rotation']['ctrl_slow_r_median']:+.2f}" + "). Dark: no rhythm, as the recording: r "
               + ", ".join(f"{v['r']:+.2f}" for v in mw_.values()) + " over the dark's three windows (recording "
               + ", ".join(f"{v['r']:+.2f}" for v in rw_.values()) + ").\\par}")
-        deck.append(("19_artr_model", S.frame_wide("the ARTR, in the learned model", twin_("artr_model", t_),
+        deck.append(("19_artr_model", S.frame_wide("the ARTR, in the learned model", twin_("artr", "artr_model", t_),
                                                    "tools/exp17_artr.py --movie --model zap_n19_nom",
                                                    deck_title="batch 19.25 $\\cdot$ the learned model $\\cdot$ the ARTR")))
     jp_m = os.path.join(EXP, "data", "phase_rotation_model.json")
@@ -1590,8 +1595,9 @@ def write_slides():
         PM_, PRr_ = json.load(open(jp_m)), json.load(open(os.path.join(EXP, "data", "phase_rotation.json")))
         ag_ = PM_["agreement"]
         t_ = (head("half a cycle apart, in the learned model")
-              + "{\\scriptsize\\raggedright Slide 14's twin on the 19.25 law's free rollout: every neuron fitted by a sine "
-                "of the rotation's 60-s period, the model's own fit and groups.\\par}\\vspace{6pt}\n"
+              + "{\\scriptsize\\raggedright Left, the recording (slide 15); middle, the 19.25 law's free rollout of "
+                "the 2 h: every neuron fitted by a sine of the rotation's 60-s period, each its own fit and "
+                "groups.\\par}\\vspace{6pt}\n"
               + head("what it shows")
               + "{\\scriptsize\\raggedright The model oscillates with the rotation in " + f"{PM_['significant']:,}"
               + " neurons (recording " + f"{PRr_['significant']:,}" + "): twice as many. Of the "
@@ -1600,7 +1606,7 @@ def write_slides():
               + " left, " + f"{PM_['red_left_right'][1]:,}" + " right), blue mostly right (" + f"{PM_['blue_left_right'][0]:,}"
               + " left, " + f"{PM_['blue_left_right'][1]:,}" + " right).\\par}")
         deck.append(("19_phase_model", S.frame_wide("half a cycle apart, in the learned model",
-                                                    twin_("phase_rotation_model", t_),
+                                                    twin_("phase_rotation", "phase_rotation_model", t_),
                                                     "tools/exp17_phase.py --movie --model zap_n19_nom",
                                                     deck_title="batch 19.25 $\\cdot$ the learned model $\\cdot$ the rotation block, in antiphase")))
     # Cedric, 2026-10-08: the learned W's distribution per level, a threshold per level below which an edge is removable
