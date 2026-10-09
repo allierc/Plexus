@@ -217,6 +217,74 @@ class CellAdjacency(Rewire):
         return {}
 
 
+@register_operator("cell_neighbours", set="cell", kind="rewire", family="topology", model="point_contact",
+                   title="Who neighbours whom",
+                   equation=r"""$$E=\big\{(c,d)\ :\ \exists\, i\in c,\ j\in d,\ |\mathbf x_i-\mathbf x_j|<r_c\big\},\qquad w_{cd}=\#\{(i,j)\}$$""")
+class CellAdjacencyPointContact(Rewire):
+    """`point_contact` MODEL of cell_neighbours -- the cells are BODIES OF MATERIAL POINTS (MPM cells), so two cells
+    touch when some point of one lies within `contact` of some point of the other.
+
+    particle -[containment]-> cell: reads the point set's positions and its parent map (`points`), writes the cell
+    set's `edge_index` (both directions) and `edge_weight` (the number of touching point pairs, a contact AREA in
+    point pairs, for `cell_chem_diffuse[model: contact_weighted]`), every `every` calls (default 1: the cells move).
+
+        E    = { (c, d) : some point i of c and j of d are closer than r_c }
+        w_cd = the number of such (i, j)
+
+    r_c is `contact` (world) -- the reach of the contact law the cells meet through (`pair_potential` sigma, plus its
+    adhesive shoulder). WHY A MODEL: the contract is `cell_neighbours`' own (-> cell `edge_index`); what differs is
+    where the contact comes from: a body of points, not a half-edge mesh or a label image. A gap junction needs two
+    membranes touching, which is exactly a contact between two cells' material.
+
+    Reference: none -- the adjacency of touching bodies, not a mechanism. Plexus (this work).
+    """
+    SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False
+    REQUIRES_PARAMS = ["points", "contact"]
+    MECHANISM_TAGS = ["cell_neighbours", "neighbour_graph", "contact"]
+    PARAM_ROLES = {"points": "the_material_point_set", "contact": "touch_distance_world", "every": "calls_between_rebuilds"}
+    PARAM_UNITS = {"contact": "length"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.points = str(params["points"])
+        self.contact = float(params["contact"])
+        self.every = max(1, int(params.get("every", 1)))
+        self._n = 0
+
+    def forward(self, H, mask=None):
+        self._n += 1
+        clvl = H.level(self.at)
+        if (self._n - 1) % self.every and getattr(clvl, "edge_index", None) is not None:
+            return {}
+        P = H.level(self.points)
+        X = P.get("pos").detach()
+        par = H.lift_index(self.points, self.at).long()
+        live = (P.occ > 0.5) & torch.isfinite(X).all(1)
+        X, par = X[live], par[live]
+        dev = clvl.state.device
+        from scipy.spatial import cKDTree
+        pr = cKDTree(X.cpu().double().numpy()).query_pairs(self.contact, output_type="ndarray")
+        if len(pr) == 0:
+            clvl.edge_index = torch.zeros(2, 0, dtype=torch.long, device=dev)
+            clvl.edge_weight = torch.zeros(0, device=dev)
+            return {}
+        pc = par.cpu().numpy()
+        a, b = pc[pr[:, 0]], pc[pr[:, 1]]
+        m = a != b
+        e = np.sort(np.stack([a[m], b[m]], 1), axis=1)
+        if e.shape[0] == 0:
+            clvl.edge_index = torch.zeros(2, 0, dtype=torch.long, device=dev)
+            clvl.edge_weight = torch.zeros(0, device=dev)
+            return {}
+        u, c = np.unique(e, axis=0, return_counts=True)
+        ei = np.concatenate([u.T, u.T[::-1]], axis=1)
+        clvl.edge_index = torch.as_tensor(ei, dtype=torch.long, device=dev)
+        clvl.edge_weight = torch.as_tensor(np.concatenate([c, c]).astype(np.float32), device=dev)
+        return {}
+
+
 @register_operator("cell_neighbours", set="cell", kind="rewire", family="topology", model="label_image",
                    title="Who neighbours whom",
                    equation=r"""$$E=\big\{(i,j)\ :\ \text{a pixel of label } i+1 \text{ shares an edge with a pixel of label } j+1\big\}$$""")

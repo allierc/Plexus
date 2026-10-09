@@ -2285,6 +2285,89 @@ class MeshContactCentre(MeshContact):
     """
 
 
+@register_operator("mesh_contact", model="adhesive_plane", family="boundary", set="particle",
+                   kind="lateral", title="Contact with a flat, adhesive substrate",
+                   equation=r"""$$a_n=k\,(z_0-z_i)^+\;-\;a_{\rm adh}\sin\!\big(\pi\,u_i\big)\,[0\le u_i\le 1],\quad u_i=\frac{z_i-z_0}{b},\qquad \mathbf a_t=-\mu\,|a_n|\,\frac{\mathbf v_t}{\lVert\mathbf v_t\rVert+\varepsilon_v}$$""")
+class MeshContactAdhesivePlane(Lateral):
+    """`mesh_contact` against a FLAT SUBSTRATE THE MATERIAL STICKS TO -- an epithelium's basement membrane, as a plane:
+    material points below it are pushed out, points within a thin band above it are held down, and both slide on it
+    against a regularised Coulomb friction.
+
+    particle -> particle: reads pos and vel; emits an external acceleration the MPM substep consumes.
+
+        u_i  = sigma (z_i - z0) / b                     height above the plane along `axis`, in bands; sigma = `side`
+                                                        (+1 default: the material lies on the +axis side; -1: below)
+        a_n  = k (z0 - z_i)          if z_i < z0         the penalty, along +axis
+             = -a_adh sin(pi u_i)    if 0 <= u_i <= 1    the adhesion, toward the plane (0 at contact and at b)
+        v_t  = v_i - (v_i . e) e                        the in-plane velocity (the substrate is at rest)
+        a_t  = -mu |a_n| v_t / (|v_t| + eps_v)          regularised Coulomb friction
+
+    z0 is `z` (world), e the unit vector of `axis` (default 2), k `k` (1 / time^2), a_adh `adhesion` (world / time^2,
+    the hold per unit mass), b `band` (world), mu `mu` (dimensionless) and eps_v `eps_v` (world / time). The
+    substrate is not a body: nothing reacts on it.
+
+    WHY A MODEL OF `mesh_contact`. The contract is the same -- a particle-to-surface contact with friction, consumed
+    as a_ext -- against the one surface that needs no mesh: an infinite plane, given analytically. A triangulated
+    plate under a few hundred crawling cells is ~10^4 faces searched every substep for a surface whose normal is
+    one vector. FOUR planes with `adhesion: 0` and `side` +-1 make a square corral -- the walls of a dish or a
+    micropattern that keep a monolayer confluent. The ADHESIVE band is the biology the default does not carry: an epithelium's cells are attached to
+    their basement membrane by integrins (here without the proteins: a hold of fixed depth), and that attachment is
+    what keeps a crawling sheet a sheet instead of a heap -- with a plane that only pushes, a cell squeezed by its
+    neighbours rises off it.
+
+    Reference: Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19 (the
+    particle-to-surface penalty and friction of `mesh_contact`); Wang, S. et al. (2021). Cell 184:3702-3716 (the
+    salivary epithelium's cell-matrix adhesion, integrin beta1).
+    """
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["z"]
+    MECHANISM_TAGS = ["cell_matrix_contact", "adhesion", "friction", "substrate", "basement_membrane"]
+    PARAM_ROLES = {"z": "substrate_plane_world", "axis": "plane_normal_axis", "side": "which_side_the_material_is_on",
+                   "k": "penalty_per_depth",
+                   "adhesion": "hold_per_unit_mass", "band": "adhesive_band_height_world", "mu": "friction_coefficient",
+                   "eps_v": "slip_regularisation_velocity"}
+    PARAM_UNITS = {"z": "length", "band": "length", "eps_v": "velocity"}
+    REFERENCE = ("Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19; Wang, S. et al. (2021). "
+                 "Cell 184:3702-3716.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.z0 = float(params["z"])
+        self.axis = int(params.get("axis", 2))
+        self.k = float(params.get("k", 100.0))
+        self.a_adh = float(params.get("adhesion", 0.0))
+        self.band = float(params.get("band", 0.1))
+        self.mu = float(params.get("mu", 0.0))
+        self.eps_v = float(params.get("eps_v", 0.05))
+        self.side = float(params.get("side", 1.0))
+        if self.side not in (1.0, -1.0):
+            raise ValueError("mesh_contact[adhesive_plane]: side is +1 (material above the plane) or -1 (below)")
+        if self.band <= 0.0 or self.k < 0.0 or self.a_adh < 0.0 or self.mu < 0.0:
+            raise ValueError("mesh_contact[adhesive_plane]: band > 0 and k, adhesion, mu >= 0")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        X = lvl.get("pos")
+        h = self.side * (X[:, self.axis] - self.z0)                    # > 0 on the material's side
+        an = torch.where(h < 0.0, -self.k * h, torch.zeros_like(h))
+        if self.a_adh > 0.0:
+            u = h / self.band
+            an = an + torch.where((u >= 0.0) & (u <= 1.0), -self.a_adh * torch.sin(math.pi * u), torch.zeros_like(h))
+        a = torch.zeros_like(X)
+        a[:, self.axis] = self.side * an
+        if self.mu > 0.0 and "vel" in lvl.state_schema:
+            v = lvl.get("vel")
+            vt = v.clone()
+            vt[:, self.axis] = 0.0
+            a = a - (self.mu * an.abs() / (vt.norm(dim=1) + self.eps_v))[:, None] * vt
+        a = a * lvl.occ[:, None].to(X.dtype)
+        if mask is not None:
+            a = a * mask[:, None].to(X.dtype)
+        return {self.at: a}
+
+
 @register_operator("mesh_contact", model="spatial_hash", family="boundary", set="particle",
                    kind="lateral", title="Contact with a live surface")
 class MeshContactHash(MeshContact):

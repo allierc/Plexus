@@ -357,6 +357,72 @@ class SeedPositionsPackedBall(SeedPositions):
         return {}
 
 
+@register_operator("seed_positions", family="seed", set="cell", kind="seed", model="packed_sheet",
+                   title="Cell centres packed in a sheet",
+                   equation=r"""$$\mathbf x_i=\mathbf c+a\,\big(k_i\,\mathbf e_1+l_i\,\mathbf e_2+\boldsymbol\epsilon_i\big),\qquad (k_i,l_i)\ \text{the }n\text{ sites of a triangular lattice nearest }\mathbf c$$""")
+class SeedPositionsPackedSheet(SeedPositionsPackedBall):
+    """The CENTRES OF A MONOLAYER: the n sites of a triangular lattice of pitch `spacing`, in the plane through
+    `centre` normal to `plane_axis`, closest to the centre, each jittered in the plane by up to `jitter` of a pitch.
+
+    set -> set: writes `pos` for the set's n live elements.
+
+        x_i = c + a (k_i e1 + l_i e2 + eps_i),   (k_i, l_i) = (u + v/2, v sqrt(3)/2) over integers u, v,
+                                                 the n nearest the origin;   eps_i ~ U(-j, j) on e1 and e2
+
+    a is `spacing` (world, centre-to-centre), j `jitter` (a fraction of a, below 0.5), c the `centre` (a point, a
+    set's live centroid, or the world box's centre), e1 and e2 the two axes other than `plane_axis` (default 2: the
+    sheet lies in x-y). `shape: disc` (default) takes the n sites nearest the centre, a disc of radius about
+    a sqrt(n sqrt(3) / (2 pi)); `shape: square` the n sites nearest it in the max-norm, a square of side about
+    a sqrt(n sqrt(3) / 2) -- the patch a square corral holds wall to wall.
+
+    WHY NOT `packed_ball` WITH A FLAT BOX. An epithelium is ONE layer: a cubic packing cut to a slab is two or three
+    layers or none, and its square rows give every cell four neighbours where an epithelium's give six (the
+    hexagonal packing a triangular lattice of centres is). The jitter keeps every pair at least a (1 - 2j) apart,
+    so a body built around each centre (`voronoi_parent`) starts space-filling and not overlapped.
+
+    Reference: none -- an initial condition. Plexus (this work). The six-neighbour packing is the epithelial mean
+    (Lewis, F. T. (1928). Anat. Rec. 38:341; Gibson, M. C. et al. (2006). Nature 442:1038).
+    """
+    PARAM_ROLES = dict(SeedPositionsPackedBall.PARAM_ROLES, plane_axis="sheet_normal_axis", shape="disc_or_square")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.plane_axis = int(params.get("plane_axis", 2))
+        self.shape = str(params.get("shape", "disc"))
+        if self.shape not in ("disc", "square"):
+            raise ValueError("seed_positions[packed_sheet]: shape is disc or square")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        p0, p1 = lvl.state_schema["pos"]
+        n, D = int(lvl.occ.sum().item()), p1 - p0
+        if D != 3:
+            raise ValueError("seed_positions[packed_sheet] is a 3D placement")
+        k = int(math.ceil(math.sqrt(n))) + 3
+        r = torch.arange(-k, k + 1, dtype=torch.float64)
+        U, V = torch.meshgrid(r, r, indexing="ij")
+        g2 = torch.stack([U + 0.5 * V, V * math.sqrt(3.0) / 2.0], -1).reshape(-1, 2)
+        if self.shape == "square":
+            # the max-norm, with a tie-break on the euclidean norm so a ring of equal max-norm fills from its middle
+            key = g2.abs().max(1).values + 1e-6 * (g2 * g2).sum(1)
+        else:
+            key = (g2 * g2).sum(1)
+        g2 = g2[torch.argsort(key, stable=True)][:n]
+        gen = torch.Generator(device="cpu").manual_seed(self.seed)
+        eps = (torch.rand(n, 2, generator=gen, dtype=torch.float64) * 2.0 - 1.0) * self.jitter
+        ax = [a for a in range(3) if a != self.plane_axis]
+        g = torch.zeros(n, 3, dtype=torch.float64)
+        g[:, ax[0]] = g2[:, 0] + eps[:, 0]
+        g[:, ax[1]] = g2[:, 1] + eps[:, 1]
+        c = (self._centre(H, D, "cpu").double() if self.centre is not None else
+             0.5 * torch.as_tensor(H.world_size, dtype=torch.float64)[:3])
+        pos = c + self.spacing * g
+        st = lvl.state.clone()
+        st[:n, p0:p1] = pos.to(device=lvl.state.device, dtype=st.dtype)
+        lvl.state = st
+        return {}
+
+
 @register_operator("seed_positions", family="seed", set="particle", kind="seed", model="voronoi_parent",
                    title="Each cell's material fills its Voronoi cell",
                    equation=r"""$$\mathbf x_i\sim U\big(\{\mathbf x:\ \arg\min_{c}|\mathbf x-\mathbf x_c|=\pi(i),\ |\mathbf x-\mathbf o|<R\}\big),\qquad v_i=\frac{V_{\pi(i)}}{n_{\pi(i)}}$$""")

@@ -1130,6 +1130,78 @@ class PairPotentialTyped(PairPotential):
 # ---- pair_potential[table]: a LAW, a size and a depth per pair of types, within one set or across two -------------
 # (exp04 Phase G, 2026-09-30: Cooke, Kremer & Deserno's three-bead lipid needs heads repulsive at 0.95 sigma against
 # every bead and tails attractive among themselves, inside the lipid set AND against the frozen lipids of the rim.)
+@register_operator("pair_potential", model="soft_adhesive", family="interaction", set="particle", kind="exchange",
+                   title="Soft contact with an adhesive shoulder",
+                   equation=r"""$$U(r)=\tfrac{\epsilon}{2}\big(1-\tfrac{r}{\sigma}\big)^2\ (r<\sigma)\;-\;\epsilon_a\cos^2\!\Big(\frac{\pi(r-\sigma)}{2w}\Big)\ (\sigma\le r\le\sigma+w),\quad -\epsilon_a\ (r<\sigma)$$""")
+class PairPotentialSoftAdhesive(PairPotential):
+    """`pair_potential` whose contact both RESISTS OVERLAP SOFTLY and HOLDS: the harmonic soft sphere of the default
+    (`law: harmonic`) with an adhesive shoulder -- Cooke's cos^2 tail -- grafted onto its contact distance.
+
+        r < s           U = eps/2 (1 - r/s)^2 - eps_a       the soft core, at the bottom of the well
+        s <= r <= s+w   U = -eps_a cos^2(pi (r - s) / (2 w))   the shoulder: attraction out to s + w
+        r > s + w       U = 0
+
+    s is `sigma` (world, the contact distance), eps `epsilon` (the core's stiffness, sim energy), eps_a `adhesion`
+    (the well's depth, sim energy) and w `tail` (world, its width). The largest pulling force one contact holds is
+    eps_a pi / (2 w), at r = s + w/2: a pair pulled harder comes apart -- DE-ADHESION is the same law read past its
+    peak, and a pair pushed back within s + w re-adheres. eps_a = 0 is the default's harmonic contact exactly.
+
+    WHY A MODEL. `law: cooke` carries an attractive tail but on the WCA core, whose r^-12 is the force the guards
+    cap when two cells' material points start interleaved (a Voronoi-seeded tissue's boundary, a division's cut):
+    the harmonic core is why exp 11 chose `harmonic` for its MPM cells (its docstring). A list `[harmonic, cooke]`
+    shares one sigma and so keeps the WCA core inside the contact. Different biology under the same contract: cells
+    that STICK -- the cell-cell adhesion that keeps an epithelium one sheet while its cells exchange neighbours,
+    without modelling the cadherins (adhesive soft spheres: Drasdo & Hoehme 2005, Phys. Biol. 2:133; Szabo et al.
+    2006, Phys. Rev. E 74:061908 use the same repulsive core + attractive shoulder for migrating epithelial cells).
+
+    THE NEIGHBOUR SEARCH. MPM cells carry a hundred points each, so a few hundred cells are ~10^9 candidate pairs,
+    where the default still runs all-pairs `cdist` in every substep; this model switches to the cell list above 5e7
+    candidates (the same pairs, found in O(N)).
+
+    Reference: Cooke, I.R., Kremer, K. & Deserno, M. (2005). Phys. Rev. E 72:011506 (the cos^2 tail); O'Hern, C.S. et
+    al. (2003). Phys. Rev. E 68:011306 (the harmonic core); Szabo, B. et al. (2006). Phys. Rev. E 74:061908.
+    """
+    CELL_LIST_ABOVE = 5e7
+    REQUIRES_PARAMS = []                                  # `law` is the harmonic core, implied
+    PARAM_ROLES = dict(PairPotential.PARAM_ROLES, adhesion="well_depth_of_the_adhesive_shoulder_sim_energy",
+                       tail="width_of_the_adhesive_shoulder_world")
+    PARAM_UNITS = dict(PairPotential.PARAM_UNITS, adhesion="energy", tail="length")
+    MECHANISM_TAGS = ["soft_sphere", "adhesion", "de_adhesion", "excluded_volume"]
+    REFERENCE = ("Cooke, I.R., Kremer, K. & Deserno, M. (2005). Phys. Rev. E 72:011506; O'Hern, C.S. et al. (2003). "
+                 "Phys. Rev. E 68:011306; Szabo, B. et al. (2006). Phys. Rev. E 74:061908.")
+
+    def __init__(self, params, device="cpu"):
+        law = params.get("law", "harmonic")
+        if (law if isinstance(law, str) else "+".join(law)) != "harmonic":
+            raise ValueError("pair_potential[soft_adhesive]: the core is the harmonic soft sphere; `law` is harmonic "
+                             f"(or omitted), got {law!r}")
+        if isinstance(params.get("sigma"), dict):
+            raise ValueError("pair_potential[soft_adhesive]: one contact distance `sigma` (a number)")
+        p = dict(params); p["law"] = "harmonic"
+        self.eps_a = float(p.pop("adhesion", 0.0))
+        tail = p.pop("tail", None)
+        super().__init__(p, device)
+        self.w = float(tail) if tail is not None else 0.5 * self.sigma
+        if self.w <= 0.0:
+            raise ValueError("pair_potential[soft_adhesive]: `tail` must be > 0")
+        if self.eps_a < 0.0:
+            raise ValueError("pair_potential[soft_adhesive]: `adhesion` is a well depth, >= 0")
+        self.cutoff = self.sigma + (self.w if self.eps_a > 0.0 else 0.0)
+
+    def _force(self, d, r, qa=None, qb=None, inslab=None, sig=None, mu_i=None, h=1.0):
+        s = self.sigma
+        m = torch.where(r < s, self.eps * (1.0 - r / s) / s, torch.zeros_like(r))
+        if self.eps_a > 0.0:
+            u = (r - s) / self.w
+            m = m + torch.where((u >= 0.0) & (u <= 1.0),
+                                -self.eps_a * (math.pi / (2.0 * self.w)) * torch.sin(math.pi * u), torch.zeros_like(r))
+        n_capped = 0
+        if self.f_max > 0:
+            m = m.clamp(-self.f_max, self.f_max)
+            n_capped = int((m.abs() >= 0.999 * self.f_max).sum())
+        return -(m / r)[:, None] * d, n_capped, None
+
+
 @register_operator("pair_potential", model="table", family="interaction", set="particle", kind="exchange",
                    title="Pair potential with its law, size and depth chosen per pair of types",
                    equation=r"""$$U_{ij}=U_{\ell(\tau_i,\tau_j)}\big(r_{ij};\,\sigma_{\tau_i\tau_j},\epsilon_{\tau_i\tau_j}\big)$$""")

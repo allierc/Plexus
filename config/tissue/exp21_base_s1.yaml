@@ -1,0 +1,90 @@
+general:
+  name: exp21_base_s1
+  seed: 1
+  n_frames: 144
+  dt: 1.0
+  record_cap: 145
+  boundary: free
+  dim: 3
+  world: [60.0, 60.0, 10.0]
+  units: {length_um: 10.0, time_s: 300.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 9, per_parent: cell, cell_box: 4.0}
+sets:
+  cell:
+    n: 300
+    types:
+      epi: {fraction: 1.0, shape: ball, youngs: 2.0, material: elastic, density: 1.0}
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+  pt:
+    entity: mpm_particle
+    parent: cell
+    per_parent: 160
+    particle_mass: 0.014
+    density: 1.0
+    radius: 0.85
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      cellc: {width: 1}
+      pid: {width: 1}
+      nuc: {width: 1}
+operators:
+- {op: active_force, model: substrate_walk, at: pt, cell_set: cell, f: 0.6, Dr: 0.59, seed: 1, speed_cv: 0.16,
+  speed_noise: 0.3, speed_tau: 3.0, front_bias: 0.5, front_width: 0.5, basal_band: 0.5}
+- {op: pair_potential, model: soft_adhesive, at: pt, sigma: 0.24, epsilon: 0.3, adhesion: 0.001, tail: 0.1,
+  mobility: 100.0, exclude: pid, emit: mpm_acceleration}
+- {op: mesh_contact, model: adhesive_plane, at: pt, z: 4.3, k: 50.0, adhesion: 2.0, band: 0.15, mu: 0.2,
+  eps_v: 0.05}
+- {op: mpm_strain, at: pt, implementation: default}
+- {op: mpm_scatter, at: pt, to: mpm_grid, drag: 1.0, polar: higham, implementation: default}
+- {op: mpm_grid_update, at: mpm_grid, implementation: default}
+- {op: mpm_gather, at: pt, from: mpm_grid, implementation: default}
+- {op: aggregate_centroid, at: cell, child: pt}
+schedule:
+- active_force
+- steps: [pair_potential, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+  substep_dt: 0.05
+  capture: false
+- aggregate_centroid
+seed:
+- op: seed_positions
+  model: packed_sheet
+  at: cell
+  spacing: 1.4
+  jitter: 0.15
+  centre: [30.0, 30.0, 5.0]
+  seed: 1
+- op: seed_positions
+  model: voronoi_parent
+  at: pt
+  reach: 0.85
+  clip_radius: 14.5
+  centre: [30.0, 30.0, 5.0]
+  seed: 1
+  label: cellc
+  parent_id: pid
+- {op: set_material, model: nucleus, at: pt, stiffness: 4.0, radius_frac: 0.45, label: nuc}
+plotting:
+  renderer: vtk_points
+  subject: pt
+  render_3d: contour
+  contour_bodies:
+    nucleus: nuc
+    nucleus_color: '#1b1464'
+    iso_frac: 0.2
+    sigma: 1.0
+    colors: ['#cfe3f5', '#9ecae1', '#6baed6', '#4292c6', '#2f7fc1', '#b3d4ee', '#5aa2d8', '#2171b5']
+  surface_opacity: 0.78
+  surface_roughness: 0.14
+  surface_env_color: white
+  surface_env_bright: 1.5
+  surface_diffuse: 0.75
+  surface_ambient: 0.28
+  background: '#dcdcdc'
+  camera: {elev: 34, azim: 25}
+  zoom: 3.4
+  duration_s: 10
+  slow_motion: 1

@@ -143,6 +143,123 @@ from plexus.units import unit_label as _units_label             # noqa: E402
 
 
 
+def body_contours(X, labels, dx, sigma=0.9, iso_frac=0.35, smooth_iter=20, min_points=8):
+    """ONE CLOSED SURFACE PER BODY, each contoured on its own small grid: (merged PolyData with a per-point
+    `body` array holding the label, number of bodies drawn), or (None, 0).
+
+    X [n, 3] positions, labels [n] integer body of each point, dx the voxel side (world). Each body's points are
+    counted into a grid that covers them with a 3-voxel margin, blurred by a gaussian of `sigma` voxels and
+    contoured at `iso_frac` x the mean density of its occupied voxels (morph.reconstruct_contour's rule, per
+    body), then smoothed. WHY LOCAL: a world-sized grid per body (`contour_by_type`'s path) costs the whole box
+    for every one of a few hundred cells, and one grid for all of them fuses touching cells into one skin."""
+    from scipy.ndimage import gaussian_filter
+    import pyvista as pv
+    X = np.asarray(X, np.float64); labels = np.asarray(labels).astype(np.int64)
+    order = np.argsort(labels, kind="stable")
+    ls, Xs = labels[order], X[order]
+    cut = np.flatnonzero(np.diff(ls)) + 1
+    parts = []
+    for grp, lab in zip(np.split(Xs, cut), np.split(ls, cut)):
+        if grp.shape[0] < min_points:
+            continue
+        lo = grp.min(0) - 3.0 * dx
+        dims = np.ceil((grp.max(0) - lo) / dx).astype(int) + 4
+        ijk = np.clip(((grp - lo) / dx).astype(int), 0, dims - 1)
+        dens = np.zeros(tuple(dims), np.float32)
+        np.add.at(dens, (ijk[:, 0], ijk[:, 1], ijk[:, 2]), 1.0)
+        dens = gaussian_filter(dens, sigma=sigma)
+        g = pv.ImageData(dimensions=tuple(int(d) + 1 for d in dims), spacing=(dx, dx, dx), origin=tuple(lo))
+        g["v"] = np.pad(dens, ((0, 1), (0, 1), (0, 1))).flatten(order="F")
+        iso = max(iso_frac * float(dens[dens > 0].mean()), 1e-6)
+        surf = g.contour([iso], scalars="v")
+        if surf.n_points == 0:
+            continue
+        if smooth_iter:
+            surf = surf.smooth(n_iter=int(smooth_iter), relaxation_factor=0.15)
+        surf = surf.extract_surface() if not isinstance(surf, pv.PolyData) else surf
+        surf.point_data.clear(); surf.cell_data.clear()
+        surf["body"] = np.full(surf.n_points, int(lab[0]), np.int64)
+        parts.append(surf)
+    if not parts:
+        return None, 0
+    out = parts[0].merge(parts[1:]) if len(parts) > 1 else parts[0]
+    out = out.extract_surface() if not isinstance(out, pv.PolyData) else out
+    out = out.compute_normals(auto_orient_normals=False, consistent_normals=True, split_vertices=False)
+    return out, len(parts)
+
+
+def body_partition(X, labels, dx, reach, sigma=0.8, iso=0.55, smooth_iter=15, min_points=8, clip=None,
+                   smooth_method="laplace", pass_band=0.05):
+    """ONE SURFACE PER BODY FROM A PARTITION OF SPACE, so two bodies in contact share one face and never overlap:
+    (merged PolyData with a per-point `body` array, number of bodies drawn), or (None, 0).
+
+    Every voxel (side `dx`) is given to the body owning the nearest point, if that point is within `reach`
+    (world), else to nobody; each body's voxels are blurred by a gaussian of `sigma` voxels and contoured at `iso`
+    (0.5 is the partition's own boundary; above it leaves a thin seam between neighbours). `clip: (lo, hi)` gives no
+    voxel outside that box to anyone, so no surface is drawn past a wall the run declares. WHY NOT A DENSITY
+    CONTOUR (`body_contours`): the blur that makes a density smooth pushes every surface past its own material,
+    so neighbouring cells overlap on screen and the flattened face where two cells press -- the contact
+    deformation the picture is for -- cannot show (the human, exp 21, 2026-10-08)."""
+    from scipy.ndimage import gaussian_filter
+    from scipy.spatial import cKDTree
+    import pyvista as pv
+    X = np.asarray(X, np.float64); labels = np.asarray(labels).astype(np.int64)
+    if X.shape[0] < min_points:
+        return None, 0
+    lo = X.min(0) - 2.0 * reach
+    dims = np.ceil((X.max(0) + 2.0 * reach - lo) / dx).astype(int) + 1
+    axes = [lo[k] + dx * (np.arange(dims[k]) + 0.5) for k in range(3)]
+    V = np.stack(np.meshgrid(*axes, indexing="ij"), -1).reshape(-1, 3)
+    d, j = cKDTree(X).query(V, k=1, distance_upper_bound=reach)
+    lab = np.full(V.shape[0], -1, np.int64)
+    ok = np.isfinite(d)
+    if clip is not None:                       # `clip: (lo, hi)` -- no voxel outside the box belongs to a body
+        clo, chi = np.asarray(clip[0], float), np.asarray(clip[1], float)
+        ok &= np.all((V >= clo) & (V <= chi), axis=1)
+    lab[ok] = labels[j[ok]]
+    lab = lab.reshape(tuple(dims))
+    parts = []
+    order = np.argsort(labels, kind="stable")
+    ls, Xs = labels[order], X[order]
+    cut = np.flatnonzero(np.diff(ls)) + 1
+    for grp, lb in zip(np.split(Xs, cut), np.split(ls, cut)):
+        if grp.shape[0] < min_points:
+            continue
+        c = int(lb[0])
+        i0 = np.clip(np.floor((grp.min(0) - reach - lo) / dx).astype(int) - 2, 0, dims - 1)
+        i1 = np.clip(np.ceil((grp.max(0) + reach - lo) / dx).astype(int) + 3, 1, dims)
+        sub = (lab[i0[0]:i1[0], i0[1]:i1[1], i0[2]:i1[2]] == c).astype(np.float32)
+        if sub.sum() < 4:
+            continue
+        sub = np.pad(sub, 1)
+        if sigma:
+            sub = gaussian_filter(sub, sigma=sigma)
+        org = lo + dx * (i0 - 1) + 0.5 * dx
+        g = pv.ImageData(dimensions=tuple(int(n) for n in sub.shape), spacing=(dx, dx, dx), origin=tuple(org))
+        g["v"] = sub.flatten(order="F")
+        surf = g.contour([iso], scalars="v")
+        if surf.n_points == 0:
+            continue
+        if smooth_iter:
+            # `taubin` (windowed sinc) smooths WITHOUT SHRINKING: Laplacian smoothing strong enough to remove the
+            # point-scale bumps of a 160-point cell also pulls its faces in, opening gaps between neighbours
+            if smooth_method == "taubin":
+                surf = surf.smooth_taubin(n_iter=int(smooth_iter), pass_band=float(pass_band),
+                                          boundary_smoothing=False, normalize_coordinates=True)
+            else:
+                surf = surf.smooth(n_iter=int(smooth_iter), relaxation_factor=0.1, boundary_smoothing=False)
+        surf = surf.extract_surface() if not isinstance(surf, pv.PolyData) else surf
+        surf.point_data.clear(); surf.cell_data.clear()
+        surf["body"] = np.full(surf.n_points, c, np.int64)
+        parts.append(surf)
+    if not parts:
+        return None, 0
+    out = parts[0].merge(parts[1:]) if len(parts) > 1 else parts[0]
+    out = out.extract_surface() if not isinstance(out, pv.PolyData) else out
+    out = out.compute_normals(auto_orient_normals=False, consistent_normals=True, split_vertices=False)
+    return out, len(parts)
+
+
 def _snap_range(lo, hi, ticks):
     """Round ends with a round step: the largest of {1, 2, 2.5, 5} x 10^k no bigger than
     range/(ticks-1), and the top is the first multiple of it above hi*1.02. Returns
@@ -2398,8 +2515,32 @@ class LiveMovie:
             s = self._contour_settings()
             self._contour_s = s
             self._contour_part = self._contour_partition(H, lvl)
+            # `contour_bodies:` -- ONE GLASS BODY PER CELL (exp 21's sheet of MPM cells), keyed by an integer block
+            # of the points (the cell id), each contoured on its own small grid, with an opaque nucleus inside.
+            self._contour_bodies = (self.style or {}).get("contour_bodies") or None
+            if self._contour_bodies:
+                self._contour_part = None
             _live = self._contour_live(lvl)
             pos = np.asarray(pos)[_live] if _live is not None else np.asarray(pos)
+            if self._contour_bodies:
+                if not getattr(self, "_contour_lit", False):
+                    self.p.set_environment_texture(self._env_texture(s["env_bright"]))
+                    if not bool((self.style or {}).get("surface_env", False)):
+                        build_lights(self.p, s)
+                    try:
+                        self.p.enable_depth_peeling(number_of_peels=int(s["peels"]))
+                        box = float(np.max(self.world))
+                        self.p.enable_ssao(radius=box * s["ssao_radius_frac"], bias=box * s["ssao_bias_frac"],
+                                           kernel_size=int(s["ssao_kernel"]))
+                    except Exception as _e:                          # noqa: BLE001
+                        print(f"[live-movie] contour: ssao/peeling unavailable ({_e})", flush=True)
+                    self._contour_lit = True
+                n_b = self._contour_draw_bodies(H, lvl, pos, _live)
+                print(f"[live-movie] contour bodies: {n_b} cells, each its own glass", flush=True)
+                if n_b == 0:
+                    self._contour_s = None
+                    return False
+                return True
             if self._contour_part is None:
                 surf = self._contour_surface(pos)
                 if surf is None or surf.n_points == 0:
@@ -2460,6 +2601,166 @@ class LiveMovie:
                 self._contour_draw(surf, name=f"contour_{nm}", color=cols[nm]); n_ok += 1
         return n_ok
 
+    def _contour_draw_bodies(self, H, lvl, pts, live=None):
+        """`plotting.contour_bodies` -- every cell its own glass, the nucleus an opaque body inside it:
+
+            contour_bodies:
+              block: pid              the integer point block naming each point's cell (required)
+              colors: [...]           the glass palette, one colour per cell by its id (default: seven blues)
+              dx: 0.08                voxel side, world (default: 0.6 x the drawn points' median spacing)
+              sigma: 0.9, iso_frac: 0.35, smooth: 20     the per-body contour (`body_contours`)
+              nucleus: nuc            a width-1 point block > 0.5 on the nucleus's points (optional)
+              color_by: {block: chem, channel: 0, cmap: Blues, range: [0, 1], floor: 0.25}
+                                      each cell coloured by a value of its own parent-set block (a wave)
+              nucleus_color: '#ffb347', nucleus_opacity: 1.0, nucleus_sigma: 1.2
+
+        The glass is morph's dielectric (`_contour_settings`: opacity, roughness, coat, sky), coloured per cell."""
+        cfg = self._contour_bodies if isinstance(self._contour_bodies, dict) else {"block": str(self._contour_bodies)}
+        # THE CELL OF EACH POINT IS THE CONTAINMENT MAP (`parent`), which the engine's Level and the replay's level
+        # both carry; a named integer block (`block:`) is read only when the set has no parent. The nucleus block is
+        # read through `get`, which both serve -- `state_schema` is the live Level's alone, and a replay reading it
+        # fell back to dots (smoke_exp21_sheet_base, 2026-10-08).
+        idx = np.asarray(self.idx.detach().cpu().numpy() if hasattr(self.idx, "detach") else self.idx)
+
+        def _block(name):
+            try:
+                v = lvl.get(name)
+            except Exception:                                            # noqa: BLE001
+                v = None
+            if v is None:
+                return None
+            v = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v)
+            return v.reshape(v.shape[0], -1)[idx, 0] if v.shape[0] > idx.max() else None
+        par = getattr(lvl, "parent", None)
+        if par is not None:
+            lab = np.asarray(par.detach().cpu().numpy() if hasattr(par, "detach") else par).astype(np.int64)[idx]
+        else:
+            lab = _block(str(cfg.get("block", "pid")))
+            if lab is None:
+                if not getattr(self, "_bodies_warned", False):
+                    self._bodies_warned = True
+                    print(f"[live-movie] contour_bodies: the set has no parent and no block "
+                          f"{cfg.get('block', 'pid')!r}", flush=True)
+                return 0
+            lab = np.rint(lab).astype(np.int64)
+        nuc = None
+        nb = cfg.get("nucleus")
+        if nb:
+            v = _block(str(nb))
+            nuc = None if v is None else (v > 0.5)
+        if live is not None:
+            lab = lab[live]
+            nuc = nuc[live] if nuc is not None else None
+        pts = np.asarray(pts, np.float64)
+        mode = str(cfg.get("mode", "partition"))
+        if getattr(self, "_bodies_dx", None) is None:
+            from scipy.spatial import cKDTree
+            sub = pts[:: max(1, pts.shape[0] // 20000)]
+            spacing = float(np.median(cKDTree(sub).query(sub, k=2)[0][:, 1]))
+            dx = cfg.get("dx")
+            if dx is None:
+                dx = (0.35 if mode == "partition" else 0.6) * spacing
+            self._bodies_dx = float(dx)
+            # 1.2 x THE SPACING: a voxel inside a body is never farther than ~0.7 spacings from a point, so a reach
+            # under one spacing leaves holes (0.8 x read as foam, exp21_w_still_s1)
+            self._bodies_reach = float(cfg.get("reach", 1.2 * spacing))
+            print(f"[live-movie] contour_bodies: mode {mode}, voxel {self._bodies_dx:.3g}, reach "
+                  f"{self._bodies_reach:.3g} (points {spacing:.3g} apart)", flush=True)
+        s = self._contour_s
+        # STATIC BODIES ARE CONTOURED ONCE: a frame whose points have not moved reuses the last surface and only its
+        # colours change (the wave arm freezes the mechanics on its seconds-long clock)
+        _same = getattr(self, "_bodies_last_pts", None)
+        if _same is not None and _same.shape == pts.shape and np.array_equal(_same, pts) \
+                and getattr(self, "_bodies_last_surf", None) is not None:
+            surf, n_b = self._bodies_last_surf.copy(), self._bodies_last_n
+        elif mode == "partition":
+            # `clip_to_box: true` -- THE BODIES STAY INSIDE THE DRAWN BOX: the box frame is the run's walls, and a body
+            # drawn `reach` past its outermost points crossed the frame lines and read as a cell outside its corral
+            # (exp 21, steps 28 and 30, 2026-10-08)
+            _clip = None
+            if cfg.get("clip_to_box") and getattr(self, "world", None) is not None:
+                _clip = (np.zeros(3), np.asarray(self.world, float)[:3])
+            surf, n_b = body_partition(pts, lab, self._bodies_dx, self._bodies_reach,
+                                       sigma=float(cfg.get("sigma", 0.8)), iso=float(cfg.get("iso", 0.55)),
+                                       smooth_iter=int(cfg.get("smooth", 15)), clip=_clip,
+                                       smooth_method=str(cfg.get("smooth_method", "laplace")),
+                                       pass_band=float(cfg.get("pass_band", 0.05)))
+        else:
+            surf, n_b = body_contours(pts, lab, self._bodies_dx, sigma=float(cfg.get("sigma", 0.9)),
+                                      iso_frac=float(cfg.get("iso_frac", 0.35)), smooth_iter=int(cfg.get("smooth", 20)))
+        if surf is None:
+            return 0
+        self._bodies_last_pts, self._bodies_last_surf, self._bodies_last_n = pts.copy(), surf.copy(), n_b
+        from matplotlib.colors import to_rgb
+        pal = cfg.get("colors") or ["#1a4fc0", "#2a6fdb", "#3b8beb", "#1e5aa8", "#4a7fd0", "#2b9be0", "#3d5fc4"]
+        pal = np.array([to_rgb(c) for c in pal])
+        body = np.asarray(surf["body"])
+        # NEIGHBOURS NEVER SHARE A COLOUR: a cell is given, once, the palette entry least used among the cells
+        # touching it (centres within 1.5 x the median centre spacing), so every contact face separates two hues.
+        # A hash gave half the cells a same-coloured neighbour, whose shared face then disappeared.
+        cmap = getattr(self, "_body_colour", None)
+        if cmap is None:
+            cmap = self._body_colour = {}
+        new_ids = [int(b) for b in np.unique(lab) if int(b) not in cmap]
+        if new_ids:
+            from scipy.spatial import cKDTree
+            ids = np.unique(lab)
+            cen = np.stack([pts[lab == b].mean(0) for b in ids])
+            tree = cKDTree(cen)
+            d0 = float(np.median(tree.query(cen, k=2)[0][:, 1])) if len(ids) > 1 else 1.0
+            pos_of = {int(b): i for i, b in enumerate(ids)}
+            for b in new_ids:
+                nb = tree.query_ball_point(cen[pos_of[b]], 1.5 * d0)
+                used = np.bincount([cmap[int(ids[j])] for j in nb if int(ids[j]) in cmap], minlength=len(pal))
+                tot = np.bincount(list(cmap.values()), minlength=len(pal)) if cmap else np.zeros(len(pal), int)
+                # the least used among its neighbours, ties to the least used overall: a hexagonal sheet needs only
+                # three colours, and first-index ties drew it in the palette's three palest blues
+                cmap[b] = int(np.argmin(used * 100000 + tot))
+        h = np.array([cmap.get(int(b), 0) for b in body])
+        surf["rgb"] = (pal[h] * 255).astype(np.uint8)
+        # `color_by: {block, channel, cmap, range}` -- EACH CELL LIT BY A VALUE OF ITS OWN (its excitation, a
+        # morphogen): the parent set's block, mapped through `cmap` over `range`, replaces the palette colour, so a
+        # wave reads as glass lighting up cell by cell (exp 21's gap-junction wave)
+        cb = cfg.get("color_by")
+        if cb:
+            try:
+                plv = H.level(getattr(lvl, "parent_name", None) or cfg.get("cell_set", "cell"))
+                v = plv.get(str(cb.get("block", "chem")))
+                v = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v, float)
+                v = v.reshape(v.shape[0], -1)[:, int(cb.get("channel", 0))]
+                lo, hi = (cb.get("range") or [float(np.nanmin(v)), float(np.nanmax(v)) + 1e-12])
+                import matplotlib.pyplot as _plt
+                cm = _plt.get_cmap(str(cb.get("cmap", "Blues")))
+                x = np.clip((v[np.clip(body, 0, v.shape[0] - 1)] - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+                lo_c = float(cb.get("floor", 0.25))                      # the resting cell stays a visible glass
+                surf["rgb"] = (np.asarray(cm(lo_c + (1.0 - lo_c) * x))[:, :3] * 255).astype(np.uint8)
+            except Exception as _e:                                      # noqa: BLE001
+                if not getattr(self, "_cb_warned", False):
+                    self._cb_warned = True
+                    print(f"[live-movie] contour_bodies.color_by unavailable ({type(_e).__name__}: {_e})", flush=True)
+        # `coat: 0` -- NO CLEAR COAT: the dielectric's second, sharp highlight read as streaks and lines across a
+        # sheet of opaque cells (the human, exp 21 run 30); with `surface_opacity: 1` and a satin roughness the cells
+        # are soft opaque bodies
+        coat = float(cfg.get("coat", s["coat_strength"]))
+        act = self.p.add_mesh(surf, name="contour_bodies", scalars="rgb", rgb=True, pbr=True,
+                              metallic=s["metallic"], roughness=s["roughness"], opacity=s["opacity"],
+                              diffuse=s["diffuse"], ambient=s["ambient"], smooth_shading=True, show_scalar_bar=False)
+        try:
+            prop = act.GetProperty()
+            prop.SetBaseIOR(s["ior"]); prop.SetCoatStrength(coat)
+            prop.SetCoatRoughness(s["coat_roughness"]); prop.SetCoatIOR(s["coat_ior"])
+        except Exception:                                                # noqa: BLE001
+            pass
+        if nuc is not None and nuc.any():
+            ns, _n = body_contours(pts[nuc], lab[nuc], self._bodies_dx, sigma=float(cfg.get("nucleus_sigma", 1.2)),
+                                   iso_frac=float(cfg.get("iso_frac", 0.35)), smooth_iter=int(cfg.get("smooth", 20)),
+                                   min_points=4)
+            if ns is not None:
+                self.p.add_mesh(ns, name="contour_nuclei", color=str(cfg.get("nucleus_color", "#ffb347")),
+                                pbr=True, metallic=0.0, roughness=0.35, opacity=float(cfg.get("nucleus_opacity", 1.0)),
+                                diffuse=0.8, ambient=0.15, smooth_shading=True, show_scalar_bar=False)
+        return n_b
+
     def _contour_draw(self, surf, name="contour", color=None):
         """Replace the contour actor -- same name, so pyvista swaps rather than stacks."""
         s = self._contour_s
@@ -2493,7 +2794,9 @@ class LiveMovie:
         try:
             _live = self._contour_live(lvl)
             pts = np.asarray(pts)[_live] if _live is not None else np.asarray(pts)
-            if getattr(self, "_contour_part", None) is not None:
+            if getattr(self, "_contour_bodies", None):
+                self._contour_draw_bodies(H, lvl, pts, _live)
+            elif getattr(self, "_contour_part", None) is not None:
                 self._contour_draw_types(pts, _live)
             else:
                 surf = self._contour_surface(pts)
@@ -6615,7 +6918,11 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
         shift = -(0.5 * (lo + hi) - 0.5 * box)
     else:
         lo, hi = flat.min(0), flat.max(0)
-        if not bool(((hi - lo) > ws * 1.02).any()) and not bool((lo < -1e-6 * ws.max()).any()):
+        # A HAIR BELOW ZERO IS STILL [0, world]. The test was lo < -1e-6 x world, so one point a soft wall let
+        # press 0.02 past x = 0 made the replay read the run as centred on the origin and shift every set by half
+        # a box (T-76: exp 21's corral drawn half a box off its frame). A run centred on the origin reaches about
+        # -world/2; 2 % of the box separates the two with room on both sides.
+        if not bool(((hi - lo) > ws * 1.02).any()) and not bool((lo < -0.02 * ws).any()):
             box = ws                                            # already in [0, world]
         elif not bool(((hi - lo) > ws * 1.02).any()):
             box = ws                                            # fits [-world/2, world/2]
