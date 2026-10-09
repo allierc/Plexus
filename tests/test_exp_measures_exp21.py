@@ -80,3 +80,45 @@ def test_shape_index_of_a_hexagonal_sheet_is_the_hexagons():
     q = M.voronoi_shape_index(X, sel)
     assert np.median(q) == pytest.approx(2 * 6 ** 0.5 / 3 ** 0.25, rel=1e-3)     # 3.722, a regular hexagon
     assert M.voronoi_sides(X, sel).mean() == pytest.approx(6.0)
+
+
+def test_velocity_correlation_length_reads_independent_walkers_short_and_a_swirl_long():
+    X = _hex(20)
+    rng = np.random.default_rng(5)
+    L_rand = M.velocity_correlation_length(X, rng.normal(size=X.shape), 1.0)
+    c = X.mean(0)
+    k = 2 * np.pi / 16.0                                           # a flow pattern 16 spacings across
+    V = np.stack([np.sin(k * (X[:, 1] - c[1])), np.sin(k * (X[:, 0] - c[0]))], 1)
+    L_flow = M.velocity_correlation_length(X, V, 1.0)
+    assert L_rand < 1.3 and L_flow > 2.5          # uncorrelated walkers read the floor: the first bin of neighbours, ~1.2
+
+
+def test_neighbour_correlation_after_removing_the_tissue_flow():
+    """PLANTED: a pure shear flow plus independent noise reads ~0 once the affine flow is removed; a flow of packs
+    (neighbours moving together) reads high."""
+    X = _hex(16)
+    rng = np.random.default_rng(7)
+    D = np.c_[0.3 * X[:, 1], np.zeros(len(X))] + rng.normal(scale=0.1, size=X.shape)
+    assert abs(M.neighbour_correlation(X, M.affine_residual(X, X + D), 1.0)) < 0.15
+    k = 2 * np.pi / 8.0
+    P = np.stack([np.sin(k * X[:, 1]), np.cos(k * X[:, 0])], 1)
+    assert M.neighbour_correlation(X, M.affine_residual(X, X + P), 1.0) > 0.6
+
+
+def test_neighbour_correlation_splits_along_and_across_the_pair():
+    """PLANTED: a uniform drift is carried along AND across (1, 1); independent walkers neither (~0, ~0); rows of
+    cells sliding past each other in alternate directions (the human's two crowds passing) anti-correlate ACROSS
+    the pair (C_T -1: every across-row pair slides) while the along-pair part stays positive (+1/3: same-row pairs
+    +1, across-row pairs -1/4 from the 60-degree projection)."""
+    X = _hex(16)
+    cl, ct = M.neighbour_correlation_lt(X, np.tile([0.3, 0.1], (len(X), 1)), 1.0)
+    assert cl == pytest.approx(1.0) and ct == pytest.approx(1.0)
+    rng = np.random.default_rng(1)
+    cl, ct = M.neighbour_correlation_lt(X, rng.normal(size=X.shape), 1.0)
+    assert abs(cl) < 0.1 and abs(ct) < 0.1
+    row = np.round(X[:, 1] / (math.sqrt(3) / 2)).astype(int)
+    V = np.c_[np.where(row % 2 == 0, 1.0, -1.0), np.zeros(len(X))]          # rows slide along x, alternate signs
+    cl, ct = M.neighbour_correlation_lt(X, V, 1.0)
+    full = M.neighbour_correlation(X, V, 1.0)
+    assert full == pytest.approx(-1.0 / 3.0, abs=0.02)                    # 1 same-row pair in 3 at one spacing
+    assert ct == pytest.approx(-1.0, abs=0.02) and cl == pytest.approx(1.0 / 3.0, abs=0.02)

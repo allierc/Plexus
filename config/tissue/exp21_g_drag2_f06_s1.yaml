@@ -1,5 +1,5 @@
 general:
-  name: exp21_sheet_base
+  name: exp21_g_drag2_f06_s1
   seed: 1
   n_frames: 144
   dt: 1.0
@@ -33,32 +33,43 @@ sets:
       nuc: {width: 1}
 operators:
 - {op: active_force, model: substrate_walk, at: pt, cell_set: cell, f: 0.6, Dr: 0.59, seed: 1, speed_cv: 0.16,
-   speed_noise: 0.3, speed_tau: 3.0, front_bias: 0.5, front_width: 0.5, basal_band: 0.5}
+  speed_noise: 0.3, speed_tau: 3.0, front_bias: 0.5, front_width: 0.5, basal_band: 0.5}
 - {op: pair_potential, model: soft_adhesive, at: pt, sigma: 0.24, epsilon: 0.3, adhesion: 0.002, tail: 0.1,
-   mobility: 100.0, exclude: pid, emit: mpm_acceleration}
-- {op: mesh_contact, model: adhesive_plane, at: pt, z: 1.0, k: 50.0, adhesion: 2.0, band: 0.15, mu: 0.2, eps_v: 0.05}
-- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 0, z: 0.0, side: 1, k: 400.0, adhesion: 0.0, band: 0.1}
-- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 0, z: 25.0, side: -1, k: 400.0, adhesion: 0.0, band: 0.1}
-- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 1, z: 0.0, side: 1, k: 400.0, adhesion: 0.0, band: 0.1}
-- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 1, z: 25.0, side: -1, k: 400.0, adhesion: 0.0, band: 0.1}
-- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 2, z: 2.6, side: -1, k: 50.0, adhesion: 0.0, band: 0.1}
+  mobility: 100.0, exclude: pid, emit: mpm_acceleration}
+- {op: mesh_contact, model: adhesive_plane, at: pt, z: 1.0, k: 50.0, adhesion: 2.0, band: 0.15, mu: 0.2,
+  eps_v: 0.05}
+- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 0, z: 0.0, side: 1, k: 400.0, adhesion: 0.0,
+  band: 0.1}
+- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 0, z: 25.0, side: -1, k: 400.0, adhesion: 0.0,
+  band: 0.1}
+- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 1, z: 0.0, side: 1, k: 400.0, adhesion: 0.0,
+  band: 0.1}
+- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 1, z: 25.0, side: -1, k: 400.0, adhesion: 0.0,
+  band: 0.1}
+- {op: mesh_contact, model: adhesive_plane, at: pt, axis: 2, z: 2.6, side: -1, k: 50.0, adhesion: 0.0,
+  band: 0.1}
 - {op: mpm_strain, at: pt, implementation: default}
-- {op: mpm_scatter, at: pt, to: mpm_grid, drag: 1.0, polar: higham, implementation: default}
+- {op: mpm_scatter, at: pt, to: mpm_grid, drag: 2.0, polar: higham, implementation: default}
 - {op: mpm_grid_update, at: mpm_grid, implementation: default}
 - {op: mpm_gather, at: pt, from: mpm_grid, implementation: default}
 - {op: aggregate_centroid, at: cell, child: pt}
 schedule:
 - active_force
-- steps: [pair_potential, mesh_contact, mesh_contact, mesh_contact, mesh_contact, mesh_contact, mesh_contact, mpm_strain,
-    mpm_scatter, mpm_grid_update, mpm_gather]
+- steps: [pair_potential, mesh_contact, mesh_contact, mesh_contact, mesh_contact, mesh_contact, mesh_contact,
+    mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
   substep_dt: 0.05
   capture: false
 - aggregate_centroid
 seed:
-- {op: seed_positions, model: packed_sheet, at: cell, shape: square, spacing: 1.4, jitter: 0.05, centre: [12.5, 12.5, 1.7],
-   seed: 1}
+- op: seed_positions
+  model: packed_sheet
+  at: cell
+  shape: square
+  spacing: 1.4
+  jitter: 0.05
+  centre: [12.5, 12.5, 1.7]
+  seed: 1
 - {op: seed_positions, model: voronoi_parent, at: pt, reach: 0.85, seed: 1, label: cellc, parent_id: pid}
-- {op: set_material, at: pt, youngs: 10.0, nu: 0.2}
 - {op: set_material, model: nucleus, at: pt, stiffness: 4.0, radius_frac: 0.45, label: nuc}
 plotting:
   renderer: vtk_points

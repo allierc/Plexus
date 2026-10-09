@@ -196,6 +196,94 @@ def voronoi_shape_index(XY, sel):
     return np.asarray(out, float)
 
 
+def velocity_correlation_length(X, V, d0, r_max=8.0, nbins=16):
+    """The distance, in spacings d0, at which the velocities of two cells stop being alike: C(r) = <v_i . v_j> /
+    <|v|^2> over the pairs at distance r (V with its mean removed), the first r where C falls below 1/e (linear
+    between bins); r_max when it never does. Park et al. 2015 (Fig 1d, 2g-h): cooperative packs of 7-26 cells."""
+    from scipy.spatial import cKDTree
+    X = np.asarray(X, float)[:, :2]; V = np.asarray(V, float)[:, :2]
+    V = V - V.mean(0)
+    v2 = float((V * V).sum(1).mean())
+    if v2 <= 0 or X.shape[0] < 10:
+        return None
+    pr = cKDTree(X).query_pairs(r_max * d0, output_type="ndarray")
+    if len(pr) == 0:
+        return None
+    r = np.linalg.norm(X[pr[:, 0]] - X[pr[:, 1]], axis=1) / d0
+    c = (V[pr[:, 0]] * V[pr[:, 1]]).sum(1) / v2
+    edges = np.linspace(0.5, r_max, nbins + 1)
+    mid, C = [], []
+    for a, b in zip(edges[:-1], edges[1:]):
+        m = (r >= a) & (r < b)
+        if m.sum() >= 5:
+            mid.append(0.5 * (a + b)); C.append(float(c[m].mean()))
+    for k in range(len(C)):
+        if C[k] < 1.0 / np.e:
+            if k == 0:
+                return float(mid[0])
+            x0, x1, y0, y1 = mid[k - 1], mid[k], C[k - 1], C[k]
+            return float(x0 + (1.0 / np.e - y0) * (x1 - x0) / (y1 - y0))
+    return float(r_max)
+
+
+def affine_residual(X0, X1):
+    """X1 - X0 with the best affine flow of the whole set removed (least squares d = A x + b): what each cell moved
+    RELATIVE to the tissue's own stretch, shear, rotation and drift."""
+    X0 = np.asarray(X0, float); D = np.asarray(X1, float) - X0
+    A = np.c_[X0, np.ones(len(X0))]
+    coef, *_ = np.linalg.lstsq(A, D, rcond=None)
+    return D - A @ coef
+
+
+def neighbour_correlation(X, V, d0, r_lo=0.75, r_hi=1.25):
+    """<v_i . v_j> / <|v|^2> over the pairs between r_lo and r_hi spacings apart: how alike two NEIGHBOURS' motions
+    are (0: independent walkers; 1: carried as one). The gland's surface cells read ~0.1 (exp 21 literature audit,
+    2026-10-08: Wang 2021 tracks, 30-min displacements, tissue flow removed)."""
+    from scipy.spatial import cKDTree
+    X = np.asarray(X, float); V = np.asarray(V, float)
+    v2 = float((V * V).sum(1).mean())
+    if v2 <= 0 or len(X) < 10:
+        return None
+    pr = cKDTree(X).query_pairs(r_hi * d0, output_type="ndarray")
+    if len(pr) == 0:
+        return None
+    r = np.linalg.norm(X[pr[:, 0]] - X[pr[:, 1]], axis=1)
+    pr = pr[r >= r_lo * d0]
+    if len(pr) < 10:
+        return None
+    return float((V[pr[:, 0]] * V[pr[:, 1]]).sum(1).mean() / v2)
+
+
+def neighbour_correlation_lt(X, V, d0, r_lo=0.75, r_hi=1.25):
+    """(C_L, C_T): `neighbour_correlation` split into the displacement component ALONG the line joining two
+    neighbours (L) and ACROSS it (T), each <a_i . a_j> / <a^2> over the pairs r_lo-r_hi spacings apart. A push
+    handed on through a contact correlates L; neighbours carried together sideways -- a sheet that resists shear --
+    correlate T. Henkes 2020 (Nat Commun 11:1405): the longitudinal modes' correlation length grows with the
+    sheet's bulk + shear modulus, the transverse ones' with its shear modulus only. The gland's surface cells: C_L
+    0.20, C_T 0.07 (exp 21 Finding 22). V must lie in the plane (the model's 2D displacements; the gland's after
+    projecting out the surface normal)."""
+    from scipy.spatial import cKDTree
+    X = np.asarray(X, float); V = np.asarray(V, float)
+    if len(X) < 10:
+        return None, None
+    pr = cKDTree(X).query_pairs(r_hi * d0, output_type="ndarray")
+    if len(pr) == 0:
+        return None, None
+    R = X[pr[:, 1]] - X[pr[:, 0]]
+    r = np.linalg.norm(R, axis=1)
+    k = r >= r_lo * d0
+    pr, R, r = pr[k], R[k], r[k]
+    if len(pr) < 10:
+        return None, None
+    u = R / r[:, None]
+    ai, aj = (V[pr[:, 0]] * u).sum(1), (V[pr[:, 1]] * u).sum(1)
+    ti, tj = V[pr[:, 0]] - ai[:, None] * u, V[pr[:, 1]] - aj[:, None] * u
+    sl = 0.5 * float((ai ** 2 + aj ** 2).mean()); st = 0.5 * float(((ti ** 2).sum(1) + (tj ** 2).sum(1)).mean())
+    cl = float((ai * aj).mean()) / sl if sl > 0 else None
+    ct = float((ti * tj).sum(1).mean()) / st if st > 0 else None
+    return cl, ct
+
+
 # ============================================================================ reading a run
 def _units(T):
     g = T.spec.get("general") or {}
@@ -229,7 +317,7 @@ def _rows(T, every):
 
 
 # ============================================================================ exp21.sheet
-def sheet(T, cell_set="cell", point_set="pt", every=10, contact=0.25, rim=1.5, axis=2, **_):
+def sheet(T, cell_set="cell", point_set="pt", every=10, contact=None, rim=1.5, axis=2, **_):
     """Is it ONE epithelium of constant height, every cell one body? Per sampled row, and summarised:
 
       n_cells                 live cells (first, last)
@@ -250,6 +338,11 @@ def sheet(T, cell_set="cell", point_set="pt", every=10, contact=0.25, rim=1.5, a
       shape_index             median perimeter / sqrt(area) of the interior cells' Voronoi polygons, last row
                               (Bi et al. 2015/2016: a sheet is fluid above 3.81, solid below)
       nonfinite               any non-finite point position in any sampled row (True is a wreck)"""
+    # TWO CELLS TOUCH within the run's own contact range: the pair_potential's sigma (+ 0.01), so a run with a wider
+    # contact (round 12 sig036: sigma 0.36 against the old fixed 0.25) does not read as disconnected
+    if contact is None:
+        pp = spec_op(T, "pair_potential")
+        contact = float(pp.get("sigma", 0.24)) + 0.01 if pp else 0.25
     rows = _rows(T, every)
     ser = {k: [] for k in ("row", "n_cells", "integrity", "monolayer_out", "height_med", "height_cv", "connected",
                            "coverage")}
@@ -324,7 +417,15 @@ def motion(T, cell_set="cell", point_set="pt", rim=1.5, lags_h=(1.0, 2.0), max_l
       msd_1h_um2              the MSD at a lag of 1 h, interpolated on the row lags
       kept_1h, kept_2h        `neighbour_retention` at 1 h and 2 h lags, averaged over every start row, interior
                               cells at the start (Wang's surface nuclei: tools/exp21_wang_neighbours.py)
-      exchange_per_cell_h     (1 - kept_1h) x mean neighbours per cell: neighbours lost per cell per hour"""
+      exchange_per_cell_h     (1 - kept_1h) x mean neighbours per cell: neighbours lost per cell per hour
+      prw_P_h_1h              the persistence fitted over the first hour of lags (the 2-h fit floors on a caged walk)
+      msd_ratio_3h_1h         MSD/lag at 3 h over MSD/lag at 1 h: < 1 caged, > 1 still spreading (gland 1.18)
+      corr_1sp                how alike two neighbours' 30-min displacements are, the tissue's affine flow removed
+                              (0 independent, 1 carried together; gland ~0.1)
+      corr_L_1sp, corr_T_1sp  the same split along / across the line joining the two (gland 0.20 / 0.07): a push
+                              passed on (L) or neighbours carried together sideways (T)
+      vcorr_len_cells         how far, in cell spacings, the cells' 30-min displacements stay alike (C(r) = 1/e):
+                              ~1 for independent walkers, several for a crowd flowing in packs (Park 2015: 7-26 cells)"""
     um, s_per_frame = _units(T)
     n = T.n_rows()
     fr = np.asarray(_row_frames(T) if _row_frames else list(range(n)), float)
@@ -378,6 +479,39 @@ def motion(T, cell_set="cell", point_set="pt", rim=1.5, lags_h=(1.0, 2.0), max_l
         out[f"kept_{lh:g}h"] = finite(np.mean(vals)) if vals else None
     k1 = out.get("kept_1h")
     out["exchange_per_cell_h"] = finite((1.0 - k1) * mean_nb) if k1 is not None else None
+    # THE CAGE AND THE 1-H PERSISTENCE (literature audit, 2026-10-08): a caged walk's MSD / lag FALLS after its
+    # persistence time while the gland's keeps rising (1.18 from 1 h to 3 h); and a PRW fit over 2 h of a caged MSD
+    # collapses to its floor, so the persistence is also fitted over the first hour, as the gland's is
+    if lag[-1] >= 1.0:
+        def _per_h(th):
+            return np.interp(th, lag, msd) / th
+        Lx = min(int(round(3.0 / row_h)), n - 1) if row_h and np.isfinite(row_h) else 0
+        if Lx >= 2:
+            m3 = np.array([((Xc[k:] - Xc[:-k]) ** 2).sum(2).mean() for k in range(1, Lx + 1)])
+            l3 = np.arange(1, Lx + 1) * row_h
+            out["msd_ratio_3h_1h"] = finite((np.interp(min(3.0, l3[-1]), l3, m3) / min(3.0, l3[-1]))
+                                            / (np.interp(1.0, l3, m3) / 1.0))
+        k1h = int(np.searchsorted(lag, 1.0 + 1e-9))
+        if prw_fit is not None and k1h >= 3:
+            f1 = prw_fit(lag[:k1h], msd[:k1h])
+            out["prw_P_h_1h"] = finite(f1["P"]); out["prw_v_um_h_1h"] = finite(f1["v"])
+    # COLLECTIVE FLOW: the velocity correlation length of the interior cells over 30-min displacements (a step is
+    # too noisy to correlate), median over start rows
+    k30 = max(1, int(round(0.5 / row_h))) if row_h and np.isfinite(row_h) else 1
+    vl = []
+    for t0 in range(0, n - k30, max(1, k30)):
+        vl.append(velocity_correlation_length(Xi[t0] / um, (Xi[t0 + k30] - Xi[t0]) / um, d0))
+    vl = [v for v in vl if v is not None]
+    out["vcorr_len_cells"] = finite(np.median(vl)) if vl else None
+    nc_ = [neighbour_correlation(Xi[t0] / um, affine_residual(Xi[t0], Xi[t0 + k30]) / um, d0)
+           for t0 in range(0, n - k30, max(1, k30))]
+    nc_ = [v for v in nc_ if v is not None]
+    out["corr_1sp"] = finite(np.median(nc_)) if nc_ else None
+    lt = [neighbour_correlation_lt(Xi[t0] / um, affine_residual(Xi[t0], Xi[t0 + k30]) / um, d0)
+          for t0 in range(0, n - k30, max(1, k30))]
+    cl_ = [a for a, _ in lt if a is not None]; ct_ = [b for _, b in lt if b is not None]
+    out["corr_L_1sp"] = finite(np.median(cl_)) if cl_ else None
+    out["corr_T_1sp"] = finite(np.median(ct_)) if ct_ else None
     return out
 
 

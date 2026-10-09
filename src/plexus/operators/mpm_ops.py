@@ -4527,6 +4527,12 @@ class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
     above the row-0 median of axis a along +dir and the others along -dir -- TWO CROWDS WALKING AT EACH OTHER
     (the counter-flow arm); without `split_axis` every cell is cued along +dir. No `cue`: k = 0, a free walk.
 
+    `align: r_a` (1 / time, default 0) turns each cell's polarity toward its OWN velocity, -r_a sin(theta_c -
+    theta_v,c) in d theta_c, theta_v the direction of the cell's centroid displacement since the last call (Szabo et
+    al. 2006, Phys. Rev. E 74:061908: "the direction of self-propulsion relaxes toward the cell's velocity"). A
+    cell pushed by its neighbours turns to go where it is pushed, and the crowd lines up into streams and swirls --
+    the collective flow of a migrating epithelium -- with no rule that reads a neighbour.
+
     WHY A MODEL AND NOT `persistent_walk`. An epithelial cell in a sheet migrates by basal, "cryptic" lamellipodia
     under its neighbours, on its basement membrane (Farooqui & Fenteany 2005, J. Cell Sci. 118:51): its
     polarity is the direction of that protrusion, IN the substrate's plane, and the push is at its base.
@@ -4541,7 +4547,8 @@ class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
     """
     PARAM_ROLES = dict(ActiveForcePersistentWalk.PARAM_ROLES, plane_axis="normal_of_the_substrate_plane",
                        basal_band="height_above_the_cells_lowest_point_that_is_pushed",
-                       cue="dir_split_axis_strength_of_a_polarity_cue")
+                       cue="dir_split_axis_strength_of_a_polarity_cue",
+                       align="rate_of_polarity_turning_toward_own_velocity")
     PARAM_UNITS = dict(ActiveForcePersistentWalk.PARAM_UNITS, basal_band="length")
     MECHANISM_TAGS = ActiveForcePersistentWalk.MECHANISM_TAGS + ["substrate_crawling", "cryptic_lamellipodia"]
     REFERENCE = ("Farooqui, R. & Fenteany, G. (2005). J. Cell Sci. 118:51-63; Romanczuk, P. et al. (2012). "
@@ -4573,6 +4580,11 @@ class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
             self.cue_split = None if cue.get("split_axis") is None else int(cue["split_axis"])
         self._theta = None
         self._cue_sign = None
+        self.align = float(params.get("align", 0.0))
+        if self.align < 0.0:
+            raise ValueError("active_force[substrate_walk]: align is a rate, >= 0")
+        self._prev_xb = None
+        self._theta_v = None
 
     def _init_cells(self, nc):
         super()._init_cells(nc)                                            # drives, speed factors, generator
@@ -4586,7 +4598,8 @@ class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
     def _step(self, h):
         """theta by Euler-Maruyama sub-steps (variance 2 D_c h_s each, <= 0.02 rad^2), the cue's torque in each."""
         n_sub = max(1, int(math.ceil(float(self._Dc.max()) * h / 0.01)),
-                    int(math.ceil(self.cue_k * h / 0.1)) if self.cue_k > 0 else 1)
+                    int(math.ceil(self.cue_k * h / 0.1)) if self.cue_k > 0 else 1,
+                    int(math.ceil(self.align * h / 0.1)) if self.align > 0 else 1)
         hs = h / n_sub
         for _ in range(n_sub):
             z = torch.randn(self._theta.shape[0], generator=self._gen, dtype=torch.float64)
@@ -4594,6 +4607,9 @@ class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
             if self.cue_k > 0.0 and self._cue_sign is not None:
                 tgt = self.cue_dir + torch.where(self._cue_sign > 0, 0.0, math.pi)
                 dth = dth - self.cue_k * torch.sin(self._theta - tgt) * hs
+            if self.align > 0.0 and self._theta_v is not None:
+                tv, moving = self._theta_v
+                dth = dth - self.align * torch.where(moving, torch.sin(self._theta - tv), torch.zeros_like(tv)) * hs
             self._theta = torch.remainder(self._theta + dth, 2.0 * math.pi)
         self._sync_p()
         if self.speed_noise > 0.0:
@@ -4627,6 +4643,13 @@ class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
                 alive = (_w > 0).detach().cpu()
                 med = float(v[alive].median()) if bool(alive.any()) else 0.0
                 self._cue_sign = torch.where(v > med, 1.0, -1.0).double()
+        if self.align > 0.0:
+            xb_now, _l, _w = self._cells_xbar(lvl, X, idx, nc)
+            xb_now = xb_now.detach().double().cpu()
+            if self._prev_xb is not None and self._prev_xb.shape == xb_now.shape:
+                dv = (xb_now - self._prev_xb) @ self._E.T                        # [nc, 2] in-plane displacement
+                self._theta_v = (torch.atan2(dv[:, 1], dv[:, 0]), dv.norm(dim=1) > 1e-9)
+            self._prev_xb = xb_now
         if not fresh:
             self._step(float(getattr(H, "dt", 1.0)))
         if self.f == 0.0:
