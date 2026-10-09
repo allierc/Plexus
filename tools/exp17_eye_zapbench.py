@@ -27,6 +27,18 @@ THE MATCH, per recorded neuron (all 100,759 destriped traces; the constant fill 
   gain               held-out r(best model cell) - held-out r(stimulus control); gain_bank the same against the bank
 Each neuron's region is the smallest Z-Brain mask holding it (data/atlas_destripe.npz).
 
+THE POOLS (Cedric, 2026-10-08: "a proper localisation"; papers/Horizontal_integrator_abducens_literature_summary_v3.pdf):
+each model type is matched only against recorded neurons where the literature puts it, on its own side --
+  pretectum   AF5 cells        Z-Brain Pretectum + its Gad1b, dopaminergic and anterior vmat2 clusters (Kubo 2014: the
+                               pretectum is necessary and sufficient for the OKR slow phase)
+  r7/8        integrator       Rhombomere 7 (Z-Brain's r7 runs on through r8) + Medial Vestibular Nucleus, 50-200 um
+                               caudal of the Mauthner soma (Miri 2011, Goncalves 2014: 50-150 um; Lee 2015)
+  r5/6        abducens         Rhombomere 5 + 6, motor (AMN) and internuclear (AIN) cells both (Brysch 2019: AMN 30-70 um
+                               ventral to the MLF, AIN medial / dorsal; Z-Brain has no MLF mask, so the match decides)
+Side: the atlas midline is Z-Brain's width / 2 (247.8 um); which half is the fish's left is not known from the
+registration, so both conventions are scored and the one the model fits better is kept (the rig's left and right cells
+are mirror images under a conjugate drive, so the wrong convention pairs each neuron with its opposite).
+
     PYTHONPATH=src:tools python tools/exp17_eye_zapbench.py
 -> presentation/figs/eye_zapbench_session.png, eye_zapbench_rotation.png; data/eye_zapbench.json
 """
@@ -46,6 +58,13 @@ RUN, CORPUS, BLOCK = "zf_eye2_rig_zapbench", "t9_zapbench_eye", "rotation"
 TAU_CA = 3.0                                    # s, the assumed nuclear-GCaMP decay
 N_SHOW = 60                                     # recorded neurons in the rotation raster
 N_BANK = 20                                     # leaky-integrator time constants of the stimulus bank
+N_POOL_SHOW = 20                                # recorded neurons per pool in the rotation raster
+MIDLINE_UM = 621 * 0.798 / 2                    # Z-Brain's width / 2
+POOLS = (("pretectum", ("AF5",), ("Diencephalon - Pretectum", "Diencephalon - Pretectal Gad1b Cluster",
+                                  "Diencephalon - Pretectal dopaminergic cluster",
+                                  "Diencephalon - Anterior pretectum cluster of vmat2 Neurons"), None),
+         ("r7/8", ("INTG",), ("Rhombencephalon - Rhombomere 7", "Rhombencephalon - Medial Vestibular Nucleus"), (50.0, 200.0)),
+         ("r5/6", ("AMN", "AIN"), ("Rhombencephalon - Rhombomere 5", "Rhombencephalon - Rhombomere 6"), None))
 
 
 def model_types(spec):
@@ -132,11 +151,44 @@ def match(r, S_rec, off, names, dff, regions, rnames):
     def region(j):
         m = np.flatnonzero(regions[j])
         return str(rnames[m[np.argmin(size[m])]]) if len(m) else "outside the atlas"
-    return dict(B=B, Sm=Sm, sc=sc, O=O, idx=idx, r_model=r_model, r_stim=r_stim, r_bank=r_bank,
+    return dict(B=B, Sm=Sm, sc=sc, O=O, idx=idx, r_model=r_model, r_stim=r_stim, r_bank=r_bank, C=C, Cf=Cf,
                 gain=r_model - r_stim, gain_bank=r_model - r_bank, taus=taus,
                 best=best_full, region=region, cyc=cyc, n_cycles=int(cyc.max() + 1),
                 model_vs_stim=np.array([np.corrcoef(Sm[:, i], sc)[0, 1] if Sm[:, i].std() > 1e-9 else 0.0
                                         for i in range(Sm.shape[1])]))
+
+
+def match_pools(m, tnames, P, R, rnames):
+    """The match restricted to each model type's own anatomy and side (see THE POOLS) -> {convention: {pool: ...}}."""
+    rnames = [str(n) for n in rnames]
+    idx = m["idx"]
+    Pk, Rk = P[idx], R[idx]
+    yM = float(np.median(P[R[:, rnames.index("Rhombencephalon - Mauthner")]][:, 1]))
+    side = np.array([t[-1] for t in tnames])
+    out = {}
+    for conv in ("L", "R"):                                   # the fish's side of the half x < midline
+        nside = np.where(Pk[:, 0] < MIDLINE_UM, conv, "R" if conv == "L" else "L")
+        res = {}
+        for name, prefs, masks, band in POOLS:
+            inp = np.zeros(len(idx), bool)
+            for mk in masks:
+                inp |= Rk[:, rnames.index(mk)]
+            if band is not None:
+                inp &= (Pk[:, 1] - yM >= band[0]) & (Pk[:, 1] - yM <= band[1])
+            j = np.flatnonzero(inp)
+            allow = (np.array([any(t.startswith(p_) for p_ in prefs) for t in tnames])[None, :]
+                     & (side[None, :] == nside[j][:, None]))                       # [n_pool, 285]
+            rm = np.zeros(len(j))
+            for a_, b_ in ((0, 1), (1, 0)):
+                ca = np.where(allow, m["C"][a_][0][j], -np.inf)
+                i_ = ca.argmax(1)
+                rm += m["C"][b_][0][j, i_] / 2
+            best = np.where(allow, m["Cf"][j], -np.inf).argmax(1)
+            res[name] = dict(j=j, r_model=rm, r_bank=m["r_bank"][j], best=best, y_mauthner_um=yM)
+        out[conv] = res
+    score = {c: float(np.mean(np.concatenate([v["r_model"] for v in out[c].values()]))) for c in out}
+    keep = max(score, key=score.get)
+    return out, keep, score
 
 
 def session_fig(path, r, t_s, U, Y, gaze, d, types):
@@ -162,11 +214,11 @@ def session_fig(path, r, t_s, U, Y, gaze, d, types):
     ax[1].set_ylabel("gaze\n(deg)", color="white", fontsize=9)
     ax[1].legend(loc="upper left", fontsize=7, frameon=False, labelcolor="white", ncol=2)
     vm = np.percentile(np.abs(r), 99)
-    ax[2].imshow(r.T, aspect="auto", cmap="RdBu_r", vmin=-vm, vmax=vm, interpolation="nearest",
+    ax[2].imshow(r.T, aspect="auto", cmap="gray", vmin=-0.3 * vm, vmax=vm, interpolation="nearest",  # the deck's grey LUT
                  extent=(t_s[0], t_s[-1] + 0.914, r.shape[1], 0))
     y0 = 0
     for nm, c in types:
-        ax[2].axhline(y0, color="0.35", lw=0.4)
+        ax[2].axhline(y0, color="#e6a03c", lw=0.4)
         ax[2].text(-0.006, 1 - (y0 + c / 2) / r.shape[1], f"{nm.replace('_', ' ')} ({c})", transform=ax[2].transAxes,
                    ha="right", va="center", color="white", fontsize=6)
         y0 += c
@@ -180,13 +232,13 @@ def session_fig(path, r, t_s, U, Y, gaze, d, types):
         ax[0].text((off[i] + off[i + 1]) / 2 * 0.914, 1.04, str(nm), transform=ax[0].get_xaxis_transform(),
                    ha="center", va="bottom", color="white", fontsize=7.5)
     ax[0].set_xticklabels([]); ax[1].set_xticklabels([])
-    ax[2].text(1.0, -0.075, f"rate tanh(v), colour scale +-{vm:.2f}", transform=ax[2].transAxes, ha="right",
+    ax[2].text(1.0, -0.075, f"rate tanh(v), grey from {-0.3 * vm:.2f} to {vm:.2f}", transform=ax[2].transAxes, ha="right",
                color="0.7", fontsize=7)
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
 
 
-def rotation_fig(path, m, types, d, r, gaze_rot):
+def rotation_fig(path, m, types, d, r, gaze_rot, pools=None, tnames=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -194,7 +246,7 @@ def rotation_fig(path, m, types, d, r, gaze_rot):
     t = (B - B[0]) * 0.914
     fig = plt.figure(figsize=(13, 7.6), facecolor="black")
     gs = fig.add_gridspec(3, 2, height_ratios=[0.7, 2.3, 2.3], width_ratios=[1, 0.012], hspace=0.16, wspace=0.01,
-                          left=0.14, right=0.97, top=0.95, bottom=0.08)
+                          left=0.20, right=0.97, top=0.95, bottom=0.08)
     a0, a1, a2 = (fig.add_subplot(gs[i, 0]) for i in range(3))
     for a in (a0, a1, a2):
         a.set_facecolor("black"); a.tick_params(colors="white", labelsize=8)
@@ -206,26 +258,36 @@ def rotation_fig(path, m, types, d, r, gaze_rot):
     a0.set_yticks([]); a0.set_xticklabels([])
     a0.set_ylabel("+ left\n- right", color="white", fontsize=8)
     Sm = _z(m["Sm"])
-    a1.imshow(Sm.T, aspect="auto", cmap="RdBu_r", vmin=-2.5, vmax=2.5, interpolation="nearest",
+    a1.imshow(Sm.T, aspect="auto", cmap="gray", vmin=-0.75, vmax=2.5, interpolation="nearest",
               extent=(t[0], t[-1] + 0.914, Sm.shape[1], 0))
     y0 = 0
     for nm, c in types:
-        a1.axhline(y0, color="0.35", lw=0.4)
+        a1.axhline(y0, color="#e6a03c", lw=0.4)
         a1.text(-0.006, 1 - (y0 + c / 2) / Sm.shape[1], f"{nm.replace('_', ' ')}", transform=a1.transAxes,
                 ha="right", va="center", color="white", fontsize=5.5)
         y0 += c
     a1.set_yticks([]); a1.set_xticklabels([])
     a1.text(0.0, 1.01, "model: the 285 cells, rate through the GCaMP kernel, z-scored", transform=a1.transAxes,
             color="white", fontsize=8)
-    top = np.argsort(-m["r_model"])[:N_SHOW]
-    O = _z(m["O"][:, m["idx"][top]])
-    a2.imshow(O.T, aspect="auto", cmap="RdBu_r", vmin=-2.5, vmax=2.5, interpolation="nearest",
-              extent=(t[0], t[-1] + 0.914, len(top), 0))
-    a2.set_yticks(np.arange(len(top))[::6] + 0.5)
-    a2.set_yticklabels([m["region"](m["idx"][j]).split(" - ")[-1][:28] for j in top[::6]], fontsize=5.2, color="white")
+    rows, labels, seps = [], [], []
+    for name, v in pools.items():
+        o_ = np.argsort(-v["r_model"])[:N_POOL_SHOW]
+        seps.append((len(rows), name, len(o_)))
+        rows += [m["idx"][v["j"][k]] for k in o_]
+        labels += [f"{str(tnames[v['best'][k]]).replace('_', ' ')}  {v['r_model'][k]:.2f}" for k in o_]
+    O = _z(m["O"][:, rows])
+    a2.imshow(O.T, aspect="auto", cmap="gray", vmin=-0.75, vmax=2.5, interpolation="nearest",
+              extent=(t[0], t[-1] + 0.914, len(rows), 0))
+    a2.set_yticks(np.arange(len(rows)) + 0.5)
+    a2.set_yticklabels(labels, fontsize=3.6, color="white")
+    for y0, name, n_ in seps:
+        a2.axhline(y0, color="#e6a03c", lw=0.8)
+        a2.text(-0.115, 1 - (y0 + n_ / 2) / len(rows), name, transform=a2.transAxes, ha="right", va="center",
+                color="white", fontsize=8)
     a2.set_xlabel("time in the rotation block (s)", color="white", fontsize=9)
-    a2.text(0.0, 1.01, f"recorded: the {N_SHOW} neurons most like a model cell (held-out r), z-scored dF/F; "
-                       f"labelled by region", transform=a2.transAxes, color="white", fontsize=8)
+    a2.text(0.0, 1.01, f"recorded: per pool, the {N_POOL_SHOW} neurons most like a model cell of that pool and side "
+                       f"(the cell and its held-out r on the left), z-scored dF/F", transform=a2.transAxes,
+            color="white", fontsize=8)
     for a in (a0, a1, a2):
         a.set_xlim(t[0], t[-1] + 0.914)
     fig.savefig(path, dpi=150, facecolor="black")
@@ -240,8 +302,10 @@ def main():
     session_fig(os.path.join(FIGS, "eye_zapbench_session.png"), r, t_s, U, Y, gaze, d, types)
     m = match(r, d["stimulus"], d["offsets"], d["names"], d["dff"], a["regions"], a["names"])
     tnames = np.concatenate([[nm] * c for nm, c in types])
+    pools, conv, conv_score = match_pools(m, tnames, a["atlas_um"], a["regions"], a["names"])
     k60 = np.round(m["B"] * 0.914 * 60).astype(int)
-    rotation_fig(os.path.join(FIGS, "eye_zapbench_rotation.png"), m, types, d, r, gaze[np.minimum(k60, len(gaze) - 1)])
+    rotation_fig(os.path.join(FIGS, "eye_zapbench_rotation.png"), m, types, d, r, gaze[np.minimum(k60, len(gaze) - 1)],
+                 pools=pools[conv], tnames=tnames)
     g, gb, rm, rs, rb = m["gain"], m["gain_bank"], m["r_model"], m["r_stim"], m["r_bank"]
     top = np.argsort(-rm)[:200]
     by_type = {}
@@ -269,7 +333,24 @@ def main():
                    for j in top[:25]],
            "top200_by_model_type": {k: {"n": len(v), "regions": Counter(v).most_common(3)} for k, v in
                                     sorted(by_type.items(), key=lambda kv: -len(kv[1]))}}
+    pj = {}
+    for name, v in pools[conv].items():
+        rm_, rb_ = v["r_model"], v["r_bank"]
+        o_ = np.argsort(-rm_)
+        pj[name] = {"n": int(len(rm_)), "n_r_model_gt_0.5": int((rm_ > 0.5).sum()), "n_r_bank_gt_0.5": int((rb_ > 0.5).sum()),
+                    "median_r_model": float(np.median(rm_)), "median_r_bank": float(np.median(rb_)),
+                    "top20_mean_r_model": float(rm_[o_[:20]].mean()), "top20_mean_r_bank": float(rb_[o_[:20]].mean()),
+                    "median_model_minus_bank_where_r_gt_0.5": (float(np.median((rm_ - rb_)[rm_ > 0.5]))
+                                                               if (rm_ > 0.5).any() else None),
+                    "top": [{"neuron": int(m["idx"][v["j"][k]]), "model_type": str(tnames[v["best"][k]]),
+                             "region": m["region"](m["idx"][v["j"][k]]), "r_model": float(rm_[k]), "r_bank": float(rb_[k])}
+                            for k in o_[:10]]}
+    out["pools"] = {"side_convention": f"x < {MIDLINE_UM:.1f} um is the fish's {conv}",
+                    "mean_held_out_r_by_convention": conv_score,
+                    "y_mauthner_um": float(next(iter(pools[conv].values()))["y_mauthner_um"]), "by_pool": pj}
     json.dump(out, open(os.path.join(EXP, "data", "eye_zapbench.json"), "w"), indent=1)
+    print(json.dumps({k: {kk: vv for kk, vv in v.items() if kk != "top"} for k, v in pj.items()}, indent=1))
+    print("side", out["pools"]["side_convention"], conv_score)
     print(json.dumps({k: out[k] for k in ("model_cell_vs_stimulus_r", "held_out", "top200_by_model_type")}, indent=1))
     for row in out["top"][:12]:
         print(row)

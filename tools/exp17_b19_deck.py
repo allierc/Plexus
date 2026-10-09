@@ -1846,28 +1846,41 @@ def write_slides():
                    + "{\\scriptsize\\raggedright The trained two-eye rig, unchanged (a test-only run: "
                      "\\texttt{epochs: 0, init\\_from: zf\\_eye2\\_rig}). Gaze error over the 2 h "
                      f"{Jz['test_rmse_deg']:.2f} deg rms, {100 * frac_:.1f} \\% of the target's variance. The 285 "
-                     "cells' rate, tanh(v), is recorded on the volume clock: 7,879 frames, ZAPBench's shape.\\par}")
+                     "cells' rate, tanh(v), is recorded on the volume clock: 7,879 frames, ZAPBench's shape.\\par}\n"
+                   + S.head("against the literature")
+                   + "{\\scriptsize\\raggedright The ZAPBench fish is paralysed ($\\alpha$-bungarotoxin): its OKR is "
+                     "fictive and open-loop, the slip the stimulus's own velocity, as here. Real slow phases run 9--15 "
+                     "deg/s for 10--20 deg/s stimuli and reset by fast phases every few seconds; the rig has no fast phase, "
+                     "so a held drive parks its eyes at 8 times the slip in degrees and 1 deg/s keeps them in the trained "
+                     "range. The integrator's 8-s target sits inside the neurons' 1--70 s (median 5 s; OKR 6.7 s).\\par}")
         deck.append(("90b_eye_zapbench", S.frame_narrow(
             "the eye circuit on ZAPBench's 2-h session", "figs/eye_zapbench_session.png", right_s,
             "Plexus_Main.py -o test zf_eye2_rig_zapbench; tools/exp17_eye_zapbench.py", left=0.70,
             deck_title="appendix $\\cdot$ the oculomotor circuit on ZAPBench's 2-h session")))
+        Pz = Jz["pools"]["by_pool"]
+        cv_ = Jz["pools"]["mean_held_out_r_by_convention"]
+        rows_ = "".join(f"{nm_} & {v_['n']:,} & {v_['n_r_model_gt_0.5']:,} & {v_['n_r_bank_gt_0.5']:,} \\\\ "
+                        for nm_, v_ in Pz.items())
         right_r = (S.head("the block: rotation")
                    + f"{{\\scriptsize\\raggedright {Jz['n_cycles']} cycles of 30 s leftward then 30 s rightward "
                      "rotation: the one optokinetic stimulus proper, and 30-s holds long against the integrator's 8-s "
                      "time constant.\\par}\n"
-                   + S.head("the match")
+                   + S.head("the match, where each cell type lives")
                    + f"{{\\scriptsize\\raggedright Each model cell's rate through a GCaMP kernel ({Jz['tau_ca_s']:g}-s "
-                     f"decay, assumed); for each of the {Jz['n_scored']:,} recorded neurons the most similar model "
-                     "cell is picked on the even cycles and scored on the odd ones, and back. Held-out r > 0.5: "
-                     f"{H_['n_r_model_gt_0.5']:,} neurons. The same choice from a bank of leaky integrators of the "
-                     f"stimulus ({Jz['bank_taus_s'][0]:g} to {Jz['bank_taus_s'][-1]:g} s, both signs): "
-                     f"{H_['n_r_bank_gt_0.5']:,}; median model-minus-bank "
-                     f"{H_['median_gain_bank_where_r_model_gt_0.5']:+.3f}.\\par}}\n"
+                     "decay, assumed); each recorded neuron matched only to the model types of its anatomy and side "
+                     "(AF5: pretectum; integrator: r7/8, 50--200 $\\mu$m caudal of the Mauthner cell; abducens motor "
+                     "and internuclear: r5/6), the most similar cell picked on the even cycles and scored on the odd "
+                     "ones, and back. Neurons at held-out r $>$ 0.5, model vs the same choice from a bank of leaky "
+                     f"integrators of the stimulus ({Jz['bank_taus_s'][0]:g}--{Jz['bank_taus_s'][-1]:g} s, both signs):"
+                     "\\\\[2pt]\\begin{tabular}{@{}lrrr@{}}pool & n & model & bank \\\\ \\hline " + rows_
+                   + "\\end{tabular}\\\\[2pt]"
+                     f"Side: mean r {cv_['L']:.3f} with the atlas's low-x half as the fish's left, {cv_['R']:.3f} "
+                     "the other way: undecided.\\par}\n"
                    + S.head("so far")
-                   + "{\\scriptsize\\raggedright Many neurons look like the circuit's cells, but no more than they "
-                     "look like a filtered stimulus: with this input the circuit is a filter of the stimulus. Next: "
-                     "learn the input (the 22 features to the retinas) against these neurons, the circuit frozen, the "
-                     "bank as the yardstick.\\par}")
+                   + "{\\scriptsize\\raggedright In every pool the recorded neurons look like the circuit's cells "
+                     "no more than like a filtered stimulus, and they adapt within each 30-s epoch where the model "
+                     "holds. Next: learn the input (the 22 features to the retinas) against these pools, the circuit "
+                     "frozen, the bank as the yardstick.\\par}")
         deck.append(("90c_eye_rotation", S.frame_narrow(
             "the rotation block: model cells and the recorded neurons most like them", "figs/eye_zapbench_rotation.png",
             right_r, "tools/exp17_eye_zapbench.py (data/eye_zapbench.json)", left=0.70,
