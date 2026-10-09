@@ -2450,7 +2450,11 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
 
             if snap is not None:
                 for n, before in snap.items():
-                    if not torch.equal(before, H.levels[n].state):
+                    # NaN-AWARE (2026-10-08): torch.equal is False for an unchanged state holding a NaN, which made a
+                    # NaN seeded state (a NaN learnable injected at on_seeded) read as an operator writing the state
+                    after = H.levels[n].state
+                    if before.shape != after.shape or not bool(((before == after)
+                                                                | (before.isnan() & after.isnan())).all()):
                         raise RuntimeError(
                             f"operator {nm!r} wrote the integrated state of set {n!r} "
                             f"directly. A dynamics operator must RETURN a delta (the engine "

@@ -55,6 +55,7 @@ task:
   - name: no_stimulus
     drive: 'off'
 training:
+  resume: best
   optimizer: adam
   lr: 0.0018
   schedule: none
