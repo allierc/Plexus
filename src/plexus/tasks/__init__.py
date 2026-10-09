@@ -98,6 +98,7 @@ def teachers() -> list:
 from plexus.tasks import processes    # noqa: E402,F401  self-registers the input ensembles
 from plexus.tasks import lti          # noqa: E402,F401  self-registers the LTI teacher laws
 from plexus.tasks import selfmotion   # noqa: E402,F401  the swim-event drive and the heading teacher
+from plexus.tasks import zapbench     # noqa: E402,F401  ZAPBench's session as the two-eye rig's drive
 
 __all__ = ["register_stimulus", "register_teacher", "get_stimulus", "get_teacher",
            "stimuli", "teachers", "processes", "lti"]

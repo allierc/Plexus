@@ -1821,33 +1821,57 @@ def write_slides():
         deck += new_                                   # after 20.3's V_rest slides (Cedric, 2026-10-08: "after 41")
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
-    # THE EYE CIRCUIT, TRAINED ON A TASK (Cedric, 2026-10-08: "add slides in the appendix, starting with the circuit eye
-    # simulation", then "use only codebase code and specs", "the one without fast oscillation"): Plexus's zf_eye_rig,
-    # its movie by plexus.tasks.plot_trainer.circuit_movie (Plexus_Main.py -o analyse zf_eye_rig)
-    if os.path.exists(os.path.join(PRES, "Movies", "eye_circuit_zf_eye_rig.mp4")):
-        GDe = "/groups/saalfeld/home/allierc/GraphData/log/training/neural_eye/zf_eye_rig/results/zf_eye_rig_test.json"
-        J_e = json.load(open(GDe))
-        cap_e = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.32\\textwidth}\\raggedright"
-                 "{\\footnotesize\\textbf{the task}}\\\\[2pt]{\\tiny Track a target with the eye: the drive is a "
-                 "band-limited signal (up to 1 Hz) on the retina, the target the eye angle that integrates it with an "
-                 "8-s leak. The circuit drives the lateral and medial rectus through its motor pools; the eye pose is "
-                 "the output, in degrees.\\par}\\end{column}\n"
-                 "\\begin{column}{0.32\\textwidth}\\raggedright{\\footnotesize\\textbf{the circuit}}\\\\[2pt]"
-                 "{\\tiny The 285-cell zebrafish oculomotor connectome (EM), Dale-signed: 41 AF5 input cells, 117 "
-                 "integrator cells (INTG), 92 abducens motor (AMN) and 35 internuclear (AIN) neurons, 5,013 synapses. "
-                 "Trained: the synapse, afferent and muscle-junction weights, each cell's time constant and bias "
-                 "(Plexus, zf\\_eye\\_rig).\\par}\\end{column}\n"
-                 "\\begin{column}{0.32\\textwidth}\\raggedright{\\footnotesize\\textbf{the movie}}\\\\[2pt]"
-                 "{\\tiny Two held-out trials, real time. Left: target, model, command. Middle: the message on the "
-                 "connectivity matrix. Right: the eye from above and the muscle drives. Below: the 285 cells. Held-out "
-                 "error " + f"{100 * J_e['normalised_mse']:.2f}" + " \\% of the target's variance; no fast oscillation "
-                 "(98 \\% of each cell's activity below 1 Hz).\\par}\\end{column}\n\\end{columns}")
-        body_e = ("\\vspace*{0.08\\textheight}\\centering\\playmovie[0.84\\textwidth]{Movies/eye_circuit_zf_eye_rig}\\par"
-                  "\\vspace{1pt}" + cap_e)     # moved down to the slide's centre (Cedric, 2026-10-08)
-        deck.append(("90b_eye_circuit", S.frame_wide("the eye circuit, trained on a task", body_e,
-                                                     "Plexus: Plexus_Main.py -o analyse zf_eye_rig "
-                                                     "(plexus.tasks.plot_trainer.circuit_movie)",
-                                                     deck_title="appendix $\\cdot$ the oculomotor circuit, trained on a task")))
+    # THE EYE CIRCUIT ON ZAPBENCH'S 2-H SESSION (Cedric, 2026-10-08: "replace slide 48 with the new 2H data", "rotation
+    # be it", "find cell activities that resemble the simulation activities"): the trained two-eye rig (zf_eye2_rig) on
+    # the corpus t9_zapbench_eye through Plexus_Main.py -o test zf_eye2_rig_zapbench, and the rotation block matched
+    # against the recorded neurons by tools/exp17_eye_zapbench.py (data/eye_zapbench.json). Replaces the zf_eye_rig
+    # movie slide.
+    pj_ = os.path.join(EXP, "data", "eye_zapbench.json")
+    if os.path.exists(pj_) and os.path.exists(os.path.join(PRES, "figs", "eye_zapbench_session.png")):
+        import yaml as yaml_
+        Jz = json.load(open(pj_))
+        tk_ = yaml_.safe_load(open(os.path.join(ROOT, "config", "task", "t9_zapbench_eye.yaml")))["stimulus"]
+        H_ = Jz["held_out"]
+        frac_ = (Jz["test_rmse_deg"] / Jz["test_target_rms_deg"]) ** 2
+        right_s = (S.head("the input")
+                   + "{\\scriptsize\\raggedright The 22 stimulus features are condition codes (a direction, an on/off "
+                     "flag), never a speed. Only rotation and the lateral turning drifts move the whole field sideways, "
+                     "the one input the rig was trained on, so the drive on both retinas is\\\\[2pt]"
+                     "$\\mathrm{slip} = v_{rot}\\,f_{20} + v_{turn}\\,f_{10}\\,f_{11}$\\\\[2pt]"
+                     f"($f_{{20}}$ rotation direction, $f_{{10}}$ turning grating moving, $f_{{11}}$ its left / right "
+                     f"part; + is leftward), $v_{{rot}} = v_{{turn}} = {tk_['v_rotation_deg_s']:g}$ deg/s (the release "
+                     "has no speed); every other condition 0. Held over each 0.914-s frame, run at the rig's 60 Hz "
+                     "(432,084 steps).\\par}\n"
+                   + S.head("the run")
+                   + "{\\scriptsize\\raggedright The trained two-eye rig, unchanged (a test-only run: "
+                     "\\texttt{epochs: 0, init\\_from: zf\\_eye2\\_rig}). Gaze error over the 2 h "
+                     f"{Jz['test_rmse_deg']:.2f} deg rms, {100 * frac_:.1f} \\% of the target's variance. The 285 "
+                     "cells' rate, tanh(v), is recorded on the volume clock: 7,879 frames, ZAPBench's shape.\\par}")
+        deck.append(("90b_eye_zapbench", S.frame_narrow(
+            "the eye circuit on ZAPBench's 2-h session", "figs/eye_zapbench_session.png", right_s,
+            "Plexus_Main.py -o test zf_eye2_rig_zapbench; tools/exp17_eye_zapbench.py", left=0.70,
+            deck_title="appendix $\\cdot$ the oculomotor circuit on ZAPBench's 2-h session")))
+        right_r = (S.head("the block: rotation")
+                   + f"{{\\scriptsize\\raggedright {Jz['n_cycles']} cycles of 30 s leftward then 30 s rightward "
+                     "rotation: the one optokinetic stimulus proper, and 30-s holds long against the integrator's 8-s "
+                     "time constant.\\par}\n"
+                   + S.head("the match")
+                   + f"{{\\scriptsize\\raggedright Each model cell's rate through a GCaMP kernel ({Jz['tau_ca_s']:g}-s "
+                     f"decay, assumed); for each of the {Jz['n_scored']:,} recorded neurons the most similar model "
+                     "cell is picked on the even cycles and scored on the odd ones, and back. Held-out r > 0.5: "
+                     f"{H_['n_r_model_gt_0.5']:,} neurons. The same choice from a bank of leaky integrators of the "
+                     f"stimulus ({Jz['bank_taus_s'][0]:g} to {Jz['bank_taus_s'][-1]:g} s, both signs): "
+                     f"{H_['n_r_bank_gt_0.5']:,}; median model-minus-bank "
+                     f"{H_['median_gain_bank_where_r_model_gt_0.5']:+.3f}.\\par}}\n"
+                   + S.head("so far")
+                   + "{\\scriptsize\\raggedright Many neurons look like the circuit's cells, but no more than they "
+                     "look like a filtered stimulus: with this input the circuit is a filter of the stimulus. Next: "
+                     "learn the input (the 22 features to the retinas) against these neurons, the circuit frozen, the "
+                     "bank as the yardstick.\\par}")
+        deck.append(("90c_eye_rotation", S.frame_narrow(
+            "the rotation block: model cells and the recorded neurons most like them", "figs/eye_zapbench_rotation.png",
+            right_r, "tools/exp17_eye_zapbench.py (data/eye_zapbench.json)", left=0.70,
+            deck_title="appendix $\\cdot$ the oculomotor circuit against fish 2, rotation")))
     from PIL import Image
     recs_ = {r_["name"]: r_ for r_ in S.results_rows()}
     for n_ in APPENDIX_CURVES:
