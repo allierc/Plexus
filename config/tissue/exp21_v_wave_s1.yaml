@@ -1,0 +1,101 @@
+general:
+  name: exp21_v_wave_s1
+  seed: 1
+  n_frames: 1500
+  dt: 0.02
+  record_cap: 301
+  boundary: free
+  dim: 3
+  world: [25.0, 25.0, 3.0]
+  units: {length_um: 10.0, time_s: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 9, per_parent: cell, cell_box: 4.0}
+sets:
+  cell:
+    n: 300
+    types:
+      epi: {fraction: 1.0, shape: ball, youngs: 10.0, material: elastic, density: 1.0}
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      chem: {width: 2, integration: first_order}
+  pt:
+    entity: mpm_particle
+    parent: cell
+    per_parent: 160
+    particle_mass: 0.014
+    density: 1.0
+    radius: 0.85
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      cellc: {width: 1}
+      pid: {width: 1}
+      nuc: {width: 1}
+operators:
+- {op: cell_neighbours, model: point_contact, at: cell, points: pt, contact: 0.34, every: 100000}
+- op: cell_chem_diffuse
+  implementation: graph_laplacian
+  at: cell
+  d: [5.0, 0.0]
+  chi: 1.0
+- op: cell_chem_react
+  model: aliev_panfilov
+  at: cell
+  k: 8.0
+  a: 0.15
+  eps0: 0.002
+  mu1: 0.2
+  mu2: 0.3
+  rate: 2.56
+  stim:
+    times: [0.1]
+    duration: 0.04
+    amp: 20.0
+    below: {axis: 0, value: 2.0}
+schedule: [cell_neighbours, cell_chem_diffuse, cell_chem_react]
+seed:
+- op: seed_positions
+  model: packed_sheet
+  at: cell
+  shape: square
+  spacing: 1.4
+  jitter: 0.05
+  centre: [12.5, 12.5, 1.7]
+  seed: 1
+- {op: seed_positions, model: voronoi_parent, at: pt, reach: 0.85, seed: 1, label: cellc, parent_id: pid}
+- {op: set_material, model: nucleus, at: pt, stiffness: 4.0, radius_frac: 0.45, label: nuc}
+plotting:
+  renderer: vtk_points
+  subject: pt
+  render_3d: contour
+  contour_bodies:
+    nucleus: nuc
+    nucleus_color: '#1b1464'
+    mode: partition
+    clip_to_box: true
+    iso: 0.55
+    sigma: 2.0
+    reach: 0.26
+    smooth_method: taubin
+    smooth: 100
+    pass_band: 0.02
+    coat: 0.0
+    colors: ['#cfe3f5', '#9ecae1', '#6baed6', '#4292c6', '#2f7fc1', '#b3d4ee', '#5aa2d8', '#2171b5']
+    color_by:
+      block: chem
+      channel: 0
+      cmap: Blues_r
+      range: [0.0, 1.0]
+      floor: 0.25
+  surface_opacity: 1.0
+  surface_roughness: 0.45
+  surface_diffuse: 0.85
+  surface_ambient: 0.3
+  background: black
+  box_frame: true
+  floor: '#26324a'
+  camera: {elev: 34, azim: 25}
+  zoom: 1.0
+  duration_s: 10
+  slow_motion: 1

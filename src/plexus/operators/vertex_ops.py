@@ -9806,3 +9806,157 @@ class CellDivideMPM(Structural):
             C.state, C.occ = st, oc
         H.mpm_divisions = int(getattr(H, "mpm_divisions", 0)) + int(go.size)
         return {}
+
+
+@register_operator("cell_divide", model="mpm_planar", set="particle", kind="divide", family="population",
+                   title="Cell division in the plane of the sheet",
+                   equation=r"""$$\mathbf u_c=\arg\max_{\mathbf u\perp\mathbf e_n}\ \mathbf u^{\!\top}G_c\,\mathbf u,\qquad \xi_i=(\mathbf x_i-\bar{\mathbf x}_c)\cdot\mathbf u_c\ \gtrless\ 0,\qquad v_i=\frac{f\,V_c}{n}$$""")
+class CellDivideMPMPlanar(CellDivideMPM):
+    """A cell of an epithelial MONOLAYER made of material points divides IN THE PLANE of the sheet: its points are cut
+    by the plane through their centroid that contains the sheet's normal and is normal to the cell's longest IN-PLANE
+    axis, and each half -- a narrower column of the mother's height -- becomes one daughter.
+
+    particle cell -> two particle cells: as `cell_divide[model: mpm]` (the trigger `mark` / `p_div` / `max_per_call`,
+    the free slot, the copied width-1 blocks, `daughter_mark`, `gap`), with three differences:
+
+        u_c        the largest eigenvector of the gyration tensor G_c of the cell's points PROJECTED on the plane normal
+                   to `plane_axis` (default 2): the long axis within the sheet, never the apico-basal one
+        daughter   KEEPS ITS HALF'S POINTS where they are (no rounding to a ball), each copied once more (with a
+                   jitter kept on its side of the cut) until the half holds the block's n points; F = I, so the half
+                   column is its rest shape; each point's volume f V_c / n (`daughter_frac` f, default 0.5)
+        nucleus    with `nucleus: {label, stiffness, radius_frac}`, every daughter point gets the mother's cytoplasm
+                   moduli, and as many of its points as the mother's nucleus held, the nearest its centroid, are made
+                   `stiffness` times stiffer and marked -- each daughter a whole nucleus, as after mitosis
+
+    WHY A MODEL AND NOT `cell_divide[mpm]`. That model cuts along the cell's longest axis -- for a column, the
+    apico-basal one, which stacks the daughters into two layers -- and rebuilds each as a ball (mitotic rounding
+    inside the gland's lumen, exp 11). An epithelial cell divides with its spindle in the plane of the sheet and both
+    daughters stay in the layer (Aw et al. 2016, Curr. Biol. 26:2090, Fig 4B: basal-epidermis divisions within the
+    plane); the contract (one cell's point block -> two) is the same.
+
+    Reference: Aw, W. Y., Heck, B. W., Joyce, B. & Devenport, D. (2016). Transient tissue-scale deformation
+    coordinates alignment of planar cell polarity junctions in the mammalian skin. Curr. Biol. 26:2090-2100.
+    """
+    PARAM_ROLES = dict(CellDivideMPM.PARAM_ROLES, plane_axis="sheet_normal_axis",
+                       nucleus="label_stiffness_radius_frac_of_each_daughters_nucleus")
+    REFERENCE = "Aw, W. Y. et al. (2016). Curr. Biol. 26:2090-2100."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__({k: v for k, v in params.items() if k not in ("plane_axis", "nucleus")}, device)
+        self.plane_axis = int(params.get("plane_axis", 2))
+        self.nucleus = params.get("nucleus")
+
+    def forward(self, H, mask=None):
+        C, P = H.level(self.at), H.level(self.points)
+        blocks, per = mpm_blocks(H, self.at, self.points)
+        live = (C.occ > 0.5).detach().cpu().numpy()
+        ok = live.copy()
+        if self.mark:
+            if self.mark not in C.state_schema:
+                raise ValueError(f"cell_divide[mpm_planar]: mark {self.mark!r} is not a block of {self.at!r}")
+            ok &= C.state[:, C.state_schema[self.mark][0]].detach().cpu().numpy() > 0.5
+        cand = np.flatnonzero(ok)
+        if cand.size == 0:
+            return {}
+        u = torch.rand(cand.size, generator=self._gen, dtype=torch.float64).numpy()
+        go = cand[u < self.p_div][: self.max_per_call]
+        free = np.flatnonzero(~live)
+        go = go[: free.size]
+        if go.size == 0:
+            if cand.size and free.size == 0:
+                H.mpm_div_blocked = int(getattr(H, "mpm_div_blocked", 0)) + 1
+            return {}
+        p0, p1 = P.state_schema["pos"]
+        D = p1 - p0
+        ax_in = [a for a in range(D) if a != self.plane_axis]
+        nl = self.nucleus or {}
+        nlab = nl.get("label")
+        for j, c in enumerate(go.tolist()):
+            d = int(free[j])
+            idx = blocks[c]
+            X = P.state[idx, p0:p1].detach().double()
+            vol = float(P.p_vol[idx].sum()) if getattr(P, "p_vol", None) is not None else 1.0
+            xb = X.mean(0)
+            Y = (X - xb)[:, ax_in]
+            w, V = torch.linalg.eigh((Y[:, :, None] * Y[:, None, :]).mean(0))
+            ax = torch.zeros(D, dtype=X.dtype, device=X.device)
+            ax[ax_in] = V[:, -1]
+            xi = (X - xb) @ ax
+            vbar = None
+            if "vel" in P.state_schema:
+                v0, v1 = P.state_schema["vel"]
+                vbar = P.state[idx, v0:v1].detach().mean(0)
+            mu0 = la0 = None
+            n_nuc = 0
+            if getattr(P, "mu", None) is not None:
+                if nlab and nlab in P.state_schema:
+                    cyto = P.state[idx, P.state_schema[nlab][0]] < 0.5
+                    n_nuc = int((~cyto).sum())
+                    mu0 = float(P.mu[idx][cyto].median()) if bool(cyto.any()) else float(P.mu[idx].min())
+                    la0 = float(P.la[idx][cyto].median()) if bool(cyto.any()) else float(P.la[idx].min())
+                src_mu, src_la = P.mu[idx].clone(), P.la[idx].clone()
+            v_d = self.daughter_frac * vol
+            halves = []
+            for slot, side in ((c, 1.0), (d, -1.0)):
+                own = torch.nonzero(side * xi > 0).flatten()
+                if own.numel() == 0:
+                    own = torch.nonzero(side * xi >= 0).flatten()
+                k = int(own.numel())
+                reps = own[torch.arange(per, device=own.device) % k]
+                pos = X[reps].clone()
+                extra = torch.arange(per, device=own.device) >= k
+                if bool(extra.any()):
+                    jit = (torch.randn(int(extra.sum()), D, generator=self._gen, dtype=torch.float64)
+                           * self.jitter).to(pos.device)
+                    q = pos[extra] + jit
+                    s_q = (q - xb) @ ax
+                    q = q - torch.where(side * s_q < 0, s_q, torch.zeros_like(s_q))[:, None] * ax   # back on its side
+                    pos[extra] = q
+                pos = pos + side * 0.5 * self.gap * ax
+                halves.append((slot, reps, pos))
+            for slot, reps, pos in halves:
+                tgt = blocks[slot]
+                _mpm_reset_points(P, tgt, pos.to(device=P.state.device, dtype=P.state.dtype),
+                                  torch.full((per,), v_d / per, dtype=P.state.dtype, device=P.state.device))
+                if vbar is not None:
+                    st = P.state.clone()
+                    st[tgt, v0:v1] = vbar
+                    P.state = st
+                if getattr(P, "mu", None) is not None:
+                    if mu0 is not None:
+                        Xd = pos.to(P.state.dtype)
+                        cen = Xd.mean(0)
+                        rr = (Xd - cen).norm(dim=1)
+                        # A WHOLE NUCLEUS EACH: the mother's count of nuclear points, the ones nearest the daughter's
+                        # centre (`radius_frac` x the rms radius when the mother had none). A radius alone found no
+                        # point in a narrow half-column of 48 (tests/test_exp21_mpm_sheet.py)
+                        k_n = n_nuc if n_nuc > 0 else int((rr < float(nl.get("radius_frac", 0.45))
+                                                           * rr.pow(2).mean().sqrt()).sum())
+                        nuc = torch.zeros(per, dtype=torch.bool, device=rr.device)
+                        nuc[torch.argsort(rr)[:max(1, k_n)]] = True
+                        s = float(nl.get("stiffness", 1.0))
+                        P.mu[tgt] = torch.where(nuc.to(P.mu.device), mu0 * s, mu0).to(P.mu.dtype)
+                        P.la[tgt] = torch.where(nuc.to(P.la.device), la0 * s, la0).to(P.la.dtype)
+                        st = P.state.clone()
+                        st[tgt, P.state_schema[nlab][0]] = nuc.to(st.dtype).to(st.device)
+                        P.state = st
+                    else:
+                        P.mu[tgt] = src_mu[reps].to(P.mu.dtype)
+                        P.la[tgt] = src_la[reps].to(P.la.dtype)
+                _mpm_label_points(P, tgt, slot, "pid", "cellc")
+                oc = P.occ.clone(); oc[tgt] = 1.0; P.occ = oc
+            st, oc = C.state.clone(), C.occ.clone()
+            for k_, (a, b) in C.state_schema.items():
+                if b - a == 1 or k_ in ("pos",):
+                    st[d, a:b] = st[c, a:b]
+            c0, c1 = C.state_schema["pos"]
+            for slot, reps, pos in halves:
+                st[slot, c0:c1] = pos.mean(0).to(st.dtype)
+            if self.mark and self.clear_mark:
+                st[[c, d], C.state_schema[self.mark][0]] = 0.0
+            if self.daughter_mark:
+                st[[c, d], C.state_schema[self.daughter_mark][0]] = 1.0
+            oc[d] = 1.0
+            C.state, C.occ = st, oc
+        H.mpm_divisions = int(getattr(H, "mpm_divisions", 0)) + int(go.size)
+        return {}

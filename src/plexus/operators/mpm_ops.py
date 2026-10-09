@@ -4502,6 +4502,162 @@ class ActiveForcePersistentWalk(ActiveForce):
         return {self.at: a}
 
 
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle",
+                   kind="exchange", model="substrate_walk",
+                   equation=r"""$$\mathbf a_i=f_c\,s_c(t)\,\chi_i\,\mathbf p_c,\qquad \mathbf p_c=(\cos\theta_c,\sin\theta_c,0),\qquad d\theta_c=-k\sin(\theta_c-\theta^{\rm cue}_c)\,dt+\sqrt{2D_c}\,dW_c$$""")
+class ActiveForceSubstrateWalk(ActiveForcePersistentWalk):
+    """`substrate_walk` MODEL of active_force -- a cell of an epithelium CRAWLING ON ITS SUBSTRATE: the persistent
+    walk of `persistent_walk`, with the polarity confined to the plane of the substrate and the push applied at the
+    cell's basal side.
+
+    particle -[containment]-> cell: as `persistent_walk` (the drive per cell, its log-normal spread `speed_cv`, the
+    speed-persistence coupling `ucsp`, the stop-and-go `speed_noise` / `speed_tau`, the leading-edge `front_bias`);
+    what differs is where the polarity lives and which points are pushed.
+
+        a_i       = f_c s_c(t) chi_i [1 + b tanh(xi_i / w)] p_c         every live point i of cell c
+        p_c       = cos(theta_c) e1 + sin(theta_c) e2                   e1, e2 span the plane normal to `plane_axis`
+        d theta_c = -k sin(theta_c - theta_cue_c) dt + sqrt(2 D_c) dW_c  rotational diffusion on the CIRCLE
+        chi_i     = 1 if point i is within `basal_band` (world) of its cell's lowest point along the plane's
+                    normal, else 0 (no band: every point, chi = 1); the push is renormalised so the cell's
+                    total drive stays f_c s_c per unit mass whatever share of its points is basal
+
+    D_c (`Dr`, 1 / time) is the in-plane rotational diffusion: <p(t).p(0)> = exp(-D_c t), a persistence time
+    1 / D_c (on the sphere it is 1 / (2 D_c)). k (`cue.strength`, 1 / time) turns the polarity toward a cue
+    direction theta_cue: `cue: {dir: [dx, dy, dz], split_axis: a, strength: k}` points cells whose centroid is
+    above the row-0 median of axis a along +dir and the others along -dir -- TWO CROWDS WALKING AT EACH OTHER
+    (the counter-flow arm); without `split_axis` every cell is cued along +dir. No `cue`: k = 0, a free walk.
+
+    WHY A MODEL AND NOT `persistent_walk`. An epithelial cell in a sheet migrates by basal, "cryptic" lamellipodia
+    under its neighbours, on its basement membrane (Farooqui & Fenteany 2005, J. Cell Sci. 118:51): its
+    polarity is the direction of that protrusion, IN the substrate's plane, and the push is at its base.
+    `persistent_walk` turns its polarity on the sphere and pushes every point -- right for a cell in the gland's
+    interior, which has no floor (its docstring), wrong for a cell on one: a polarity with a vertical
+    component lifts the cell off its substrate and stacks the sheet. The contract (a net push per cell along
+    its polarity, consumed as a_ext by the MPM substep) is unchanged.
+
+    Reference: Farooqui, R. & Fenteany, G. (2005). Multiple rows of cells behind an epithelial wound edge extend
+    cryptic lamellipodia to collectively drive cell-sheet movement. J. Cell Sci. 118:51-63; Romanczuk, P. et
+    al. (2012). Eur. Phys. J. Spec. Top. 202:1-162 (active Brownian particles in 2D).
+    """
+    PARAM_ROLES = dict(ActiveForcePersistentWalk.PARAM_ROLES, plane_axis="normal_of_the_substrate_plane",
+                       basal_band="height_above_the_cells_lowest_point_that_is_pushed",
+                       cue="dir_split_axis_strength_of_a_polarity_cue")
+    PARAM_UNITS = dict(ActiveForcePersistentWalk.PARAM_UNITS, basal_band="length")
+    MECHANISM_TAGS = ActiveForcePersistentWalk.MECHANISM_TAGS + ["substrate_crawling", "cryptic_lamellipodia"]
+    REFERENCE = ("Farooqui, R. & Fenteany, G. (2005). J. Cell Sci. 118:51-63; Romanczuk, P. et al. (2012). "
+                 "Eur. Phys. J. Spec. Top. 202:1-162.")
+
+    def __init__(self, params, device="cpu"):
+        if params.get("cil_surface"):
+            raise ValueError("active_force[substrate_walk]: `cil_surface` is the gland interior's contact rule; "
+                             "a cell on a substrate has no lumen wall to turn back from")
+        super().__init__(params, device)
+        self.plane_axis = int(params.get("plane_axis", 2))
+        if self.plane_axis not in (0, 1, 2):
+            raise ValueError("active_force[substrate_walk]: plane_axis is 0, 1 or 2")
+        ax = [a for a in range(3) if a != self.plane_axis]
+        E = torch.zeros(2, 3, dtype=torch.float64)
+        E[0, ax[0]] = 1.0; E[1, ax[1]] = 1.0
+        self._E = E                                                        # rows e1, e2 span the plane
+        bb = params.get("basal_band")
+        self.basal_band = None if bb is None else float(bb)
+        cue = params.get("cue")
+        self.cue_k, self.cue_dir, self.cue_split = 0.0, None, None
+        if cue:
+            d = torch.as_tensor([float(v) for v in cue["dir"]], dtype=torch.float64)
+            d2 = E @ d
+            if float(d2.norm()) < 1e-12:
+                raise ValueError("active_force[substrate_walk]: cue.dir has no component in the plane")
+            self.cue_dir = float(torch.atan2(d2[1], d2[0]))
+            self.cue_k = float(cue.get("strength", 0.1))
+            self.cue_split = None if cue.get("split_axis") is None else int(cue["split_axis"])
+        self._theta = None
+        self._cue_sign = None
+
+    def _init_cells(self, nc):
+        super()._init_cells(nc)                                            # drives, speed factors, generator
+        self._theta = torch.rand(nc, generator=self._gen, dtype=torch.float64) * (2.0 * math.pi)
+        self._sync_p()
+
+    def _sync_p(self):
+        c, s = torch.cos(self._theta), torch.sin(self._theta)
+        self._p = c[:, None] * self._E[0][None, :] + s[:, None] * self._E[1][None, :]
+
+    def _step(self, h):
+        """theta by Euler-Maruyama sub-steps (variance 2 D_c h_s each, <= 0.02 rad^2), the cue's torque in each."""
+        n_sub = max(1, int(math.ceil(float(self._Dc.max()) * h / 0.01)),
+                    int(math.ceil(self.cue_k * h / 0.1)) if self.cue_k > 0 else 1)
+        hs = h / n_sub
+        for _ in range(n_sub):
+            z = torch.randn(self._theta.shape[0], generator=self._gen, dtype=torch.float64)
+            dth = torch.sqrt(2.0 * self._Dc * hs) * z
+            if self.cue_k > 0.0 and self._cue_sign is not None:
+                tgt = self.cue_dir + torch.where(self._cue_sign > 0, 0.0, math.pi)
+                dth = dth - self.cue_k * torch.sin(self._theta - tgt) * hs
+            self._theta = torch.remainder(self._theta + dth, 2.0 * math.pi)
+        self._sync_p()
+        if self.speed_noise > 0.0:
+            tau = max(self.speed_tau, 1e-9)
+            zs = torch.randn(self._s.shape[0], generator=self._gen, dtype=torch.float64)
+            self._s = (self._s - (self._s - 1.0) * (h / tau)
+                       + math.sqrt(2.0 * h / tau) * self.speed_noise * zs).clamp_min(0.0)
+
+    def _cells_xbar(self, lvl, X, idx, nc):
+        live = lvl.occ.to(X.dtype)
+        w = torch.zeros(nc, device=X.device, dtype=X.dtype).index_add_(0, idx, live)
+        xb = torch.zeros(nc, 3, device=X.device, dtype=X.dtype).index_add_(0, idx, X * live[:, None])
+        return xb / w.clamp_min(1.0)[:, None], live, w
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        X = lvl.get("pos")
+        nc = int(H.level(self.cell_set).state.shape[0])
+        idx = H.lift_index(self.at, self.cell_set)
+        if self._theta is None or self._theta.shape[0] != nc:
+            self._init_cells(nc)
+            fresh = True
+        else:
+            fresh = False
+        if self.cue_k > 0.0 and (self._cue_sign is None or self._cue_sign.shape[0] != nc):
+            xb, _live, _w = self._cells_xbar(lvl, X, idx, nc)
+            if self.cue_split is None:
+                self._cue_sign = torch.ones(nc, dtype=torch.float64)
+            else:
+                v = xb[:, self.cue_split].detach().double().cpu()
+                alive = (_w > 0).detach().cpu()
+                med = float(v[alive].median()) if bool(alive.any()) else 0.0
+                self._cue_sign = torch.where(v > med, 1.0, -1.0).double()
+        if not fresh:
+            self._step(float(getattr(H, "dt", 1.0)))
+        if self.f == 0.0:
+            return {self.at: torch.zeros_like(X)}
+        dev, dt_ = X.device, X.dtype
+        pc = self._p.to(device=dev, dtype=dt_)[idx]
+        amp = (self._fc * self._s).to(device=dev, dtype=dt_)[idx]
+        live = lvl.occ.to(dt_)
+        chi = live
+        if self.basal_band is not None:
+            z = X[:, self.plane_axis]
+            big = torch.full((nc,), float("inf"), device=dev, dtype=dt_)
+            zmin = big.scatter_reduce(0, idx, torch.where(live > 0, z, torch.full_like(z, float("inf"))),
+                                      reduce="amin", include_self=True)
+            chi = live * (z <= zmin[idx] + self.basal_band).to(dt_)
+            n_all = torch.zeros(nc, device=dev, dtype=dt_).index_add_(0, idx, live)
+            n_bas = torch.zeros(nc, device=dev, dtype=dt_).index_add_(0, idx, chi)
+            chi = chi * (n_all / n_bas.clamp_min(1.0))[idx]                  # the cell's total push unchanged
+        if self.front_bias != 0.0:
+            xbar, _l, w = self._cells_xbar(lvl, X, idx, nc)
+            d = X - xbar[idx]
+            r2 = torch.zeros(nc, device=dev, dtype=dt_).index_add_(0, idx, (d * d).sum(1) * live)
+            R = (r2 / w.clamp_min(1.0)).clamp_min(1e-12).sqrt()
+            xi = (d * pc).sum(1) / R[idx]
+            amp = amp * (1.0 + self.front_bias * torch.tanh(xi / max(self.front_width, 1e-6)))
+        a = (amp * chi)[:, None] * pc
+        if mask is not None:
+            a = a * mask[:, None].to(dt_)
+        return {self.at: a}
+
+
 @register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange",
                    equation=r"""$$\boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
 -\,A\,a(\mathbf x)\,\mathbf n(\mathbf x)\,\mathbf n(\mathbf x)^{\!\top},
@@ -4909,6 +5065,90 @@ class SetMaterial(Seed):
             said.append(f"density {rho:g}")
         print(f"[set_material] {lvl.name} ({n:,} points): " + "; ".join(said or ["nothing given"]),
               flush=True)
+        return {}
+
+
+@register_operator("set_material", family="mpm", set="particle", kind="seed", model="nucleus",
+                   equation=r"""$$(\mu_i,\lambda_i)\leftarrow s\,(\mu_i,\lambda_i)\quad\text{for }\ |\mathbf x_i-\bar{\mathbf x}_{\pi(i)}-o\,\mathbf e_n|<r_n$$""")
+class SetMaterialNucleus(SetMaterial):
+    """Re-state what a cell is made of INSIDE ITS NUCLEUS, once, at x_0: every material point within `radius` of its
+    cell's centre is made `stiffness` times stiffer than the cytoplasm around it, and marked.
+
+    particle -[containment]-> cell: reads the points' positions and their parent cells; rewrites `mu` and `la` of the
+    nuclear points in place and writes 1 / 0 into the width-1 `label` block (default `nuc`) of every point.
+
+        nuclear(i)    |x_i - xbar_pi(i) - o e_n| < r_n        xbar the centroid of cell pi(i)'s points at x_0
+        mu_i, la_i    <- s mu_i, s la_i on nuclear points        (Poisson's ratio, hence the volume law, unchanged)
+
+    r_n is `radius` (world), or `radius_frac` times the cell's rms point radius; o is `offset` (world) along the
+    unit axis e_n of `axis` (default 2, the sheet's normal) -- a nucleus sitting basally in a columnar cell is a
+    negative offset; s is `stiffness`, the nucleus's Young's modulus over the cytoplasm's.
+
+    WHY A MODEL OF `set_material`. The contract is the same -- re-state the material of a body at x_0, after the
+    geometry seeded it and before the dynamics -- over a region of each cell instead of the whole set. A nucleus
+    is the stiffest organelle of a cell: micropipette aspiration puts it several times stiffer than the cytoplasm
+    (Guilak, Tedrow & Burgkart 2000, Biochem. Biophys. Res. Commun. 269:781; Dahl, Ribeiro & Lammerding 2008, Circ.
+    Res. 102:1307 review the range). The value is a model choice of the experiment that uses it. The marked block
+    lets a renderer draw the nucleus and a ruler find it; a nucleus is not otherwise a body of its own here (it
+    shares its cell's grid), which keeps it inside the cell by construction.
+
+    Reference: Guilak, F., Tedrow, J. R. & Burgkart, R. (2000). Viscoelastic properties of the cell nucleus.
+    Biochem. Biophys. Res. Commun. 269:781-786.
+    """
+    REQUIRES_PARAMS = ["stiffness"]
+    PARAM_ROLES = {"stiffness": "nucleus_youngs_over_cytoplasm", "radius": "nucleus_radius_world",
+                   "radius_frac": "nucleus_radius_over_cell_rms_radius", "offset": "offset_along_axis_world",
+                   "axis": "offset_axis", "label": "width_1_block_marking_nuclear_points", "cell_set": "parent_set"}
+    PARAM_UNITS = {"radius": "length", "offset": "length"}
+    MECHANISM_TAGS = ["material", "initial_condition", "nucleus", "heterogeneous_stiffness"]
+    REFERENCE = "Guilak, F., Tedrow, J. R. & Burgkart, R. (2000). Biochem. Biophys. Res. Commun. 269:781-786."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__({k: v for k, v in params.items()
+                          if k not in ("stiffness", "radius", "radius_frac", "offset", "axis", "label", "cell_set")},
+                         device)
+        self.stiff = float(params["stiffness"])
+        self.radius = params.get("radius")
+        self.radius_frac = params.get("radius_frac")
+        if (self.radius is None) == (self.radius_frac is None):
+            raise ValueError("set_material[nucleus]: give exactly one of `radius` (world) or `radius_frac`")
+        self.offset = float(params.get("offset", 0.0))
+        self.axis = int(params.get("axis", 2))
+        self.label = str(params.get("label", "nuc"))
+        self.cell_set = params.get("cell_set")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pname = self.cell_set or getattr(lvl, "parent_name", None)
+        if pname is None:
+            raise ValueError(f"set_material[nucleus]: {self.at!r} has no parent set; name it with `cell_set:`")
+        X = lvl.get("pos").detach()
+        idx = H.lift_index(self.at, pname).long()
+        nc = int(H.level(pname).state.shape[0])
+        live = (lvl.occ > 0.5).to(X.dtype)
+        w = torch.zeros(nc, device=X.device, dtype=X.dtype).index_add_(0, idx, live)
+        xb = torch.zeros(nc, X.shape[1], device=X.device, dtype=X.dtype).index_add_(0, idx, X * live[:, None])
+        xb = xb / w.clamp_min(1.0)[:, None]
+        c = xb[idx].clone()
+        c[:, self.axis] = c[:, self.axis] + self.offset
+        d = (X - c).norm(dim=1)
+        if self.radius is not None:
+            r = torch.full_like(d, float(self.radius))
+        else:
+            r2 = torch.zeros(nc, device=X.device, dtype=X.dtype).index_add_(0, idx, ((X - xb[idx]) ** 2).sum(1) * live)
+            r = float(self.radius_frac) * (r2 / w.clamp_min(1.0)).sqrt()[idx]
+        nuc = (d < r) & (live > 0)
+        lvl.mu.copy_(torch.where(nuc, lvl.mu * self.stiff, lvl.mu))
+        lvl.la.copy_(torch.where(nuc, lvl.la * self.stiff, lvl.la))
+        if self.label in lvl.state_schema:
+            a, b = lvl.state_schema[self.label]
+            st = lvl.state.clone()
+            st[:, a] = nuc.to(st.dtype)
+            lvl.state = st
+        n_nuc = int(nuc.sum()); n_live = int(live.sum())
+        per = n_nuc / max(int((w > 0).sum()), 1)
+        print(f"[set_material[nucleus]] {lvl.name}: {n_nuc:,} of {n_live:,} points nuclear ({per:.1f} per cell), "
+              f"x{self.stiff:g} stiffer", flush=True)
         return {}
 
 
