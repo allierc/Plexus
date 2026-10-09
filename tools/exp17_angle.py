@@ -102,24 +102,24 @@ def figure(r, path):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     names, off, F = r["names"], r["off"], r["F"]
-    fig = plt.figure(figsize=(13, 4.6), facecolor="black")
-    ax = fig.add_axes([0.07, 0.14, 0.91, 0.66])
+    fig = plt.figure(figsize=(16, 3.6), facecolor="black")       # wide and flat: a band across the slide
+    ax = fig.add_axes([0.055, 0.17, 0.935, 0.60])
     ax.set_facecolor("black")
-    ax.tick_params(colors="white", labelsize=9)
+    ax.tick_params(colors="white", labelsize=11)
     for s_ in ax.spines.values():
         s_.set_color("0.5")
     t = np.arange(F) * 0.914
-    ax.plot(t, np.degrees(wrap(r["alpha"])), ".", ms=1.0, color="#e6a03c")
+    ax.plot(t, np.degrees(wrap(r["alpha"])), ".", ms=1.6, color="#e6a03c")
     for k, nm in enumerate(names):
         x0, x1 = off[k] * 0.914, off[k + 1] * 0.914
         ax.axvline(x0, color="0.4", lw=0.5, ls=":")
         ax.text((x0 + x1) / 2, 1.03, f"{nm}\n{np.degrees(r['ak'][k]):+.0f}° ± {np.degrees(r['asd'][k]):.0f}°",
-                transform=ax.get_xaxis_transform(), ha="center", va="bottom", color="white", fontsize=9)
+                transform=ax.get_xaxis_transform(), ha="center", va="bottom", color="white", fontsize=11)
     ax.set_xlim(0, F * 0.914)
     ax.set_ylim(-180, 180)
     ax.set_yticks([-180, -90, 0, 90, 180])
-    ax.set_ylabel("alpha(t) (deg)", color="white", fontsize=10)
-    ax.set_xlabel("time in the session (s)", color="white", fontsize=10)
+    ax.set_ylabel("alpha(t) (deg)", color="white", fontsize=12)
+    ax.set_xlabel("time in the session (s)", color="white", fontsize=12)
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
 

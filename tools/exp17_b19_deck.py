@@ -657,6 +657,69 @@ def law_block_(spec, title, eq, small, rows, foot, split=False):
     return "\\fitcol{%\n" + law + "\\vspace{8pt}\n" + table + "\\vspace{8pt}\n" + closing + "}"
 
 
+def vrest_slides_(S, run, num, lab):
+    """The V_rest-per-block slides of a run (tools/exp17_vrest_blocks.py, exp17_tau_regions.py --vrest), first
+    written for 20.3, now any run with V_rest per block (Cedric, 2026-10-09: 24.10). -> [(name, tex)]."""
+    head = S.head
+    out = []
+    jv_ = os.path.join(EXP, "data", f"vrest_blocks_{run}.json")   # Cedric, 2026-10-08: how V_rest changes per block
+    if os.path.exists(jv_) and os.path.exists(os.path.join(PRES, "figs", f"vrest_blocks_{run}.png")):
+        VB_ = json.load(open(jv_))
+        rk_ = VB_["r_dV_vs_recorded_shift"]
+        mech_ = (("Every neuron has its own learned rest offset per block (V$_{rest}$ per block): its rest is V$_i$ + "
+                  "dV$_{i,k}$ while block $k$ plays, dV its offset for block $k$ (plus, for an input neuron, its weight on "
+                  "block $k$'s marker; " + f"{VB_['neurons_reading_markers']:,}" + " neurons), in dF/F.")
+                 if VB_.get("mechanism") == "rest_block" else
+                 ("Every neuron reads the 9 condition markers, each 1 while its block plays: the neuron's rest is V$_i$ + "
+                  "dV$_{i,k}$ in block $k$, dV its learned weight on block $k$'s marker (" + f"{VB_['neurons_reading_markers']:,}"
+                  + " neurons), in dF/F."))
+        right_v = (head("V$_{rest}$ per block, " + num)
+                   + "{\\scriptsize\\raggedright " + mech_ + "\\par}\\vspace{6pt}\n"
+                   + head("what it shows")
+                   + "{\\scriptsize\\raggedright (a) The brain-wide V$_{rest}$ moves little from block to block; (b) the "
+                     "regions' means move more, each its own way. Each neuron's offset follows its own recorded block "
+                     "shift: r " + f"{min(rk_.values()):+.2f}" + " to " + f"{max(rk_.values()):+.2f}" + " over the neurons -- the "
+                     "offsets fit each neuron's slow baseline per block, much of this run's per-neuron r. Middle: the "
+                     "fish from above and from the side, one block after the other, each neuron coloured by its offset minus its "
+                     "offset in the first block, gain (red: raised against gain, blue: lowered), the small changes faded "
+                     "out. The part of dV shared by all 9 blocks is V$_i$'s own, so only the change is drawn.\\par}")
+        # Cedric, 2026-10-08: panels a and b, and the offsets as a movie of the fish beside them (no white dots)
+        mvv_ = os.path.join(PRES, "Movies", f"vrest_blocks_{run}.mp4")
+        body_v = ("\\vspace*{0.04\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.50\\textwidth}\\centering"
+                  "\\includegraphics[width=\\linewidth,height=0.80\\textheight,keepaspectratio]{figs/vrest_blocks_" + run + ".png}"
+                  "\\end{column}\n\\begin{column}{0.27\\textwidth}\\centering"
+                  + ("\\playmovie[\\linewidth]{Movies/vrest_blocks_" + run + "}" if os.path.exists(mvv_) else "")
+                  + "\\end{column}\n\\begin{column}{0.20\\textwidth}\\fitcol{%\n" + right_v
+                  + "}\\end{column}\n\\end{columns}")
+        out.append((f"19_vrest_{run}", S.frame_wide("V$_{rest}$ per block", body_v,
+                                                             "tools/exp17_vrest_blocks.py " + run,
+                                                             deck_title=f"batch {num} $\\cdot$ {lab} $\\cdot$ the offsets")))
+        # the twin of the tau-by-region slide for V_rest (Cedric, 2026-10-08)
+        jvr_ = os.path.join(EXP, "data", f"vrest_regions_{run}.json")
+        if os.path.exists(jvr_) and os.path.exists(os.path.join(PRES, "figs", f"vrest_regions_{run}.png")):
+            VR_ = json.load(open(jvr_))
+            pr2_ = VR_["per_region"]
+            srt_ = sorted(pr2_.items(), key=lambda kv: kv[1]["median"])
+            right_vr = (head("V$_{rest}$ by brain region")
+                        + "{\\scriptsize\\raggedright each neuron's learned rest in dF/F, time-averaged over the 9 blocks "
+                          "(each block's offset weighted by its length), grouped by its atlas region, head to tail. Left: "
+                          "every neuron by its own V$_{rest}$, from above and from the side.\\par}\\vspace{6pt}\n"
+                        + head("what it shows")
+                        + "{\\scriptsize\\raggedright The regions explain " + f"{100 * VR_['eta2_log_tau_by_region']:.0f}"
+                        + " \\% of the variance of V$_{rest}$ (shuffled labels: " + f"{100 * VR_['eta2_shuffled_max']:.2f}"
+                        + " \\%), less than for $\\tau$. Lowest: " + ", ".join(f"{k} ({v['median']:.3f})" for k, v in srt_[:3])
+                        + "; highest: " + ", ".join(f"{k} ({v['median']:.3f})" for k, v in srt_[::-1][:3])
+                        + "; the brain's median " + f"{VR_['brain_median']:.3f}" + " dF/F.\\par}")
+            body_vr = ("\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.77\\textwidth}\\centering"
+                       "\\includegraphics[width=\\linewidth,height=0.80\\textheight,keepaspectratio]{figs/vrest_regions_" + run + ".png}"
+                       "\\end{column}\n\\begin{column}{0.21\\textwidth}\\fitcol{%\n" + right_vr
+                       + "}\\end{column}\n\\end{columns}\\vspace*{\\fill}")
+            out.append((f"19_vrest_regions_{run}", S.frame_wide("the learned rest, region by region", body_vr,
+                                                                         "tools/exp17_tau_regions.py " + run + " --vrest",
+                                                                         deck_title=f"batch {num} $\\cdot$ {lab} $\\cdot$ V$_{{rest}}$ by region")))
+    return out
+
+
 def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf"), desc=None,
                  label=None, law=None):
     """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
@@ -1749,56 +1812,7 @@ def write_slides():
         law=("known ODE, lattice grid, V$_{rest}$ per block",
              "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_{i,k(t)}$\\\\ $\\quad + \\Omega_i(t)\\,g_i\\textstyle\\sum_{c} w_{ic}$\\\\ "
              "$\\qquad\\textstyle\\sum_j a_j \\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$")) if not x[0].startswith("19_edges_")]
-    jv_ = os.path.join(EXP, "data", "vrest_blocks_zap_n20_markall.json")   # Cedric, 2026-10-08: how V_rest changes per block
-    if os.path.exists(jv_) and os.path.exists(os.path.join(PRES, "figs", "vrest_blocks_zap_n20_markall.png")):
-        VB_ = json.load(open(jv_))
-        rk_ = VB_["r_dV_vs_recorded_shift"]
-        right_v = (head("V$_{rest}$ per block, 20.3")
-                   + "{\\scriptsize\\raggedright Every neuron reads the 9 condition markers, each 1 while its block plays: "
-                     "the neuron's rest is V$_i$ + dV$_{i,k}$ in block $k$, dV its learned weight on block $k$'s marker "
-                     "(" + f"{VB_['neurons_reading_markers']:,}" + " neurons), in dF/F.\\par}\\vspace{6pt}\n"
-                   + head("what it shows")
-                   + "{\\scriptsize\\raggedright (a) The brain-wide V$_{rest}$ moves little from block to block; (b) the "
-                     "regions' means move more, each its own way. Each neuron's offset follows its own recorded block "
-                     "shift: r " + f"{min(rk_.values()):+.2f}" + " to " + f"{max(rk_.values()):+.2f}" + " over the neurons -- the "
-                     "offsets fit each neuron's slow baseline per block, much of this run's per-neuron r. Middle: the "
-                     "fish from above and from the side, one block after the other, each neuron coloured by its offset minus its "
-                     "offset in the first block, gain (red: raised against gain, blue: lowered), the small changes faded "
-                     "out. The part of dV shared by all 9 blocks is V$_i$'s own, so only the change is drawn.\\par}")
-        # Cedric, 2026-10-08: panels a and b, and the offsets as a movie of the fish beside them (no white dots)
-        mvv_ = os.path.join(PRES, "Movies", "vrest_blocks_zap_n20_markall.mp4")
-        body_v = ("\\vspace*{0.04\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.50\\textwidth}\\centering"
-                  "\\includegraphics[width=\\linewidth,height=0.80\\textheight,keepaspectratio]{figs/vrest_blocks_zap_n20_markall.png}"
-                  "\\end{column}\n\\begin{column}{0.27\\textwidth}\\centering"
-                  + ("\\playmovie[\\linewidth]{Movies/vrest_blocks_zap_n20_markall}" if os.path.exists(mvv_) else "")
-                  + "\\end{column}\n\\begin{column}{0.20\\textwidth}\\fitcol{%\n" + right_v
-                  + "}\\end{column}\n\\end{columns}")
-        deck.append(("19_vrest_zap_n20_markall", S.frame_wide("V$_{rest}$ per block", body_v,
-                                                             "tools/exp17_vrest_blocks.py zap_n20_markall",
-                                                             deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ the offsets")))
-        # the twin of the tau-by-region slide for V_rest (Cedric, 2026-10-08)
-        jvr_ = os.path.join(EXP, "data", "vrest_regions_zap_n20_markall.json")
-        if os.path.exists(jvr_) and os.path.exists(os.path.join(PRES, "figs", "vrest_regions_zap_n20_markall.png")):
-            VR_ = json.load(open(jvr_))
-            pr2_ = VR_["per_region"]
-            srt_ = sorted(pr2_.items(), key=lambda kv: kv[1]["median"])
-            right_vr = (head("V$_{rest}$ by brain region")
-                        + "{\\scriptsize\\raggedright each neuron's learned rest in dF/F, time-averaged over the 9 blocks "
-                          "(each block's offset weighted by its length), grouped by its atlas region, head to tail. Left: "
-                          "every neuron by its own V$_{rest}$, from above and from the side.\\par}\\vspace{6pt}\n"
-                        + head("what it shows")
-                        + "{\\scriptsize\\raggedright The regions explain " + f"{100 * VR_['eta2_log_tau_by_region']:.0f}"
-                        + " \\% of the variance of V$_{rest}$ (shuffled labels: " + f"{100 * VR_['eta2_shuffled_max']:.2f}"
-                        + " \\%), less than for $\\tau$. Lowest: " + ", ".join(f"{k} ({v['median']:.3f})" for k, v in srt_[:3])
-                        + "; highest: " + ", ".join(f"{k} ({v['median']:.3f})" for k, v in srt_[::-1][:3])
-                        + "; the brain's median " + f"{VR_['brain_median']:.3f}" + " dF/F.\\par}")
-            body_vr = ("\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.77\\textwidth}\\centering"
-                       "\\includegraphics[width=\\linewidth,height=0.80\\textheight,keepaspectratio]{figs/vrest_regions_zap_n20_markall.png}"
-                       "\\end{column}\n\\begin{column}{0.21\\textwidth}\\fitcol{%\n" + right_vr
-                       + "}\\end{column}\n\\end{columns}\\vspace*{\\fill}")
-            deck.append(("19_vrest_regions_zap_n20_markall", S.frame_wide("the learned rest, region by region", body_vr,
-                                                                         "tools/exp17_tau_regions.py zap_n20_markall --vrest",
-                                                                         deck_title="batch 20.3 $\\cdot$ V$_{rest}$ per block, lattice grid $\\cdot$ V$_{rest}$ by region")))
+    deck += vrest_slides_(S, "zap_n20_markall", "20.3", "V$_{rest}$ per block, lattice grid")
     # Cedric, 2026-10-08: "add twin of 33 34 for 20.3" -- the lattice grid pruned (tools/exp17_prune.py zap_n20_markall,
     # tools/exp17_b19_deck.py --prune-grid), after 20.3's tau by region
     jg_ = os.path.join(EXP, "data", "prune_window_zap_n20_markall.json")
@@ -1899,31 +1913,43 @@ def write_slides():
         eq_ = ("$\\begin{aligned}\\tau_i\\,\\dfrac{dz_i}{dt} &= -z_i + V_i + \\Delta V_{i,k(t)}\\\\ &\\quad + \\textstyle\\sum_j "
                "W_{ij}\\tanh z_j\\,\\cos\\!\\big(\\varphi_{ij} - \\alpha(t)\\big) + B_i\\cdot u(t)\\\\ \\alpha(t) &= "
                + ("f_\\theta\\big(t, e_{k(t)}\\big)" if ctx_ else "f_\\theta(t)") + "\\end{aligned}$")
-        small_ = ("$z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges $j \\to i$, its three "
-                  "levels; no $\\Omega$ (24.1's law, Omega = 1). Each message turned by $\\cos(\\varphi_{ij} - \\alpha(t))$: "
-                  "1 when the angle sits on the edge's phase, 0 a quarter turn away, $-1$ half a turn (the edge reverses). "
-                  "$\\varphi_{ij}$ one phase per edge, started uniform in $[0, 2\\pi)$. $\\alpha(t)$ one angle for the whole "
-                  "brain per frame, $f_\\theta$ a SIREN of the frame time"
-                  + (" and of $e_{k(t)}$, the one-hot of the stimulus block $k$ playing" if ctx_ else "")
-                  + ", 0 untrained, a 0.1-rad jitter per training rollout. $V_i + \\Delta V_{i,k(t)}$ the rest while block "
-                    "$k$ plays. $B_i = 0$ outside the input neurons (the balanced 20 \\% mask); 4 exponential-Euler steps "
-                    "per frame.")
+        small_ = ("$z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges $j \\to i$; no $\\Omega$. "
+                  "Each message turned by $\\cos(\\varphi_{ij} - \\alpha(t))$: 1 when the angle sits on the edge's phase, "
+                  "$-1$ half a turn away (the edge reverses). $\\varphi_{ij}$ one phase per edge, started uniform in "
+                  "$[0, 2\\pi)$. $\\alpha(t)$ one angle for the whole brain per frame, $f_\\theta$ a SIREN of the frame time"
+                  + (" and of $e_{k(t)}$, the stimulus block's one-hot" if ctx_ else "")
+                  + ", with a 0.1-rad jitter in training. $V_i + \\Delta V_{i,k(t)}$ the rest while block $k$ plays. "
+                    "$B_i = 0$ outside the input neurons (the balanced 20 \\% mask).")
         q_ = A_["dphi_quantiles_deg_10_50_90"]
-        am_, bl_ = A_["alpha_block_mean_deg"], A_["blocks"]
-        foot_ = (f"Free rollout of the 2 h: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r {pn_:.3f}; long "
-                 f"skill {T_['skill_long']:.3f}. Top, $\\alpha(t)$ and each block's mean $\\pm$ spread: "
-                 f"{min(am_[:4]):+.0f} to {max(am_[:4]):+.0f} deg in the first four blocks ({bl_[0]} to {bl_[3]}), "
-                 f"{min(am_[4:]):+.0f} to {max(am_[4:]):+.0f} deg in the last five: an early / late split more than one "
-                 f"angle per stimulus. The phases moved a median {q_['short'][1]:.0f} / {q_['mid'][1]:.0f} / "
-                 f"{q_['long'][1]:.0f} deg (short / mid / long) from their random start.")
+        am_ = A_["alpha_block_mean_deg"]
+        foot_ = (f"Free rollout of the 2 h: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r {pn_:.3f}, long "
+                 f"skill {T_['skill_long']:.3f}. Top: $\\alpha$ {min(am_[:4]):+.0f} to {max(am_[:4]):+.0f} deg in the "
+                 f"first four blocks, {min(am_[4:]):+.0f} to {max(am_[4:]):+.0f} in the last five, an early / late split. "
+                 f"The phases moved a median {q_['short'][1]:.0f} / {q_['mid'][1]:.0f} / {q_['long'][1]:.0f} deg "
+                 f"(short / mid / long) from their start.")
         lawL_, lawR_ = law_block_(spec_, f"known ODE, the angle ({num_})", eq_, small_, rows_, foot_, split=True)
-        body_a = ("\\centering\\includegraphics[width=0.92\\textwidth,height=0.20\\textheight,keepaspectratio]"
+        body_a = ("\\vspace*{0.03\\textheight}\\centering\\includegraphics[width=0.97\\textwidth,height=0.27\\textheight,"
+                  "keepaspectratio]"
                   f"{{figs/angle_{run_}.png}}\\par\\vspace{{4pt}}\n"
                   "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\\centering" + lawL_
                   + "\\end{column}\n\\begin{column}{0.49\\textwidth}\\centering" + lawR_
                   + "\\end{column}\n\\end{columns}")
         deck.append((f"24_angle_{run_}", S.frame_wide(f"{num_}: the angle", body_a, "tools/exp17_angle.py " + run_,
                                                       deck_title=f"batch {num_} $\\cdot$ the law and its angle")))
+        if ctx_:
+            # Cedric, 2026-10-09: "add some results slides for 24.10" -- 20.3's set: the free rollout with the network
+            # test, the learned constants, tau and V_rest by region, the V_rest offsets per block (exp17_param_maps,
+            # exp17_tau_regions [--vrest], exp17_vrest_blocks, exp17_run_movie); no Omega, so no modulation slide
+            lab24_ = "the angle, $\\varphi$ per edge + block"
+            deck += [x for x in slides_run19(S, run=run_, num=num_, now_=None, label=lab24_, desc=(
+                "the known ODE on the mesh with every message turned by $\\cos(\\varphi_{ij} - \\alpha(t))$: one phase per "
+                "edge, $\\alpha(t)$ a SIREN of the frame time and of the block's one-hot; each neuron's V$_{rest}$ per "
+                "block; no $\\Omega$; $\\tau$ in [1, 100] s, x1 updates (H100)"),
+                law=("known ODE, the angle (24.10)",
+                     "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_i + \\Delta V_{i,k(t)}$\\\\ $\\quad + \\textstyle\\sum_j "
+                     "W_{ij}\\tanh z_j\\,\\cos(\\varphi_{ij} - \\alpha(t))$\\\\ $\\quad + B_i\\cdot u(t)$"))
+                     if not x[0].startswith("19_edges_")]
+            deck += vrest_slides_(S, run_, num_, lab24_)
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     # THE EYE CIRCUIT ON ZAPBENCH'S 2-H SESSION (Cedric, 2026-10-08: "replace slide 48 with the new 2H data", "rotation
@@ -2067,7 +2093,8 @@ def write_slides():
                 deck_title="multi-level GNN on fish 2 $\\cdot$ " + ttl_d)))
             open(os.path.join(SL, nm_d + ".tex"), "w").write(deck[[n for n, _ in deck].index(nm_d)][1])
     hide_ = {"00c_traces_resid", "00e_brain_mean_lag", "00g_classic_regressors", "00h_classic_reliability",
-             "00i_classic_circuits", "00d_brain_mean_spread", "06_model", "19_prune_dist", "20_prune_dist", "19_flow_pruned_sigma10", "20_flow_pruned_sigma10"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
+             "00i_classic_circuits", "00d_brain_mean_spread", "06_model", "19_prune_dist", "20_prune_dist", "19_flow_pruned_sigma10", "20_flow_pruned_sigma10",
+             "24_angle_zap_n24_ph_edge"} | {n for n, _ in deck if n.startswith("19_edges_")}   # Cedric, 2026-10-07: slide 3, then 9 (the per-feature model) in comments
     deck = [(n, b) for n, b in deck if n != "00j_lateral"]   # Cedric, 2026-10-07: "delete slide 7" (left against right)
     deck = [(n, b) for n, b in deck if n != "00l_atlas_raster"]   # Cedric, 2026-10-07: "delete slide 5" (the mean traces)                   # Cedric, 2026-10-07: "delete slide 8", "delete slides 6 and 7"
     deck = [(n, b) for n, b in deck if n not in ("00g_classic_regressors", "00h_classic_reliability", "00i_classic_circuits")]  # Cedric, 2026-10-07: "slide 3 in comments", then "slide 13 in comments"
