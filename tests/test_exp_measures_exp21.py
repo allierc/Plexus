@@ -122,3 +122,18 @@ def test_neighbour_correlation_splits_along_and_across_the_pair():
     full = M.neighbour_correlation(X, V, 1.0)
     assert full == pytest.approx(-1.0 / 3.0, abs=0.02)                    # 1 same-row pair in 3 at one spacing
     assert ct == pytest.approx(-1.0, abs=0.02) and cl == pytest.approx(1.0 / 3.0, abs=0.02)
+
+
+def test_affine_msd_reads_only_what_the_cells_moved_among_each_other():
+    """PLANTED: a sheet stretched, turned and shifted (no cell moves among its neighbours) reads 0; independent
+    steps of sd s per axis read 2 s^2 in the plane (two axes); with normals given, the part along them is dropped."""
+    X = _hex(14)
+    A = np.array([[1.05, -0.08], [0.08, 0.97]])
+    assert M.affine_msd(X, X @ A.T + [0.4, -0.2]) == pytest.approx(0.0, abs=1e-12)
+    rng = np.random.default_rng(3)
+    s = 0.1
+    assert M.affine_msd(X, X + rng.normal(0, s, X.shape)) == pytest.approx(2 * s * s, rel=0.1)
+    X3 = np.c_[X, np.zeros(len(X))]
+    D3 = np.c_[np.zeros((len(X), 2)), rng.normal(0, s, len(X))]             # moves only along z, the normal
+    N = np.tile([0.0, 0.0, 1.0], (len(X), 1))
+    assert M.affine_msd(X3, X3 + D3, N) == pytest.approx(0.0, abs=1e-12)

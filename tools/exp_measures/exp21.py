@@ -235,6 +235,18 @@ def affine_residual(X0, X1):
     return D - A @ coef
 
 
+def affine_msd(X0, X1, N=None):
+    """The mean squared displacement X0 -> X1 of a set of cells with the set's best AFFINE flow removed
+    (`affine_residual`) and, given unit normals N [n, 3], the part along each cell's normal removed too: what the
+    cells moved AMONG each other, in their own sheet. The salivary bud grows and turns, so a surface nucleus's raw
+    displacement carries the tissue's stretch and rotation and its motion off the surface; the model's corral has
+    neither. One function for both sides (exp 21 Finding 29: the gland reads 40 um^2 at 1 h this way, 60 raw)."""
+    D = affine_residual(X0, X1)
+    if N is not None:
+        D = D - (D * N).sum(1)[:, None] * N
+    return float((D * D).sum(1).mean())
+
+
 def neighbour_correlation(X, V, d0, r_lo=0.75, r_hi=1.25):
     """<v_i . v_j> / <|v|^2> over the pairs between r_lo and r_hi spacings apart: how alike two NEIGHBOURS' motions
     are (0: independent walkers; 1: carried as one). The gland's surface cells read ~0.1 (exp 21 literature audit,
@@ -424,6 +436,10 @@ def motion(T, cell_set="cell", point_set="pt", rim=1.5, lags_h=(1.0, 2.0), max_l
                               (0 independent, 1 carried together; gland ~0.1)
       corr_L_1sp, corr_T_1sp  the same split along / across the line joining the two (gland 0.20 / 0.07): a push
                               passed on (L) or neighbours carried together sideways (T)
+      msd_1h_aff_um2, prw_v_aff_um_h, prw_P_aff_h   the MSD at 1 h with the set's affine flow removed per window
+                              (`affine_msd`) and the persistent walk (with noise offset) fitted to its curve up to
+                              1 h: the cells' own motion among each other, the gland's read the same way
+                              (40 um^2, 11.1 um/h, 0.195 h; Finding 29)
       vcorr_len_cells         how far, in cell spacings, the cells' 30-min displacements stay alike (C(r) = 1/e):
                               ~1 for independent walkers, several for a crowd flowing in packs (Park 2015: 7-26 cells)"""
     um, s_per_frame = _units(T)
@@ -495,6 +511,19 @@ def motion(T, cell_set="cell", point_set="pt", rim=1.5, lags_h=(1.0, 2.0), max_l
         if prw_fit is not None and k1h >= 3:
             f1 = prw_fit(lag[:k1h], msd[:k1h])
             out["prw_P_h_1h"] = finite(f1["P"]); out["prw_v_um_h_1h"] = finite(f1["v"])
+    # THE CELLS' OWN MOTION, LIKE FOR LIKE WITH THE GLAND'S (Finding 29): the MSD curve over lags up to 1 h with the
+    # interior set's affine flow removed per start row (`affine_msd`, the gland's reader projects on its surface
+    # too), and the persistent walk fitted to it with a noise offset (exp11.prw_fit, the gland's estimator)
+    if row_h and np.isfinite(row_h):
+        kmax = min(int(round(1.0 / row_h)), n - 1)
+        if kmax >= 3:
+            starts = range(0, n - kmax, max(1, kmax // 4))
+            cur = np.array([np.mean([affine_msd(Xi[t0], Xi[t0 + L]) for t0 in starts]) for L in range(1, kmax + 1)])
+            lh = np.arange(1, kmax + 1) * row_h
+            out["msd_1h_aff_um2"] = finite(cur[-1])
+            if prw_fit is not None:
+                fa = prw_fit(lh, cur)
+                out["prw_v_aff_um_h"] = finite(fa["v"]); out["prw_P_aff_h"] = finite(fa["P"])
     # COLLECTIVE FLOW: the velocity correlation length of the interior cells over 30-min displacements (a step is
     # too noisy to correlate), median over start rows
     k30 = max(1, int(round(0.5 / row_h))) if row_h and np.isfinite(row_h) else 1

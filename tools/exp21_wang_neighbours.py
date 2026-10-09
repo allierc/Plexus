@@ -30,7 +30,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 import wang_smg_stats as W                                          # noqa: E402
-from exp_measures.exp21 import neighbour_retention, neighbour_correlation, affine_residual  # noqa: E402
+from exp_measures.exp21 import (neighbour_retention, neighbour_correlation, affine_residual,  # noqa: E402
+                                affine_msd)
 
 
 def retention(movie, surface_um=8.0, lags_h=(0.5, 1.0, 2.0)):
@@ -139,6 +140,67 @@ def motion_shape(movie, surface_um=8.0, lag_corr=6, lags_msd=(12, 36)):
             "estimators": "exp_measures.exp21.neighbour_correlation + affine_residual; exp11.prw_fit over lags <= 1 h"}
 
 
+def surface_normals(X, S, d0):
+    """Unit normals of the surface at X: the least-variance axis of the surface nuclei S within 3 spacings (at
+    least 6 of them; else 0, which leaves that nucleus's displacement unprojected)."""
+    from scipy.spatial import cKDTree
+    tr = cKDTree(S)
+    N = np.zeros_like(X)
+    for i, x in enumerate(X):
+        nb = tr.query_ball_point(x, 3.0 * d0)
+        if len(nb) >= 6:
+            Q = S[nb] - S[nb].mean(0)
+            N[i] = np.linalg.svd(Q, full_matrices=False)[2][-1]
+    return N
+
+
+def own_motion(movie, surface_um=8.0, max_lag=12, every=3):
+    """The surface cells' OWN motion, read as the model's ruler reads its cells (`exp_measures.exp21.affine_msd`,
+    exp11.prw_fit): for each start frame (every `every`) and lag 1..max_lag frames (~5 min each), the surface
+    nuclei tracked at both ends, their displacement with the surface set's affine flow removed (the bud's growth
+    and turn) and projected on the local surface plane (the model is a plane), squared and averaged; the
+    persistent walk with a noise offset fitted to that curve. The raw estimator (`surface_motion`: whole-gland
+    drift per frame, 3D) reads 60 um^2 at 1 h; this one reads the cells moving among each other."""
+    from scipy.spatial import cKDTree
+    from exp_measures.exp11 import prw_fit
+    z = zipfile.ZipFile(W.ZIP)
+    pos = W._csv(z, f"Tracks-epithelial/{movie}-denoised_Position.csv")
+    dist = W._csv(z, f"Tracks-epithelial/{movie}-denoised_Shortest_Distance_to_Surfaces_Surfaces=Surfaces_1.csv")
+    df = pos.rename(columns={"Position X": "x", "Position Y": "y", "Position Z": "z", "Time": "t"})
+    df = df.merge(dist[["ID", "Shortest Distance to Surfaces"]].rename(
+        columns={"Shortest Distance to Surfaces": "d"}), on="ID", how="left")
+    df = df[["x", "y", "z", "t", "TrackID", "d"]].dropna(subset=["TrackID", "d"])
+    frames = np.sort(df["t"].unique())
+    by_t = {int(t): g.drop_duplicates("TrackID").set_index("TrackID") for t, g in df.groupby("t")}
+    acc = {L: [] for L in range(1, max_lag + 1)}
+    for t0 in range(int(frames[0]), int(frames[-1]) - max_lag + 1, every):
+        a = by_t.get(t0)
+        if a is None:
+            continue
+        S0 = a[a["d"].values > -surface_um][["x", "y", "z"]].values
+        if len(S0) < 30:
+            continue
+        d0 = float(np.median(cKDTree(S0).query(S0, k=2)[0][:, 1]))
+        for L in acc:
+            b = by_t.get(t0 + L)
+            if b is None:
+                continue
+            ids = a.index.intersection(b.index)
+            A, B = a.loc[ids], b.loc[ids]
+            srf = A["d"].values > -surface_um
+            if srf.sum() < 30:
+                continue
+            X0, X1 = A[["x", "y", "z"]].values[srf], B[["x", "y", "z"]].values[srf]
+            acc[L].append(affine_msd(X0, X1, surface_normals(X0, S0, d0)))
+    lag_h = np.arange(1, max_lag + 1) * 4.9983 / 60.0
+    cur = np.array([np.mean(acc[L]) for L in range(1, max_lag + 1)])
+    f = prw_fit(lag_h, cur)
+    return {"msd_1h_aff_um2": float(cur[-1]), "prw_v_aff_um_h": float(f["v"]), "prw_P_aff_h": float(f["P"]),
+            "noise_sigma_um": float(f["noise_sigma"]), "curve_um2": [float(x) for x in cur],
+            "lag_h": [float(x) for x in lag_h],
+            "estimator": "exp_measures.exp21.affine_msd (surface-plane projection) + exp11.prw_fit, lags <= 1 h"}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--movie", default="2020-01-25-K14R-HisG-2photon-25x-4")
@@ -152,6 +214,7 @@ def main():
     st = json.load(open(os.path.join(ROOT, "experiments/exp11_bm_hole_budding/data/wang_smg_cell_stats.json")))
     srf = st["surface"]
     out["surface_motion_shape"] = motion_shape(a.movie, a.surface_um)
+    out["surface_own_motion"] = own_motion(a.movie, a.surface_um)
     out["surface_motion"] = {"from": "experiments/exp11_bm_hole_budding/data/wang_smg_cell_stats.json (tools/wang_smg_stats.py)",
                              "speed_um_h_median": srf["speed_um_h_median"], "prw_P_h": srf["prw_P_h"],
                              "msd_1h_um2": srf["msd_um2"][11], "nn_um_median_3d": srf["nn_um_median"]}

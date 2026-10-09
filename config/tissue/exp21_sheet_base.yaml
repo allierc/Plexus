@@ -32,18 +32,18 @@ sets:
       pid: {width: 1}
       nuc: {width: 1}
 operators:
-- {op: active_force, model: substrate_walk, at: pt, cell_set: cell, f: 0.6, Dr: 0.59, seed: 1, speed_cv: 0.16,
-   speed_noise: 0.3, speed_tau: 3.0, front_bias: 0.5, front_width: 0.5, basal_band: 0.5}
-- {op: pair_potential, model: soft_adhesive, at: pt, sigma: 0.24, epsilon: 0.3, adhesion: 0.002, tail: 0.1,
+- {op: active_force, model: substrate_walk, at: pt, cell_set: cell, f: 0.75, Dr: 0.3, seed: 1, speed_cv: 0.31, ucsp: 1.0,
+   speed_noise: 0.3, speed_tau: 3.0, front_bias: 0.5, front_width: 0.5, basal_band: 1.0}
+- {op: pair_potential, model: soft_adhesive, at: pt, sigma: 0.24, epsilon: 0.3, adhesion: 0.0005, tail: 0.1,
    mobility: 100.0, exclude: pid, emit: mpm_acceleration}
-- {op: mesh_contact, model: adhesive_plane, at: pt, z: 1.0, k: 50.0, adhesion: 2.0, band: 0.15, mu: 0.2, eps_v: 0.05}
+- {op: mesh_contact, model: adhesive_plane, at: pt, z: 1.0, k: 50.0, adhesion: 1.0, band: 0.15, mu: 0.2, eps_v: 0.05}
 - {op: mesh_contact, model: adhesive_plane, at: pt, axis: 0, z: 0.0, side: 1, k: 400.0, adhesion: 0.0, band: 0.1}
 - {op: mesh_contact, model: adhesive_plane, at: pt, axis: 0, z: 25.0, side: -1, k: 400.0, adhesion: 0.0, band: 0.1}
 - {op: mesh_contact, model: adhesive_plane, at: pt, axis: 1, z: 0.0, side: 1, k: 400.0, adhesion: 0.0, band: 0.1}
 - {op: mesh_contact, model: adhesive_plane, at: pt, axis: 1, z: 25.0, side: -1, k: 400.0, adhesion: 0.0, band: 0.1}
 - {op: mesh_contact, model: adhesive_plane, at: pt, axis: 2, z: 2.6, side: -1, k: 50.0, adhesion: 0.0, band: 0.1}
 - {op: mpm_strain, at: pt, implementation: default}
-- {op: mpm_scatter, at: pt, to: mpm_grid, drag: 1.0, polar: higham, implementation: default}
+- {op: mpm_scatter, at: pt, to: mpm_grid, drag: 4.0, polar: higham, implementation: default}
 - {op: mpm_grid_update, at: mpm_grid, implementation: default}
 - {op: mpm_gather, at: pt, from: mpm_grid, implementation: default}
 - {op: aggregate_centroid, at: cell, child: pt}
