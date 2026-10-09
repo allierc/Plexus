@@ -52,6 +52,16 @@ def constants(name):
             np.add.at(w_abs, rcv, np.abs(w_))
     m_ = op.input_mask.cpu().numpy() if op.input_mask is not None else np.ones(N, bool)
     mask = (m_.reshape(N, -1) != 0).any(1)        # a per-feature mask [N, F] (mask_by_input): an input on any feature
+    # THE STIMULUS NEURONS: an input on a stimulus FEATURE column, the 9 condition markers set aside. With the markers fed
+    # to every neuron (markall: 20.3, 22.3, 23.3) `mask` holds all 100,759 neurons, so "the input neurons against the
+    # others" compared against an empty set (the tau slide printed "against nan s", 2026-10-09); here the 20,195 of the
+    # balanced 20 % mask, as in the nominal
+    m2_ = m_.reshape(N, -1) != 0
+    if m2_.shape[1] > 1:
+        from exp17_vrest_blocks import MARKERS
+        stim = m2_[:, [k for k in range(m2_.shape[1]) if k not in MARKERS]].any(1)
+    else:
+        stim = mask
     # tau through the law's own rate: the bound [rate_min, rate_max] when the run declares one (15.18, 2026-10-06)
     tau_s = FRAME_S / op._rate(fit["neuron.tau"].float()).detach().numpy().reshape(-1)
     lo_, hi_ = getattr(op, "rate_min", None), getattr(op, "rate_max", None)
@@ -69,7 +79,7 @@ def constants(name):
         w_lab = "effective W in, via the grid" + (", pruned" if prune_th else "")
     return {"w_label": w_lab, "W_abs": w_abs, "tau_s": tau_s, "tau_bounds": bounds,
             "V": fit["neuron.rest"].float().numpy().reshape(-1) * sd + mu, "W_in": w_in,
-            "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask,
+            "B_norm": np.linalg.norm(fit["neuron.input"].float().numpy(), axis=1), "mask": mask, "stim_mask": stim,
             "pos": np.asarray(rec["pos_um"], np.float64)}
 
 
@@ -109,7 +119,7 @@ def render(name):
     from matplotlib.colors import LinearSegmentedColormap
     BKR = LinearSegmentedColormap.from_list("bkr", ["#4a9bff", "#000000", "#ff4a3a"])
     panels = [("a   leak time constant $\\tau$, s", c["tau_s"], "RdBu", Normalize(lo_t, hi_t)),   # linear, red fast / blue slow (Cedric, 2026-10-08)
-              ("b   rest $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
+              ("b   baseline $V$, dF/F", c["V"], "magma", Normalize(*np.percentile(c["V"], [2, 98]))),
               # Cedric, 2026-10-08: "panel c is not very informative: plot |W|, and a LUT that shows the differences" --
               # the summed |W_ij| into each neuron (after pruning), log scale over its 2nd-98th percentile (positive
               # values), viridis; a neuron with no incoming weight left in grey

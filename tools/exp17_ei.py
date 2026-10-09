@@ -13,7 +13,7 @@ sender to one sign; the five folds are the same spec from five seeds (19.29-19.3
 cell of a region -- so the share they give is still written to the json, but not drawn.)
 
     PYTHONPATH=src:tools python tools/exp17_ei.py
--> presentation/figs/ei_dale_n19.png, data/ei_dale_n19.json
+-> presentation/figs/ei_dale_n<19|22>.png, data/ei_dale_n<19|22>.json  ([--n22] for batch 22's folds)
 """
 import json
 import os
@@ -24,7 +24,8 @@ import numpy as np
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
-FOLDS = [f"zap_n19_dale_s{k}" for k in range(5)]
+BATCH = "22" if "--n22" in sys.argv else "19"       # Cedric, 2026-10-09: batch 22's Dale twins (22.5-22.9) with --n22
+FOLDS = [f"zap_n{BATCH}_dale_s{k}" for k in range(5)]
 SILENT = 1e-3
 
 
@@ -81,7 +82,7 @@ def main():
                                           / max(int((np.abs(sg[:, signed_all].sum(0)) == len(FOLDS)).sum()), 1)),
            "atlas_global_inhibitory_share": float((inh_m & ~exc_m & ins).sum() / max(int(((inh_m ^ exc_m) & ins).sum()), 1)),
            "r_learned_vs_atlas_across_regions": r_atlas, "per_region": per}
-    json.dump(doc, open(os.path.join(EXP, "data", "ei_dale_n19.json"), "w"), indent=1)
+    json.dump(doc, open(os.path.join(EXP, "data", f"ei_dale_n{BATCH}.json"), "w"), indent=1)
     print(json.dumps({k: v for k, v in doc.items() if k not in ("per_region",)}, indent=1))
 
     plt.style.use("dark_background")
@@ -132,7 +133,7 @@ def main():
     c.set_ylim(len(rs) - 0.5, -0.5)
     c.set_xlim(0, 100)
     c.set_xlabel("inhibitory, % of the signed neurons\n(mean $\\pm$ SD over the five folds)", fontsize=9)
-    fig.savefig(os.path.join(EXP, "presentation", "figs", "ei_dale_n19.png"), dpi=130, facecolor="black",
+    fig.savefig(os.path.join(EXP, "presentation", "figs", f"ei_dale_n{BATCH}.png"), dpi=130, facecolor="black",
                 bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
 
