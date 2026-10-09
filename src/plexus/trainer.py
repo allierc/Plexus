@@ -96,7 +96,7 @@ _KEYS = {
     "observe": {"set", "block", "channel", "unit", "measure", "grid", "of", "field", "alive", "elements"},
     "training": {"optimizer", "lr", "lr_min", "lr_min_frac", "schedule", "clip", "epochs", "batch",
                  "seed", "horizon", "horizon_min", "snapshot_every", "guard", "stages", "render",
-                 "iters", "save_every", "anneal", "select", "init_from", "circuit_movie"},
+                 "iters", "save_every", "anneal", "select", "init_from", "circuit_movie", "resume"},
     "term": {"term", "weight", "reduction"},
     "stage": {"resolution", "iters", "horizon"},
 }
@@ -462,6 +462,9 @@ def load(path_or_name) -> dict:
     if (s.get("task") or {}).get("observe", {}).get("elements", "all") != "all":
         raise ValueError(f"{path}: task.observe.elements is `all` (every element of the observed set, one column each) "
                          f"or absent (element 0)")
+    if "resume" in tr and kind != "trace_recording":
+        raise ValueError(f"{path}: `training.resume` (restart from this run's own models/<name>.pt) is read by a "
+                         f"trace_recording task only")
     if "circuit_movie" in tr:                       # the circuit at work (plot_trainer.circuit_movie), a corpus run's
         cm = tr["circuit_movie"]
         if kind != "corpus":
@@ -2823,6 +2826,17 @@ def _train_trace(spec, device="cpu", root=None):
         learn.restore({k: fit_[k] for k in learn.p})
         print(f"[init] {len(learn.p)} learnables from {tr['init_from']}", flush=True)
         _trace_rollout(sims[stages[0][0]], learn, spec, box, int(origins[0]), stages[0][0], device, False)
+    start_it = 0
+    if tr.get("resume"):
+        # A RESUME (Cedric, 2026-10-08: 23.3 and 23.9 stopped ~1,500 updates from their end): this run's own
+        # models/<resume>.pt -- its learnables and its update count -- and the curriculum picks up at that update
+        # (`skip` below). Adam's moments and the origin draws are not in a checkpoint: the moments restart from
+        # zero and the origins are drawn afresh, so a resumed run is not bit-identical to an uninterrupted one.
+        ck_ = torch.load(os.path.join(out, "models", f"{tr['resume']}.pt"), weights_only=False, map_location=device)
+        learn.restore({k: ck_["fitted"][k] for k in learn.p})
+        start_it = int(ck_["it"])
+        print(f"[resume] {len(learn.p)} learnables and update {start_it} from models/{tr['resume']}.pt", flush=True)
+        _trace_rollout(sims[stages[0][0]], learn, spec, box, int(origins[0]), stages[0][0], device, False)
     params = learn.parameters()
     n_par = sum(p.numel() for p in params)
     lr, batch, clip = float(tr.get("lr", 1e-3)), max(1, int(tr.get("batch", 4))), float(tr.get("clip", 1.0))
@@ -2854,10 +2868,16 @@ def _train_trace(spec, device="cpu", root=None):
     del look
     save_every = int(tr.get("save_every", 500))
     hist_p = os.path.join(out, "results", "history.jsonl")
-    open(hist_p, "w").close()
-    log, last_ok, t_all, it = [], learn.snapshot(), time.time(), 0
+    if not start_it:
+        open(hist_p, "w").close()                  # a resume appends to the interrupted run's history
+    for _ in range(start_it if sch is not None else 0):
+        sch.step()
+    log, last_ok, t_all, it = [], learn.snapshot(), time.time(), start_it
+    skip = start_it
     for si, (K, n_it) in enumerate(stages):
-        for _ in range(n_it):
+        done_ = min(skip, n_it)
+        skip -= done_
+        for _ in range(n_it - done_):
             t0 = time.time()
             opt.zero_grad()
             parts, loss_v, finite = {}, 0.0, True
@@ -2879,7 +2899,20 @@ def _train_trace(spec, device="cpu", root=None):
                 print(f"  it {it:6d} loss not finite -- restored the last finite values, step sizes halved", flush=True)
                 it += 1
                 continue
-            torch.nn.utils.clip_grad_norm_(params, clip)
+            gn_ = torch.nn.utils.clip_grad_norm_(params, clip)
+            if not torch.isfinite(gn_) and guard == "restore_and_halve":
+                # A FINITE LOSS WITH A NON-FINITE GRADIENT (Cedric, 2026-10-08: 20.4, 23.3 and 23.9 each stopped near
+                # update 48,000): clipping a NaN norm scales every gradient to NaN, the step writes NaN into the
+                # learnables, and the next rollout seeds a NaN state -- which the engine's tick-0 write check then
+                # reported as "state_diffuse wrote the integrated state directly". The step is skipped as a
+                # non-finite loss is.
+                learn.restore(last_ok)
+                for g in opt.param_groups:
+                    g["lr"] *= 0.5
+                print(f"  it {it:6d} gradient not finite -- step skipped, last finite values kept, step sizes halved",
+                      flush=True)
+                it += 1
+                continue
             opt.step()
             if sch is not None:
                 sch.step()
