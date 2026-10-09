@@ -55,8 +55,15 @@ def main(run):
     B = fit["neuron.input"].float().numpy() * M                                  # [N, 22], the effective weights
     V = fit["neuron.rest"].float().numpy().reshape(-1)
     dV = B[:, list(MARKERS)] * sd                                                # [N, 9] dF/F
-    Veff = V[:, None] * sd + mu + dV                                             # [N, 9] dF/F
     reads = M[:, list(MARKERS)].any(1)
+    # rest_per_block (batch 24, Cedric 2026-10-09): every neuron's own learned offset per block, added to its rest by
+    # the operator (cell_ops: rest + rest_block[:, k]) beside any marker weight; then every neuron has a per-block rest
+    mech = "markers"
+    if "neuron.rest_block" in fit:
+        dV = dV + fit["neuron.rest_block"].float().numpy() * sd
+        reads = np.ones(len(V), bool)
+        mech = "rest_block"
+    Veff = V[:, None] * sd + mu + dV                                             # [N, 9] dF/F
     # the recorded shift of each neuron per block: its block mean minus its recording mean
     xm = X.mean(0)
     shift = np.stack([X[off[k]:off[k + 1]].mean(0) - xm for k in range(len(bn))], 1)   # [N, 9]
@@ -73,7 +80,7 @@ def main(run):
         per[r_] = {"neurons": int(m.sum()), "dV_mean": dV[m].mean(0).tolist(), "dV_sd": dV[m].std(0).tolist(),
                    "Veff_mean": Veff[m].mean(0).tolist()}
     kmax = int(np.argmax(dV[reads].std(0)))
-    doc = {"run": run, "blocks": bn, "neurons_reading_markers": int(reads.sum()), "norm_mu_sd": [mu, sd],
+    doc = {"run": run, "blocks": bn, "mechanism": mech, "neurons_reading_markers": int(reads.sum()), "norm_mu_sd": [mu, sd],
            "global": {"Veff_mean": Veff[reads].mean(0).tolist(), "Veff_sd": Veff[reads].std(0).tolist(),
                       "dV_mean": dV[reads].mean(0).tolist(), "dV_sd": dV[reads].std(0).tolist(),
                       "recorded_block_mean": [float(X[off[k]:off[k + 1]].mean()) for k in range(len(bn))]},

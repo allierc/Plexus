@@ -68,6 +68,8 @@ def main(run, what="tau"):
             M_ = np.load(graphs_data_path(*mf.split("/")))[ma]
             M_ = (M_.reshape(len(V), -1) if M_.ndim == 2 else np.repeat(M_.reshape(-1, 1), 22, 1)) != 0
             dV_ = (fit_["neuron.input"].float().numpy() * M_)[:, list(MARKERS)] * sd_
+            if "neuron.rest_block" in fit_:                # rest_per_block: the operator adds rest_block[:, k] too
+                dV_ = dV_ + fit_["neuron.rest_block"].float().numpy() * sd_
             V = V + (dV_ * w_).sum(1) / w_.sum()
         tau = V                                            # the quantity drawn, below (named tau for the tau slide)
     za = np.load(os.path.join(EXP, "data", "atlas_destripe.npz"))
