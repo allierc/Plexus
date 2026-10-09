@@ -84,7 +84,8 @@ _KEYS = {
     "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
                   "prior", "field", "levels", "features", "log2_table", "base", "scale", "title"},
     "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup", "rollouts",
-             "movie_metric"},
+             "movie_metric", "record"},
+    "record": {"set", "block", "every_s"},
     "rollout": {"name", "zero", "drive", "clamp", "messages"},
     "clamp": {"rois"},
     "roi": {"box", "sphere", "units"},
@@ -467,6 +468,20 @@ def load(path_or_name) -> dict:
             raise ValueError(f"{path}: `training.circuit_movie` is read by a corpus task only")
         if not isinstance(cm, dict) or set(cm) - {"trials", "fps", "stride"}:
             raise ValueError(f"{path}: training.circuit_movie is {{trials, fps, stride}} (any of them, or {{}})")
+    if "record" in t:                               # the test's activity read-out (`test`), a corpus run's
+        rc = t["record"]
+        if kind != "corpus":
+            raise ValueError(f"{path}: `task.record` is read by a corpus task's test only")
+        _refuse_unread(f"{path}: task.record", rc, _KEYS["record"])
+        if set(rc) != _KEYS["record"] or rc["set"] not in sets or float(rc["every_s"]) <= 0:
+            raise ValueError(f"{path}: task.record is {{set, block, every_s}}, a set of the model and a period > 0 s")
+    if kind == "corpus" and ("init_from" in tr or int(tr.get("epochs", 1)) == 0):
+        # A TEST-ONLY RUN (Cedric, 2026-10-08: the trained two-eye rig on ZAPBench's 2-h session): `epochs: 0` and
+        # `init_from:` the trained run, together or not at all -- the run trains nothing, its test and plots read
+        # that run's checkpoint (`_restore`) and write into this run's own folder.
+        if int(tr.get("epochs", 1)) != 0 or not tr.get("init_from"):
+            raise ValueError(f"{path}: a corpus run reads `training.init_from` only as a test-only run: "
+                             f"`epochs: 0` and `init_from: <the trained run>`, both")
     s["_kind"] = kind
     for k, allowed in (("optimizer", OPTIMIZERS), ("schedule", SCHEDULES), ("guard", GUARDS)):
         if k in tr and tr[k] not in allowed:
@@ -889,6 +904,9 @@ def train(spec, device="cpu", root=None):
     if spec.get("_kind") == "trace_recording":
         return _train_trace(spec, device, root)
     tr, task = spec["training"], spec["task"]
+    if int(tr.get("epochs", 1)) == 0:
+        raise ValueError(f"{spec['name']} is a test-only run (`epochs: 0`, `init_from: {tr.get('init_from')}`): "
+                         f"run `-o test` / `-o plot`, not `train`")
     ref = task["reference"]
     torch.manual_seed(int(tr.get("seed", 0)))
     out = out_dir(spec, root)
@@ -1012,9 +1030,12 @@ def train(spec, device="cpu", root=None):
 
 
 def _restore(spec, device="cpu", root=None):
-    """The model, the trained learnables and the run folder -- everything a held-out rollout needs."""
+    """The model, the trained learnables and the run folder -- everything a held-out rollout needs. A test-only run
+    (`training: {epochs: 0, init_from: <run>}`, `load`) reads the named run's checkpoint and keeps its own folder."""
     out = out_dir(spec, root)
-    ck = torch.load(os.path.join(out, "models", "best.pt"), weights_only=False, map_location=device)
+    tr = spec.get("training") or {}
+    src = out_dir(load(str(tr["init_from"])), root) if int(tr.get("epochs", 1)) == 0 else out
+    ck = torch.load(os.path.join(src, "models", "best.pt"), weights_only=False, map_location=device)
     learn = Learnables(spec["learnable"], device)
     learn.restore(ck["fitted"])
     return _model(spec), learn, ck, out
@@ -1040,8 +1061,14 @@ def test(spec, device="cpu", root=None):
     U, Y, cond = _data(spec, split, int(ck.get("n_cond", 1)), device)
     n = min(int(task["reference"].get("n_test", 24)), U.shape[0])
     ch = int(task["observe"].get("channel", 0))
+    sim.n_frames = int(U.shape[1])                   # the corpus's trial, whatever length the model file declares
+    os.makedirs(os.path.join(out, "results"), exist_ok=True)
+    rec = _Record(task.get("record"), float(sim.dt), int(U.shape[1]))
     with torch.no_grad():
-        _, Yp = rollout(sim, learn, U[:n], task, device, grad=False)
+        _, Yp = rollout(sim, learn, U[:n], task, device, grad=False, watch=rec if rec.on else None)
+    Yp = Yp if Yp.dim() == 3 else Yp[None]           # one trial: the engine ran unbatched, `rollout` returns [T, w]
+    if rec.on:
+        rec.save(os.path.join(out, "results", f"{spec['name']}_{split}"), n)
     per = [float(_mse(Yp[i], Y[i], ch)) for i in range(n)]
     traces = [Yp[i, :, ch].cpu().numpy() for i in range(min(n, 6))]
     var = float((Y[:n] ** 2).mean())
@@ -1088,6 +1115,41 @@ def test(spec, device="cpu", root=None):
             f"{res['normalised_per_cell'][str(c)]:.5f}" for c in cells))
     print(f"[test] wrote {p}")
     return res
+
+
+class _Record:
+    """`task.record: {set, block, every_s}` -- a block of a set, sampled every `every_s` seconds through the test's
+    rollout (Cedric, 2026-10-08: the two-eye rig's 285 cells on ZAPBench's 0.914-s volume clock). Sample i is trace
+    frame round(i every_s / dt) (`rollout`'s clock: it has seen the drive up to that frame); a block written in place
+    is read one hook later, as `rollout` reads its observable. -> <stem>_<set>_<block>.npz: `x` [trials, samples,
+    elements, width] and `t_s` [samples]."""
+
+    def __init__(self, rc, dt, T):
+        self.on = bool(rc)
+        if not self.on:
+            return
+        self.set, self.block = rc["set"], rc["block"]
+        k = np.round(np.arange(0.0, T * dt, float(rc["every_s"])) / dt).astype(int)
+        self.frames = k[k < T]
+        self.t_s = self.frames * dt
+        self.tick, self.shift, self.x = 0, None, []
+
+    def __call__(self, H):
+        if self.shift is None:
+            self.shift = 1 if _written_in_place(H, {"set": self.set, "block": self.block}) else 0
+            self.want = set((self.frames + self.shift).tolist())
+        if self.tick in self.want:
+            self.x.append(H.level(self.set).get(self.block).detach().float().cpu())
+        self.tick += 1
+
+    def save(self, stem, n):
+        x = torch.stack(self.x).numpy()                                 # [samples, (trials,) elements, width]
+        x = x[:, None] if x.ndim == 3 else x
+        x = np.moveaxis(x, 1, 0)[:n]                                    # [trials, samples, elements, width]
+        p = f"{stem}_{self.set}_{self.block}.npz"
+        np.savez_compressed(p, x=x, t_s=self.t_s[:x.shape[1]])
+        print(f"[test] recorded {self.set}.{self.block} {tuple(x.shape)} every {np.diff(self.t_s).mean():.3f} s "
+              f"on average (each sample the nearest model frame) -> {p}")
 
 
 # ============================================================================== analyse
