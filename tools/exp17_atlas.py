@@ -115,7 +115,7 @@ REGION_ROLE = {
     "subpallium": "ventral forebrain, mostly GABAergic: homologue of the striatum and septum (basal ganglia), fed "
                   "dopamine by the posterior tuberculum: action selection",
     "habenula": "dorsal diencephalon, left / right asymmetric: relays the forebrain, smell and light to the "
-                "interpeduncular nucleus and the raphe: fear, aversion, giving up",
+                "interpeduncular nucleus and the raphe: fear, aversion, passive coping",
     "dorsal thalamus": "the thalamus proper: relays sensory input (vision, light level) to the pallium and the habenula",
     "ventral thalamus": "the prethalamus, GABAergic, homologue of the reticular thalamic nucleus and the zona incerta: "
                         "gates the thalamic relay",
@@ -138,7 +138,7 @@ REGION_ROLE = {
     "rhombomere 1": "the hindbrain's first segment, under the cerebellum: the locus coeruleus (noradrenaline) and the "
                     "dorsal raphe (serotonin), which tracks the outcome of swims for short-term motor learning",
     "rhombomere 2": "the ARTR's front (anterior rhombencephalic turning region): left and right populations in "
-                    "antiphase that set the turn direction and alternate slowly; reticulospinal neurons",
+                    "antiphase that bias the turn direction and alternate every 10-20 s; reticulospinal neurons",
     "rhombomere 3": "the ARTR's back; the trigeminal motor nucleus (jaw) and reticulospinal neurons",
     "rhombomere 4": "the two Mauthner cells, one per side: a single spike launches the fast escape (the C-start)",
     "rhombomere 5": "the abducens motor nucleus (eye, with r6) and the saccade generator; the vestibular tangential "
@@ -148,7 +148,7 @@ REGION_ROLE = {
     "rhombomere 7": "caudal hindbrain: the oculomotor integrator that holds the eyes still between saccades (with r8); "
                     "V2a reticulospinal neurons of the swim command",
     "noradrenergic (IFN, vagal)": "the noradrenaline cluster of the medulla (NE-MO, like the mammalian A2): it signals "
-                                  "failed swims to radial astrocytes, which switch the fish to giving up",
+                                  "failed swims to radial astrocytes, which switch the fish to passivity",
     "vagus motor neurons": "the vagal motor nucleus (X), the last branchiomotor nucleus: muscles of the gill arches and "
                            "the pharynx, heart rate, the gut",
     "spinal cord": "motor neurons and the interneurons of the swim rhythm, recruited in order of swim speed; the "

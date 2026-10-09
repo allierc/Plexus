@@ -1323,7 +1323,7 @@ LAW_KNOWN_ODE = ("{\\normalsize\\textbf{the law: the known ODE, + $\\Omega$}}\\\
                  "{\\scriptsize $\\tau_i\\,\\dot z_i = -z_i + V_i + \\Omega_i(t)\\,m_i + B_i\\cdot u(t)$\\\\[3pt]\n"
                  "$m_i = \\sum_{s}\\sum_{j\\in\\mathcal N_s(i)} W^{s}_{ji}\\tanh z_j$\\\\[3pt]\n"
                  "$\\Omega_i(t) = 1 + f_\\theta(p_i, t)$\\par}\\vspace{3pt}\n"
-                 "{\\tiny $z_i$: neuron $i$'s dF/F, normalised; $\\tau_i$, $V_i$, $B_i$: its learned time constant, rest "
+                 "{\\tiny $z_i$: neuron $i$'s dF/F, normalised; $\\tau_i$, $V_i$, $B_i$: its learned time constant, baseline "
                  "and weights on the stimulus features $u$ ($B_i = 0$ outside the input mask); $W^{s}_{ji}$: one learned "
                  "weight per edge, $s$ = short, mid, long. $\\Omega_i$ scales the neuron's summed messages: $f_\\theta$ a "
                  "SIREN of its position $p_i$ and the time $t$, its last layer at 0 ($\\Omega_i = 1$ untrained); learned "
@@ -1453,7 +1453,7 @@ def slides_ablation(r, tag):
         v = d.get(k)
         return f"{v:+.3f}" if v is not None and np.isfinite(v) and v > -100 else "diverged"
     out = []
-    for key, what, kind in (("W0", "every edge weight W = 0: no network, each neuron its own leak, rest and stimulus", "W0"),
+    for key, what, kind in (("W0", "every edge weight W = 0: no network, each neuron its own leak, baseline and stimulus", "W0"),
                             (kl, "no stimulus into the left half (its stimulus weights B = 0), every W kept: "
                                  "stimulus-locked activity left there came through the network from the right"
                                  if kl == "Sleft0" else "W = 0 on every edge INTO the left half", kl)):
@@ -2702,7 +2702,7 @@ def main():
                     + rows([("$\\tau$, s", r3("tau_s"))]
                            + ([(f"$\\tau$ at {tb_[0]:.0f} s", f"{100 * S_['frac_tau_at_floor']:.1f} \\%"),
                                (f"$\\tau$ at {tb_[1]:.0f} s", f"{100 * S_['frac_tau_at_ceiling']:.1f} \\%")] if tb_ else [])
-                           + [("rest $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
+                           + [("baseline $V$", r3("V")), ("W in", r3("W_in")), ("$|B|$", r3("B_norm")),
                               ("W in $<$ 0", f"{100 * S_['frac_W_in_negative']:.1f} \\%"),
                               ("inputs", f"{S_['n_masked']:,} of {S_['n']:,}")])
                     + "{\\tiny\\color{gray} " + (f"$\\tau$ bounded to [{tb_[0]:.0f}, {tb_[1]:.0f}] s (a tanh squashing of "
@@ -2721,7 +2721,7 @@ def main():
         D_ = json.load(open(jp_))
         tr_, e_, C_ = D_["trust"], D_["eta2"], D_["clusters"]
         oth_ = [(k_[len("ari_vs_"):], v_) for k_, v_ in tr_.items() if k_.startswith("ari_vs_zap")]
-        lab_e = {"V rest": "rest $V$", "dF/F mean": "mean dF/F", "log10 tau": "$\\tau$", "|B| (masked)": "$|B|$",
+        lab_e = {"V rest": "baseline $V$", "dF/F mean": "mean dF/F", "log10 tau": "$\\tau$", "|B| (masked)": "$|B|$",
                  "dF/F SD": "dF/F SD", "|W| in": "$|W|$ in", "masked": "in the mask", "W in": "W in", "W out": "W out",
                  "body axis": "head-tail position"}
         fast_ = [c["cluster"] for c in C_ if c["tau_s_median"] < D_["frame_s"]]
@@ -2935,7 +2935,7 @@ def main():
                          + "{\\scriptsize $z$ the neuron's dF/F normalised by the recording's mean and SD; $f_i$ the step fraction "
                            "its time constant $\\tau_i$ sets; $m_i = \\sum_j W_{ji}\\tanh z_j$ its senders' message; $B_i\\cdot u$ "
                            "the stimulus (0 outside the input mask).\\par}\\vspace{4pt}\n"
-                         + "{\\scriptsize \\textbf{leak pull} $V_i - z_i$: how far the neuron is from its own rest $V_i$; it pulls "
+                         + "{\\scriptsize \\textbf{leak pull} $V_i - z_i$: how far the neuron is from its own baseline $V_i$; it pulls "
                            "it back. $V_i$ is constant, so it moves exactly as much as the neuron itself.\\par}" + SEC_GAP
                          + head("how much each term moves")
                          + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
@@ -3205,7 +3205,7 @@ def main():
                   "not pinned down.\\par}\\vspace{5pt}"
                   + h_("Coarse") + f_ + it_([
                       "\\textbf{The law:} the GraphCast-style mesh model of the early batches gave way to a known ODE "
-                      f"directly on the {N_NEURONS_DS:,} neurons. Each neuron has its own time constant $\\tau$, rest $V$ and "
+                      f"directly on the {N_NEURONS_DS:,} neurons. Each neuron has its own time constant $\\tau$, baseline $V$ and "
                       "stimulus weights $B$, and is coupled by weights $W$ on short, mid and long edges.",
                       "\\textbf{Training:} destriped traces, all frames, curriculum to 50 steps ahead.",
                       "\\textbf{The test:} the brain-mean dF/F R$^2$ of a 2 h free rollout, checked against twins trained "
@@ -3292,7 +3292,7 @@ def main():
                         f"{ST_['blocks']} others, the same blocks for every law; p two-sided. "
                         "Blocks, not frames or neurons: both are correlated, and neuron-wise tests would give p $\\approx$ 0 for any "
                         f"difference. Per-neuron r over the same {ST_['neurons']:,} neurons for every law; a neuron whose learned trace is "
-                        "flat scores 0 (with $W = 0$ most neurons relax to rest within 5 min). Bars: each law's 95~\\% interval; the "
+                        "flat scores 0 (with $W = 0$ most neurons relax to their baseline within 5 min). Bars: each law's 95~\\% interval; the "
                         "tests are on the paired differences, so laws whose intervals overlap can still differ.\\par}\\vspace{3pt}\n"
                         + "{\\scriptsize\\raggedright graph $-$ mean field: brain-mean r " + f"{t1['brain_mean_r']['difference']:+.3f} "
                         f"({pq(t1['brain_mean_r']['p'])}), {ml_} {t1['local_r']['difference']:+.3f} ({pq(t1['local_r']['p'])})\\\\\n"

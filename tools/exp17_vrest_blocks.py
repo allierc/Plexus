@@ -107,7 +107,7 @@ def main(run):
     # a: the brain mean of V_rest, one value per block, beside the recorded brain mean
     a = fig.add_axes([0.08, 0.60, 0.68, 0.30])
     a.plot(t, X.mean(1), color="#4dd94d", lw=0.6, alpha=0.8, label="recorded dF/F, brain mean")
-    a.plot(t, steps(doc["global"]["Veff_mean"]), color="#ff9e1a", lw=2.0, label="learned V$_{rest}$, brain mean")
+    a.plot(t, steps(doc["global"]["Veff_mean"]), color="#ff9e1a", lw=2.0, label="learned baseline, brain mean")
     blocks_axis(a)
     a.set_ylabel("dF/F", fontsize=9)
     a.tick_params(labelsize=8)
@@ -122,7 +122,7 @@ def main(run):
         bx.plot(t, steps(per[r]["Veff_mean"]), color=rcol.get(r, "0.7"), lw=1.3, label=r)
     blocks_axis(bx, labels_=False)
     bx.set_xlabel("time, min", fontsize=9)
-    bx.set_ylabel("learned V$_{rest}$, region mean, dF/F", fontsize=9)
+    bx.set_ylabel("learned baseline, region mean, dF/F", fontsize=9)
     bx.tick_params(labelsize=8)
     bx.legend(fontsize=6.8, frameon=False, loc="upper left", bbox_to_anchor=(1.005, 1.0), ncol=1, handlelength=1.2)
     bx.set_title("b  per region", fontsize=10, loc="left")
@@ -177,7 +177,7 @@ def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
             ax.axis("off")
         fig.text(0.04, 1 - 0.35 / H, (f"{b}: the reference, 0" if k == 0 else f"{b}: each neuron's offset minus its {bn[0]} one"),
                  fontsize=14, va="top", weight="bold")
-        fig.text(0.04, 0.02, f"red: rest raised against the {bn[0]} block, blue: lowered, clear: unchanged", fontsize=10,
+        fig.text(0.04, 0.02, f"red: baseline raised against the {bn[0]} block, blue: lowered, clear: unchanged", fontsize=10,
                  va="bottom", color="0.8")
         fig.savefig(os.path.join(tmp, f"{k:03d}.png"), dpi=110, facecolor="black")
         plt.close(fig)

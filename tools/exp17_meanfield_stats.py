@@ -22,7 +22,7 @@ flat (the no-W twin: 40 %), so the deck's local r of those rows comes from the o
 without that block their r is 0 / 0. On a resample both come from
 weighted sums per block (local r: 9 sums per neuron per block), so a resample costs a matrix product.
 
-    PYTHONPATH=src:tools python tools/exp17_meanfield_stats.py [--raw] [--n19]
+    PYTHONPATH=src:tools python tools/exp17_meanfield_stats.py [--raw] [--n19 | --n22]
 Another experiment (exp20, 2026-10-05) calls main(laws, tests, seeds, exp_dir, raw) with its own runs: laws = ((label,
 run name, rollout suffix "" or "_W0"), ...), tests = ((i, j), ...) indices into laws, seeds = a (label, run, "") pair of
 one spec trained with two seeds, or None; every run's free rollout must share its frames.
@@ -55,6 +55,12 @@ SEEDS = (("15.1, seed 0", "zap_e15_cur", ""), ("17.8, seed 1", "zap_g17_s1", "")
 LAWS_N19 = (("19.25 graph", "zap_n19_nom", ""), ("19.25, W = 0 at inference", "zap_n19_nom", "_W0"),
             ("19.41 mean field", "zap_n19_mf", ""), ("19.40 no W", "zap_n19_now", ""))
 SEEDS_N19 = (("19.25, seed 0", "zap_n19_nom", ""), ("19.26, seed 1", "zap_n19_nom_s1", ""))
+# `--n22` (Cedric, 2026-10-09: "replace all slides with batch 19 with the new results from batch 22, markall"): 22.3
+# (markall, 19.27's twin without checkpointing) against batch 22's controls -- 22.17 the mean field and 22.16 no W, the
+# twins of 19.41 / 19.40, trained on the NOMINAL inputs, not markall's -- and the nominal's seed pair, 22.1 / 22.2
+LAWS_N22 = (("22.3 graph", "zap_n22_markall", ""), ("22.3, W = 0 at inference", "zap_n22_markall", "_W0"),
+            ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
+SEEDS_N22 = (("22.1, seed 0", "zap_n22_nom", ""), ("22.2, seed 1", "zap_n22_nom_s1", ""))
 
 
 def stars(p):
@@ -265,10 +271,12 @@ def draw(doc, exp_dir=EXP):
 
 
 if __name__ == "__main__":
-    tag_ = "_n19" if "--n19" in sys.argv else ""
+    tag_ = "_n19" if "--n19" in sys.argv else ("_n22" if "--n22" in sys.argv else "")
     if "--draw" in sys.argv:
         draw(json.load(open(os.path.join(EXP, "data", f"meanfield_stats{tag_}{SUF}.json"))))
-    elif tag_:
+    elif tag_ == "_n19":
         main(LAWS_N19, TESTS, SEEDS_N19, tag=tag_)
+    elif tag_ == "_n22":
+        main(LAWS_N22, TESTS, SEEDS_N22, tag=tag_)
     else:
         main()

@@ -44,7 +44,9 @@ def main(run, what="tau"):
     from matplotlib.colors import Normalize
     from exp17_param_maps import constants
     c = constants(run)
-    tau, mask = np.asarray(c["tau_s"], np.float64), np.asarray(c["mask"]).astype(bool).reshape(-1)
+    tau = np.asarray(c["tau_s"], np.float64)
+    # the stimulus neurons (exp17_param_maps.constants): with the markers fed to every neuron, "mask" is every neuron
+    mask = np.asarray(c.get("stim_mask", c["mask"])).astype(bool).reshape(-1)
     # THE V_REST TWIN (Cedric, 2026-10-08: "a twin of the tau-by-region slide for V_rest"): each neuron's rest in dF/F --
     # with a per-block rest (the 9 condition markers read by every neuron, or rest_per_block), its time average over the
     # blocks, each block weighted by its frames (tools/exp17_vrest_blocks.py's V_eff)
@@ -121,7 +123,7 @@ def main(run, what="tau"):
     norm = Normalize(lo, hi)                               # linear (Cedric, 2026-10-08)
     CM = "plasma" if what == "vrest" else "RdBu"            # tau: red fast, blue slow (Cedric, 2026-10-08); plasma: its low end shows on black
     cmap = plt.get_cmap(CM)
-    QL = "V$_{rest}$" if what == "vrest" else "tau"
+    QL = "baseline" if what == "vrest" else "tau"
     # LEFT, THE NEURONS ONLY (Cedric, 2026-10-08: "remove the atlas view, the two dot fish one above the other, larger to
     # fill the blank"): from above and from the side, one scale, stacked and centred; the box plot at the right
     ins_ = lab >= 0
@@ -146,7 +148,7 @@ def main(run, what="tau"):
     y_bot = ycur
     cax = fig.add_axes([0.01 + wf / 2 - 0.0475, y_bot - 0.05, 0.095, 0.014])
     cb = fig.colorbar(sc, cax=cax, orientation="horizontal")
-    cb.set_label("V$_{rest}$, dF/F" if what == "vrest" else "$\\tau$, s", fontsize=9, labelpad=1)
+    cb.set_label("baseline, dF/F" if what == "vrest" else "$\\tau$, s", fontsize=9, labelpad=1)
     cb.ax.tick_params(labelsize=7.5)
     cax.text(-0.06, 0.5, "low" if what == "vrest" else "fast", transform=cax.transAxes, ha="right", va="center", fontsize=9)
     cax.text(1.06, 0.5, "high" if what == "vrest" else "slow", transform=cax.transAxes, ha="left", va="center", fontsize=9)
@@ -163,7 +165,7 @@ def main(run, what="tau"):
     ar.set_ylim(len(ks) - 0.5, -0.5)
     ar.set_yticks(range(len(ks)))
     ar.set_yticklabels([f"{short[k]} ({per[short[k]]['n']:,})" for k in ks], fontsize=8.5)
-    ar.set_xlabel(("V$_{rest}$, dF/F" if what == "vrest" else "$\\tau$, s") + ": median (white), quartiles (box),\n"
+    ar.set_xlabel(("baseline, dF/F" if what == "vrest" else "$\\tau$, s") + ": median (white), quartiles (box),\n"
                   "5th-95th percentile (line)", fontsize=9)
     ar.tick_params(axis="x", labelsize=8.5)
     ar.text(doc["brain_median"], -0.9, f"brain median {doc['brain_median']:.3f} dF/F" if what == "vrest" else
