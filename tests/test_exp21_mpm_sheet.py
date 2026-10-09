@@ -356,3 +356,25 @@ def test_planar_division_keeps_both_daughters_in_the_layer_each_with_a_nucleus()
     tot = float(sum(P.p_vol[blocks[s]].sum() for s in live.tolist()))
     tot0 = float(sum(P0.p_vol[blocks[s]].sum() for s in (C0.occ > 0.5).nonzero().flatten().tolist()))
     assert tot == pytest.approx(tot0, rel=1e-4)
+
+
+def test_align_turns_each_polarity_toward_its_own_velocity_and_zero_is_the_identity():
+    """PLANTED: cells whose centroids move along +y, with a strong `align`, end with their polarity along +y; with
+    align 0 the polarities are the free walk's (identity)."""
+    nc, per = 30, 4
+    par = torch.arange(nc).repeat_interleave(per)
+    X = torch.zeros(nc * per, 3)
+    H = _H(X, par, nc)
+    op = _walk(Dr=0.01, align=2.0, seed=4)
+    ref = _walk(Dr=0.01, seed=4)
+    Href = _H(X.clone(), par, nc)
+    for k in range(25):
+        H.lv["pt"].state[:, 1] = 0.3 * k                       # every cell carried +y by its neighbours
+        op.forward(H)
+        ref.forward(Href)
+    assert float(op._p[:, 1].mean()) > 0.9
+    ref2 = _walk(Dr=0.01, seed=4, align=0.0)
+    Hr2 = _H(X.clone(), par, nc)
+    for k in range(25):
+        ref2.forward(Hr2)
+    assert torch.allclose(ref._p, ref2._p)
