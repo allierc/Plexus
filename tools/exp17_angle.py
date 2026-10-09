@@ -19,8 +19,10 @@ Read from the run's models/best.pt, through the run's own operator (its alpha() 
   d  on the fish (atlas frame, from above), per receiving neuron, how much its inputs change between blocks: the range
      over blocks of the |W|-weighted mean cos(phi_ij - alpha_k) of its incoming edges, 0 to 2
 
+The figure draws a only (Cedric, 2026-10-09: "delete panel b c d"); b, c and d are in the json.
+
     PYTHONPATH=src:tools python tools/exp17_angle.py zap_n24_ph_edge zap_n24_ph_edge_blk
--> presentation/figs/angle_<run>.png, data/angle_<run>.json
+-> presentation/figs/angle_<run>.png (alpha(t)), data/angle_<run>.json
 """
 from __future__ import annotations
 
@@ -35,7 +37,6 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 LEVELS = ("short", "mid", "long")
-LEVEL_COL = {"short": "#e6a03c", "mid": "#56b4e9", "long": "white"}
 
 
 def wrap(x):
@@ -96,67 +97,29 @@ def analyse(run):
 
 
 def figure(r, path):
+    """alpha(t) only (Cedric, 2026-10-09: "delete panel b c d"; their numbers stay in data/angle_<run>.json)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from exp17_flow_pruned import atlas_frame
     names, off, F = r["names"], r["off"], r["F"]
-    fig = plt.figure(figsize=(13, 7.6), facecolor="black")
-    gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.35], width_ratios=[1, 1, 1.25], hspace=0.38, wspace=0.28,
-                          left=0.06, right=0.95, top=0.93, bottom=0.08)
-    ax = fig.add_subplot(gs[0, :])
-    b1, b2, b3 = (fig.add_subplot(gs[1, i]) for i in range(3))
-    for a in (ax, b1, b2, b3):
-        a.set_facecolor("black")
-        a.tick_params(colors="white", labelsize=8)
-        for s_ in a.spines.values():
-            s_.set_color("0.5")
+    fig = plt.figure(figsize=(13, 4.6), facecolor="black")
+    ax = fig.add_axes([0.07, 0.14, 0.91, 0.66])
+    ax.set_facecolor("black")
+    ax.tick_params(colors="white", labelsize=9)
+    for s_ in ax.spines.values():
+        s_.set_color("0.5")
     t = np.arange(F) * 0.914
-    ax.plot(t, np.degrees(wrap(r["alpha"])), ".", ms=0.8, color="#e6a03c")
+    ax.plot(t, np.degrees(wrap(r["alpha"])), ".", ms=1.0, color="#e6a03c")
     for k, nm in enumerate(names):
         x0, x1 = off[k] * 0.914, off[k + 1] * 0.914
         ax.axvline(x0, color="0.4", lw=0.5, ls=":")
-        ax.text((x0 + x1) / 2, 1.02, f"{nm}\n{np.degrees(r['ak'][k]):+.0f}° ± {np.degrees(r['asd'][k]):.0f}°",
-                transform=ax.get_xaxis_transform(), ha="center", va="bottom", color="white", fontsize=7)
+        ax.text((x0 + x1) / 2, 1.03, f"{nm}\n{np.degrees(r['ak'][k]):+.0f}° ± {np.degrees(r['asd'][k]):.0f}°",
+                transform=ax.get_xaxis_transform(), ha="center", va="bottom", color="white", fontsize=9)
     ax.set_xlim(0, F * 0.914)
     ax.set_ylim(-180, 180)
     ax.set_yticks([-180, -90, 0, 90, 180])
-    ax.set_ylabel("alpha(t) (deg)", color="white", fontsize=9)
-    ax.set_xlabel("time in the session (s)", color="white", fontsize=9)
-    bins = np.linspace(0, 180, 61)
-    for s in LEVELS:
-        b1.hist(np.degrees(r["E"][s]["dphi"]), bins=bins, histtype="step", color=LEVEL_COL[s], lw=1.0,
-                label=f"{s} ({len(r['E'][s]['dphi']):,} edges)", density=True)
-    b1.axhline(1 / 180, color="0.5", lw=0.6, ls="--")
-    b1.text(178, 1 / 180, "no move would be a spike at 0;\nuniform = 1/180", color="0.6", fontsize=6, ha="right", va="bottom")
-    b1.set_xlabel("|phi - phi start| (deg)", color="white", fontsize=9)
-    b1.set_ylabel("density", color="white", fontsize=9)
-    b1.legend(fontsize=6.5, frameon=False, labelcolor="white")
-    xk = np.arange(len(names))
-    S_ = r["sim"]
-    lo_ = float(np.floor(S_.min() * 10) / 10)
-    b2.imshow(S_, cmap="gray", vmin=lo_, vmax=1.0)
-    for i in range(len(names)):
-        for j in range(len(names)):
-            b2.text(j, i, f"{S_[i, j]:.2f}", ha="center", va="center", fontsize=4.8,
-                    color="black" if S_[i, j] > (lo_ + 1) / 2 else "white")
-    b2.set_xticks(xk); b2.set_yticks(xk)
-    b2.set_xticklabels(names, rotation=45, ha="right", fontsize=6.5, color="white")
-    b2.set_yticklabels(names, fontsize=6.5, color="white")
-    b2.set_title(f"circuit similarity between blocks (grey {lo_:.1f} to 1)", color="white", fontsize=8)
-    P3 = atlas_frame(np.load(os.path.join(EXP, "data", "atlas_destripe.npz"))["atlas_um"].astype(np.float64))
-    ok = np.isfinite(r["rng"])
-    o_ = np.argsort(r["rng"][ok])
-    sc = b3.scatter(P3[ok, 0][o_], P3[ok, 1][o_], c=r["rng"][ok][o_], s=0.4, cmap="inferno", vmin=0,
-                    vmax=float(np.nanpercentile(r["rng"], 99)), linewidths=0)
-    b3.set_aspect("equal")
-    b3.set_xticks([]); b3.set_yticks([])
-    cb = fig.colorbar(sc, ax=b3, fraction=0.04, pad=0.01)
-    cb.ax.tick_params(colors="white", labelsize=7)
-    cb.set_label("range over blocks of a neuron's\nmean input factor", color="white", fontsize=7)
-    for a, lab in ((ax, "a"), (b1, "b"), (b2, "c"), (b3, "d")):
-        a.text(-0.02 if a is not ax else -0.045, 1.04 if a is not ax else 1.15, lab, transform=a.transAxes,
-               color="white", fontsize=12, fontweight="bold", ha="right")
+    ax.set_ylabel("alpha(t) (deg)", color="white", fontsize=10)
+    ax.set_xlabel("time in the session (s)", color="white", fontsize=10)
     fig.savefig(path, dpi=150, facecolor="black")
     plt.close(fig)
 

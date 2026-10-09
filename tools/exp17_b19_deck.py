@@ -626,6 +626,37 @@ def input_fish(path, size=(700, 1150)):
     pl.close()
 
 
+def law_block_(spec, title, eq, small, rows, foot, split=False):
+    """A law in slide 24's look (Cedric, 2026-10-09): yellow title, the complete equation large, the small text, the
+    learned values counted in yellow and their table (learnable, what, count, prior, step), a small closing line. `rows`
+    are (symbol, what, count, the spec's learnable key); prior and step are read from the training spec's `learnable:`.
+    `split`: (the law, the table) as two fitted columns instead of one."""
+    L_ = {(l.get("param") or l.get("block")): l for l in spec["learnable"]}
+    def pr(k):
+        p = L_[k].get("prior")
+        return (f"L1 {p['l1']:.1e} L2 {p['l2']:.1e}".replace("e-0", "e-") if p else "--")
+    def st(k):
+        return f"{float(L_[k]['lr']):.0e}".replace("e-0", "e-")
+    tot = sum(r[2] for r in rows)
+    stg = (spec.get("training") or {}).get("stages") or []
+    train = (f"Trained on the recording itself: {sum(int(x['iters']) for x in stg):,} updates of Adam, the forecast "
+             f"horizon growing from 1 to {max(int(x['horizon']) for x in stg)} frames, the loss the squared error on dF/F. "
+             if stg else "")
+    law = ("{\\Large\\textbf{\\textcolor{yellow}{" + title + "}}}\\\\[4pt]\n"
+           "{\\Large " + eq + "\\par}\\vspace{\\baselineskip}\n"
+           "{\\small\\raggedright " + small + "\\par}")
+    table = ("{\\Large\\textbf{\\textcolor{yellow}{" + f"{tot:,} learned values" + "}}\\par}\\vspace{4pt}\n"
+             "{\\normalsize\\begin{tabular}{@{}l@{\\hspace{5pt}}p{" + ("11em" if split else "10.5em")
+             + "}@{\\hspace{4pt}}r@{\\hspace{4pt}}p{4.2em}@{\\hspace{4pt}}l@{}}\n"
+             "learnable & what & count & prior & step \\\\\n\\hline\n"
+             + "".join(f"\\rule{{0pt}}{{2.4ex}}{a} & {b} & {c:,} & {pr(k)} & {st(k)} \\\\\n" for a, b, c, k in rows)
+             + "\\end{tabular}\\par}")
+    closing = "{\\small\\raggedright " + train + foot + "\\par}"
+    if split:                     # the closing lines under the law, the table alone on the right
+        return ("\\fitcol{%\n" + law + "\\vspace{8pt}\n" + closing + "}", "\\fitcol{%\n" + table + "}")
+    return "\\fitcol{%\n" + law + "\\vspace{8pt}\n" + table + "\\vspace{8pt}\n" + closing + "}"
+
+
 def slides_run19(S, run="zap_n19_nom", num="19.25", now_=("19.40", "zap_n19_now"), mf_=("19.41", "zap_n19_mf"), desc=None,
                  label=None, law=None):
     """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
@@ -1507,33 +1538,40 @@ def write_slides():
                                                  deck_title="the model $\\cdot$ the variants: two known ODEs and two GNN-MLPs")))
         # Cedric, 2026-10-07: batch 21's law, the angular modulation (exp18's phase_rotated on the neuron graph; the
         # GNN_Transformer note, Eq. 27), in the variants slide's look
-        mods21 = [("known ODE, the angular modulation",
-                   "$\\tau_i\\dfrac{dz_i}{dt} = -z_i + V_i + \\sum_j W_{ij}\\tanh z_j\\,\\cos\\!\\big(\\varphi_{t(j)\\,t(i)} - "
-                   "\\alpha(t)\\big) + B_i\\cdot u(t)$",
-                   "each edge's message turned by one broadcast angle: the factor is 1 when $\\alpha$ sits on the pair's "
-                   "phase, 0 at a quarter turn, $-1$ half a turn away (the edge changes sign); no $\\Omega$. Learned: "
-                   "$W_{ij}$, $\\tau_i$, $V_i$, $B_i$, $\\varphi$, $\\alpha$'s SIREN"),
-                  ("the phase $\\varphi$",
-                   "$\\varphi_{ab}$, \\; $a = t(j)$ the sender's type, $b = t(i)$ the receiver's",
-                   "one phase per ordered pair of cell types, a 25 $\\times$ 25 table: the types are the Z-Brain atlas "
-                   "regions (24 + other) until a learned type exists (the MLP embedding); started at random, since at "
-                   "$\\varphi = \\alpha = 0$ both gradients vanish. 21.9--21.10 learn the full $\\varphi_{ij}$, one per edge"),
-                  ("the angle $\\alpha(t)$",
-                   "$\\alpha(t) = f_\\theta(t)$, \\; or $f_\\theta(t, \\mathrm{block})$, \\; or $\\alpha_k$ per block $k$",
-                   "one angle for the whole brain at each frame, a SIREN of the time (0 untrained), with the block's "
-                   "one-hot, or one learned angle per block (exp18's one angle per context). When the block changes the "
-                   "angle turns, and with it which pairs excite, fall silent or inhibit: a different circuit per block on "
-                   "the same wiring. Trained with a 0.1-rad jitter per rollout (exp18: without it, a 3$^\\circ$ error "
-                   "breaks the circuits)"),
-                  ("batch 21",
-                   "21.1 no $\\Omega$, no angle \\; $\\cdot$ \\; 21.2 the angle \\; $\\cdot$ \\; 21.3 seed 1 \\; $\\cdot$ \\; "
-                   "21.4 + block \\; $\\cdot$ \\; 21.5 $\\alpha_k$ per block",
-                   "21.6 no jitter; 21.7 gain only, $(1 + \\cos)/2$: an edge silenced, never reversed; 21.8 $\\varphi$ "
-                   "fixed at random; 21.9 per-edge $\\varphi_{ij}$; 21.10 per-edge + block (H100). Base: the new nominal "
-                   "19.25 without $\\Omega$")]
-        body21 = ("\\vspace*{2\\baselineskip}\\fitcol{%\n"
-                  + "\\vspace{14pt}\n".join("{\\Large\\textbf{\\textcolor{yellow}{" + h + "}}}\\\\[4pt]\n{\\Large " + e + "}\\\\[4pt]\n"
-                                             "{\\small\\raggedright " + t_ + "\\par}\n" for h, e, t_ in mods21) + "}")
+        # Cedric, 2026-10-09: "write the slide like slide 24: the known-ODE equation first, complete, small text, and the
+        # table of learnables" -- 21.2's law (zap_n21_ph), its learnables counted from its best.pt
+        import torch as torch_
+        from plexus import trainer as Tr_
+        sp21_ = Tr_.load("zap_n21_ph")
+        ck21_ = os.path.join(Tr_.out_dir(sp21_), "models", "best.pt")
+        f21_ = torch_.load(ck21_, weights_only=False, map_location="cpu")["fitted"] if os.path.exists(ck21_) else {}
+        c21_ = {k: int(v.numel()) for k, v in f21_.items()}
+        rows21 = [("$W_{ij}$, short", "per directed edge $j \\to i$, level 0 (every neuron)", c21_.get("state_diffuse.W_short", 0), "W_short"),
+                  ("$W_{ij}$, middle", "per edge, level 1 (32 \\textmu m)", c21_.get("state_diffuse.W_mid", 0), "W_mid"),
+                  ("$W_{ij}$, long", "per edge, level 2 (64 \\textmu m)", c21_.get("state_diffuse.W_long", 0), "W_long"),
+                  ("$\\varphi_{ab}$", "per ordered pair of cell types (25 $\\times$ 25), rad", c21_.get("state_diffuse.phi", 0), "phi"),
+                  ("$\\tau_i$", "per neuron, in [1, 100] s", c21_.get("neuron.tau", 0), "tau"),
+                  ("$V_i$", "per neuron, its rest", c21_.get("neuron.rest", 0), "rest"),
+                  ("$B_{ik}$", "per input neuron and feature (22)",
+                   int((np.load(gdp_("zebrafish", "input_mask_destripe_bal20.npz"))["mask"] > 0).sum()) * 22, "input"),
+                  ("$\\theta_\\alpha$", "the SIREN of $\\alpha(t)$", c21_.get("state_diffuse.alpha_mlp", 0), "alpha_mlp")]
+        eq21 = ("$\\begin{aligned}\\tau_i\\,\\dfrac{dz_i}{dt} &= -z_i + V_i + \\textstyle\\sum_j W_{ij}\\tanh z_j\\,"
+                "\\cos\\!\\big(\\varphi_{t(j)\\,t(i)} - \\alpha(t)\\big)\\\\ &\\quad + B_i\\cdot u(t)\\\\ \\alpha(t) &= "
+                "f_\\theta(t)\\end{aligned}$")
+        small21 = ("$z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges $j \\to i$, its three levels; "
+                   "no $\\Omega$. Each message turned by one broadcast angle: the factor is 1 when $\\alpha$ sits on the "
+                   "pair's phase, 0 a quarter turn away, $-1$ half a turn (the edge reverses). $\\varphi_{ab}$, $a = t(j)$ "
+                   "the sender's type, $b = t(i)$ the receiver's: the types are the Z-Brain regions (24 + other), the "
+                   "phases started at random since at $\\varphi = \\alpha = 0$ both gradients vanish. $\\alpha(t)$ one angle "
+                   "for the whole brain per frame, $f_\\theta$ a SIREN of the frame time, 0 untrained, a 0.1-rad jitter per "
+                   "training rollout (exp18: without it a 3$^\\circ$ error breaks the circuits). When the block changes "
+                   "the angle turns, and with it which pairs excite, fall silent or inhibit: a different circuit per block "
+                   "on the same wiring. $B_i = 0$ outside the input neurons (the balanced 20 \\% mask).")
+        foot21 = ("Batch 21: 21.1 no $\\Omega$, no angle; 21.2 this law; 21.3 seed 1; 21.4 $f_\\theta(t, e_{k(t)})$ with the "
+                  "block's one-hot; 21.5 $\\alpha_k$ one learned angle per block; 21.6 no jitter; 21.7 gain only, "
+                  "$(1 + \\cos)/2$; 21.8 $\\varphi$ fixed at random; 21.9 per-edge $\\varphi_{ij}$; 21.10 per-edge + block.")
+        body21 = "\\vspace*{2\\baselineskip}" + law_block_(sp21_, "known ODE, the angular modulation (21.2)", eq21, small21,
+                                                          rows21, foot21)
         # Cedric, 2026-10-08: a right column with exp18's toy model -- one fixed wiring, six circuits, one angle each
         # (tools/exp17_exp18_toy.py: held-out traces, the angles on the circle), black
         if all(os.path.exists(os.path.join(PRES, "figs", f_)) for f_ in ("exp18_toy_traces.png", "exp18_toy_circle.png")):
@@ -1825,11 +1863,12 @@ def write_slides():
                                                          "tools/exp17_prune.py zap_n20_markall", left=0.74,
                                                          deck_title="batch 20.3 $\\cdot$ the grid weights near 0")))
         deck += new_                                   # after 20.3's V_rest slides (Cedric, 2026-10-08: "after 41")
-    # THE ANGLE OF 24.9 / 24.10 (Cedric, 2026-10-08: "add slides for the results of 24.9 and 24.10 plotting the angle and
-    # the phi analysis"): tools/exp17_angle.py -> figs/angle_<run>.png, data/angle_<run>.json; the test from the run's
-    # own results/<run>_test.json
-    for run_, num_, what_ in (("zap_n24_ph_edge", "24.9", "one phase per edge, alpha a SIREN of the frame time"),
-                              ("zap_n24_ph_edge_blk", "24.10", "24.9 with the stimulus block's one-hot in alpha's SIREN")):
+    # THE ANGLE OF 24.9 / 24.10 (Cedric, 2026-10-08: "add slides for the results of 24.9 and 24.10, plotting the angle
+    # and the phi analysis"; 2026-10-09: "the law is not clear ... write the slide like slide 24: the known-ODE equation
+    # first, complete, small text, and the table of learnables", "delete panels b c d"): left alpha(t)
+    # (tools/exp17_angle.py -> figs/angle_<run>.png, data/angle_<run>.json), right the law in slide 24's look, its
+    # learnables counted from the run's best.pt and their step / prior read from its training spec
+    for run_, num_, ctx_ in (("zap_n24_ph_edge", "24.9", False), ("zap_n24_ph_edge_blk", "24.10", True)):
         ja_ = os.path.join(EXP, "data", f"angle_{run_}.json")
         jt_ = os.path.join(S.GD, "log", "training", "zapbench", run_, "results", f"{run_}_test.json")
         if not (os.path.exists(ja_) and os.path.exists(jt_)):
@@ -1838,36 +1877,53 @@ def write_slides():
         T_ = json.load(open(jt_))
         mv_ = os.path.join(S.GD, "log", "training", "zapbench", run_, "results", f"{run_}_movie.npz")
         pn_ = S.local_r(mv_, "zapbench_destripe")["mean"] if os.path.exists(mv_) else float("nan")
-        am_, bl_ = A_["alpha_block_mean_deg"], A_["blocks"]
+        import torch as torch_
+        from plexus import trainer as Tr_
+        from plexus.paths import graphs_data_path as gdp_
+        spec_ = Tr_.load(run_)
+        fit_ = torch_.load(os.path.join(Tr_.out_dir(spec_), "models", "best.pt"), weights_only=False,
+                           map_location="cpu")["fitted"]
+        cnt_ = {k: int(v.numel()) for k, v in fit_.items()}
+        nin_ = int((np.load(gdp_("zebrafish", "input_mask_destripe_bal20.npz"))["mask"] > 0).sum())
+        rows_ = [("$W_{ij}$, short", "every neuron's neighbours", cnt_["state_diffuse.W_short"], "W_short"),
+                 ("$W_{ij}$, middle", "the 16- and 32-\\textmu m levels", cnt_["state_diffuse.W_mid"], "W_mid"),
+                 ("$W_{ij}$, long", "the 64-\\textmu m cubes", cnt_["state_diffuse.W_long"], "W_long"),
+                 ("$\\varphi_{ij}$", "per edge, rad",
+                  sum(cnt_[f"state_diffuse.phi_{s_}"] for s_ in ("short", "mid", "long")), "phi_short"),
+                 ("$\\tau_i$", "per neuron, in [1, 100] s", cnt_["neuron.tau"], "tau"),
+                 ("$V_i$", "per neuron, its rest", cnt_["neuron.rest"], "rest"),
+                 ("$\\Delta V_{i,k}$", "per neuron and block (9)", cnt_["neuron.rest_block"], "rest_block"),
+                 ("$B_{ik}$", "per input neuron and feature (22)", nin_ * 22, "input"),
+                 ("$\\theta_\\alpha$", "the SIREN of $\\alpha$" + (", time and block" if ctx_ else ", time"),
+                  cnt_["state_diffuse.alpha_mlp"], "alpha_mlp")]
+        eq_ = ("$\\begin{aligned}\\tau_i\\,\\dfrac{dz_i}{dt} &= -z_i + V_i + \\Delta V_{i,k(t)}\\\\ &\\quad + \\textstyle\\sum_j "
+               "W_{ij}\\tanh z_j\\,\\cos\\!\\big(\\varphi_{ij} - \\alpha(t)\\big) + B_i\\cdot u(t)\\\\ \\alpha(t) &= "
+               + ("f_\\theta\\big(t, e_{k(t)}\\big)" if ctx_ else "f_\\theta(t)") + "\\end{aligned}$")
+        small_ = ("$z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges $j \\to i$, its three "
+                  "levels; no $\\Omega$ (24.1's law, Omega = 1). Each message turned by $\\cos(\\varphi_{ij} - \\alpha(t))$: "
+                  "1 when the angle sits on the edge's phase, 0 a quarter turn away, $-1$ half a turn (the edge reverses). "
+                  "$\\varphi_{ij}$ one phase per edge, started uniform in $[0, 2\\pi)$. $\\alpha(t)$ one angle for the whole "
+                  "brain per frame, $f_\\theta$ a SIREN of the frame time"
+                  + (" and of $e_{k(t)}$, the one-hot of the stimulus block $k$ playing" if ctx_ else "")
+                  + ", 0 untrained, a 0.1-rad jitter per training rollout. $V_i + \\Delta V_{i,k(t)}$ the rest while block "
+                    "$k$ plays. $B_i = 0$ outside the input neurons (the balanced 20 \\% mask); 4 exponential-Euler steps "
+                    "per frame.")
         q_ = A_["dphi_quantiles_deg_10_50_90"]
-        early_ = [am_[k] for k in range(4)]
-        late_ = [am_[k] for k in range(4, len(am_))]
-        right_a = (S.head("the law")
-                   + "{\\scriptsize\\raggedright $\\tau_i\\,\\dot z_i = -z_i + V_{i,k} + \\sum_j W_{ij}\\tanh z_j\\,"
-                     "\\cos(\\varphi_{ij} - \\alpha(t)) + B_i\\cdot u$: " + what_ + "; $\\varphi_{ij}$ started uniform "
-                     f"in $[0, 2\\pi)$. Free rollout: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r "
-                     f"{pn_:.3f}; long skill {T_['skill_long']:.3f}.\\par}}\n"
-                   + S.head("the angle (a)")
-                   + f"{{\\scriptsize\\raggedright $\\alpha$ spans {A_['alpha_session_range_deg'][0]:+.0f} to "
-                     f"{A_['alpha_session_range_deg'][1]:+.0f} deg. Block means {min(early_):+.0f} to "
-                     f"{max(early_):+.0f} deg in the first four ({bl_[0]} to {bl_[3]}), {min(late_):+.0f} to "
-                     f"{max(late_):+.0f} deg in the last five ({bl_[4]} to {bl_[-1]}), drifting within each block "
-                     f"(spread {min(A_['alpha_block_spread_deg']):.0f}--{max(A_['alpha_block_spread_deg']):.0f} deg): "
-                     "an early / late split of the session more than one angle per stimulus.\\par}\n"
-                   + S.head("the phases (b)")
-                   + "{\\scriptsize\\raggedright Median move from the random start "
-                     f"{q_['short'][1]:.0f} / {q_['mid'][1]:.0f} / {q_['long'][1]:.0f} deg (short / mid / long edges); "
-                     f"90 \\% of edges under {q_['short'][2]:.0f} / {q_['mid'][2]:.0f} / {q_['long'][2]:.0f} deg: most "
-                     "phases stay near where they were drawn.\\par}\n"
-                   + S.head("the circuit per block (c, d)")
-                   + "{\\scriptsize\\raggedright Effective weights $W_{ij}\\cos(\\varphi_{ij} - \\alpha_k)$ compared "
-                     f"between blocks: similarity down to {A_['circuit_similarity_offdiag_min']:.2f}, the two halves "
-                     "of the session. (d) Per neuron, the range over blocks of its mean input factor: median "
-                     f"{A_['neuron_input_range']['median']:.2f}, above 0.5 for "
-                     f"{100 * A_['neuron_input_range']['frac_gt_0.5']:.0f} \\% of neurons.\\par}}")
-        deck.append((f"24_angle_{run_}", S.frame_narrow(
-            f"{num_}: the angle and the phases", f"figs/angle_{run_}.png", right_a, "tools/exp17_angle.py " + run_,
-            left=0.68, deck_title=f"batch {num_} $\\cdot$ the angle and the phases")))
+        am_, bl_ = A_["alpha_block_mean_deg"], A_["blocks"]
+        foot_ = (f"Free rollout of the 2 h: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r {pn_:.3f}; long "
+                 f"skill {T_['skill_long']:.3f}. Top, $\\alpha(t)$ and each block's mean $\\pm$ spread: "
+                 f"{min(am_[:4]):+.0f} to {max(am_[:4]):+.0f} deg in the first four blocks ({bl_[0]} to {bl_[3]}), "
+                 f"{min(am_[4:]):+.0f} to {max(am_[4:]):+.0f} deg in the last five: an early / late split more than one "
+                 f"angle per stimulus. The phases moved a median {q_['short'][1]:.0f} / {q_['mid'][1]:.0f} / "
+                 f"{q_['long'][1]:.0f} deg (short / mid / long) from their random start.")
+        lawL_, lawR_ = law_block_(spec_, f"known ODE, the angle ({num_})", eq_, small_, rows_, foot_, split=True)
+        body_a = ("\\centering\\includegraphics[width=0.92\\textwidth,height=0.20\\textheight,keepaspectratio]"
+                  f"{{figs/angle_{run_}.png}}\\par\\vspace{{4pt}}\n"
+                  "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\\centering" + lawL_
+                  + "\\end{column}\n\\begin{column}{0.49\\textwidth}\\centering" + lawR_
+                  + "\\end{column}\n\\end{columns}")
+        deck.append((f"24_angle_{run_}", S.frame_wide(f"{num_}: the angle", body_a, "tools/exp17_angle.py " + run_,
+                                                      deck_title=f"batch {num_} $\\cdot$ the law and its angle")))
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     # THE EYE CIRCUIT ON ZAPBENCH'S 2-H SESSION (Cedric, 2026-10-08: "replace slide 48 with the new 2H data", "rotation
