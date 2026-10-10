@@ -128,10 +128,10 @@ def main(run):
     bx.set_title("b  per region", fontsize=10, loc="left")
     fig.savefig(os.path.join(EXP, "presentation", "figs", f"vrest_blocks_{run}.png"), dpi=130, facecolor="black")
     plt.close(fig)
-    movie(run, A, dV, reads, bn)
+    movie(run, A, dV, reads, bn, strip=(t, X.mean(1), steps(doc["global"]["Veff_mean"]), np.asarray(off) * DT / 60))
 
 
-def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
+def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25, strip=None, dot=4.0):
     """THE OFFSETS, BLOCK BY BLOCK (Cedric, 2026-10-08: "a movie of the fish, from above and from the side, instead of the
     one block; no white dots"): one still per block held hold_s, every neuron coloured by its offset dV in that block on a
     blue-black-red scale and its opacity |dV| (a near-zero offset invisible), the atlas frame. -> Movies/vrest_blocks_<run>.mp4
@@ -139,7 +139,12 @@ def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
     AGAINST THE FIRST BLOCK (Cedric, 2026-10-08: "the blue does not change, subtract the first block's offset"): the rest is
     V_i + dV_ik, so the part of dV_ik shared by all 9 blocks is V_i's own and only the CHANGE between blocks is the
     per-block rest; drawn raw, that shared part held the same blue in every frame. Each block is drawn as dV_ik - dV_i1,
-    the first block (gain) the reference, all 0; the poster is the second block."""
+    the first block (gain) the reference, all 0; the poster is the second block.
+
+    WHICH BLOCK (Cedric, 2026-10-09: "bigger dots; show which block it is on"): `dot` the marker area, pt^2 (0.6 before,
+    the neurons invisible at the slide's size); `strip` = (t min, recorded brain mean, learned baseline's brain mean per
+    frame, block edges min): panel a of the figure as a strip under the side view, the block shown under a
+    semi-transparent bar, every block named above it."""
     import shutil
     import subprocess
     import tempfile
@@ -160,23 +165,37 @@ def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25):
     (x0, x1), (y0, y1), (z0, z1) = ext(xd), ext(yd), ext(A[:, 2])
     W_ = 6.0
     ht, hs = W_ * (y1 - y0) / (x1 - x0), W_ * (z1 - z0 + 40) / (x1 - x0)
+    S_ = 1.65 if strip is not None else 0.0                                  # inches added under the side view
     tmp = tempfile.mkdtemp(prefix="vrest_")
     plt.style.use("dark_background")
     for k, b in enumerate(bn):
-        fig = plt.figure(figsize=(W_ + 0.4, ht + hs + 1.3), facecolor="black")
-        H = ht + hs + 1.3
+        H = ht + hs + 1.3 + S_
+        fig = plt.figure(figsize=(W_ + 0.4, H), facecolor="black")
         v = dV[ii, k]
         o = np.argsort(np.abs(v))
         rgba = bkr(nrm(v[o]))
         rgba[:, 3] = np.clip(np.abs(v[o]) / vm, 0.0, 1.0)                       # a near-zero offset invisible
-        for (yb, h, Y, lo, hi) in (((hs + 0.55) / H, ht / H, yd, y0, y1), (0.35 / H, hs / H, A[:, 2], z0 - 40, z1)):
+        for (yb, h, Y, lo, hi) in (((hs + 0.55 + S_) / H, ht / H, yd, y0, y1), ((0.35 + S_) / H, hs / H, A[:, 2], z0 - 40, z1)):
             ax = fig.add_axes([0.2 / (W_ + 0.4), yb, W_ / (W_ + 0.4), h])
-            ax.scatter(xd[ii][o], Y[ii][o], c=rgba, s=0.6, lw=0, rasterized=True)
+            ax.scatter(xd[ii][o], Y[ii][o], c=rgba, s=dot, lw=0, rasterized=True)
             ax.set_xlim(x0, x1)
             ax.set_ylim(lo, hi)
             ax.axis("off")
         fig.text(0.04, 1 - 0.35 / H, (f"{b}: the reference, 0" if k == 0 else f"{b}: each neuron's offset minus its {bn[0]} one"),
                  fontsize=14, va="top", weight="bold")
+        if strip is not None:
+            ts_, rec_, base_, edg_ = strip
+            sx = fig.add_axes([0.2 / (W_ + 0.4), 0.55 / H, W_ / (W_ + 0.4), 0.95 / H])
+            sx.plot(ts_, rec_, color="#4dd94d", lw=0.5, alpha=0.8)
+            sx.plot(ts_, base_, color="#ff9e1a", lw=1.6)
+            for j_ in range(len(bn)):
+                sx.axvline(edg_[j_], color="0.3", lw=0.5)
+                sx.text((edg_[j_] + edg_[j_ + 1]) / 2, 1.03, bn[j_].replace("open loop", "open"), transform=sx.get_xaxis_transform(),
+                        fontsize=8.5, ha="center", va="bottom", color="white" if j_ == k else "0.5",
+                        weight="bold" if j_ == k else "normal")
+            sx.axvspan(edg_[k], edg_[k + 1], color="white", alpha=0.28, lw=0)
+            sx.set_xlim(edg_[0], edg_[-1])
+            sx.axis("off")
         fig.text(0.04, 0.02, f"red: baseline raised against the {bn[0]} block, blue: lowered, clear: unchanged", fontsize=10,
                  va="bottom", color="0.8")
         fig.savefig(os.path.join(tmp, f"{k:03d}.png"), dpi=110, facecolor="black")
