@@ -11,8 +11,8 @@ THE DOMAIN (Cedric, 2026-10-09: "too many flows that come from outside the zebra
 neurons at the bottom"): only the neurons registered INSIDE the Z-Brain brain (data/atlas_destripe.npz `inside`,
 95,248 of 100,759) place edges, corners, the grey and the mask; the 5,511 others sit around the brain after
 registration (top view y 39 .. 492 um against 97 .. 428 for the inside ones, side view z down to 55 um against 77) and
-widened the old mask (occupancy blurred over 25 um, > 0.2). The mask now: occupancy blurred over MASK_UM = 8 um,
-> 0.3, holes filled; particles die when they leave it. The two resolutions are its two
+widened the old mask (occupancy blurred over 25 um, > 0.2). The mask now: the neuron count per grid cell blurred over
+MASK_UM = 8 um, >= MASK_MIN = 2, holes filled, the largest connected piece; particles die when they leave it. The two resolutions are its two
 smoothings: COARSE 25 um (the first deck's slide 21) and MIDDLE 10 um (its slide 23).
 Here, the PRUNED law (tools/exp17_prune.py, data/prune_<run>.json): only the kept edges carry messages, and the
 activity is the pruned law's own free rollout (data/prune/<run>/results/<run>_joint_movie.npz, 800 frames over the 2 h);
@@ -38,6 +38,9 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 MASK_UM = 8.0            # the brain mask's smoothing, um (the old 25 um mask reached ~40 um past the outermost neurons)
+MASK_MIN = 2.0           # ... and its density: >= 2 neurons per grid cell after that smoothing (Cedric, 2026-10-09: "there
+                         # are still flows coming from outside neurons in the top view" -- the sparse anterior fringe,
+                         # ~1 neuron per 6-um cell, held the 1-neuron mask open); then the largest connected piece
 
 
 def atlas_frame(A):
@@ -159,8 +162,13 @@ def fields(run, view, sigma, pieces, cells=160, device="cuda:0"):
         wind["ex"][f], wind["in"][f] = Sm[:2], Sm[2:]
         A_ = torch.zeros(ny * nx, device=device).index_add_(0, cell_of(Pt), torch.as_tensor(pred[f][sel], device=device)) / cnt
         act[f] = blur(A_.reshape(1, ny, nx), W.SIGMA_UM)[0].cpu().numpy()
-    from scipy.ndimage import binary_fill_holes
-    ins = binary_fill_holes((blur((inside > 0).float().reshape(1, ny, nx), MASK_UM)[0] > 0.3).cpu().numpy())
+    from scipy.ndimage import binary_fill_holes, label
+    ins = binary_fill_holes((blur(inside.reshape(1, ny, nx), MASK_UM)[0] >= MASK_MIN).cpu().numpy())
+    lab_, n_ = label(ins)
+    if n_ > 1:                                                          # the brain: the largest connected piece
+        sz_ = np.bincount(lab_.ravel())
+        sz_[0] = 0
+        ins = lab_ == sz_.argmax()
     sp = {k: np.linalg.norm(v, axis=1) for k, v in wind.items()}
     print(f"[flow] {run} {view}: {len(snd):,} edges, grid {nx} x {ny} ({h:.1f} um cells), sigma {sigma} um; 99th pct "
           f"speed ex {np.percentile(sp['ex'][:, ins], 99):.3g}, in {np.percentile(sp['in'][:, ins], 99):.3g}", flush=True)
