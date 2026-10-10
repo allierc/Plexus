@@ -31,6 +31,21 @@ channel averaged over 4 x 4 pixels, 360 -> 90. 8 sub-bins per frame because the 
 
     PYTHONPATH=src:tools python tools/exp17_video_input.py align      # -> data/video_alignment.json, data/video_frame_start_s.npy
     PYTHONPATH=src:tools python tools/exp17_video_input.py movie      # -> presentation/Movies/video_input.mp4 (+ .png)
+    PYTHONPATH=src:tools python tools/exp17_video_input.py export     # -> graphs_data/zebrafish/zapbench_destripe_video_recording.npz
+    PYTHONPATH=src:tools python tools/exp17_video_input.py masks      # -> input_mask_destripe_markers.npz, _nomarkers.npz
+
+THE RECORDING OF BATCH 26 (`export`): zapbench_destripe_recording.npz with its `stimulus` [7,879, 22] extended to
+[7,879, 22 + SUB x 90 x 90 = 64,822]: the 22 release features, then frame k's model input (`subbins`, sub-bin major,
+row-major pixels), the mean red / 255 in [0, 1]. Every other array is copied unchanged. The trainer's drive writes all
+64,822 values into the `stimulus` set each frame (one element per value, window [0, 0]), as it writes the 22 features
+today: the video enters through the drive, and `drive: off` (the no-stimulus rollout) blanks it with the features.
+Built frame by frame from the decoded video (each video frame's 4 x 4 pixel means added to the sub-bin its time falls
+in, then divided by the count; the same numbers as `subbins`); frames 7,877-7,878 run past the video's end: their
+empty sub-bins stay 0 (dark).
+
+THE MASKS of the 22 feature columns (`masks`), for the batch-26 laws whose varying features the video replaces:
+input_mask_destripe_markers.npz (mask_by_input [N, 22]: the 9 marker columns on every neuron, the 13 varying ones on
+none: 22.3's per-block offset kept) and input_mask_destripe_nomarkers.npz (all 0: 24.10's law, rest_block the offset).
 """
 from __future__ import annotations
 
@@ -231,5 +246,65 @@ def movie(sec=6.0):
     print("[video] ->", stem + ".mp4", f"({n_out} frames, {n_out / FPS:.0f} s)")
 
 
+def export():
+    import cv2
+    from plexus.paths import graphs_data_path
+    edges = np.load(os.path.join(EXP, "data", "video_frame_start_s.npy"))
+    J = json.load(open(os.path.join(EXP, "data", "video_alignment.json")))
+    if not J["checks_pass"]:
+        raise SystemExit("[video] the alignment failed its checks; run `align` first")
+    T = len(edges) - 1
+    P_ = 360 // DOWN
+    acc = np.zeros((T, SUB, P_, P_), np.float32)
+    cnt = np.zeros((T, SUB), np.int32)
+    c = cv2.VideoCapture(VIDEO)
+    i = 0
+    while True:
+        ok, f = c.read()
+        if not ok:
+            break
+        t = i / FPS
+        k = int(np.searchsorted(edges, t, side="right") - 1)
+        if 0 <= k < T:
+            j = min(int(SUB * (t - edges[k]) / (edges[k + 1] - edges[k])), SUB - 1)
+            acc[k, j] += f[:, :, 2].astype(np.float32).reshape(P_, DOWN, P_, DOWN).mean((1, 3))
+            cnt[k, j] += 1
+        i += 1
+    acc /= np.maximum(cnt, 1)[:, :, None, None]
+    acc /= 255.0
+    empty = int((cnt == 0).sum())
+    src = graphs_data_path("zebrafish", "zapbench_destripe_recording.npz")
+    z = np.load(src)
+    out = {k: z[k] for k in z.files}
+    S0 = np.asarray(out["stimulus"], np.float32)
+    out["stimulus"] = np.concatenate([S0, acc.reshape(T, -1)], 1).astype(np.float32)
+    out["video_layout"] = np.array([S0.shape[1], SUB, P_, P_])        # features, then sub-bins x rows x columns
+    dst = graphs_data_path("zebrafish", "zapbench_destripe_video_recording.npz")
+    np.savez(dst, **out)
+    prov = json.load(open(graphs_data_path("zebrafish", "zapbench_destripe_recording.json")))
+    prov.update({"base_recording": src, "script": "tools/exp17_video_input.py export", "video": VIDEO,
+                 "stimulus": f"[{T}, {out['stimulus'].shape[1]}]: the {S0.shape[1]} release features, then {SUB} sub-bins x "
+                             f"{P_} x {P_} px of the video (mean red / 255), sub-bin major, row-major",
+                 "video_frames_used": int(cnt.sum()), "video_frames_per_subbin": [int(cnt[cnt > 0].min()), int(cnt.max())],
+                 "empty_subbins": empty, "alignment": J})
+    json.dump(prov, open(dst.replace(".npz", ".json"), "w"), indent=1)
+    print(f"[video] -> {dst}: stimulus {out['stimulus'].shape}, {int(cnt.sum()):,} video frames used, "
+          f"{cnt[cnt > 0].min()}-{cnt.max()} per sub-bin, {empty} empty sub-bins (past the video's end)")
+
+
+def masks():
+    from plexus.paths import graphs_data_path
+    mk = np.load(graphs_data_path("zebrafish", "input_mask_destripe_bal20_markall.npz"))["mask_by_input"]
+    marker = mk.min(0) > 0
+    m = np.zeros_like(mk)
+    m[:, marker] = 1.0
+    np.savez(graphs_data_path("zebrafish", "input_mask_destripe_markers.npz"), mask=np.ones(len(m), np.float32),
+             mask_by_input=m)
+    np.savez(graphs_data_path("zebrafish", "input_mask_destripe_nomarkers.npz"), mask=np.zeros(len(m), np.float32),
+             mask_by_input=np.zeros_like(mk))
+    print(f"[video] markers {[int(j) for j in np.where(marker)[0]]} -> input_mask_destripe_markers.npz (every neuron); "
+          f"input_mask_destripe_nomarkers.npz (all 0)")
+
+
 if __name__ == "__main__":
-    {"align": align, "movie": movie}[sys.argv[1] if len(sys.argv) > 1 else "align"]()
+    {"align": align, "movie": movie, "export": export, "masks": masks}[sys.argv[1] if len(sys.argv) > 1 else "align"]()
