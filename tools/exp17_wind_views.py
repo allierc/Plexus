@@ -37,6 +37,8 @@ def recorded_act(D):
     A = csr_matrix((np.ones(len(cid)), (cid, np.arange(len(cid)))), shape=(ny * nx, len(cid)))
     cnt = np.maximum(np.asarray(A.sum(1)).ravel(), 1)
     X = D["rec"]["dff"][D["fr"]].astype(np.float64)
+    if "sel" in D:                                      # the neurons D["P"] holds (exp17_flow_pruned: inside the brain)
+        X = X[:, D["sel"]]
     a = (A @ X.T).T / cnt
     return np.stack([gaussian_filter(r.reshape(ny, nx), W.SIGMA_UM / h) for r in a]).astype(np.float32)
 
@@ -82,13 +84,25 @@ def render(run, V, bg, n_part, combined, suffix=""):
     # combined (Cedric, 2026-10-04: "a 2 x 2 template, not 3 x 1"): above | oblique over side | the brain-mean dF/F
     rows = (("top", (4.35, 4.55)), ("side", (1.75, 2.25))) if not combined else \
         (("top", (4.75, 4.15)), ("oblique", (4.75, 4.15)), ("side", (0.55, 3.75)))
-    Hf = 9.2
-    fig = plt.figure(figsize=(16, Hf), facecolor="black")
+    Hf, Wf = 9.2, 16.0
+    # ONE COLUMN (Cedric, 2026-10-09: "remove the oblique view, keep top and side below one another, same size, same
+    # position as in other slides"): combined without an oblique view -> from above over from the side, 6.0-in wide
+    # views at one scale (exp17_vrest_blocks.movie's geometry), the brain-mean strip under them
+    column = combined and "oblique" not in V
+    if column:
+        W_ = 6.0
+        nx_ = V["top"]["inside"].shape[1]
+        ht, hs = W_ * V["top"]["inside"].shape[0] / nx_, W_ * V["side"]["inside"].shape[0] / nx_
+        y_side = 0.35 + 0.95 + 0.65                                    # room for the strip label over the block names
+        rows = (("top", (y_side + hs + 0.35, ht)), ("side", (y_side, hs)))
+        Hf, Wf = y_side + hs + 0.35 + ht + 0.45, W_ + 0.4
+    fig = plt.figure(figsize=(Wf, Hf), facecolor="black")
     ims = {}
     for v, (y0_, h_) in rows:
         ny, nx = V[v]["inside"].shape
         S = maps[v]["ex"].S
-        panels = ((("both", {"top": 0.005, "oblique": 0.505, "side": 0.005}[v], 0.49),) if combined
+        panels = ((("both", 0.2 / Wf, W_ / Wf),) if column else
+                  (("both", {"top": 0.005, "oblique": 0.505, "side": 0.005}[v], 0.49),) if combined
                   else (("ex", 0.005, 0.49), ("in", 0.505, 0.49)))
         for k, x_, w_ in panels:
             ax = fig.add_axes([x_, y0_ / Hf, w_, h_ / Hf])
@@ -98,7 +112,8 @@ def render(run, V, bg, n_part, combined, suffix=""):
             vn = {"top": "from above", "side": "from the side", "oblique": "oblique, from 45 deg above"}[v]
             fig.text(x_ + 0.005, (y0_ + h_ + 0.05) / Hf, f"{vn}: {lab}",
                      color="white", fontsize=11, va="bottom")
-    m_ = fig.add_axes([0.05, 0.28 / Hf, 0.90, 0.95 / Hf] if not combined else [0.54, 1.3 / Hf, 0.43, 2.4 / Hf])
+    m_ = fig.add_axes([0.2 / Wf, 0.35 / Hf, W_ / Wf, 0.95 / Hf] if column else
+                      [0.05, 0.28 / Hf, 0.90, 0.95 / Hf] if not combined else [0.54, 1.3 / Hf, 0.43, 2.4 / Hf])
     m_.set_facecolor("black")
     for k_, sp in m_.spines.items():
         sp.set_visible(k_ in ("left", "bottom"))
@@ -112,11 +127,13 @@ def render(run, V, bg, n_part, combined, suffix=""):
     m_.set_xlim(tm[0], tm[-1])
     m_.set_yticks([])
     m_.tick_params(colors="0.6", labelsize=7)
-    fig.text(*((0.05, 1.42 / Hf) if not combined else (0.54, 3.85 / Hf)), "brain-mean dF/F: recorded (green), learned "
-             "(white); time, min", color="0.75", fontsize=9 if not combined else 11)
+    fig.text(*((0.2 / Wf, 1.62 / Hf) if column else (0.05, 1.42 / Hf) if not combined else (0.54, 3.85 / Hf)),
+             "brain-mean dF/F: recorded (green), learned (white); time, min", color="0.75",
+             fontsize=9 if not combined or column else 11)
     cur = m_.axvline(tm[0], color="#ff7f0e", lw=0.9)
     # the clock: in combined mode beside the brain-mean label (2026-10-08: at the top it overprinted the oblique view's title)
-    t_txt = (fig.text(0.70, (Hf - 0.05) / Hf, "", color="0.75", fontsize=10, va="top") if not combined else
+    t_txt = (fig.text(0.97, (Hf - 0.08) / Hf, "", color="0.9", fontsize=11, va="top", ha="right") if column else
+             fig.text(0.70, (Hf - 0.05) / Hf, "", color="0.75", fontsize=10, va="top") if not combined else
              fig.text(0.97, 3.85 / Hf, "", color="0.9", fontsize=12, ha="right"))
     tmp = tempfile.mkdtemp(prefix="wind_views_")
     for f in range(F):
@@ -143,7 +160,7 @@ def render(run, V, bg, n_part, combined, suffix=""):
                     ims[(v, k)].set_data(np.clip(g + maps[v][k].canvas, 0, 1))
         t_txt.set_text(f"{names[int(cond[f])]}   t = {tm[f]:5.1f} min")
         cur.set_xdata([tm[f]] * 2)
-        fig.savefig(os.path.join(tmp, f"{f:05d}.png"), dpi=100, facecolor="black")
+        fig.savefig(os.path.join(tmp, f"{f:05d}.png"), dpi=160 if column else 100, facecolor="black")
     plt.close(fig)
     path = os.path.join(EXP, "presentation", "Movies", f"flow_views_{run}{'_combined' if combined else ''}{suffix}.mp4")
     subprocess.run([TR._ffmpeg(), "-y", "-loglevel", "error", "-framerate", "25", "-i", os.path.join(tmp, "%05d.png"),
