@@ -152,7 +152,7 @@ def render(name):
                 sc = ax.scatter(X_[o_], Y_[o_], c=vv[o_], s=0.4, cmap=cm, norm=nrm, linewidths=0)
             ax.set_xlim(lo3[0], hi3[0])
             ax.set_ylim(*ye)
-        fig.text(x0 / FW, (ytop - 0.04) / FH, lab, color="white", fontsize=13, va="top")
+        fig.text(x0 / FW, (ytop - 0.04) / FH, lab, color="white", fontsize=16, va="top")   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         cax = fig.add_axes([(x0 + CW + 0.08) / FW, (ytop - LB - th) / FH, 0.10 / FW, th / FH])
         cb = fig.colorbar(sc, cax=cax)
         cb.ax.tick_params(colors="0.8", labelsize=9)

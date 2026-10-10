@@ -140,7 +140,7 @@ def main(run, what="tau"):
         ycur -= TT / FH + hv
         a = fig.add_axes([0.01, ycur, wf, hv])
         a.axis("off")
-        a.set_title(ttl + f": each neuron's own {QL}", fontsize=10, loc="left", x=0.0, pad=2)
+        a.set_title(ttl + f": each neuron's own {QL}", fontsize=14, loc="left", x=0.0, pad=2)   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         Y = yd if view == "top" else A[:, 2]
         sc = a.scatter(xd[o], Y[o], c=tau[o], s=0.35, cmap=CM, norm=norm, lw=0, rasterized=True)
         a.set_xlim(lo_(xd), hi_(xd))

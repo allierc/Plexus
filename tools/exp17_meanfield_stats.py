@@ -259,7 +259,7 @@ def draw(doc, exp_dir=EXP):
         ax.set_xticks(x)
         ax.set_xticklabels([n.replace(", ", ",\n").replace(" graph", "\ngraph").replace(" mean", "\nmean")
                             .replace(" no W", "\nno W") for n in names], fontsize=9)
-        ax.set_title(ttl, loc="left", fontsize=12)
+        ax.set_title(ttl, loc="left", fontsize=13)   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         for s_ in ("top", "right"):
             ax.spines[s_].set_visible(False)
     fig.tight_layout()

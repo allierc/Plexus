@@ -113,7 +113,7 @@ def main(run):
     a.tick_params(labelsize=8)
     a.set_xticklabels([])
     a.legend(fontsize=8, frameon=False, loc="upper right")
-    a.set_title("a  the whole brain", fontsize=10, loc="left", pad=16)
+    a.set_title("a  the whole brain", fontsize=15, loc="left", pad=16)   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
     # b: each region's mean V_rest per block, all regions on one plot, in the atlas slide's colours
     bx = fig.add_axes([0.08, 0.08, 0.68, 0.46])
     jc = os.path.join(EXP, "data", "atlas_subregions.json")
@@ -125,7 +125,7 @@ def main(run):
     bx.set_ylabel("learned baseline, region mean, dF/F", fontsize=9)
     bx.tick_params(labelsize=8)
     bx.legend(fontsize=6.8, frameon=False, loc="upper left", bbox_to_anchor=(1.005, 1.0), ncol=1, handlelength=1.2)
-    bx.set_title("b  per region", fontsize=10, loc="left")
+    bx.set_title("b  per region", fontsize=15, loc="left")
     fig.savefig(os.path.join(EXP, "presentation", "figs", f"vrest_blocks_{run}.png"), dpi=130, facecolor="black")
     plt.close(fig)
     movie(run, A, dV, reads, bn, strip=(t, X.mean(1), steps(doc["global"]["Veff_mean"]), np.asarray(off) * DT / 60))
@@ -182,7 +182,7 @@ def movie(run, A, dV, reads, bn, hold_s=1.2, fps=25, strip=None, dot=4.0):
             ax.set_ylim(lo, hi)
             ax.axis("off")
         fig.text(0.04, 1 - 0.35 / H, (f"{b}: the reference, 0" if k == 0 else f"{b}: each neuron's offset minus its {bn[0]} one"),
-                 fontsize=14, va="top", weight="bold")
+                 fontsize=17, va="top", weight="bold")   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         if strip is not None:
             ts_, rec_, base_, edg_ = strip
             sx = fig.add_axes([0.2 / (W_ + 0.4), 0.55 / H, W_ / (W_ + 0.4), 0.95 / H])
