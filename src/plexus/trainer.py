@@ -51,6 +51,8 @@ Output, one folder per run under the model's own folder, mirroring `config/train
         results/report.json          what training did
         results/<name>_test.json     the held-out rollout
         results/<name>_test.png      the analysis figure
+        results/<name>_graph.json    the graph phase (`-o graph`, a trace run): what the learned graph does
+        results/graph/               its rollouts (cached), the card, the pulse movie
 """
 from __future__ import annotations
 
