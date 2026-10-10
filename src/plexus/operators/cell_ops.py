@@ -2871,6 +2871,108 @@ class StateDiffuseNeuronGraphPhase(StateDiffuseNeuronGraph):
         return sd * (z - z0)
 
 
+class _VideoInput:
+    """THE STIMULUS VIDEO AS INPUT (exp17 batch 26, Cedric 2026-10-09: "next batch 26 with a video input"; "we should
+    have e_{n,i}, output i of CNN(V_n)"). A mixin over a neuron-graph law: the forcing block holds the `forcing_dim`
+    release features, then the frame's video clip V_n (`video_sub` sub-bins x `video_px` x `video_px`, values in
+    [0, 1]; tools/exp17_video_input.py export), and the law's input term becomes
+
+        B_i . (M_i (.) u_n)  +  e_{n,i},        e_{n,i} = [CNN_theta(V_n)]_i = m_i (b_i . h_theta(V_n))
+
+    h_theta: 3 convolutions (5x5 / 3x3 / 3x3, stride 2, channels video_sub -> 16 -> 32 -> 32, ReLU), each half of
+    the image averaged (a 2 x 2 average pool: left / right and front / back kept apart), a linear map to `video_k`
+    features; NO BIAS anywhere, so a blank clip (the dark block, or the no-stimulus rollout, whose drive is all 0)
+    gives h = 0 and e = 0. b_i: neuron i's output weights (`video_out` [N, video_k], starting at 0: the untrained law is
+    the law without the video); m_i: the video mask (`video_mask`, an npz under graphs_data, array `mask` [N]), 0
+    outside it. h is computed once per tick (the drive window is [0, 0]: one clip per frame). Learnables:
+    `video_theta` (the convolutions and the linear map, flat) and `video_out`."""
+    VIDEO_ROLES = {"video_sub": "sub-bins per frame (8)", "video_px": "the clip's side, px (90)",
+                   "video_k": "the encoder's features (16)", "video_mask": "npz (graphs_data) whose `mask` [N] keeps the "
+                   "neurons the video enters", "video_theta": "the encoder's weights, flat", "video_out": "per-neuron "
+                   "output weights [N, video_k]"}
+
+    def _video_init(self, params, device):
+        import numpy as np
+        from plexus.paths import graphs_data_path
+        self.video_sub, self.video_px = int(params.get("video_sub", 8)), int(params.get("video_px", 90))
+        self.video_k = int(params.get("video_k", 16))
+        if not self.forcing:
+            raise ValueError("state_diffuse[*_video]: needs `forcing:` (the stimulus set holding features + clip)")
+        ch = [self.video_sub, 16, 32, 32]
+        ks = [5, 3, 3]
+        self._v_shapes = [(ch[i + 1], ch[i], ks[i], ks[i]) for i in range(3)] + [(self.video_k, ch[3] * 4)]
+        g = torch.Generator().manual_seed(self.seed + 7919)
+        parts = []
+        for sh in self._v_shapes:
+            fan_in = int(np.prod(sh[1:]))
+            parts.append(torch.randn(sh, generator=g) * math.sqrt(2.0 / fan_in))      # He et al.: ReLU layers
+        self.video_theta = torch.cat([q.reshape(-1) for q in parts]).to(device)
+        self.video_out = torch.zeros(self.n_elements, self.video_k, device=device)
+        f = str(params.get("video_mask") or "")
+        if not f:
+            raise ValueError("state_diffuse[*_video]: needs `video_mask:` (which neurons the video enters)")
+        f = f if os.path.isabs(f) else graphs_data_path(*f.split("/"))
+        m_ = np.asarray(np.load(f)["mask"], np.float32).reshape(-1)
+        if len(m_) != self.n_elements:
+            raise ValueError(f"state_diffuse[*_video]: `video_mask` has {len(m_)} values, {self.n_elements} elements")
+        self.video_mask = torch.as_tensor(m_, device=device)[:, None]
+
+    def video_features(self, v):
+        """h_theta(V): [video_k] from a clip [video_sub * video_px^2]."""
+        import torch.nn.functional as Fnn
+        x = v.reshape(1, self.video_sub, self.video_px, self.video_px)
+        o = 0
+        ws = []
+        for sh in self._v_shapes:
+            n = math.prod(sh)
+            ws.append(self.video_theta[o:o + n].reshape(sh))
+            o += n
+        for w in ws[:3]:
+            x = torch.relu(Fnn.conv2d(x, w, stride=2))
+        x = Fnn.adaptive_avg_pool2d(x, 2).reshape(-1)
+        return ws[3] @ x
+
+    def _input_drive(self, nb, u):
+        uf = u.reshape(-1)
+        nv = self.video_sub * self.video_px * self.video_px
+        if uf.numel() != self.forcing_dim + nv:
+            raise ValueError(f"state_diffuse[*_video]: the forcing has {uf.numel()} values, the law expects "
+                             f"{self.forcing_dim} features + {nv} video values")
+        d = super()._input_drive(nb, uf[:self.forcing_dim])
+        h = self.video_features(uf[self.forcing_dim:].to(self.video_theta.dtype))
+        return d + self.video_mask.to(d.device) * (self.video_out @ h)[:, None]
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_video",
+                   title="The known ODE on the neuron graph with the stimulus video as input through a convolutional "
+                         "encoder",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j}
+W^{s}_{ji}\tanh z_j+B_i\cdot u+e_{n,i}\big)/\tau_i,\quad e_{n,i}=[\mathrm{CNN}_\theta(\mathcal V_n)]_i$$""")
+class StateDiffuseNeuronGraphVideo(_VideoInput, StateDiffuseNeuronGraph):
+    """22.3's law (`neuron_graph`) with the video input of `_VideoInput` (exp17 batch 26)."""
+    MECHANISM_TAGS = StateDiffuseNeuronGraph.MECHANISM_TAGS + ["video_encoder"]
+    PARAM_ROLES = {**StateDiffuseNeuronGraph.PARAM_ROLES, **_VideoInput.VIDEO_ROLES}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self._video_init(params, device)
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_phase_video",
+                   title="The known ODE on the neuron graph, messages turned by a broadcast angle, with the stimulus video "
+                         "as input through a convolutional encoder",
+                   equation=r"""$$z_i\leftarrow z_i+\tfrac{1}{M}\big(-z_i+V_i+\textstyle\sum_{s}\sum_{j}
+W^{s}_{ji}\tanh z_j\,\cos(\varphi_{ji}-\alpha(t))+B_i\cdot u+e_{n,i}\big)/\tau_i$$""")
+class StateDiffuseNeuronGraphPhaseVideo(_VideoInput, StateDiffuseNeuronGraphPhase):
+    """24.10's law (`neuron_graph_phase`) with the video input of `_VideoInput` (exp17 batch 26)."""
+    MECHANISM_TAGS = StateDiffuseNeuronGraphPhase.MECHANISM_TAGS + ["video_encoder"]
+    PARAM_ROLES = {**StateDiffuseNeuronGraphPhase.PARAM_ROLES, **_VideoInput.VIDEO_ROLES}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self._video_init(params, device)
+
+
 @register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_graph_mlp",
                    title="A set's scalar through a learned GNN (MLP message and update, per-element embedding) on the "
                          "multi-scale graph between the elements",
