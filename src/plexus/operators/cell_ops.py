@@ -2635,6 +2635,101 @@ class StateDiffuseNeuronGraph(StateDiffuseKnownODE):
         E, stats = _NG_GRAPH_CACHE[key]
         return {**{k: (s.to(self.device_), r.to(self.device_)) for k, (s, r) in E.items()}, "stats": stats}
 
+    # ------------------------------------------------------------------ THE GRAPH, READ (the graph phase, 2026-10-10)
+    # What an analysis needs of a trained law, declared by the law itself so the phase holds no if-chain over the
+    # variants (Cedric, 2026-10-10: "unify this analysis ... in a reusable way"): which learnables are its edges, what
+    # silences it, the weight each edge carries now, its coupling linearised, and the message along each edge.
+    def graph_roles(self) -> dict:
+        """Learnable -> role, what each learned tensor is to the graph: `edges:<set>` (one weight per directed edge of
+        that set: what pruning cuts and `silencers` zero), `silence` (0 silences every message), `gain`, `time` (a
+        function of the frame clock: the modulation's SIREN or tables), `phase:<set>`, `message` / `update` (an MLP),
+        `input` (the stimulus encoder)."""
+        roles = {f"W_{s}": f"edges:{s}" for s in self.EDGE_SETS if self._E[s][0].numel()}
+        if self.modulation == "siren":
+            roles["omega_mlp"] = "time"
+        elif self.modulation == "hash":
+            roles.update({"omega_table": "time", "omega_ttable": "time", "omega_mlp": "time"})
+        for k in ("video_theta", "video_out"):
+            if hasattr(self, k):
+                roles[k] = "input"
+        return roles
+
+    def silencers(self) -> list:
+        """The learnables that, all at 0, silence every message between the elements (the graph's W = 0)."""
+        return [k for k, r in self.graph_roles().items() if r.startswith("edges:") or r == "silence"]
+
+    def edge_table(self) -> dict:
+        """{set: (snd, rcv, w)}: each edge set's senders and receivers (long [E]) and the weight its messages carry at
+        the law's current frame (the phase law's cos factor applied); w[e] weights snd[e] -> rcv[e]. A law whose
+        coupling is not a set of edges between the elements (the grid, the mean field) returns {}."""
+        return {s: (self._E[s][0], self._E[s][1], getattr(self, f"W_{s}")) for s in self.EDGE_SETS if self._E[s][0].numel()}
+
+    def prune_sets(self) -> dict:
+        """{set: (learnable, strength [E], to_param)}: what pruning reads -- the learnable a set's weights live in, the
+        strength of each entry (what a threshold applies to: |W|; the grid's W_grid^2) and the map from a strength
+        threshold to the learnable's magnitude (`prune:` cuts |value| below it)."""
+        return {s: (f"W_{s}", getattr(self, f"W_{s}").detach().abs(), (lambda t: float(t)))
+                for s in self.EDGE_SETS if self._E[s][0].numel()}
+
+    def _dphi(self, z):
+        """phi'(z) for the law's activation: 1 - tanh^2 z, the step at 0 (relu), or 1 (linear)."""
+        if self.activation == "tanh":
+            return 1.0 - torch.tanh(z) ** 2
+        return (z > 0).to(z.dtype) if self.activation == "relu" else torch.ones_like(z)
+
+    def linearise(self, z_star, omega=None):
+        """THE COUPLING LINEARISED at the state z* ([N], the law's normalised units): M_ij = Omega_i W_ij phi'(z*_j),
+        a scipy.sparse CSR [N, N] (row = receiver), so the law's Jacobian per frame is diag(r)(M - I), r the rates
+        (`_rate`); `omega` [N] the modulation at the frame of interest (None: 1). The current synapse without
+        adaptation only (a conductance synapse or an adaptation state has another Jacobian: refused)."""
+        if self.synapse != "current" or self.adapt:
+            raise NotImplementedError("state_diffuse[neuron_graph].linearise: the current synapse without adaptation only")
+        import numpy as np
+        import scipy.sparse as sp
+        N = self.n_elements
+        d = self._dphi(torch.as_tensor(z_star).reshape(-1).to(torch.float64).cpu()).numpy()
+        rows, cols, vals = [], [], []
+        for s, (snd, rcv, w) in self.edge_table().items():
+            snd_, rcv_ = snd.cpu().numpy(), rcv.cpu().numpy()
+            rows.append(rcv_)
+            cols.append(snd_)
+            vals.append(w.detach().double().cpu().numpy() * d[snd_])
+        if not rows:
+            return sp.csr_matrix((N, N))
+        M = sp.csr_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=(N, N))
+        M.sum_duplicates()
+        M.eliminate_zeros()                                    # a zero weight is no coupling, not a stored 0
+        if omega is not None:
+            M = sp.diags(np.asarray(torch.as_tensor(omega).reshape(-1).double().cpu())) @ M
+        return M.tocsr()
+
+    def messages(self, z, omega=None) -> dict:
+        """{set: the message each edge carries at the state z ([N], normalised units): W_e phi(z_snd), times the
+        receiver's Omega when given} -- what the flow maps deposit along the edges."""
+        z = torch.as_tensor(z).reshape(-1)
+        act = self._act(z)
+        out = {}
+        for s, (snd, rcv, w) in self.edge_table().items():
+            m = w.detach().to(act.dtype) * act[snd.to(act.device)]
+            if omega is not None:
+                m = m * torch.as_tensor(omega).reshape(-1).to(m.dtype)[rcv.to(m.device)]
+            out[s] = m
+        return out
+
+    def omega_at(self, frames):
+        """[F, N] Omega_i at each of `frames` (None when the law has no modulation): the frame clock moved to each and
+        restored."""
+        if self.modulation == "none":
+            return None
+        f0 = getattr(self, "frame", 0)
+        out = []
+        with torch.no_grad():
+            for f in frames:
+                self.frame = int(f)
+                out.append(self._omega().reshape(-1))
+        self.frame = f0
+        return torch.stack(out)
+
     def step(self, x, xyz, a=None, u=None, nb=None):
         import torch.nn.functional as Fnn
         E = self._E                                   # built once, from `positions_file`
@@ -2835,6 +2930,31 @@ class StateDiffuseNeuronGraphPhase(StateDiffuseNeuronGraph):
                 self._jit = float(torch.randn(()) * self.alpha_jitter)
             a = a + self._jit
         return a
+
+    def graph_roles(self) -> dict:
+        roles = super().graph_roles()
+        if self.phi_per == "pair":
+            roles["phi"] = "phase:pair"
+        else:
+            roles.update({f"phi_{s}": f"phase:{s}" for s in self.EDGE_SETS if self._E[s][0].numel()})
+        roles["alpha_table" if self.alpha_kind == "block" else "alpha_mlp"] = "time"
+        return roles
+
+    def edge_table(self) -> dict:
+        """The weight each edge carries at the law's current frame: W times cos(phi - alpha(frame)) (the `nonneg`
+        form kept), the factor the step applies (the graph phase reads it with the frame clock set)."""
+        with torch.no_grad():
+            al = self.angle()
+
+            def fac(ph):
+                c = torch.cos(ph - al)
+                return 0.5 * (1.0 + c) if self.nonneg else c
+            out = {}
+            for s, (snd, rcv, w) in super().edge_table().items():
+                f = (fac(self.phi.to(w.device)).reshape(-1)[self._pair[s]] if self.phi_per == "pair"
+                     else fac(getattr(self, f"phi_{s}")))
+                out[s] = (snd, rcv, w * f)
+            return out
 
     def step(self, x, xyz, a=None, u=None, nb=None):
         if self.synapse == "conductance" or self.adapt:
@@ -3077,6 +3197,21 @@ class StateDiffuseNeuronGraphMLP(StateDiffuseNeuronGraph):
             x = torch.cat([x, self._ctx(x.shape[0], x.device)], 1)
         return self._mlp3("theta_g", x) ** 2
 
+    def graph_roles(self) -> dict:
+        roles = super().graph_roles()
+        roles["theta_g"] = "message"
+        if hasattr(self, "theta_f"):
+            roles["theta_f"] = "update"
+        return roles
+
+    def linearise(self, z_star, omega=None):
+        raise NotImplementedError("state_diffuse[neuron_graph_mlp].linearise: the message is an MLP (g_phi^2), the law "
+                                  "has no closed-form coupling matrix")
+
+    def messages(self, z, omega=None) -> dict:
+        raise NotImplementedError("state_diffuse[neuron_graph_mlp].messages: the message is an MLP of the sender (and "
+                                  "its embedding), not W phi(z)")
+
     def prior_term(self, param, kind):
         """The connectome law's priors on theta_g, the embeddings sampled from the last rollout's (ones before any)."""
         if param != "theta_g":
@@ -3263,6 +3398,33 @@ class StateDiffuseNeuronGraphMeanField(StateDiffuseNeuronGraph):
             z = z + fz * (-z + nb["rest"] + agg + drive)
         return sd * (z - z0)
 
+    def graph_roles(self) -> dict:
+        roles = {k: v for k, v in super().graph_roles().items() if not k.startswith("W_")}
+        roles["W_mean"] = "silence"
+        return roles
+
+    def edge_table(self) -> dict:
+        return {}
+
+    def prune_sets(self) -> dict:
+        return {}
+
+    def messages(self, z, omega=None) -> dict:
+        return {}
+
+    def linearise(self, z_star, omega=None):
+        """The rank-one coupling M_ij = Omega_i W_mean_i (1 - tanh^2 z*_j) / N, as a LinearOperator [N, N]."""
+        import numpy as np
+        from scipy.sparse.linalg import LinearOperator
+        N = self.n_elements
+        z = torch.as_tensor(z_star).reshape(-1).to(torch.float64).cpu()
+        d = (1.0 - torch.tanh(z) ** 2).numpy()
+        a = self.W_mean.detach().double().cpu().numpy()
+        if omega is not None:
+            a = a * np.asarray(torch.as_tensor(omega).reshape(-1).double().cpu())
+        return LinearOperator((N, N), matvec=lambda v: a * float(d @ np.asarray(v).reshape(-1)) / N,
+                              rmatvec=lambda v: d * float(a @ np.asarray(v).reshape(-1)) / N, dtype=np.float64)
+
 
 @register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_grid",
                    title="A set's scalar through a known ODE whose coupling runs through GraphCast's lattice grid",
@@ -3361,6 +3523,65 @@ class StateDiffuseNeuronGrid(StateDiffuseNeuronGraph):
             self._grid_dev[k] = {"g2m": (gs, gr), "mm": tuple(t.to(dev) for t in self._grid["mm"]),
                                  "m2g": tuple(t.to(dev) for t in self._grid["m2g"]), "cnt": cnt}
         return self._grid_dev[k]
+
+    def graph_roles(self) -> dict:
+        roles = {k: v for k, v in super().graph_roles().items() if not k.startswith("W_")}
+        roles.update({"A_send": "silence" if self.sign == "neuron" else "gain", "W_grid": "edges:grid", "G_recv": "gain"})
+        return roles
+
+    def silencers(self) -> list:
+        """A_send = 0 silences the grid under sign: neuron (every corner reads 0); under sign: grid A_send is not
+        learned (a = 1), so the grid's own weights are the silencer."""
+        return ["A_send"] if self.sign == "neuron" else ["W_grid"]
+
+    def edge_table(self) -> dict:
+        return {}                                              # the grid's edges join corners, not elements
+
+    def prune_sets(self) -> dict:
+        """The grid's edges (corner to corner, the self edges included): strength W_grid^2 under sign: neuron (the
+        coupling it applies), |W_grid| under sign: grid; a strength threshold t is |W_grid| < sqrt(t), or < t."""
+        w = self.W_grid.detach()
+        if self.sign == "neuron":
+            return {"grid": ("W_grid", w * w, (lambda t: float(t) ** 0.5))}
+        return {"grid": ("W_grid", w.abs(), (lambda t: float(t)))}
+
+    def messages(self, z, omega=None) -> dict:
+        return {}
+
+    def grid_factors(self, z_star, omega=None):
+        """The coupling's three sparse factors at z*: Enc [n_mesh, N] (c_k = (1/n_k) sum_{j -> k} a_j phi'(z*_j) z_j),
+        Hop [n_mesh, n_mesh] (h_l = sum_{k -> l} w_kl c_k, the self edges included), Dec [N, n_mesh] (m_i = Omega_i g_i
+        (1/8) sum_{l in cube(i)} h_l), so M = Dec . Hop . Enc."""
+        import numpy as np
+        import scipy.sparse as sp
+        N, nm = self.n_elements, self._grid["n_mesh"]
+        d = self._dphi(torch.as_tensor(z_star).reshape(-1).to(torch.float64).cpu()).numpy()
+        gs, gr = (t.cpu().numpy() for t in self._grid["g2m"])
+        ms, mr = (t.cpu().numpy() for t in self._grid["mm"])
+        cs, cr = (t.cpu().numpy() for t in self._grid["m2g"])
+        cnt = np.maximum(np.bincount(gr, minlength=nm), 1).astype(np.float64)
+        a = (self.A_send.detach().double().cpu().numpy() if self.sign == "neuron" else np.ones(N))
+        w = self.W_grid.detach().double().cpu().numpy()
+        w = w * w if self.sign == "neuron" else w
+        g = self.G_recv.detach().double().cpu().numpy() ** 2
+        if omega is not None:
+            g = g * np.asarray(torch.as_tensor(omega).reshape(-1).double().cpu())
+        Enc = sp.csr_matrix((a[gs] * d[gs] / cnt[gr], (gr, gs)), shape=(nm, N))
+        Hop = sp.csr_matrix((w, (mr, ms)), shape=(nm, nm))
+        Dec = sp.csr_matrix((g[cr] / 8.0, (cr, cs)), shape=(N, nm))
+        return Dec, Hop, Enc
+
+    def linearise(self, z_star, omega=None):
+        """Dec . Hop . Enc as a LinearOperator [N, N] (`grid_factors`): the product is dense enough to be kept
+        factored."""
+        import numpy as np
+        from scipy.sparse.linalg import LinearOperator
+        Dec, Hop, Enc = self.grid_factors(z_star, omega)
+        N = self.n_elements
+        op = LinearOperator((N, N), matvec=lambda v: Dec @ (Hop @ (Enc @ np.asarray(v).reshape(-1))),
+                            rmatvec=lambda v: Enc.T @ (Hop.T @ (Dec.T @ np.asarray(v).reshape(-1))), dtype=np.float64)
+        op.factors = (Dec, Hop, Enc)
+        return op
 
     def prior_term(self, param, kind):
         """DALE'S LAW ON THE GRID'S CORNERS (sign: grid; Cedric 2026-10-06: "should we put Dale's law on the grid

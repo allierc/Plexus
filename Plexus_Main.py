@@ -19,6 +19,16 @@ config/training/<model>/, and run in `plexus.trainer` -- the engine simulates, t
 trainer trains:
 
     python Plexus_Main.py -o train_test_analyse t1_integrator_perfect_zf285
+
+`graph` is the fourth phase of a TRACE run (a neuron-graph law fitted to a recording,
+exp17): is the learned graph doing something, what, and how -- the graph silenced, cut
+and compared with trained controls, its linearised dynamics, its response to a pulse;
+scores in results/<run>_graph.json, figures and movies under results/graph/. It runs
+after test and plot, locally (the cluster runs train_test_plot only):
+
+    python Plexus_Main.py -o graph zap_n22_markall --device cuda:0 \
+        --graph-controls no_w=zap_n22_markall_now,mean_field=zap_n22_markall_mf
+    python Plexus_Main.py -o test_plot_graph zap_n22_markall
 """
 from __future__ import annotations
 
@@ -58,8 +68,11 @@ def main():
                         help="root for graphs_data/ and log/ (default: $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT / shared GraphData)")
     parser.add_argument("--device", default="cuda:0", help="cuda:N (default) or cpu")
     parser.add_argument("--checkpoint", default=None,
-                        help="training spec, test/plot: score models/<name>.pt (e.g. stage_05, the end of the horizon-5 "
-                             "stage) instead of best.pt; its results are written as <run>_<name>_* beside the run's own")
+                        help="training spec, test/plot/graph: score models/<name>.pt (e.g. stage_05, the end of the "
+                             "horizon-5 stage) instead of best.pt; its results are written as <run>_<name>_* beside the run's own")
+    parser.add_argument("--graph-controls", default=None,
+                        help="training spec, graph: the trained controls to compare the graph with, "
+                             "no_w=<run>,mean_field=<run>,seed=<run>,random=<run> (the CLI twin of task.graph.controls)")
     parser.add_argument("--force", action="store_true",
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
@@ -125,14 +138,16 @@ def main():
     # TRAINING IS A SEPARATE MODULE WITH A SEPARATE SPEC. A training spec names a model, what is
     # learnable, the task and the scheme; `plexus.trainer` owns the parameters and calls the engine
     # once per rollout. Nothing below this block knows training exists.
-    phases = [p for p in ("train", "test", "analyse") if p in task]
+    phases = [p for p in ("train", "test", "analyse", "graph") if p in task]
     # `-o train_test_plot <training spec>` (the one cluster job of a training experiment, INSTRUCTION.md): for a
-    # TRAINING spec, `plot` is the trainer's plotting phase (figures and movie), which it calls `analyse`.
+    # TRAINING spec, `plot` is the trainer's plotting phase (figures and movie), which it calls `analyse`; `graph`
+    # (`-o test_plot_graph`, `-o graph`) is the trace run's graph phase, run last (exp17, 2026-10-10)
     if phases and "plot" in task and "analyse" not in phases:
-        phases.append("analyse")
+        phases.insert(phases.index("graph") if "graph" in phases else len(phases), "analyse")
     if phases:
         from plexus.trainer import run_phases
-        run_phases(config_name, phases, device=args.device, checkpoint=args.checkpoint)    # --output_root set the root
+        controls = (dict(kv.split("=", 1) for kv in args.graph_controls.split(",") if kv) if args.graph_controls else None)
+        run_phases(config_name, phases, device=args.device, checkpoint=args.checkpoint, controls=controls)   # --output_root set the root
         return
 
     # THE PIPELINE IS ONE FUNCTION AND THIS IS ITS COMMAND LINE. `plexus.pipeline.generate` is what
