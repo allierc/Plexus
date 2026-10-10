@@ -58,7 +58,8 @@ SEEDS_N19 = (("19.25, seed 0", "zap_n19_nom", ""), ("19.26, seed 1", "zap_n19_no
 # `--n22` (Cedric, 2026-10-09: "replace all slides with batch 19 with the new results from batch 22, markall"): 22.3
 # (markall, 19.27's twin without checkpointing) against batch 22's controls -- 22.17 the mean field and 22.16 no W, the
 # twins of 19.41 / 19.40, trained on the NOMINAL inputs, not markall's -- and the nominal's seed pair, 22.1 / 22.2
-LAWS_N22 = (("22.3 graph", "zap_n22_markall", ""), ("22.3, W = 0 at inference", "zap_n22_markall", "_W0"),
+# the W0 rollout zeroes W_short and W_mid only (config/training/zapbench/zap_n22_markall.yaml, rollouts: W0), so named
+LAWS_N22 = (("22.3 graph", "zap_n22_markall", ""), ("22.3, W short, mid = 0", "zap_n22_markall", "_W0"),
             ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
 SEEDS_N22 = (("22.1, seed 0", "zap_n22_nom", ""), ("22.2, seed 1", "zap_n22_nom_s1", ""))
 

@@ -627,6 +627,189 @@ def input_fish(path, size=(700, 1150)):
     pl.close()
 
 
+FRAME_S_ = 0.914                                 # ZAPBench's volume period, s (one frame)
+
+
+def lr_(v):
+    """A learning rate as the training spec has it: 0.0018 -> 1.8e-3, 0.0009 -> 9e-4 (not rounded to one digit)."""
+    m, e = f"{float(v):.1e}".split("e")
+    return f"{m.rstrip('0').rstrip('.')}e{int(e)}"
+
+
+def law_of(run):
+    """THE RUN'S LAW, READ FROM ITS SPECS (Cedric, 2026-10-09: "slide 50 text is wrong ... replace it by the right model
+    equation", every law slide checked against spec and code). From the model spec's state_diffuse op (its `model:` and
+    options), the training spec's `learnable:` and the run's best.pt (the counts), as cell_ops' forward computes it:
+    neuron_graph (current synapses, tanh), neuron_graph_phase (each message times cos(phi - alpha(t))), neuron_grid
+    (sign: neuron), neuron_graph_meanfield; an option outside these raises rather than being described wrongly.
+    -> {title, lines (the equation, one LaTeX line each), syms (one short line per symbol), rows (symbol, what, count,
+    learnable key), spec, op, w0 (the W = 0 rollout's label)}."""
+    import torch
+    import yaml as yaml_
+    from plexus import trainer as T
+    from plexus.paths import graphs_data_path
+    spec = T.load(run)
+    mdl = yaml_.safe_load(open(os.path.join(ROOT, spec["model"])))
+    ops = [o for o in mdl["operators"] if o.get("op") == "state_diffuse"]
+    if len(ops) != 1:
+        raise ValueError(f"law_of({run}): {len(ops)} state_diffuse operators")
+    op = ops[0]
+    model = str(op.get("model"))
+    if model not in ("neuron_graph", "neuron_graph_phase", "neuron_grid", "neuron_graph_meanfield"):
+        raise ValueError(f"law_of({run}): model {model} not described here")
+    for k_, ok_ in (("synapse", ("current",)), ("activation", ("tanh",)), ("integrator", ("exponential",)),
+                    ("modulation", ("none", "siren")), ("mod_context", ("none",)), ("sign", ("neuron",)),
+                    ("adaptation", ("none", False, None))):
+        if k_ in op and op[k_] not in ok_:
+            raise ValueError(f"law_of({run}): {k_}: {op[k_]} not described here")
+    bp_ = os.path.join(T.out_dir(spec, None), "models", "best.pt")
+    fit = torch.load(bp_, weights_only=False, map_location="cpu")["fitted"] if os.path.exists(bp_) else None   # None: not landed
+    mz = np.load(graphs_data_path(*str(op["input_mask"]).split("/")))
+    M = np.asarray(mz[str(op.get("input_mask_array", "mask"))]) != 0
+    N, F = int(M.shape[0]), int(op.get("forcing_dim", 22))
+    M = M.reshape(N, -1) if M.ndim == 2 else np.repeat(M.reshape(N, 1), F, 1)
+    from exp17_vrest_blocks import MARKERS
+    feat = [k for k in range(F) if k not in MARKERS]
+    n_in, n_mk = int(M[:, feat].any(1).sum()), int((M[:, list(MARKERS)].any(1) & ~M[:, feat].any(1)).sum())
+    mod = str(op.get("modulation", "none")) == "siren"
+    rpb = bool(op.get("rest_per_block", False))
+    sub, rmin, rmax = int(op.get("substeps", 1)), float(op["rate_min"]), float(op["rate_max"])
+    tlo, thi = FRAME_S_ / rmax, FRAME_S_ / rmin
+    # the mesh's edge sets (cell_ops._neuron_mesh_edges): the finest level every neuron (short), the cube levels up to
+    # mesh_mid_max_um mid, the coarser long
+    if model in ("neuron_graph", "neuron_graph_phase"):
+        if op.get("graph") != "mesh":
+            raise ValueError(f"law_of({run}): graph {op.get('graph')} not described here")
+        lv_, b0_, mm_ = int(op["mesh_levels"]), float(op["mesh_bin_um"]), float(op["mesh_mid_max_um"])
+        cubes = [b0_ * 2 ** (lv_ - 2 - k) for k in range(lv_ - 1)]
+        fb_ = float(op.get("mesh_fine_um", b0_ / 2))
+        sets_ = {"short": f"the Delaunay mesh of every neuron (edges up to {2 * fb_:g} \\textmu m, + each neuron's shortest)",
+                 "mid": "the mesh of the " + " and ".join(f"{b:g}-\\textmu m" for b in cubes if b <= mm_) + " cube nodes",
+                 "long": "the mesh of the " + " and ".join(f"{b:g}-\\textmu m" for b in cubes if b > mm_) + " cube nodes"}
+    rhs = ("-z_i + V_i" + (" + \\Delta V_{i,k(t)}" if rpb else "") + (" + \\Omega_i(t)\\,m_i" if mod else " + m_i")
+           + " + B_i\\cdot\\big(\\mathbf{M}_i \\odot u(t)\\big)")
+    lines = ["\\tau_i\\,\\dfrac{dz_i}{dt} = " + rhs]
+    syms = ["$z_i$: neuron $i$'s dF/F, normalised over the recording; " + f"{N:,} neurons"]
+    title = "known ODE, current synapses, multi-level mesh"
+    if model == "neuron_graph":
+        lines.append("m_i = \\textstyle\\sum_{s}\\sum_{j \\to i} W^{s}_{ij}\\tanh z_j")
+        syms.append("$W^{s}_{ij}$: one weight per directed edge $j \\to i$ of set $s$: short, " + sets_["short"]
+                    + "; mid, " + sets_["mid"] + "; long, " + sets_["long"])
+    elif model == "neuron_graph_phase":
+        title = "known ODE, the angle, multi-level mesh"
+        per_edge = str(op.get("phi_per", "pair")) == "edge"
+        ph = "\\varphi_{ij}" if per_edge else "\\varphi_{t(j)\\,t(i)}"
+        fac = (f"\\tfrac12\\big(1 + \\cos({ph} - \\alpha(t))\\big)" if op.get("nonneg") else f"\\cos\\!\\big({ph} - \\alpha(t)\\big)")
+        lines.append("m_i = \\textstyle\\sum_{s}\\sum_{j \\to i} W^{s}_{ij}\\tanh z_j\\," + fac)
+        ak = str(op.get("alpha", "siren"))
+        if ak == "siren":
+            lines.append("\\alpha(t) = f_\\theta\\big(t" + (", e_{k(t)}" if op.get("alpha_context") == "block" else "") + "\\big)")
+        else:
+            lines.append("\\alpha(t) = \\alpha_{k(t)}")
+        syms.append("$W^{s}_{ij}$: one weight per directed edge $j \\to i$ of set $s$: short, " + sets_["short"]
+                    + "; mid, " + sets_["mid"] + "; long, " + sets_["long"])
+        syms.append(("$\\varphi_{ij}$: one phase per edge" if per_edge else
+                     "$\\varphi_{ab}$: one phase per ordered pair of cell types, $t(j)$ the sender's, $t(i)$ the receiver's "
+                     "(the Z-Brain regions)")
+                    + (", fixed at its start" if not any(str(l_.get("param", "")).startswith("phi") for l_ in spec["learnable"])
+                       else ", learned") + ", started uniform in $[0, 2\\pi)$")
+        if ak == "siren":
+            syms.append("$\\alpha(t)$: one angle per frame for all neurons; $f_\\theta$ a SIREN of the frame time $t$"
+                        + (" and of $e_{k(t)}$, the one-hot of the block playing" if op.get("alpha_context") == "block" else "")
+                        + "; in training + one $N(0, " + f"{float(op.get('alpha_jitter', 0.0)):g}" + "^2)$ rad offset per rollout"
+                        if float(op.get("alpha_jitter", 0.0) or 0.0) > 0 else
+                        "$\\alpha(t)$: one angle per frame for all neurons; $f_\\theta$ a SIREN of the frame time $t$"
+                        + (" and of $e_{k(t)}$, the one-hot of the block playing" if op.get("alpha_context") == "block" else ""))
+        else:
+            syms.append("$\\alpha_k$: one learned angle per block $k$")
+    elif model == "neuron_grid":
+        title = "known ODE, lattice grid"
+        lines.append("m_i = G_i^2\\,\\tfrac18\\textstyle\\sum_{l \\in \\mathrm{c}(i)}\\sum_{k \\to l} W_{kl}^2\\,c_k")
+        lines.append("c_k = \\tfrac{1}{n_k}\\textstyle\\sum_{j \\to k} a_j\\tanh z_j")
+        L0_, lv_ = float(op.get("mesh_spacing", 16.0)), int(op.get("mesh_levels", 3))
+        syms.append("$a_j$: neuron $j$'s output weight, signed (Dale exact: $W^2$, $G^2 \\geq 0$); $c_k$: corner $k$'s "
+                    "value, $n_k$ the neurons encoded into it; c($i$): the 8 corners of neuron $i$'s cube; $G_i$: neuron $i$'s gain")
+        syms.append("$W_{kl}$: one weight per lattice edge $k \\to l$ (" + " / ".join(f"{L0_ * 2 ** k:g}" for k in range(lv_))
+                    + "-\\textmu m cubes, nested; a self edge per corner)")
+    else:
+        title = "known ODE, mean field"
+        lines.append("m_i = a_i\\,\\tfrac1N\\textstyle\\sum_j \\tanh z_j")
+        syms.append("$a_i$: one gain per neuron; the mean over all neurons")
+    if mod:
+        syms.append("$\\Omega_i(t) = 1 + f_\\omega(\\mathbf{p}_i, t)$, $f_\\omega$ a SIREN of neuron $i$'s position "
+                    "$\\mathbf{p}_i$ and the frame time, its last layer 0 at the start")
+    syms.append(f"$\\tau_i = 0.914\\,\\mathrm{{s}}/r_i$ in ({tlo:.0f}, {thi:.0f}) s, $r_i$ a learned rate per neuron "
+                "(softplus, bounded); $V_i$: learned baseline"
+                + ("; $\\Delta V_{i,k}$: learned offset in block $k$, $k(t)$ the block playing at $t$" if rpb else ""))
+    anyf_ = M[:, feat].any(1)
+    allf_ = bool(M[anyf_][:, feat].all(1).all())
+    syms.append(f"$u(t)$: {F} columns, 13 stimulus features and 9 block markers (marker $k$ = 1 in block $k$, else 0)"
+                + (", and 5 ephys columns (swim left, swim right, turn left, turn right, bout)" if F == 27 else ""))
+    syms.append("$\\mathbf{M}_i$: neuron $i$'s row of the input mask, $B_{ik}$ learned where it is 1: "
+                + (f"{n_in:,} neurons all {F} columns" if allf_ and not n_mk else
+                   f"{n_in:,} neurons all {len(feat)} non-marker columns" if allf_ else
+                   f"{n_in:,} neurons one or more of the {len(feat)} non-marker columns")
+                + ("; every neuron the 9 markers" if bool(M[:, list(MARKERS)].all()) else ", 0 elsewhere"))
+    syms.append(f"integrated with {sub} substeps per 0.914-s frame, the leak exact over each substep (exponential Euler)")
+    what = {"W_short": "per directed edge, short", "W_mid": "per directed edge, mid", "W_long": "per directed edge, long",
+            "tau": "per neuron, $r_i$", "rest": "per neuron, $V_i$", "rest_block": "per neuron and block (9)",
+            "input": "per neuron and column read", "omega_mlp": "the SIREN $f_\\omega$ of $\\Omega$",
+            "alpha_mlp": "the SIREN $f_\\theta$ of $\\alpha$", "alpha_table": "one angle per block",
+            "phi": "per ordered type pair", "phi_short": "per short edge", "phi_mid": "per mid edge",
+            "phi_long": "per long edge", "A_send": "per neuron, $a_j$", "W_grid": "per lattice edge, self edges included",
+            "G_recv": "per neuron, $G_i$", "W_mean": "per neuron, $a_i$"}
+    sym = {"W_short": "$W^{short}_{ij}$", "W_mid": "$W^{mid}_{ij}$", "W_long": "$W^{long}_{ij}$", "tau": "$\\tau_i$",
+           "rest": "$V_i$", "rest_block": "$\\Delta V_{i,k}$", "input": "$B_{ik}$", "omega_mlp": "$f_\\omega$",
+           "alpha_mlp": "$f_\\theta$", "alpha_table": "$\\alpha_k$", "phi": "$\\varphi_{ab}$", "phi_short": "$\\varphi_{ij}$, short",
+           "phi_mid": "$\\varphi_{ij}$, mid", "phi_long": "$\\varphi_{ij}$, long", "A_send": "$a_j$", "W_grid": "$W_{kl}$",
+           "G_recv": "$G_i$", "W_mean": "$a_i$"}
+    rows = []
+    for e in spec["learnable"]:
+        k_ = str(e.get("param") or e.get("block"))
+        cnt = int(M.sum()) if k_ == "input" else (int(fit[T.Learnables.key(e)].numel()) if fit is not None else 0)
+        rows.append((sym.get(k_, k_.replace("_", "\\_")), what.get(k_, ""), cnt, k_))
+    zr = [r_.get("zero") for r_ in spec["task"].get("rollouts", []) if r_.get("name") == "W0"]
+    zr = zr[0] if zr else None
+    w0 = ("$" + " = ".join({"W_short": "W^{short}", "W_mid": "W^{mid}", "W_long": "W^{long}", "A_send": "a_j",
+                            "W_mean": "a_i", "W_grid": "W_{kl}"}.get(z_, z_) for z_ in zr) + " = 0$") if zr else "W = 0"
+    return {"title": title, "lines": lines, "syms": syms, "rows": rows, "spec": spec, "op": op, "w0": w0, "model": model}
+
+
+def eq_aligned(lines, narrow=False):
+    """The law's lines as one aligned display (the first line's '=' the anchor); `narrow` puts the angle's factor on
+    its own line."""
+    out = []
+    for i, l_ in enumerate(lines):
+        a_, b_ = l_.split(" = ", 1)
+        cut_ = next((c_ for c_ in ("\\,\\cos", "\\,\\tfrac12") if c_ in b_), None) if narrow else None
+        if cut_:
+            out.append(a_ + " &= " + b_.split(cut_, 1)[0])
+            out.append("&\\quad \\times " + cut_[2:] + b_.split(cut_, 1)[1])
+            continue
+        if i == 0 and " + B_i" in b_:                  # the leak terms, then the input on its own line
+            h_, t_ = b_.split(" + B_i", 1)
+            out.append(a_ + " &= " + h_)
+            out.append("&\\quad + B_i" + t_)
+        else:
+            out.append(a_ + " &= " + b_)
+    return "$\\begin{aligned}" + "\\\\ ".join(out) + "\\end{aligned}$"
+
+
+def eq_narrow(lines):
+    """The law for a narrow column: each line its own display line, the long first one broken after its leak terms."""
+    a_, b_ = lines[0].split(" = ", 1)
+    p_ = b_.split(" + ")
+    head_ = a_ + " = " + " + ".join(p_[:2])
+    mid_ = [t_ for t_ in p_[2:] if not t_.startswith("B_i")]
+    inp_ = [t_ for t_ in p_[2:] if t_.startswith("B_i")]
+    rest_ = (["\\quad + " + " + ".join(mid_)] if mid_ else []) + ["\\quad + " + t_ for t_ in inp_]   # the input alone
+    more_ = []
+    for l_ in lines[1:]:                               # the angle's factor on its own line (a narrow column)
+        cut_ = next((c_ for c_ in ("\\,\\cos", "\\,\\tfrac12") if c_ in l_), None)
+        more_ += ([l_.split(cut_, 1)[0], "\\quad \\times " + cut_[2:] + l_.split(cut_, 1)[1]] if cut_ else [l_])
+    return "$" + "$\\\\ $".join([head_] + rest_ + more_) + "$"
+
+
 def law_block_(spec, title, eq, small, rows, foot, split=False):
     """A law in slide 24's look (Cedric, 2026-10-09): yellow title, the complete equation large, the small text, the
     learned values counted in yellow and their table (learnable, what, count, prior, step), a small closing line. `rows`
@@ -637,7 +820,7 @@ def law_block_(spec, title, eq, small, rows, foot, split=False):
         p = L_[k].get("prior")
         return (f"L1 {p['l1']:.1e} L2 {p['l2']:.1e}".replace("e-0", "e-") if p else "--")
     def st(k):
-        return f"{float(L_[k]['lr']):.0e}".replace("e-0", "e-")
+        return lr_(L_[k]["lr"])
     tot = sum(r[2] for r in rows)
     stg = (spec.get("training") or {}).get("stages") or []
     train = (f"Trained on the recording itself: {sum(int(x['iters']) for x in stg):,} updates of Adam, the forecast "
@@ -645,14 +828,23 @@ def law_block_(spec, title, eq, small, rows, foot, split=False):
              if stg else "")
     law = ("{\\Large\\textbf{\\textcolor{yellow}{" + title + "}}}\\\\[4pt]\n"
            "{\\Large " + eq + "\\par}\\vspace{\\baselineskip}\n"
-           "{\\small\\raggedright " + small + "\\par}")
+           + ("" if split == "right" else "{\\small\\raggedright " + small + "\\par}"))
+    if split == "balanced":       # the law and its symbols left, the table and the closing lines right (2026-10-09)
+        split = "right_closing"
     table = ("{\\Large\\textbf{\\textcolor{yellow}{" + f"{tot:,} learned values" + "}}\\par}\\vspace{4pt}\n"
-             "{\\normalsize\\begin{tabular}{@{}l@{\\hspace{5pt}}p{" + ("11em" if split else "10.5em")
+             "{" + ("\\small" if split is True else "\\normalsize") + "\\begin{tabular}{@{}l@{\\hspace{5pt}}p{"
+             + ("8.5em" if split is True else "10.5em")
              + "}@{\\hspace{4pt}}r@{\\hspace{4pt}}p{4.2em}@{\\hspace{4pt}}l@{}}\n"
-             "learnable & what & count & prior & step \\\\\n\\hline\n"
+             "learnable & what & count & prior & lr \\\\\n\\hline\n"
              + "".join(f"\\rule{{0pt}}{{2.4ex}}{a} & {b} & {c:,} & {pr(k)} & {st(k)} \\\\\n" for a, b, c, k in rows)
              + "\\end{tabular}\\par}")
-    closing = "{\\small\\raggedright " + train + foot + "\\par}"
+    closing = "{\\small\\raggedright " + train + "lr: Adam's learning rate. " + foot + "\\par}"
+    if split == "right_closing":  # the table and the closing lines on the right, the law and its symbols left
+        return ("\\fitcol{%\n" + law + "}",
+                "\\fitcol{%\n" + table + "\\vspace{8pt}\n" + closing + "}")
+    if split == "right":          # the symbols under the table, on the right (a slide with a figure above, 2026-10-09)
+        return ("\\fitcol{%\n" + law + "\\vspace{8pt}\n" + closing + "}",
+                "\\fitcol{%\n" + table + "\\vspace{8pt}\n{\\small\\raggedright " + small + "\\par}}")
     if split:                     # the closing lines under the law, the table alone on the right
         return ("\\fitcol{%\n" + law + "\\vspace{8pt}\n" + closing + "}", "\\fitcol{%\n" + table + "}")
     return "\\fitcol{%\n" + law + "\\vspace{8pt}\n" + table + "\\vspace{8pt}\n" + closing + "}"
@@ -724,14 +916,16 @@ def vrest_slides_(S, run, num, lab):
 
 
 def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_now"), mf_=("22.17", "zap_n22_mf"), desc=None,
-                 label=None, law=None, eq=None, time_=None):
+                 label=None, law=None, eq=None, time_=None, note=None, law_slide=True):
     """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
     slide, and prepare slide 17"; 2026-10-08: "make all the slides with 19.25", the new nominal, its controls landed;
     2026-10-09: 19.25 replaced by 22.3, the nominal with the markers to every neuron, trained without checkpointing):
     the free rollout with the network test, the modulation Omega, the learned constants, tau by region, the edge
-    weights, and the mean-field control. `law` (title, equation) also gives the run slide slide 31's layout; `eq` the
-    modulation slide's law alone; `time_` replaces the training-time row (a resumed run's report counts its last leg
-    only). -> [(name, tex)]."""
+    weights, and the mean-field control. `law` (truthy) gives the run slide slide 31's layout; `time_` replaces the
+    training-time row (a resumed run's report counts its last leg only); `note` a line under it. 2026-10-09 (Cedric:
+    "replace it by the right model equation"): the run's law is read by law_of from its specs -- the equation on the
+    run and modulation slides, and with `law_slide` its own slide first (symbols and learnables); `desc` and `eq` are
+    no longer drawn. -> [(name, tex)]."""
     from plexus.tasks import trace_recording as TR_
     GD_ = os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
     res = os.path.join(GD_, "log", "training", "zapbench", run, "results")
@@ -743,12 +937,13 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
     shutil.copy(os.path.join(res, "movie.mp4"), os.path.join(PRES, "Movies", f"{run}.mp4"))
     shutil.copy(os.path.join(res, "movie.png"), os.path.join(PRES, "Movies", f"{run}.png"))
     rep = json.load(open(os.path.join(res, "report.json")))
+    L = law_of(run)
 
     def ctrl(n_):                                        # a control's movie npz once it has landed, else None
         f_ = os.path.join(GD_, "log", "training", "zapbench", n_, "results", f"{n_}_movie.npz")
         return f_ if os.path.exists(f_) else None
     lines = [("full model", os.path.join(res, f"{run}_movie.npz")),
-             ("W = 0 at inference", os.path.join(res, f"{run}_W0_movie.npz")),
+             ("W0 rollout", os.path.join(res, f"{run}_W0_movie.npz")),   # what it zeroes: from its spec, below
              ("no stimulus", os.path.join(res, f"{run}_no_stimulus_movie.npz")),
              ] + ([(f"no W ({now_[0]})", ctrl(now_[1])), (f"mean field ({mf_[0]})", ctrl(mf_[1]))] if now_ else [])
     bm_, loc_ = "", ""
@@ -761,30 +956,42 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
         loc_ += lab_t + (f" & {S.qv(l_['mean'], big=big_)} $\\pm$ {l_['sd']:.3f} \\\\\n" if l_ else " & \\\\\n")
     stg = rep.get("stages") or []
     right = (S.head(f"batch {num}: {rt}")
-             + "{\\scriptsize " + (desc or "19.27's twin retrained without checkpointing: the new nominal (the balanced "
-               "20 \\% input mask; known ODE on the mesh: level 0 every neuron, edges up to 16 \\textmu m; level 1 the "
-               "32-\\textmu m cubes; level 2 the 64-\\textmu m cubes; SIREN $\\Omega$, $\\tau$ in [1, 100] s, x1 updates) "
-               "with the 9 condition markers fed to EVERY neuron (input\\_mask\\_destripe\\_bal20\\_markall), so each "
-               "neuron's baseline gains a learned offset per stimulus block") + "\\par}" + S.SEC_GAP
+             + "{\\footnotesize\\raggedright " + eq_narrow(L["lines"]) + "\\par}" + S.SEC_GAP
              + S.head("the network test: brain-mean dF/F, 2 h") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
                "& r & RMSE \\\\\n\\hline\n" + bm_ + "\\end{tabular}\\par}" + S.SEC_GAP
              + S.head("per-neuron r, brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
                "& mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + loc_ + "\\end{tabular}\\par}\\vspace{2pt}\n"
-             + ("{\\tiny\\color{gray} the two controls are the nominal's twins (no markers), trained from scratch with no "
-                "W (" + now_[0] + ") and with the mean field in place of the graph (" + mf_[0] + ")\\par}" if now_ else "")
+             + "{\\tiny\\color{gray} W0 rollout: the trained law run with " + L["w0"] + "; no stimulus: $u = 0$\\par}"
+               "\\vspace{1pt}\n"
+             + ("{\\tiny\\color{gray} the controls, 22.1's spec (no markers) trained from scratch: " + now_[0]
+                + " no W learned ($m_i = 0$) and no $\\Omega$; " + mf_[0] + " $m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$\\par}"
+                if now_ else "")
              + S.SEC_GAP
              + S.head("training") + S.rows([("updates", f"{rep.get('iters', 0):,} (horizons {stg[0][0]}..{stg[-1][0]})" if stg else "--"),
                                          ("time", time_ or f"{rep.get('seconds', 0) / 3600:.1f} h"),
-                                         ("weights", f"{rep.get('n_params', 0):,}")]))
+                                         ("weights", f"{rep.get('n_params', 0):,}")])
+             + ("{\\scriptsize\\raggedright " + note + "\\par}" if note else ""))
+    if law_slide:                                      # the law's own slide, in slide 24's look, before the run
+        lL_, lR_ = law_block_(L["spec"], L["title"] + f" ({num})", eq_aligned(L["lines"]),
+                              "\\par\\vspace{1pt}\n".join(L["syms"]), L["rows"], "", split=True)
+        out.append((f"19_law_{run}", S.frame_wide(f"{num}: the law", "\\vspace*{0.04\\textheight}\\begin{columns}[T,onlytextwidth]\n"
+                                                   "\\begin{column}{0.49\\textwidth}\\centering" + lL_ + "\\end{column}\n"
+                                                   "\\begin{column}{0.49\\textwidth}\\centering" + lR_ + "\\end{column}\n\\end{columns}",
+                                                   f"config/zapbench/{run}.yaml, config/training/zapbench/{run}.yaml; cell_ops: {L['model']}",
+                                                   deck_title=dt + " $\\cdot$ the law")))
     # the atlas frame with the side views when tools/exp17_run_movie.py has drawn it (Cedric, 2026-10-08)
     mvr_ = f"{run}_atlas" if os.path.exists(os.path.join(PRES, "Movies", f"{run}_atlas.mp4")) else run
     ttl_r = f"batch {num}: the free rollout of the whole 2 h, recorded left, learned right"
+    # the right column starts 2 lines down (S.frame): fitted to 0.64 of the slide, not 0.80, so a full column stays clear
+    # of the footer (Cedric, 2026-10-09: "text too close from bottom")
+    fb_ = lambda t_: t_.replace("\\vspace*{2\\baselineskip}\n\\fitcol{%", "\\vspace*{2\\baselineskip}\n"   # noqa: E731
+                                "\\setlength{\\colheight}{0.64\\textheight}\\fitcol{%", 1)
     if law:                                          # 20.3: slide 31's layout (Cedric, 2026-10-08)
-        out.append((f"19_run_{run}", movie_narrow(S, ttl_r, f"Movies/{mvr_}", right, f"log/training/zapbench/{run}", dt,
-                                                  left=0.70)))
+        out.append((f"19_run_{run}", fb_(movie_narrow(S, ttl_r, f"Movies/{mvr_}", right, f"log/training/zapbench/{run}", dt,
+                                                      left=0.70))))
     else:
-        out.append((f"19_run_{run}", S.frame(ttl_r, f"\\playmovie{{Movies/{mvr_}}}", right, f"log/training/zapbench/{run}",
-                                             left_gap=True, deck_title=dt)))
+        out.append((f"19_run_{run}", fb_(S.frame(ttl_r, f"\\playmovie{{Movies/{mvr_}}}", right, f"log/training/zapbench/{run}",
+                                                 left_gap=True, deck_title=dt))))
     # the modulation Omega_i(t) beside the recorded activity, x4 (tools/exp17_modulation.py)
     if any(os.path.exists(os.path.join(res, f_)) for f_ in ("movie_omega.mp4", "movie_omega_atlas.mp4")):
         # the atlas frame with the side views when tools/exp17_modulation.py --atlas has drawn it (Cedric, 2026-10-08);
@@ -797,14 +1004,13 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
         O_ = np.load(os.path.join(res, f"{run}_omega.npz"))["omega"].astype(np.float32)
         mt_ = O_.mean(1)
         # ragged, the law on two explicit lines: justified in the narrow column it stretched its spaces (2026-10-08)
-        eq_ = eq or law or ("known ODE, current synapses", "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_i$\\\\ $\\quad + "
-                                                           "\\Omega_i(t)\\textstyle\\sum_j W_{ij}\\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$")
+        eq_ = (L["title"], eq_narrow(L["lines"]))
         right_om = (("\\raggedright{\\Large\\textbf{\\textcolor{yellow}{" + eq_[0] + "}}}\\\\[4pt]\n"
                      "{\\Large " + eq_[1] + "\\par}\\vspace{10pt}\n")   # Cedric, 2026-10-08
                     + S.head("the learned modulation $\\Omega_i(t)$")
-                    + "{\\scriptsize each neuron's message sum is multiplied by $\\Omega_i(t) = 1 + f(x_i, y_i, z_i, t)$, "
-                      "$f$ a SIREN of the position and the absolute time; 1 = no modulation, 0 = no input from the "
-                      "network at that frame\\par}\\vspace{6pt}\n"
+                    + "{\\scriptsize $m_i$, neuron $i$'s message sum, is multiplied by $\\Omega_i(t) = 1 + f_\\omega(\\mathbf{p}_i, t)$, "
+                      "$f_\\omega$ a SIREN of the position $\\mathbf{p}_i$ and the frame time; 1 = no modulation, 0 = no input "
+                      "from the network at that frame\\par}\\vspace{6pt}\n"
                     + S.rows([("mean over all", f"{O_.mean():.2f}"),
                               ("5th-95th pct", f"{np.percentile(O_, 5):.2f} .. {np.percentile(O_, 95):.2f}"),
                               ("brain mean over time", f"{mt_.min():.2f} .. {mt_.max():.2f}"),
@@ -832,10 +1038,14 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                               ("$|B|$", r3("B_norm")),
                               ("no $|W|$ left", f"{100 * P_.get('frac_W_abs_zero', 0.0):.1f} \\%"),
                               ("inputs", f"{P_['n_masked']:,} of {P_['n']:,}")])
-                    + "{\\tiny\\color{gray} $\\tau$ bounded to [" + f"{tb_[0]:.0f}, {tb_[1]:.0f}" + "] s; $V$ in dF/F; W "
-                      "$|W|$ the summed absolute weight into the neuron over the kept edges, after pruning (the messages then scaled by "
-                      "$\\Omega$); $B$ used "
-                      "only inside the input mask\\par}\n")
+                    + "{\\tiny\\color{gray} $\\tau$ bounded to (" + f"{tb_[0]:.0f}, {tb_[1]:.0f}" + ") s; $V$ in dF/F; $|W|$ in: "
+                      + ("the summed absolute effective weight into the neuron through the grid" if L["model"] == "neuron_grid"
+                         else "the summed absolute weight into the neuron")
+                      + (", the edges below the pruning thresholds removed" if os.path.exists(os.path.join(EXP, "data", f"prune_{run}.json"))
+                         else ", no pruning")
+                      + ("; the messages then scaled by $\\Omega$" if str(L["op"].get("modulation", "none")) == "siren" else "")
+                      + ("; each message times $\\cos(\\varphi_{ij} - \\alpha(t))$" if L["model"] == "neuron_graph_phase" else "")
+                      + "; inputs: the neurons with at least one input column; $B$ used only inside the input mask\\par}\n")
         out.append((f"19_params_{run}", S.frame_narrow("the learned constants on the brain", f"figs/param_maps_{run}.png",
                                                        right_pm, f"tools/exp17_param_maps.py {run}", left=0.76,
                                                        deck_title=dt + " $\\cdot$ tau, V, W, B")))
@@ -846,7 +1056,7 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
         pr_ = T_["per_region"]
         srt = sorted(pr_.items(), key=lambda kv: kv[1]["median"])
         right_t = (S.head("$\\tau$ by brain region")
-                   + "{\\scriptsize each neuron's learned leak time constant $\\tau$ (bounded to [1, 100] s), grouped by "
+                   + "{\\scriptsize each neuron's learned leak time constant $\\tau$ (bounded to (1, 100) s), grouped by "
                      "its atlas region (the most specific of the table's), head to tail. Left: every neuron by its own $\\tau$, "
                      "from above and from the side; one linear colour scale, red fast, blue slow\\par}\\vspace{6pt}\n"
                    + S.head("values")
@@ -911,10 +1121,10 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                     + "{\\scriptsize\\raggedright\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
                       "& brain-mean r & per-neuron r, removed, mean $\\pm$ SD \\\\\n\\hline\n" + rows_mf
                     + "\\end{tabular}\\par}\\vspace{3pt}\n"
-                    + "{\\scriptsize\\raggedright graph: $m_i = \\sum_j W_{ji}\\tanh z_j$, one weight per edge; mean field: "
-                      "$m_i = a_i\\,\\langle\\tanh z\\rangle$, one gain per neuron; no W: $m_i = 0$ ($\\Omega$, which "
-                      "scales $m_i$, then has no effect). The two controls are the nominal's twins (no markers), trained "
-                      "from scratch"
+                    + "{\\scriptsize\\raggedright graph (22.3): $m_i = \\sum_s\\sum_{j \\to i} W^s_{ij}\\tanh z_j$, times "
+                      "$\\Omega_i(t)$; mean field (22.17): $m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$, times $\\Omega_i(t)$; no W "
+                      "(22.16): $m_i = 0$, no $\\Omega$; " + L["w0"] + ": the W0 rollout of the trained 22.3. The two controls "
+                      "are 22.1's spec (no markers), trained from scratch"
                     + (f"; 22.1, the nominal's graph without the markers: per-neuron r {nl_['mean']:.3f}" if nl_ else "")
                     + ".\\par}" + S.SEC_GAP
                     + S.head("the test")
@@ -926,7 +1136,7 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                       f"({pq(t1['brain_mean_r']['p'])}), per-neuron r {t1['local_r']['difference']:+.3f} ({pq(t1['local_r']['p'])})\\\\\n"
                       f"mean field $-$ no W: {t2['brain_mean_r']['difference']:+.3f} ({pq(t2['brain_mean_r']['p'])}), "
                       f"{t2['local_r']['difference']:+.3f} ({pq(t2['local_r']['p'])})\\\\\n"
-                      f"graph $-$ its $W = 0$: {t3['brain_mean_r']['difference']:+.3f} ({pq(t3['brain_mean_r']['p'])}), "
+                      "graph $-$ its " + L["w0"] + f": {t3['brain_mean_r']['difference']:+.3f} ({pq(t3['brain_mean_r']['p'])}), "
                       f"{t3['local_r']['difference']:+.3f} ({pq(t3['local_r']['p'])})\\\\[2pt]\n"
                       f"Retraining with another seed ({ST_['seed_pair']['a'].split(',')[0]} against "
                       f"{ST_['seed_pair']['b'].split(',')[0]}, the nominal's spec) moves brain-mean r by "
@@ -936,6 +1146,123 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                                                           deck_title=dt + " $\\cdot$ the mean-field control",
                                                           left=0.50, height=0.70, img_top="0.12\\textheight")))
     return out
+
+
+def batch25_slide(S):
+    """BATCH 25, THE INPUT MASK BY REGION (Cedric, 2026-10-09: "one description slide for batch with new input mask like
+    slide 49 + one figure regions highlighted in the atlas fish two view"): left the regions on the fish
+    (tools/exp17_bio_mask.py --figure), the two laws as law_of reads them from 25.1's and 25.4's specs; right the
+    regions and the columns that reach them (graphs_data/zebrafish/input_mask_destripe_bio*.npz) and the six arms.
+    -> (name, tex) or None."""
+    from plexus.paths import graphs_data_path
+    if not os.path.exists(os.path.join(PRES, "figs", "bio_mask_regions.png")):
+        return None
+    La_, Lb_ = law_of("zap_n25_bio"), law_of("zap_n25_ph_bio")
+    z_ = {k: np.load(graphs_data_path("zebrafish", f"input_mask_destripe_{k}.npz"), allow_pickle=True)
+          for k in ("bio", "bio_eff")}
+    rc_ = json.loads(str(z_["bio_eff"]["region_counts"]))
+    nn_ = {k: int((np.asarray(v["mask"]) != 0).sum()) for k, v in z_.items()}
+    mk_ = "f1 f3 f5 f8 f12 f17 f18 f20 f21"
+    left_ = ("{\\Large\\textbf{\\textcolor{yellow}{batch 25: the input mask by region}}}\\\\[4pt]\n"
+             "{\\normalsize 25.1-25.3, 22.3's law:\\par}{\\Large " + eq_aligned(La_["lines"]) + "\\par}\\vspace{4pt}\n"
+             "{\\normalsize 25.4-25.6, 24.10's law:\\par}{\\Large " + eq_aligned(Lb_["lines"]) + "\\par}\\vspace{6pt}\n"
+             "{\\small\\raggedright $\\mathbf{M}_i$: neuron $i$'s row of the input mask (mask\\_by\\_input), $\\odot$ the "
+             "element-wise product: $B_{ik}$ acts only where $M_{ik} = 1$\\par\\vspace{1pt}\n"
+             "$u(t)$: the 22 columns f0-f21, 9 of them the block markers (" + mk_ + "); 25.2, 25.3, 25.5, 25.6 add 5 "
+             "ephys columns (swim and turn power left and right, bout fraction): 27\\par\\vspace{1pt}\n"
+             "the per-block offset: 25.1-25.3 the marker weight $B_{i,m(k)}$, marker $m(k)$ on every neuron; 25.4-25.6 "
+             "$\\Delta V_{i,k}$ (rest\\_block), the markers on no neuron\\par\\vspace{1pt}\n"
+             "the other symbols as in 22.3's and 24.10's laws\\par}")
+    right_ = (S.head("the regions and the columns that reach them")
+              + "{\\scriptsize\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{7.5em}@{\\hspace{5pt}}r@{\\hspace{5pt}}"
+                ">{\\raggedright\\arraybackslash}p{10.5em}@{}}\n"
+                "region & neurons & columns \\\\\n\\hline\n"
+                "pretectum & " + f"{rc_['pretectum']:,}" + " & f0, f9-f11, f13-f16, f19; f4, f6, f7 \\\\\n"
+                "tectum (periventricular layer, medial tectal band) & " + f"{rc_['tectum']:,}" + " & f2, f4, f6, f7 \\\\\n"
+                "dorsal thalamus & " + f"{rc_['dorsal thalamus']:,}" + " & f4, f6, f7 \\\\\n"
+                "rhombomere 7 & " + f"{rc_['rhombomere 7']:,}" + " & the 5 ephys columns (25.2, 25.3, 25.5, 25.6) \\\\\n"
+                "every neuron & 100,759 & the 9 markers, 25.1-25.3 only \\\\\n"
+                "\\end{tabular}\\par}\\vspace{2pt}\n"
+                "{\\tiny\\color{gray} Z-Brain masks (Randlett et al. 2015) per neuron, data/atlas\\_destripe.npz; per block: "
+                "gain, turning, position, rotation the pretectum; dots the tectum; flash, taxis the tectum, dorsal "
+                "thalamus and pretectum (tools/exp17\\_bio\\_mask.py)\\par}" + S.SEC_GAP
+              + S.head("the arms")
+              + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}>{\\raggedright\\arraybackslash}p{12.6em}@{\\hspace{5pt}}"
+                ">{\\raggedright\\arraybackslash}p{7.5em}@{}}\n"
+                "& run & mask \\\\\n\\hline\n"
+                "25.1 & zap\\_n25\\_bio & 22.3's law, visual columns only \\\\\n"
+                "25.2 & zap\\_n25\\_bio\\_eff & + the 5 ephys columns into rhombomere 7 \\\\\n"
+                "25.3 & zap\\_n25\\_bio\\_eff\\_perm & 25.2's mask, its neuron rows permuted (seed 0) \\\\\n"
+                "25.4-25.6 & zap\\_n25\\_ph\\_bio, zap\\_n25\\_ph\\_bio\\_eff, zap\\_n25\\_ph\\_bio\\_eff\\_perm & the same three masks without the markers, on 24.10's law \\\\\n"
+                "\\end{tabular}\\par}\\vspace{3pt}\n"
+                "{\\scriptsize\\raggedright Neurons with a non-marker column: " + f"{nn_['bio']:,}" + " (25.1, 25.4), "
+              + f"{nn_['bio_eff']:,}" + " (the others); 22.3: 20,195.\\par}" + S.SEC_GAP
+              + S.head("status")
+              + "{\\scriptsize\\raggedright running (25.1-25.3 LSF 154614836-38 gpu\\_rtx6000; 25.4-25.6 LSF "
+                "154617482-84 gpu\\_h100); no results yet\\par}")
+    body_ = ("\\vspace*{0.02\\textheight}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.54\\textwidth}\\centering"
+             "\\includegraphics[width=\\linewidth,height=0.34\\textheight,keepaspectratio]{figs/bio_mask_regions.png}\\par"
+             "\\vspace{4pt}\\setlength{\\colheight}{0.38\\textheight}\\fitcol{%\n" + left_ + "}\\end{column}\n"
+             "\\begin{column}{0.44\\textwidth}\\setlength{\\colheight}{0.70\\textheight}\\fitcol{%\n" + right_
+             + "}\\end{column}\n\\end{columns}")
+    return ("25_bio_mask", S.frame_wide("batch 25: the input mask by region", body_,
+                                         "tools/exp17_bio_mask.py; config/zapbench/zap_n25_*.yaml",
+                                         deck_title="batch 25 $\\cdot$ the input mask by region"))
+
+
+def batch26_slide(S):
+    """BATCH 26, THE STIMULUS VIDEO AS INPUT, planned (Cedric, 2026-10-09: "one for the visual input like slide 49 + one
+    movie"): left the movie of what the model would read (tools/exp17_video_input.py movie), the law with u(t)
+    replaced by the encoder's output; right the alignment numbers of data/video_alignment.json (tools/exp17_video_input.py
+    align) and the planned arms. -> (name, tex) or None."""
+    ja_ = os.path.join(EXP, "data", "video_alignment.json")
+    if not os.path.exists(ja_):
+        return None
+    J = json.load(open(ja_))
+    fit_ = J["t_ephys_s = a + s * t_video_s"]
+    fp_, ck_, tx_ = J["frame_period_video_s"], J["checks"], J["taxis_raw_lag_s"]
+    La_ = law_of("zap_n22_markall")
+    eqv_ = eq_aligned([La_["lines"][0].replace("B_i\\cdot\\big(\\mathbf{M}_i \\odot u(t)\\big)", "B_i\\cdot e_{n(t)}")]
+                      + La_["lines"][1:] + ["e_n = \\mathrm{CNN}_\\theta\\big(\\mathcal{V}_n\\big)"])
+    left_ = ("{\\Large\\textbf{\\textcolor{yellow}{batch 26: the stimulus video as input (planned)}}}\\\\[4pt]\n"
+             "{\\Large " + eqv_ + "\\par}\\vspace{6pt}\n"
+             "{\\small\\raggedright 22.3's law with $u(t)$ replaced by $e_{n(t)}$; 24.10's law likewise\\par\\vspace{1pt}\n"
+             "$n(t)$: the recording frame at $t$; $\\mathcal{V}_n$: frame $n$'s video clip, $8 \\times 90 \\times 90$: the "
+             "video frames in $[t_n, t_{n+1})$ split into 8 equal sub-bins and averaged in each, the red channel "
+             "averaged over $4 \\times 4$ pixels ($360 \\to 90$)\\par\\vspace{1pt}\n"
+             "$\\mathrm{CNN}_\\theta$: a learned convolutional encoder\\par}")
+    rows_ = [("video", f"{J['video_frames']:,} frames, {J['video_s']:,.1f} s, 30 frames/s, 360 $\\times$ 360"),
+             ("clock fit", f"$t_{{ephys}} = {fit_['a']:.3f}$ s $+ {fit_['s']:.7f}\\,t_{{video}}$; {J['pairs']} paired "
+                           f"steps, residuals $\\leq$ {ck_['fit_residual_ms_max']:.1f} ms"),
+             ("frame 0", f"starts at video $t$ = {J['frame0_start_video_s']:.4f} s"),
+             ("frame period", f"{fp_['mean']:.6f} s mean ({fp_['min']:.4f}-{fp_['max']:.4f})"),
+             ("drift", f"{J['drift_vs_k_x_0.914_s_at_end']:.3f} s at the end, against $n \\times 0.914$ s"),
+             ("no ephys", f"frames {J['frames_without_ephys'][0]:,}-{J['frames_without_ephys'][1]:,}: starts extrapolated"),
+             ("past the video", f"frames {J['frames_past_video_end'][0]:,}-{J['frames_past_video_end'][1]:,}: black"),
+             ("block edges", f"dots onset in frame {ck_['dots_onset_frame']}, dark onset in frame {ck_['dark_onset_frame']}: "
+                             "the release's block offsets"),
+             ("flash", f"{ck_['flash_steps']} steps, each {ck_['flash_lag_frames'][0]} frame before f4 changes"),
+             ("taxis", f"the raw stimulus parameters (ch3, ch6) change a median {tx_['lag_quantiles_10_50_90'][1]:.3f} s "
+                       f"after the video's steps ({tx_['steps'] - tx_['within_33_ms']} of {tx_['steps']} steps)")]
+    right_ = (S.head("the video against the recording")
+              + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}>{\\raggedright\\arraybackslash}p{15em}@{}}\n"
+              + "".join(f"{a} & {b} \\\\\n" for a, b in rows_) + "\\end{tabular}\\par}\\vspace{2pt}\n"
+              "{\\tiny\\color{gray} data/video\\_alignment.json (tools/exp17\\_video\\_input.py align)\\par}" + S.SEC_GAP
+              + S.head("the arms, planned")
+              + "{\\scriptsize\\raggedright the encoder on 22.3's law; the encoder on 24.10's law\\par}" + S.SEC_GAP
+              + S.head("the movie")
+              + "{\\scriptsize\\raggedright per block a 6-s excerpt: left the video as shown (360 $\\times$ 360, 30 "
+                "frames/s), right the model input at that instant (90 $\\times$ 90, the current sub-bin of the current "
+                "recording frame); under them the block strip, the block shown under a grey bar\\par}")
+    mv_ = os.path.join(PRES, "Movies", "video_input.mp4")
+    body_ = ("\\vspace*{0.02\\textheight}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.54\\textwidth}\\centering"
+             + ("\\playmovie[0.80\\linewidth]{Movies/video_input}\\par\\vspace{4pt}" if os.path.exists(mv_) else "")
+             + "\\setlength{\\colheight}{0.33\\textheight}\\fitcol{%\n" + left_ + "}\\end{column}\n"
+             "\\begin{column}{0.44\\textwidth}\\setlength{\\colheight}{0.70\\textheight}\\fitcol{%\n" + right_
+             + "}\\end{column}\n\\end{columns}")
+    return ("26_video_input", S.frame_wide("batch 26: the stimulus video as input (planned)", body_,
+                                            "tools/exp17_video_input.py; data/video_alignment.json",
+                                            deck_title="batch 26 $\\cdot$ the stimulus video as input, planned"))
 
 
 def flow_slides(S, run, num, law_txt, msg_txt, dt):
@@ -952,13 +1279,19 @@ def flow_slides(S, run, num, law_txt, msg_txt, dt):
         mv_ = f"Movies/flow_views_{run}_pruned_combined{suf_}"
         if not os.path.exists(os.path.join(PRES, mv_ + ".mp4")):
             continue
-        cap_ = (f"the flow of {num} after pruning, smoothed over {sg_} \\textmu m ({res_}): one map per view -- from above, "
-                "oblique from 45 deg above, from the side; " + msg_txt + f" on the {kept_:,} kept edges as wind, excitatory "
-                "particles red, inhibitory cyan, on the RECORDED dF/F in grey; the activity is the pruned law's own free "
-                "rollout, the curve below its brain mean (white) against the recording's (green); "
-                f"tools/exp17\\_flow\\_pruned.py {run.replace('_', chr(92) + '_')} --sigma {sg_}")
-        body_ = ("\\vspace*{1.2\\baselineskip}\\centering\\playmovie[0.82\\textwidth]{" + mv_ + "}\\par\\vspace{2pt}"
-                 "{\\fontsize{5.5}{6.5}\\selectfont\\color{gray} " + cap_ + "\\par}")
+        # Cedric, 2026-10-09: "remove the oblique view, keep top and side below one another, same size, same position
+        # as in other slides": the movie (top view over side view, then the brain-mean strip) in the baseline-per-block
+        # slides' middle column, the text in their right column
+        cap_ = (f"smoothed over {sg_} \\textmu m ({res_}); top, from above; below it, from the side; " + msg_txt
+                + f" on the {kept_:,} kept edges as wind, excitatory particles red, inhibitory cyan, on the recorded dF/F "
+                "in grey; only the neurons inside the Z-Brain brain; the activity: the pruned law's free rollout; under "
+                "the views its brain mean (white) and the recording's (green)")
+        ph_ = (("\\phantom{\\includegraphics[width=\\linewidth,height=0.80\\textheight,keepaspectratio]{figs/vrest_blocks_"
+                + run + ".png}}") if os.path.exists(os.path.join(PRES, "figs", f"vrest_blocks_{run}.png")) else "")   # same centring
+        body_ = ("\\vspace*{0.04\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.50\\textwidth}" + ph_ +
+                 "\\end{column}\n\\begin{column}{0.27\\textwidth}\\centering\\playmovie[\\linewidth]{" + mv_ + "}"
+                 "\\end{column}\n\\begin{column}{0.20\\textwidth}\\fitcol{%\n" + S.head(f"the flow of {num}, pruned")
+                 + "{\\scriptsize\\raggedright " + cap_ + "\\par}}\\end{column}\n\\end{columns}")
         out.append((f"{num.split('.')[0]}_flow_pruned{suf_}", S.frame_wide(f"the flow of {num}, pruned, {sg_} um", body_,
                                                                           f"tools/exp17_flow_pruned.py {run} --sigma {sg_}",
                                                                           deck_title=dt + f" $\\cdot$ the flow, pruned, {res_} ({sg_} \\textmu m)")))
@@ -1004,9 +1337,11 @@ def write_slides():
                          for k in range(LEVELS)]
                       + [("neurons $\\to$ grid", f"each neuron to the corners within {g['reach_um']:.1f} \\textmu m"),
                          ("", f"{g['g2m_edges']:,} edges, weight $a_j / n_k$"),
+                         ("", "$n_k$: the neurons at corner $k$"),
                          ("grid $\\to$ neurons", "each neuron from its cube's 8 corners"),
-                         ("", f"{g['m2g_edges']:,} edges, weight $g_i / 8$"),
-                         ("", "$a_j$, $g_i$: learned, one per neuron")])
+                         ("", f"{g['m2g_edges']:,} edges, weight $G_i^2 / 8$"),
+                         ("", "$a_j$, $G_i$: learned, one per neuron"),
+                         ("grid edges", "$k \\to l$: weight $W_{kl}^2$, learned")])
                )
     right_t = (head("the triangular multi-level mesh, 3 levels")
                + rows([("neurons", f"{g['neurons']:,} (destriped): the finest nodes")]
@@ -1018,7 +1353,7 @@ def write_slides():
     tot_g = ("{\\Large\\textbf{\\textcolor{yellow}{" + f"{g['neurons']:,} neurons}}}}}}\\\\[3pt]"
              + "{\\Large\\textbf{\\textcolor{yellow}{" + f"{gl['total']:,} learned coupling weights}}}}}}\\\\[2pt]"
              + "{\\normalsize\\textcolor{yellow}{" + f"{gl['W_grid']:,} grid edges (directed, both ways, + a self edge "
-             f"per corner) + {gl['a']:,} $a_i$ + {gl['g']:,} gains $g_i$" + "}\\par}\\vspace{8pt}\n")
+             f"per corner) + {gl['a']:,} $a_j$ + {gl['g']:,} gains $G_i$" + "}\\par}\\vspace{8pt}\n")
     tot_t = ("{\\Large\\textbf{\\textcolor{yellow}{" + f"{g['neurons']:,} neurons}}}}}}\\\\[3pt]"
              + "{\\Large\\textbf{\\textcolor{yellow}{" + f"{tw:,} learned coupling weights}}}}}}\\\\[2pt]"
              + "{\\normalsize\\textcolor{yellow}{one $W_{ij}$ per directed edge $j \\to i$ (every edge both ways); no $a_i$, no gain}"
@@ -1505,81 +1840,32 @@ def write_slides():
             + "}\\end{column}\n\\end{columns}",
             "tools/exp17_input_neurons.py --mask vis20, exp17_stim_coherence.py",
             deck_title="the input neurons $\\cdot$ 20 \\% of the neurons, by their coherence with the stimulus")))
-    # Cedric, 2026-10-06: slide 8, THE MODEL -- the known ODE with current synapses, its learnables the main focus
-    # (data/b19_nominal_learnables.json: the law built from its spec, every count read off it)
-    jl_ = os.path.join(EXP, "data", "b19_nominal_learnables.json")
-    if os.path.exists(jl_):
-        L_ = json.load(open(jl_))
-        N_, F_ = L_["N"], L_["forcing_dim"]
-        from plexus.paths import graphs_data_path as gdp_
-        mz_ = np.load(gdp_("zebrafish", "input_mask_destripe_bal20.npz"))   # zap_b19_nom's input_mask since 2026-10-06
-        nm_ = int((mz_["mask"] > 0).sum())
-        nB_ = int((mz_["mask_by_input"] > 0).sum())       # the per-feature mask: B_ik learned only where it is 1
-        nb_per = nB_ / max(nm_, 1)
-        lr_ = {(l.get("param") or l.get("block")): l for l in L_["learnable"]}
-        pr_ = lambda k: (f"L1 {lr_[k]['prior']['l1']:.1e} L2 {lr_[k]['prior']['l2']:.1e}".replace("e-0", "e-")    # noqa: E731
-                         if lr_[k].get("prior") else "--")
-        st_ = lambda k: f"{lr_[k]['lr']:.0e}".replace("e-0", "e-")                                                # noqa: E731
-        tmin_, tmax_ = 0.914 / L_["rate_max"], 0.914 / L_["rate_min"]
-        # Cedric, 2026-10-07: the mesh of levels 0 (every neuron), 1 (32-um cubes), 2 (64-um cubes) -- W short / middle /
-        # long one per directed edge of each (data/b19_graphs.json, from cell_ops._neuron_mesh_edges)
-        ws_ = json.load(open(os.path.join(EXP, "data", "b19_graphs.json")))["triangular_W_sets"]
-        # Cedric, 2026-10-07: slide 9 the per-feature mask, slide 10 its twin on the balanced 20 % mask, all 22 columns
-        for var_ in ("feature", "all"):
-            rws = [("$W_{ij}$, short", "per directed edge $j \\to i$, level 0 (every neuron)",
-                    ws_["short"], pr_("W_short"), st_("W_short")),
-                   ("$W_{ij}$, middle", "per edge, level 1 (32 \\textmu m)", ws_["mid"], pr_("W_mid"),
-                    st_("W_mid")),
-                   ("$W_{ij}$, long", "per edge, level 2 (64 \\textmu m)", ws_["long"], pr_("W_mid"),
-                    st_("W_mid")),
-                   ("$\\tau_i$", f"per neuron, in [{tmin_:.0f}, {tmax_:.0f}] s", N_, "--", st_("tau")),
-                   ("$V_i$", "per neuron, its baseline", N_, "--", st_("rest")),
-                   (("$B_{ik}$", f"its selecting feature(s) only: {nb_per:.1f} per input neuron", nB_, "--", st_("input"))
-                    if var_ == "feature" else
-                    ("$B_{ik}$", f"per input neuron and feature ({F_})", nm_ * F_, "--", st_("input"))),
-                   ("$\\theta_\\Omega$", "the SIREN of $\\Omega_i(t)$, shared", L_["omega_mlp"], "--",
-                    st_("omega_mlp"))]
-            tot_ = sum(r[2] for r in rws)
-            body8 = ("\\vspace*{2\\baselineskip}\\fitcol{%\n"              # Cedric, 2026-10-06: 2 lines above, 1 below
-                     + "{\\Large\\textbf{\\textcolor{yellow}{known ODE, current synapses}}}\\\\[4pt]\n"   # yellow, large (Cedric, 2026-10-08)
-                     + "{\\Large $\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_i + \\Omega_i(t)\\textstyle\\sum_j W_{ij}\\tanh z_j "
-                     "+ B_i\\cdot u(t)$\\par}\\vspace{\\baselineskip}\n"
-                     "{\\small\\raggedright $z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges "
-                     "$j \\to i$; $\\Omega_i(t) = 1 + \\mathrm{SIREN}(x_i, y_i, z_i, t)$ scales the summed message; $u(t)$ "
-                     "the known stimulus; stepped 4 times per frame, the leak solved exactly over each step with the message and "
-                     "stimulus held fixed (exponential Euler). $B_i = 0$ unless neuron $i$ is an input neuron (the balanced "
-                     "20 \\% mask); " + ("an input neuron reads only the feature(s) that selected it, the 9 condition "
-                                         "markers none." if var_ == "feature" else
-                                         "an input neuron reads the whole stimulus, all 22 columns.")
-                     + "\\par}\\vspace{8pt}\n"
-                     "{\\Large\\textbf{\\textcolor{yellow}{" + f"{tot_:,} learned values" + "}}\\par}\\vspace{4pt}\n"
-                     "{\\normalsize\\begin{tabular}{@{}l@{\\hspace{5pt}}p{10.5em}@{\\hspace{4pt}}r@{\\hspace{4pt}}p{4.2em}@{\\hspace{4pt}}l@{}}\n"
-                     "learnable & what & count & prior & step \\\\\n\\hline\n"
-                     + "".join(f"\\rule{{0pt}}{{2.4ex}}{a} & {b} & {c:,} & {d} & {e} \\\\\n" for a, b, c, d, e in rws)
-                     + "\\end{tabular}\\par}\\vspace{8pt}\n"
-                     "{\\small\\raggedright Trained on the recording itself: "
-                     f"{L_['stages']:,} updates of Adam, the forecast horizon growing from 1 to {L_['horizon_max']} frames, "
-                     "the loss the squared error on dF/F. $B_i$ is zero outside the input neurons.\\par}}")
-            # Cedric, 2026-10-07: three columns -- left the input neurons lit by their feature (13 colours) over the stimulus
-            # kymograph, middle the law's text, right the recording over the brain mean; the two movies on the same frames
-            # (tools/exp17_model_movies.py), so they play in step
-            mv9_ = lambda st_: ("\\playmovie[\\linewidth]{Movies/" + st_ + "}"                                # noqa: E731
-                                if os.path.exists(os.path.join(PRES, "Movies", st_ + ".mp4")) else "")
-            gf_ = ("\\includegraphics[width=\\linewidth,height=\\colheight,keepaspectratio]{figs/b19_graph_fish.png}"
-                   if os.path.exists(os.path.join(PRES, "figs", "b19_graph_fish.png")) else "")
-            # Cedric, 2026-10-07: the priors left to right -- the graph, the sparse stimulus, the law -- and what they predict
-            body8 = ("\\vspace*{0.06\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.165\\textwidth}\\centering"
-                     + mv9_("b19_model_inputs" if var_ == "feature" else "b19_model_inputs_all")
-                     + "\\end{column}\n\\begin{column}{0.165\\textwidth}\\centering"
-                     + gf_ + "\\end{column}\n\\begin{column}{0.48\\textwidth}\\centering"
-                     + body8.replace("\\vspace*{2\\baselineskip}\\fitcol{%", "\\fitcol{%", 1)
-                     + "\\end{column}\n\\begin{column}{0.165\\textwidth}\\centering" + mv9_("b19_model_recording")
-                     + "\\end{column}\n\\end{columns}")
-            deck.append(("06_model" if var_ == "feature" else "06b_model_all", S.frame_wide(
-                "the model: the known ODE, current synapses", body8, "zap_b19_nom's spec (data/b19_nominal_learnables.json)",
-                deck_title="the model $\\cdot$ the known ODE, current synapses" + (" $\\cdot$ per-feature stimulus mask"
-                                                                                  if var_ == "feature" else
-                                                                                  " $\\cdot$ balanced 20 \\% mask, all features"))))
+    # Cedric, 2026-10-06: slide 8, THE MODEL -- the known ODE with current synapses, its learnables the main focus.
+    # 2026-10-09 ("replace the model prose with the model's exact equation, checked against spec and code"): the law of
+    # 22.1, the nominal the results below are built on, read by law_of from its specs and best.pt -- not the stale
+    # data/b19_nominal_learnables.json of zap_b19_nom (122,500 updates); the per-feature twin (hidden 06_model) dropped
+    if True:
+        Ln_ = law_of("zap_n22_nom")
+        body8 = law_block_(Ln_["spec"], Ln_["title"] + " (22.1, the nominal)", eq_aligned(Ln_["lines"]),
+                           "\\par\\vspace{1pt}\n".join(Ln_["syms"]), Ln_["rows"], "")
+        # Cedric, 2026-10-07: three columns -- left the input neurons lit by their feature (13 colours) over the stimulus
+        # kymograph, middle the law's text, right the recording over the brain mean; the two movies on the same frames
+        # (tools/exp17_model_movies.py), so they play in step
+        mv9_ = lambda st_: ("\\playmovie[\\linewidth]{Movies/" + st_ + "}"                                # noqa: E731
+                            if os.path.exists(os.path.join(PRES, "Movies", st_ + ".mp4")) else "")
+        gf_ = ("\\includegraphics[width=\\linewidth,height=\\colheight,keepaspectratio]{figs/b19_graph_fish.png}"
+               if os.path.exists(os.path.join(PRES, "figs", "b19_graph_fish.png")) else "")
+        # Cedric, 2026-10-07: the priors left to right -- the graph, the sparse stimulus, the law -- and what they predict
+        body8 = ("\\vspace*{0.06\\textheight}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.165\\textwidth}\\centering"
+                 + mv9_("b19_model_inputs_all")
+                 + "\\end{column}\n\\begin{column}{0.165\\textwidth}\\centering"
+                 + gf_ + "\\end{column}\n\\begin{column}{0.48\\textwidth}\\centering" + body8
+                 + "\\end{column}\n\\begin{column}{0.165\\textwidth}\\centering" + mv9_("b19_model_recording")
+                 + "\\end{column}\n\\end{columns}")
+        deck.append(("06b_model_all", S.frame_wide(
+            "the model: the known ODE, current synapses", body8,
+            "config/zapbench/zap_n22_nom.yaml, config/training/zapbench/zap_n22_nom.yaml; cell_ops: neuron_graph",
+            deck_title="the model $\\cdot$ 22.1, the nominal: the known ODE, current synapses, balanced 20 \\% mask")))
         # slide 9: the variants of the law
         mods_ = [("known ODE, current synapses",
                   "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_i + \\Omega_i(t)\\textstyle\\sum_j W_{ij}\\tanh z_j + B_i\\cdot u(t)$",
@@ -1606,45 +1892,28 @@ def write_slides():
                                                  "neuron_graph_mlp_leak, neuron_graph_mlp",
                                                  deck_title="the model $\\cdot$ the variants: two known ODEs and two GNN-MLPs")))
         # Cedric, 2026-10-07: batch 21's law, the angular modulation (exp18's phase_rotated on the neuron graph; the
-        # GNN_Transformer note, Eq. 27), in the variants slide's look
-        # Cedric, 2026-10-09: "write the slide like slide 24: the known-ODE equation first, complete, small text, and the
-        # table of learnables" -- 21.2's law (zap_n21_ph), its learnables counted from its best.pt
-        import torch as torch_
-        from plexus import trainer as Tr_
-        sp21_ = Tr_.load("zap_n21_ph")
-        ck21_ = os.path.join(Tr_.out_dir(sp21_), "models", "best.pt")
-        f21_ = torch_.load(ck21_, weights_only=False, map_location="cpu")["fitted"] if os.path.exists(ck21_) else {}
-        c21_ = {k: int(v.numel()) for k, v in f21_.items()}
-        rows21 = [("$W_{ij}$, short", "per directed edge $j \\to i$, level 0 (every neuron)", c21_.get("state_diffuse.W_short", 0), "W_short"),
-                  ("$W_{ij}$, middle", "per edge, level 1 (32 \\textmu m)", c21_.get("state_diffuse.W_mid", 0), "W_mid"),
-                  ("$W_{ij}$, long", "per edge, level 2 (64 \\textmu m)", c21_.get("state_diffuse.W_long", 0), "W_long"),
-                  ("$\\varphi_{ab}$", "per ordered pair of cell types (25 $\\times$ 25), rad", c21_.get("state_diffuse.phi", 0), "phi"),
-                  ("$\\tau_i$", "per neuron, in [1, 100] s", c21_.get("neuron.tau", 0), "tau"),
-                  ("$V_i$", "per neuron, its baseline", c21_.get("neuron.rest", 0), "rest"),
-                  ("$B_{ik}$", "per input neuron and feature (22)",
-                   int((np.load(gdp_("zebrafish", "input_mask_destripe_bal20.npz"))["mask"] > 0).sum()) * 22, "input"),
-                  ("$\\theta_\\alpha$", "the SIREN of $\\alpha(t)$", c21_.get("state_diffuse.alpha_mlp", 0), "alpha_mlp")]
-        eq21 = ("$\\begin{aligned}\\tau_i\\,\\dfrac{dz_i}{dt} &= -z_i + V_i + \\textstyle\\sum_j W_{ij}\\tanh z_j\\,"
-                "\\cos\\!\\big(\\varphi_{t(j)\\,t(i)} - \\alpha(t)\\big)\\\\ &\\quad + B_i\\cdot u(t)\\\\ \\alpha(t) &= "
-                "f_\\theta(t)\\end{aligned}$")
-        small21 = ("$z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges $j \\to i$, its three levels; "
-                   "no $\\Omega$. Each message turned by one broadcast angle: the factor is 1 when $\\alpha$ sits on the "
-                   "pair's phase, 0 a quarter turn away, $-1$ half a turn (the edge reverses). $\\varphi_{ab}$, $a = t(j)$ "
-                   "the sender's type, $b = t(i)$ the receiver's: the types are the Z-Brain regions (24 + other), the "
-                   "phases started at random since at $\\varphi = \\alpha = 0$ both gradients vanish. $\\alpha(t)$ one angle "
-                   "for the whole brain per frame, $f_\\theta$ a SIREN of the frame time, 0 untrained, a 0.1-rad jitter per "
-                   "training rollout. $B_i = 0$ outside the input neurons (the balanced 20 \\% mask).")
-        foot21 = ("Batch 21: 21.1 no $\\Omega$, no angle; 21.2 this law; 21.3 seed 1; 21.4 $f_\\theta(t, e_{k(t)})$ with the "
-                  "block's one-hot; 21.5 $\\alpha_k$ one learned angle per block; 21.6 no jitter; 21.7 gain only, "
-                  "$(1 + \\cos)/2$; 21.8 $\\varphi$ fixed at random; 21.9 per-edge $\\varphi_{ij}$; 21.10 per-edge + block.")
-        body21 = "\\vspace*{2\\baselineskip}" + law_block_(sp21_, "known ODE, the angular modulation (21.2)", eq21, small21,
-                                                          rows21, foot21)
+        # GNN_Transformer note, Eq. 27); 2026-10-09: "write the slide like slide 24", then "the model's exact equation,
+        # checked against spec and code" -- batch 21 was killed (the checkpoint-recompute frame bug), its twins are batch
+        # 24 (checkpoint: false, + a baseline offset per block): 24.2's law (zap_n24_ph), read by law_of
+        L21_ = law_of("zap_n24_ph")
+        foot21 = ("Batch 24, each 21.k's twin with checkpoint: false and $\\Delta V_{i,k}$: 24.1 no $\\Omega$, no angle; 24.2 "
+                  "this law; 24.3 seed 1; 24.4 $f_\\theta(t, e_{k(t)})$; 24.5 $\\alpha_k$ one learned angle per block; "
+                  "24.6 no jitter; 24.7 $\\tfrac12(1 + \\cos)$; 24.8 $\\varphi$ not learned; 24.9 $\\varphi_{ij}$ per edge; "
+                  "24.10 per edge + $f_\\theta(t, e_{k(t)})$.")
+        body21 = "\\vspace*{2\\baselineskip}" + law_block_(L21_["spec"], L21_["title"] + " (24.2)", eq_aligned(L21_["lines"]),
+                                                          "\\par\\vspace{1pt}\n".join(L21_["syms"]), L21_["rows"], foot21)
         # Cedric, 2026-10-08: a right column with exp18's toy model -- one fixed wiring, six circuits, one angle each
         # (tools/exp17_exp18_toy.py: held-out traces, the angles on the circle), black
         if all(os.path.exists(os.path.join(PRES, "figs", f_)) for f_ in ("exp18_toy_traces.png", "exp18_toy_circle.png")):
-            body21 = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.56\\textwidth}\n"
-                      + body21.replace("\\vspace*{2\\baselineskip}\\fitcol", "\\vspace*{0.05\\textheight}\\fitcol", 1)   # a bit down (2026-10-08)
-                      + "\\end{column}\n\\begin{column}{0.42\\textwidth}\\vspace*{0.05\\textheight}\n"
+            # 2026-10-09: the law in two fitted columns, its equation and symbols, then its learnables (one column was
+            # too long to read), and exp18 on the right
+            l21L_, l21R_ = law_block_(L21_["spec"], L21_["title"] + " (24.2)", eq_aligned(L21_["lines"], narrow=True),
+                                      "\\par\\vspace{1pt}\n".join(L21_["syms"]), L21_["rows"], foot21, split=True)
+            body21 = ("\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.33\\textwidth}\n"
+                      "\\vspace*{0.03\\textheight}\\setlength{\\colheight}{0.70\\textheight}" + l21L_
+                      + "\\end{column}\n\\begin{column}{0.41\\textwidth}\n"
+                      "\\vspace*{0.03\\textheight}\\setlength{\\colheight}{0.70\\textheight}" + l21R_
+                      + "\\end{column}\n\\begin{column}{0.24\\textwidth}\\vspace*{0.03\\textheight}\n"
                         # the header and caption in a fitted column too, so at the left's size (Cedric, 2026-10-08)
                         "\\fitcol{%\n{\\Large\\textbf{exp18: one wiring, six laws}}\\\\[4pt]\n"
                         "{\\small\\raggedright The 285-cell zebrafish oculomotor integrator, its wiring fixed; six laws "
@@ -1653,23 +1922,21 @@ def write_slides():
                         "(white), the circuit (dashed, the law's colour). Right: the wiring, then the six angles\\\\ and the "
                         "held-out error over the law's own variance.\\par}}\\par\\vspace{4pt}\n"
                         # the wiring on top, the angles below (Cedric, 2026-10-08), clear of the title band and the footer
-                        "\\begin{minipage}[t]{0.52\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.54\\textheight,"
+                        "\\begin{minipage}[t]{0.52\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.50\\textheight,"
                         "keepaspectratio]{figs/exp18_toy_traces.png}\\end{minipage}\\hfill"
-                        "\\begin{minipage}[t]{0.46\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.27\\textheight,"
+                        "\\begin{minipage}[t]{0.46\\linewidth}\\vspace{0pt}\\includegraphics[width=\\linewidth,height=0.24\\textheight,"
                         "keepaspectratio]{figs/exp18_toy_W.png}\\par\\vspace{2pt}"
-                        "\\includegraphics[width=\\linewidth,height=0.26\\textheight,keepaspectratio]{figs/exp18_toy_circle.png}"
+                        "\\includegraphics[width=\\linewidth,height=0.21\\textheight,keepaspectratio]{figs/exp18_toy_circle.png}"
                         "\\end{minipage}\n\\end{column}\n\\end{columns}")
         deck.append(("07b_angle", S.frame_wide("the angular modulation", body21,
-                                               "cell_ops: neuron_graph_phase; Allier 2026, GNN_Transformer note, Eq. 27",
-                                               deck_title="the model $\\cdot$ batch 21: the angular modulation")))
+                                               "config/zapbench/zap_n24_ph.yaml; cell_ops: neuron_graph_phase; Allier 2026, GNN_Transformer note, Eq. 27",
+                                               deck_title="the model $\\cdot$ batch 24: the angular modulation")))
     # Cedric, 2026-10-07: an appendix, its title slide as the first deck's slide 66, then the first deck's slide-8 look
     # (the forecast error step by step, panel a) for the held-out runs against ZAPBench (batch 20) that have landed
     # Cedric, 2026-10-07: the nominal's results (19.25 since 2026-10-08; 22.3 since 2026-10-09: "replace every slide built
     # on 19.25 with 22.3"), the first deck's slides 12-17; 22.3 reads the markers, so its V_rest-per-block slides follow
     # its tau by region, as 23.3's do
-    s22_ = slides_run19(S, eq=("known ODE, current synapses, baseline per block",
-                               "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_{i,k(t)}$\\\\ $\\quad + \\Omega_i(t)\\textstyle\\sum_j "
-                               "W_{ij}\\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$"))
+    s22_ = slides_run19(S)
     it22_ = [i for i, (n, _) in enumerate(s22_) if n.startswith("19_tau_")]
     at22_ = it22_[0] + 1 if it22_ else len(s22_)
     s22_[at22_:at22_] = vrest_slides_(S, "zap_n22_markall", "22.3", "markers to every neuron")
@@ -1770,7 +2037,7 @@ def write_slides():
                                                        centred_movie("Movies/b19_fish_prune", right_pf),
                                                        "tools/exp17_b19_deck.py --prune-movie",
                                                        deck_title="batch 22.3 $\\cdot$ zap\\_n22\\_markall $\\cdot$ the whole fish, pruned")))
-        deck += flow_slides(S, "zap_n22_markall", "22.3", "", "each kept edge's message $W_{ji}\\tanh z_j\\,\\Omega_i$",
+        deck += flow_slides(S, "zap_n22_markall", "22.3", "", "each kept edge's message $W^s_{ij}\\tanh z_j\\,\\Omega_i(t)$ (edge $j \\to i$)",
                             "batch 22.3 $\\cdot$ zap\\_n22\\_markall")
         # Cedric, 2026-10-08: excitatory / inhibitory under Dale; batch 22's folds (22.5-22.9) since 2026-10-09
         je_ = os.path.join(EXP, "data", "ei_dale_n22.json")
@@ -1826,15 +2093,11 @@ def write_slides():
     zg20_ = os.path.join(S.GD, "log", "training", "zapbench", "zap_n20_markall", "results", "zap_n20_markall_movie.npz")
     b20_, l20_ = S.bm_metrics(zg20_), S.local_r(zg20_, "zapbench_destripe")
     vs20_ = (f" 20.3: brain-mean r {b20_['r']:.3f}, per-neuron r {l20_['mean']:.3f}." if b20_ and l20_ else "")
-    deck += [x for x in slides_run19(S, run="zap_n23_markall", num="23.3", now_=None, desc=(
-        "20.3's twin retrained without checkpointing: the lattice grid (20.1's law) with each neuron's baseline PER BLOCK: "
-        "every neuron reads the 9 condition markers, so its baseline gains a learned offset per stimulus block (the "
-        "20 \\% input neurons read all 22 columns); SIREN $\\Omega$, $\\tau$ in [1, 100] s, x1 updates. Resumed at "
-        "update 47,500 after a NaN-gradient crash; the gradient guard then skipped 685 of its last 1,500 updates." + vs20_),
-        label="baseline per block, lattice grid", time_="7.8 h + 0.3 h resumed",
-        law=("known ODE, lattice grid, baseline per block",
-             "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_{i,k(t)}$\\\\ $\\quad + \\Omega_i(t)\\,g_i\\textstyle\\sum_{c} w_{ic}$\\\\ "
-             "$\\qquad\\textstyle\\sum_j a_j \\tanh z_j$\\\\ $\\quad + B_i\\cdot u(t)$")) if not x[0].startswith("19_edges_")]
+    deck += [x for x in slides_run19(S, run="zap_n23_markall", num="23.3", now_=None,
+                                     label="baseline per block, lattice grid", time_="7.8 h + 0.3 h resumed", law=True,
+                                     note="20.3's twin with checkpoint: false. Resumed at update 47,500 after a NaN-gradient "
+                                          "crash; the gradient guard then skipped 685 of its last 1,500 updates." + vs20_)
+             if not x[0].startswith("19_edges_")]
     deck += vrest_slides_(S, "zap_n23_markall", "23.3", "baseline per block, lattice grid")
     # Cedric, 2026-10-08: "add twin of 33 34 for 20.3" -- the lattice grid pruned (tools/exp17_prune.py zap_n23_markall,
     # tools/exp17_b19_deck.py --prune-grid), after 23.3's tau by region
@@ -1888,8 +2151,9 @@ def write_slides():
                                                        "tools/exp17_b19_deck.py --prune-grid",
                                                   deck_title="batch 23.3 $\\cdot$ baseline per block, lattice grid $\\cdot$ the whole fish, pruned")))
         new_ += flow_slides(S, "zap_n23_markall", "23.3", "",
-                            "each kept grid hop's message $w_{kl}\\,c_k\\,\\Omega_l\\,g_l$ (corner $k$ to corner $l$; $c_k$ the "
-                            "mean $a_j\\tanh z_j$ of the neurons encoded into $k$)",
+                            "each kept lattice hop's message $W_{kl}^2\\,c_k\\,o_l$ (corner $k$ to corner $l$; $c_k$ the "
+                            "mean of $a_j\\tanh z_j$ over the neurons encoded into $k$; $o_l$ the mean of $\\Omega_i(t)\\,G_i^2/8$ "
+                            "over the neurons decoded from $l$)",
                             "batch 23.3 $\\cdot$ baseline per block, lattice grid")
         if os.path.exists(os.path.join(PRES, "figs", "prune_zap_n23_markall.png")):
             new_.append(("20_prune_dist", S.frame_narrow("the learned grid weights, level by level", "figs/prune_zap_n23_markall.png",
@@ -1914,46 +2178,24 @@ def write_slides():
         T_ = json.load(open(jt_))
         mv_ = os.path.join(S.GD, "log", "training", "zapbench", run_, "results", f"{run_}_movie.npz")
         pn_ = S.local_r(mv_, "zapbench_destripe")["mean"] if os.path.exists(mv_) else float("nan")
-        import torch as torch_
-        from plexus import trainer as Tr_
-        from plexus.paths import graphs_data_path as gdp_
-        spec_ = Tr_.load(run_)
-        fit_ = torch_.load(os.path.join(Tr_.out_dir(spec_), "models", "best.pt"), weights_only=False,
-                           map_location="cpu")["fitted"]
-        cnt_ = {k: int(v.numel()) for k, v in fit_.items()}
-        nin_ = int((np.load(gdp_("zebrafish", "input_mask_destripe_bal20.npz"))["mask"] > 0).sum())
-        rows_ = [("$W_{ij}$, short", "every neuron's neighbours", cnt_["state_diffuse.W_short"], "W_short"),
-                 ("$W_{ij}$, middle", "the 16- and 32-\\textmu m levels", cnt_["state_diffuse.W_mid"], "W_mid"),
-                 ("$W_{ij}$, long", "the 64-\\textmu m cubes", cnt_["state_diffuse.W_long"], "W_long"),
-                 ("$\\varphi_{ij}$", "per edge, rad",
-                  sum(cnt_[f"state_diffuse.phi_{s_}"] for s_ in ("short", "mid", "long")), "phi_short"),
-                 ("$\\tau_i$", "per neuron, in [1, 100] s", cnt_["neuron.tau"], "tau"),
-                 ("$V_i$", "per neuron, its baseline", cnt_["neuron.rest"], "rest"),
-                 ("$\\Delta V_{i,k}$", "per neuron and block (9)", cnt_["neuron.rest_block"], "rest_block"),
-                 ("$B_{ik}$", "per input neuron and feature (22)", nin_ * 22, "input"),
-                 ("$\\theta_\\alpha$", "the SIREN of $\\alpha$" + (", time and block" if ctx_ else ", time"),
-                  cnt_["state_diffuse.alpha_mlp"], "alpha_mlp")]
-        eq_ = ("$\\begin{aligned}\\tau_i\\,\\dfrac{dz_i}{dt} &= -z_i + V_i + \\Delta V_{i,k(t)}\\\\ &\\quad + \\textstyle\\sum_j "
-               "W_{ij}\\tanh z_j\\,\\cos\\!\\big(\\varphi_{ij} - \\alpha(t)\\big) + B_i\\cdot u(t)\\\\ \\alpha(t) &= "
-               + ("f_\\theta\\big(t, e_{k(t)}\\big)" if ctx_ else "f_\\theta(t)") + "\\end{aligned}$")
-        small_ = ("$z_i$ neuron $i$'s dF/F, normalised; the sum over the mesh's directed edges $j \\to i$; no $\\Omega$. "
-                  "Each message turned by $\\cos(\\varphi_{ij} - \\alpha(t))$: 1 when the angle sits on the edge's phase, "
-                  "$-1$ half a turn away (the edge reverses). $\\varphi_{ij}$ one phase per edge, started uniform in "
-                  "$[0, 2\\pi)$. $\\alpha(t)$ one angle for the whole brain per frame, $f_\\theta$ a SIREN of the frame time"
-                  + (" and of $e_{k(t)}$, the stimulus block's one-hot" if ctx_ else "")
-                  + ", with a 0.1-rad jitter in training. $V_i + \\Delta V_{i,k(t)}$ the baseline while block $k$ plays. "
-                    "$B_i = 0$ outside the input neurons (the balanced 20 \\% mask).")
+        # 2026-10-09: the law read by law_of from the run's specs, best.pt and cell_ops (was hand-written: its W_mid row
+        # read "the 16- and 32-um levels", the mesh's mid set is the 32-um level alone)
+        La_ = law_of(run_)
         q_ = A_["dphi_quantiles_deg_10_50_90"]
         am_ = A_["alpha_block_mean_deg"]
-        foot_ = (f"Free rollout of the 2 h: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r {pn_:.3f}, long "
-                 f"skill {T_['skill_long']:.3f}. Top: the block mean of $\\alpha$, {min(am_[:4]):+.0f} to {max(am_[:4]):+.0f} deg in "
+        foot_ = (f"Free rollout of the 2 h: brain-mean r {T_['free']['brain_mean_r']:.3f}, per-neuron r {pn_:.3f}; forecast "
+                 f"skill over steps 16-32 (1 $-$ its MSE over the best mean baseline's) {T_['skill_long']:.3f}. Top: the block mean of $\\alpha$, {min(am_[:4]):+.0f} to {max(am_[:4]):+.0f} deg in "
                  f"the first four blocks, {min(am_[4:]):+.0f} to {max(am_[4:]):+.0f} in the last five. "
                  f"The phases moved a median {q_['short'][1]:.0f} / {q_['mid'][1]:.0f} / {q_['long'][1]:.0f} deg "
                  f"(short / mid / long) from their start.")
-        lawL_, lawR_ = law_block_(spec_, f"known ODE, the angle ({num_})", eq_, small_, rows_, foot_, split=True)
+        lawL_, lawR_ = law_block_(La_["spec"], La_["title"] + f" ({num_})", eq_aligned(La_["lines"]),
+                                  "\\par\\vspace{1pt}\n".join(La_["syms"]), La_["rows"], foot_, split="balanced")
         body_a = ("\\vspace*{0.03\\textheight}\\centering\\includegraphics[width=0.97\\textwidth,height=0.27\\textheight,"
                   "keepaspectratio]"
                   f"{{figs/angle_{run_}.png}}\\par\\vspace{{4pt}}\n"
+                  # the columns fitted to what the figure leaves above the footer (Cedric, 2026-10-09: "text too close
+                  # from bottom"; \\colheight is 0.80 of the slide, the figure takes 0.27 of it)
+                  "\\setlength{\\colheight}{0.46\\textheight}"
                   "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\\centering" + lawL_
                   + "\\end{column}\n\\begin{column}{0.49\\textwidth}\\centering" + lawR_
                   + "\\end{column}\n\\end{columns}")
@@ -1964,15 +2206,15 @@ def write_slides():
             # test, the learned constants, tau and V_rest by region, the V_rest offsets per block (exp17_param_maps,
             # exp17_tau_regions [--vrest], exp17_vrest_blocks, exp17_run_movie); no Omega, so no modulation slide
             lab24_ = "the angle, $\\varphi$ per edge + block"
-            deck += [x for x in slides_run19(S, run=run_, num=num_, now_=None, label=lab24_, desc=(
-                "the known ODE on the mesh with every message turned by $\\cos(\\varphi_{ij} - \\alpha(t))$: one phase per "
-                "edge, $\\alpha(t)$ a SIREN of the frame time and of the block's one-hot; each neuron's baseline per "
-                "block; no $\\Omega$; $\\tau$ in [1, 100] s, x1 updates (H100)"),
-                law=("known ODE, the angle (24.10)",
-                     "$\\tau_i\\,\\dfrac{dz_i}{dt} = -z_i + V_i + \\Delta V_{i,k(t)}$\\\\ $\\quad + \\textstyle\\sum_j "
-                     "W_{ij}\\tanh z_j\\,\\cos(\\varphi_{ij} - \\alpha(t))$\\\\ $\\quad + B_i\\cdot u(t)$"))
-                     if not x[0].startswith("19_edges_")]
+            deck += [x for x in slides_run19(S, run=run_, num=num_, now_=None, label=lab24_, law=True, law_slide=False)
+                     if not x[0].startswith("19_edges_")]           # its law: the angle slide above
             deck += vrest_slides_(S, run_, num_, lab24_)
+    # Cedric, 2026-10-09: batch 25 (the input mask by region, running) and batch 26 (the stimulus video, planned), each
+    # one description slide, after 24.10's results
+    for f_ in (batch25_slide, batch26_slide):
+        it_ = f_(S)
+        if it_:
+            deck.append(it_)
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     # THE EYE CIRCUIT ON ZAPBENCH'S 2-H SESSION (Cedric, 2026-10-08: "replace slide 48 with the new 2H data", "rotation
