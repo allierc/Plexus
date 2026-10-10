@@ -3465,7 +3465,8 @@ def _render_variant(spec, out, stem, nm, res_dir=None, variant=None, path=None):
 SILENCE_RANGE = (-1.0, 3.0)   # dF/F; the free rollout freezes an element outside it (finding 21)
 
 
-def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None, res_dir=None, traces_path=None):
+def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None, res_dir=None, traces_path=None,
+                n_frames=None):
     """ONE FREE ROLLOUT of the whole recording from the law's first `inputs` frames: R^2 per frame over the elements,
     raw and against the denoised recording (results/<stem>_free.npz), and THE MOVIE sampled from this same rollout
     (Cedric, 2026-10-02: the whole 2 h, not a 200-frame restart): `n_movie` frames evenly spaced over it, the learned
@@ -3474,7 +3475,8 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None, 
     its `drive: off`, its `clamp:` elements given their recorded frames and left out of R2 and the brain mean; the
     graph phase's kinds too (`prune:`, `zero_input:`, `pulse:`, `clock:`), each recorded in the summary. `res_dir`:
     where the npz go (default results/); `traces_path`: an .npy written with EVERY predicted frame, float16 [T, N],
-    NaN before the first free frame and for silenced elements (the every-frame traces of the graph phase)."""
+    NaN before the first free frame and for silenced elements (the every-frame traces of the graph phase); `n_frames`:
+    only that many free frames from the start (a short rollout: the graph phase's pulses), default the whole recording."""
     from plexus.tasks import trace_recording as TR
     X, T = box["X"], box["T"]
     variant = variant or {}
@@ -3488,7 +3490,7 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None, 
                              "a clamp needs some elements given and some free")
     w = _warmup(spec)
     o0 = box["n_in"] - 1 + w                # the free rollout's first origin, after its warm-up
-    n = T - 1 - o0
+    n = T - 1 - o0 if n_frames is None else max(1, min(int(n_frames), T - 1 - o0))
     sim = _model(spec, train=False, n_frames=w + n - 1)
     Xd = TR.denoise(X)
     r2r, r2d, finite = np.zeros(n), np.zeros(n), True
@@ -3790,7 +3792,7 @@ def graph(spec, device="cpu", root=None):
 PHASES = {"train": train, "test": test, "analyse": analyse, "graph": graph}
 
 
-def run_phases(name_or_path, phases, device="cpu", root=None, checkpoint=None, controls=None):
+def run_phases(name_or_path, phases, device="cpu", root=None, checkpoint=None, controls=None, regions=None):
     """`Plexus_Main.py -o train_test_analyse <name>` lands here. `checkpoint` (a trace run's test/analyse/graph only):
     score models/<checkpoint>.pt, e.g. `stage_05`, and write its results under <name>_<checkpoint>_*. `controls`
     ({no_w, mean_field, seed, random}: run names) are the graph phase's trained controls, the CLI twin of
@@ -3805,6 +3807,8 @@ def run_phases(name_or_path, phases, device="cpu", root=None, checkpoint=None, c
         if bad:
             raise ValueError(f"--graph-controls: {bad} are not controls; the controls are {sorted(_KEYS['graph_controls'])}")
         spec["_graph_controls"] = dict(controls)
+    if regions:
+        spec["_graph_regions"] = str(regions)          # the graph phase's atlas (--graph-regions)
     for ph in phases:
         PHASES[ph](spec, device=device, root=root)
 

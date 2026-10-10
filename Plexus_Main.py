@@ -73,6 +73,9 @@ def main():
     parser.add_argument("--graph-controls", default=None,
                         help="training spec, graph: the trained controls to compare the graph with, "
                              "no_w=<run>,mean_field=<run>,seed=<run>,random=<run> (the CLI twin of task.graph.controls)")
+    parser.add_argument("--graph-regions", default=None,
+                        help="training spec, graph: an atlas npz (regions [N, R] bool, names, inside, atlas_um) for the "
+                             "region tests (the CLI twin of task.graph.regions)")
     parser.add_argument("--force", action="store_true",
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
@@ -147,7 +150,8 @@ def main():
     if phases:
         from plexus.trainer import run_phases
         controls = (dict(kv.split("=", 1) for kv in args.graph_controls.split(",") if kv) if args.graph_controls else None)
-        run_phases(config_name, phases, device=args.device, checkpoint=args.checkpoint, controls=controls)   # --output_root set the root
+        run_phases(config_name, phases, device=args.device, checkpoint=args.checkpoint, controls=controls,
+                   regions=args.graph_regions)    # --output_root set the root
         return
 
     # THE PIPELINE IS ONE FUNCTION AND THIS IS ITS COMMAND LINE. `plexus.pipeline.generate` is what
