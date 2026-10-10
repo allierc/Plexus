@@ -2265,15 +2265,17 @@ def write_slides():
     # Cedric, 2026-10-08: twins of the ARTR and antiphase slides on the LEARNED nominal law's free rollout of the 2 h
     # (tools/exp17_model_traces.py; exp17_artr.py / exp17_phase.py --model), right after its run slide; 22.3's since
     # 2026-10-09
-    def twin_(mv_true, mv_):
+    def twin_(mv_true, mv_, law_="22.3", foot_=""):
         # Cedric, 2026-10-09: "draw the comparison with 14 / 15: left column true, middle column learned, right column
         # text"; then "slide 30 remove the text, do the same in other like slides": the two movies alone, side by side,
         # centred in height
         hd_ = lambda s_: "{\\fontsize{6.5}{7.5}\\selectfont\\textbf{" + s_ + "}}\\par\\vspace{2pt}"     # noqa: E731
         return ("\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]\n\\begin{column}{0.49\\textwidth}\\centering"
                 + hd_("the recording") + "\\playmovie[\\linewidth]{Movies/" + mv_true + "}\\end{column}\n"
-                "\\begin{column}{0.49\\textwidth}\\centering" + hd_("the learned 22.3 law")
-                + "\\playmovie[\\linewidth]{Movies/" + mv_ + "}\\end{column}\n\\end{columns}\\vspace*{\\fill}")
+                "\\begin{column}{0.49\\textwidth}\\centering" + hd_(f"the learned {law_} law")
+                + "\\playmovie[\\linewidth]{Movies/" + mv_ + "}\\end{column}\n\\end{columns}"
+                + ("\\par\\vspace{3pt}{\\fontsize{5.5}{6.5}\\selectfont\\color{gray} " + foot_ + "\\par}" if foot_ else "")
+                + "\\vspace*{\\fill}")
     if all(os.path.exists(os.path.join(PRES, "Movies", f_)) for f_ in ("artr_model.mp4", "artr.mp4")):
         deck.append(("19_artr_model", S.frame_wide("the ARTR, in the learned model", twin_("artr", "artr_model"),
                                                    "tools/exp17_artr.py --movie --model zap_n22_markall",
@@ -2283,6 +2285,53 @@ def write_slides():
                                                     twin_("phase_rotation", "phase_rotation_model"),
                                                     "tools/exp17_phase.py --movie --model zap_n22_markall",
                                                     deck_title="batch 22.3 $\\cdot$ the learned model $\\cdot$ the rotation block, in antiphase")))
+    # Cedric, 2026-10-10: "a twin of 29 for neurons that are not correlated to the stimuli and not silent, sorted by
+    # non-correlation; a twin for neurons that are correlated but have a large lag, sorted by lag; twins of these three
+    # slides for 23.3" (tools/exp17_phase.py --select quiet / lagged; the selection on the recording, the same rows)
+    def sel_foot_(sel_, run_):
+        jr_ = os.path.join(EXP, "data", f"phase_rotation_{sel_}.json")
+        jm_ = os.path.join(EXP, "data", f"phase_rotation_{sel_}_model" + ("" if run_ == "zap_n22_markall" else f"_{run_}") + ".json")
+        if not (os.path.exists(jr_) and os.path.exists(jm_)):
+            return ""
+        R_, M_ = json.load(open(jr_)), json.load(open(jm_))
+        rule_ = (f"R$^2$ of the 60-s sinusoid below {R_['rule']['r2_max_null_median']:.4f} (the null's median), dF/F SD over "
+                 f"the block at least {R_['rule']['sd_min']:.4f}; rows by R$^2$, the least first"
+                 if sel_ == "quiet" else
+                 f"R$^2$ above {R_['rule']['r2_min']:.3f} (the null's 99.9th percentile), phase lag between 7.5 and 22.5 s or "
+                 f"37.5 and 52.5 s behind the rotation; rows by lag; colour by lag")
+        q_ = M_["model_vs_recording_r_10_50_90"]
+        return (f"{R_['neurons']:,} neurons chosen on the recording: {rule_}. The same neurons and rows in the law's free "
+                f"rollout; r of the law's trace with the recording's over the window: {q_[1]:.2f} median "
+                f"({q_[0]:.2f} .. {q_[2]:.2f}, 10th-90th percentile).")
+    for sel_, ttl_ in (("quiet", "not correlated with the rotation, not silent"), ("lagged", "correlated with the rotation, lagged")):
+        for run_, num_ in (("zap_n22_markall", "22.3"), ("zap_n23_markall", "23.3")):
+            mv_ = f"phase_rotation_{sel_}_model" + ("" if run_ == "zap_n22_markall" else f"_{run_}")
+            if all(os.path.exists(os.path.join(PRES, "Movies", f_ + ".mp4")) for f_ in (f"phase_rotation_{sel_}", mv_)):
+                deck.append((f"19_phase_{sel_}_{num_}", S.frame_wide(f"{ttl_}, in the learned model",
+                                                                    twin_(f"phase_rotation_{sel_}", mv_, num_, sel_foot_(sel_, run_)),
+                                                                    f"tools/exp17_phase.py --movie --select {sel_} --model {run_}",
+                                                                    deck_title=f"batch {num_} $\\cdot$ the learned model $\\cdot$ {ttl_}")))
+    if all(os.path.exists(os.path.join(PRES, "Movies", f_)) for f_ in ("phase_rotation_model_zap_n23_markall.mp4", "phase_rotation.mp4")):
+        deck.append(("19_phase_23.3", S.frame_wide("half a cycle apart, in the learned model",
+                                                   twin_("phase_rotation", "phase_rotation_model_zap_n23_markall", "23.3"),
+                                                   "tools/exp17_phase.py --movie --model zap_n23_markall",
+                                                   deck_title="batch 23.3 $\\cdot$ the learned model $\\cdot$ the rotation block, in antiphase")))
+    # Cedric, 2026-10-10: "full vs W = 0 scored block by block" (tools/exp17_w0_blocks.py)
+    jw0_ = os.path.join(EXP, "data", "w0_blocks.json")
+    if os.path.exists(jw0_) and os.path.exists(os.path.join(PRES, "figs", "w0_blocks.png")):
+        W0_ = json.load(open(jw0_))
+        right_w0 = (S.head("full and W = 0, block by block")
+                    + "{\\scriptsize\\raggedright Two free rollouts of every frame from each trained law: the full law, and "
+                      "the law with its graph silenced (22.3 and 24.10: $W^{short} = W^{mid} = W^{long} = 0$; 23.3: $a_j = 0$, "
+                      "every message 0). Scored within each stimulus block, on its frames after the rollout's first "
+                      f"{W0_['skip_min']:.0f} min. Brain-mean r: the predicted against the recorded brain-mean dF/F over the "
+                      "block. Per-neuron r: per neuron, the recorded and the predicted trace over the block each regressed on "
+                      "its own brain mean, then correlated, a flat predicted residual scored 0; the mean over the neurons "
+                      "finite in both rollouts with a moving recorded residual in the block. Numbers above the bars: full "
+                      "minus W = 0; $^\\circ$: the gaps on the block's two halves differ in sign.\\par}")
+        deck.append(("19_w0_blocks", S.frame_narrow("the graph's share, block by block", "figs/w0_blocks.png", right_w0,
+                                                    "tools/exp17_w0_blocks.py (data/w0_blocks.json)", left=0.70, height=0.62,
+                                                    deck_title="batches 22.3, 23.3, 24.10 $\\cdot$ full and W = 0, block by block")))
     # Cedric, 2026-10-08: the learned W's distribution per level, a threshold per level below which an edge is removable
     # (tools/exp17_prune.py), and slide 18's window with those edges removed level by level (prune_window); they replace
     # the edge-weights slide (22.3's since 2026-10-09)
@@ -2613,6 +2662,23 @@ def write_slides():
         if rn_ in nm_:
             it_ = deck.pop(nm_.index(mfn_))
             deck.insert([n for n, _ in deck].index(rn_) + 1, it_)
+    deck = clamp_slides(S, deck)                       # the input-neuron clamp after each mean-field slide (2026-10-10)
+    def move_after_(name_, after_):
+        nm_ = [n for n, _ in deck]
+        if name_ in nm_ and after_ in nm_:
+            it_ = deck.pop(nm_.index(name_))
+            deck.insert([n for n, _ in deck].index(after_) + 1, it_)
+    move_after_("19_phase_quiet_22.3", "19_phase_model")
+    move_after_("19_phase_lagged_22.3", "19_phase_quiet_22.3")
+    a23_ = [n for n in [n_ for n_, _ in deck] if n.startswith(("19_run_zap_n23_markall", "19_meanfield_zap_n23", "19_clamp_zap_n23"))]
+    if a23_:                                           # after 23.3's network tests, as 22.3's twins follow its own
+        move_after_("19_phase_23.3", a23_[-1])
+    move_after_("19_phase_quiet_23.3", "19_phase_23.3")
+    move_after_("19_phase_lagged_23.3", "19_phase_quiet_23.3")
+    nm_ = [n for n, _ in deck]
+    last_ = [n for n in nm_ if n.startswith(("19_meanfield_zap_n24", "19_clamp_zap_n24"))]
+    if last_:
+        move_after_("19_w0_blocks", last_[-1])
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
     ed_ = [n for n in nm_ if n.startswith("19_edges_")]
     if ed_:
