@@ -49,6 +49,18 @@ TRI_DEPTH = (TRI_SLAB, 32.0, 64.0)          # um: the window's slab per level, 0
 ENC = "#e78ac3"                           # the neurons-to-grid projection edges, slide 3
 
 
+def status_(runs, batch):
+    """The batch's state read from the run directories (Cedric, 2026-10-10: the batch-25 / 26 slides said "running" /
+    "planned" after every run had landed): trained = report.json, tested = results/<run>_test.json."""
+    GD_ = os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
+    d_ = lambda r: os.path.join(GD_, "log", "training", "zapbench", r)                      # noqa: E731
+    tested = [r for r in runs if os.path.exists(os.path.join(d_(r), "results", f"{r}_test.json"))]
+    trained = [r for r in runs if os.path.exists(os.path.join(d_(r), "results", "report.json"))
+               or os.path.exists(os.path.join(d_(r), "report.json"))]
+    if len(tested) == len(runs):
+        return f"all {len(runs)} runs trained and tested; results on the next slide (batch {batch} $\\cdot$ preliminary results)"
+    return (f"tested {len(tested)} of {len(runs)}, trained {len(trained)} of {len(runs)}; the others running")
+
 def view(P):
     """The destriped anatomy frame turned head-up, as every destriped slide: (y, -x, z)."""
     return np.stack([P[:, 1], -P[:, 0], P[:, 2]], 1)
@@ -1375,8 +1387,8 @@ def batch25_slide(S):
                 "{\\scriptsize\\raggedright Neurons with a non-marker column: " + f"{nn_['bio']:,}" + " (25.1, 25.4), "
               + f"{nn_['bio_eff']:,}" + " (the others); 22.3: 20,195.\\par}" + S.SEC_GAP
               + S.head("status")
-              + "{\\scriptsize\\raggedright running (25.1-25.3 LSF 154614836-38 gpu\\_rtx6000; 25.4-25.6 LSF "
-                "154617482-84 gpu\\_h100); no results yet\\par}")
+              + "{\\scriptsize\\raggedright " + status_(("zap_n25_bio", "zap_n25_bio_eff", "zap_n25_bio_eff_perm", "zap_n25_ph_bio",
+                                                       "zap_n25_ph_bio_eff", "zap_n25_ph_bio_eff_perm"), "25") + "\\par}")
     body_ = ("\\vspace*{0.02\\textheight}\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.54\\textwidth}\\centering"
              "\\includegraphics[width=\\linewidth,height=0.34\\textheight,keepaspectratio]{figs/bio_mask_regions.png}\\par"
              "\\vspace{4pt}\\setlength{\\colheight}{0.38\\textheight}\\fitcol{%\n" + left_ + "}\\end{column}\n"
@@ -1402,7 +1414,7 @@ def batch26_slide(S):
     # Cedric, 2026-10-09: "I do not get why we have a B_i, we should have e_{n,i}, output i of CNN(V_n)"
     eqv_ = eq_aligned([La_["lines"][0].replace("B_i\\cdot\\big(\\mathbf{M}_i \\odot u(t)\\big)", "e_{n(t),i}")]
                       + La_["lines"][1:] + ["e_{n,i} = \\big[\\mathrm{CNN}_\\theta\\big(\\mathcal{V}_n\\big)\\big]_i"])
-    left_ = ("{\\Large\\textbf{\\textcolor{yellow}{batch 26: the stimulus video as input (planned)}}}\\\\[4pt]\n"
+    left_ = ("{\\Large\\textbf{\\textcolor{yellow}{batch 26: the stimulus video as input}}}\\\\[4pt]\n"
              "{\\Large " + eqv_ + "\\par}\\vspace{6pt}\n"
              "{\\small\\raggedright on 22.3's law and on 24.10's law; the stimulus features replaced by the video\\par"
              "\\vspace{1pt}\n"
@@ -1428,8 +1440,11 @@ def batch26_slide(S):
               + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}>{\\raggedright\\arraybackslash}p{15em}@{}}\n"
               + "".join(f"{a} & {b} \\\\\n" for a, b in rows_) + "\\end{tabular}\\par}\\vspace{2pt}\n"
               "{\\tiny\\color{gray} data/video\\_alignment.json (tools/exp17\\_video\\_input.py align)\\par}" + S.SEC_GAP
-              + S.head("the arms, planned")
-              + "{\\scriptsize\\raggedright the encoder on 22.3's law; the encoder on 24.10's law\\par}" + S.SEC_GAP
+              + S.head("the arms")
+              + "{\\scriptsize\\raggedright 26.1 zap\\_n26\\_vid and 26.2 zap\\_n26\\_vid\\_bio: the encoder on 22.3's law, the "
+                "video into the 20,195 data-driven input neurons / the 23,333 visual-region neurons; 26.3 zap\\_n26\\_ph\\_vid and "
+                "26.4 zap\\_n26\\_ph\\_vid\\_bio: the same on 24.10's law. "
+              + status_(("zap_n26_vid", "zap_n26_vid_bio", "zap_n26_ph_vid", "zap_n26_ph_vid_bio"), "26") + "\\par}" + S.SEC_GAP
               + S.head("the movie")
               + "{\\scriptsize\\raggedright per block a 6-s excerpt: left the video as shown (360 $\\times$ 360, 30 "
                 "frames/s), right the model input at that instant (90 $\\times$ 90, the current sub-bin of the current "
@@ -1440,9 +1455,9 @@ def batch26_slide(S):
              + "\\setlength{\\colheight}{0.33\\textheight}\\fitcol{%\n" + left_ + "}\\end{column}\n"
              "\\begin{column}{0.44\\textwidth}\\setlength{\\colheight}{0.70\\textheight}\\fitcol{%\n" + right_
              + "}\\end{column}\n\\end{columns}")
-    return ("26_video_input", S.frame_wide("batch 26: the stimulus video as input (planned)", body_,
+    return ("26_video_input", S.frame_wide("batch 26: the stimulus video as input", body_,
                                             "tools/exp17_video_input.py; data/video_alignment.json",
-                                            deck_title="batch 26 $\\cdot$ the stimulus video as input, planned"))
+                                            deck_title="batch 26 $\\cdot$ the stimulus video as input"))
 
 
 def prelim_slides(S, after):
