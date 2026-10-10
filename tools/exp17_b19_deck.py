@@ -1699,6 +1699,110 @@ def clamp_slides(S, deck):
     return deck
 
 
+def jacobian_slides(S):
+    """THE LINEARISED DYNAMICS, ONE SLIDE PER LAW (Cedric, 2026-10-10: "a Jacobian or impulse-response test ... launch
+    them on 22 to 26"): left figs/jacobian_<run>.png, right the linearisation, its reference state and the numbers of
+    data/jacobian_<run>.json (tools/exp17_jacobian.py). Placed after the law's network tests (mean field, clamp) in
+    write_slides. -> [(name, tex)], one per law whose json and figure exist."""
+    out = []
+    for run, num, lab in (("zap_n22_markall", "22.3", None), ("zap_n23_markall", "23.3", "baseline per block, lattice grid"),
+                          ("zap_n24_ph_edge_blk", "24.10", "the angle, $\\varphi$ per edge + block")):
+        jp_ = os.path.join(EXP, "data", f"jacobian_{run}.json")
+        if not (os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "figs", f"jacobian_{run}.png"))):
+            continue
+        D = json.load(open(jp_))
+        per_ = D.get("per_block")
+        Js = per_ or [D["J"]]
+        K, lk = D["K_LR"], D["leak"]
+        tmax_ = lk["slowest_tau_s"]
+
+        def rng_(vals, fmt):                         # one value, or the range over the blocks
+            lo_, hi_ = min(vals), max(vals)
+            return fmt.format(lo_) if not per_ or fmt.format(lo_) == fmt.format(hi_) else fmt.format(lo_) + " to " + fmt.format(hi_)
+        pr_ = np.concatenate([d["mode_participation_ratio"] for d in Js])
+        sp_ = np.concatenate([d["mode_spread_um"] for d in Js])
+        t20_ = np.concatenate([d["mode_mass_top20"] for d in Js])
+        im_ = max(Js, key=lambda d: d["max_abs_im"])
+        eff_ = {"graph": "$W^{\\mathrm{eff}}_{ij} = \\sum_s W^s_{ij}$, the short, mid and long edges summed",
+                "grid": "$W^{\\mathrm{eff}} = \\mathrm{diag}(g)\\,\\tfrac18\\,D\\,H\\,\\mathrm{diag}(1/n)\\,E\\,"
+                        "\\mathrm{diag}(a)$: $E$ the encode (neuron to corner), $H$ the hop ($w_{kl}$), $D$ the decode "
+                        "(the 8 corners of the neuron's cube), applied factor by factor",
+                "phase": "$W^{\\mathrm{eff}}_{ij} = \\sum_s W^s_{ij}\\cos(\\varphi_{ij} - \\alpha_k)$, $\\alpha_k$ the "
+                         "circular mean of $\\alpha(t)$ over block $k$ (" + rng_(D.get("alpha_block_mean_deg") or [0], "{:+.0f}")
+                         + " deg): one $J$ per block, " + str(len(Js))}[D["kind"]]
+        mt_ = [d["mean_tanh_prime"] for d in Js]
+        if per_:
+            ref_ = ("$z^*_i$: neuron $i$'s mean of $z$ over block $k$'s frames; mean $\\tanh'(z^*)$ "
+                    + rng_(mt_, "{:.2f}") + ". $\\bar\\Omega_i = 1$: the law has no $\\Omega$.")
+        else:
+            oq_ = D["J"]["omega_quantiles_10_50_90"]
+            ref_ = (f"$z^*_i$: neuron $i$'s mean of $z$ over the {D['frames']:,} frames; mean $\\tanh'(z^*)$ {mt_[0]:.2f}. "
+                    f"$\\bar\\Omega_i$: the mean of $\\Omega_i(t)$ over the {D['frames']:,} frames, median {oq_[1]:.2f} "
+                    f"(10-90 \\%: {oq_[0]:.2f}-{oq_[2]:.2f}).")
+        ref_ += (f" $z = (\\mathrm{{dF/F}} - \\mu)/\\sigma$, $\\mu$ = {D['mu']:.3f}, $\\sigma$ = {D['sd']:.3f}; $1/\\tau_i$ "
+                 f"{1 / tmax_:.3f} to {1 / lk['fastest_tau_s']:.2f} /s, median $\\tau$ {lk['tau_quantiles_s_10_50_90'][1]:.1f} s.")
+        cx_ = D.get("crosscheck_rest")
+        if cx_:
+            ref_ += (f" At $z^*_i = V_i$ (the learned rest) instead: abscissa {cx_['rest_omega_i']['abscissa_per_s']:+.3f} /s; "
+                     f"with $\\bar\\Omega_i = 1$, {cx_['rest_c1']['abscissa_per_s']:+.4f} /s.")
+        rows_ = [("spectral abscissa, max Re $\\lambda$", rng_([d["abscissa"] for d in Js], "{:+.4f}") + " /s")]
+        if per_:
+            rows_.append(("the same at $z^*$ = the recording mean", rng_([d["abscissa_zbar"] for d in Js], "{:+.4f}") + " /s"))
+        rows_ += [("leak only ($W = 0$), $-1/\\tau_{\\max}$", f"{lk['abscissa']:+.4f} /s ($\\tau_{{\\max}}$ {tmax_:.0f} s)"),
+                  (f"of the {K}: Re $\\lambda > -1/\\tau_{{\\max}}$", rng_([d["n_slower_than_slowest_leak"] for d in Js], "{:d}")),
+                  (f"of the {K}: Re $\\lambda > 0$", rng_([d["n_unstable"] for d in Js], "{:d}")),
+                  (f"the {K}th largest Re $\\lambda$", rng_([d["eig_re"][-1] for d in Js], "{:+.4f}") + " /s"),
+                  ("largest $|\\mathrm{Im}\\,\\lambda|$ (of the 20 largest)",
+                   f"{im_['max_abs_im']:.2f} /s, period {2 * np.pi / im_['max_abs_im']:.1f} s, Re {im_['max_abs_im_its_re']:+.2f} /s"),
+                  (f"largest $|\\mathrm{{Im}}\\,\\lambda|$ of the {K}", f"{max(d['max_abs_im_LR'] for d in Js):.4f} /s"),
+                  ("neurons per mode, $1/\\sum_i p_i^2$", f"median {np.median(pr_):.1f} ({pr_.min():.1f}-{pr_.max():.0f})"),
+                  ("their spread (rms, $|v|^2$-weighted)", f"median {np.median(sp_):.0f} \\textmu m (even: {Js[0]['uniform_spread_um']:.0f} \\textmu m)"),
+                  ("their $|v|^2$ on their 20 largest", f"median {100 * np.median(t20_):.0f} \\%")]
+        I_ = [d["impulse"] for d in Js]
+        ir_ = [("outside the pulsed region", rng_([100 * i["outside_share_all"] for i in I_], "{:.1f}") + " \\% (per pulse "
+                + f"{100 * min(min(i['outside_share']) for i in I_):.1f}-{100 * max(max(i['outside_share']) for i in I_):.1f} \\%)"),
+               ("off the diagonal of the 6 $\\times$ 6", rng_([100 * i["block_offdiag_share_all"] for i in I_], "{:.1f}") + " \\%"),
+               ("both at $W = 0$", "0 \\%"),
+               ("$\\int|z|\\,dt$ against $W = 0$", f"$\\times${min(min(i['gain_vs_w0']) for i in I_):.2f}-"
+                                                   f"{max(max(i['gain_vs_w0']) for i in I_):.2f} per pulse")]
+
+        def tab_(rows):
+            return ("{\\scriptsize\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{0.46\\linewidth}@{\\hspace{5pt}}"
+                    ">{\\raggedright\\arraybackslash}p{0.50\\linewidth}@{}}\n" + "".join(f"{a} & {b} \\\\\n" for a, b in rows)
+                    + "\\end{tabular}\\par}\n")
+        right_ = (S.head("the linearisation")
+                  + "{\\scriptsize\\raggedright $J = \\mathrm{diag}(1/\\tau_i)\\big(-I + \\mathrm{diag}(\\bar\\Omega_i)\\,"
+                    "W^{\\mathrm{eff}}\\,\\mathrm{diag}(\\tanh'(z^*_j))\\big)$, in 1/s; $\\tanh' = 1 - \\tanh^2$. "
+                  + eff_ + ".\\par}" + S.SEC_GAP
+                  + S.head("the reference state")
+                  + "{\\scriptsize\\raggedright " + ref_ + "\\par}" + S.SEC_GAP
+                  + S.head("the spectrum")
+                  + "{\\scriptsize\\raggedright Krylov-Schur on the GPU, residual $< 10^{-7}$ /s; mode $v$, "
+                    "$p_i = |v_i|^2/|v|^2$." + (" Per block: the range over the " + str(len(Js)) + " blocks."
+                                                if per_ else "") + "\\par}\\vspace{2pt}\n"
+                  + tab_(rows_) + S.SEC_GAP
+                  + S.head("the impulse response")
+                  + "{\\scriptsize\\raggedright $z(0) = 1$ on one region's neurons, 0 elsewhere; $dz/dt = Jz$ for 60 s "
+                    f"(RK4, step {I_[0]['rk4_step_s']:.3f} s); $\\int_0^{{60\\,\\mathrm{{s}}}}|z_i|\\,dt$ summed per region. "
+                    "Regions (exp17\\_atlas.REGIONS): pretectum; tectum stratum periventriculare; dorsal thalamus; "
+                    "rhombomere 7; cerebellum; telencephalon (olfactory bulb, pallium, subpallium); a neuron in two of "
+                    "them in neither.\\par}\\vspace{2pt}\n" + tab_(ir_))
+        cap_ = (f"a: the {K} eigenvalues of $J$ with the largest Re $\\lambda$" + (" per block" if per_ else "")
+                + f"; ticks: the {K} slowest $-1/\\tau_i$; inset: every $-1/\\tau_i$ (grey), the 20 with the largest "
+                "$|\\mathrm{Im}\\,\\lambda|$ (blue). b: \\% of each pulse's $\\int|z|\\,dt$ per region"
+                + (", the blocks' mean" if per_ else "") + ". c: the share of $|v_i|^2$ per Z-Brain region"
+                + (", per block the mean over its modes" if per_ else "") + " (masks overlap; last row: in none).")
+        dt_ = f"batch {num} $\\cdot$ {lab or S._tex(run)} $\\cdot$ the linearised dynamics"
+        body_ = S.frame_narrow(f"{num}: the linearised dynamics", f"figs/jacobian_{run}.png", right_,
+                               f"tools/exp17_jacobian.py {run} (data/jacobian_{run}.json)", deck_title=dt_, left=0.53,
+                               height=0.63 if per_ else 0.66, caption=cap_)
+        body_ = (body_.replace("\\vspace*{\\bandgap}\n\\begin{columns}[T,onlytextwidth]",
+                               "\\vspace*{\\bandgap}\n\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]", 1)
+                 .replace("\\end{columns}\n\\end{frame}", "\\end{columns}\\vspace*{\\fill}\n\\end{frame}", 1))
+        out.append((f"19_jacobian_{run}", body_))
+    return out
+
+
 def flow_slides(S, run, num, law_txt, msg_txt, dt):
     """THE FLOW OF THE PRUNED LAW (Cedric, 2026-10-08: "flow movies like the first deck's slides 21 and 23, after pruning
     the edges, at two resolutions, coarse and middle"): tools/exp17_flow_pruned.py's two movies, smoothed over 25 um
@@ -2779,6 +2883,12 @@ def write_slides():
     last_ = [n for n in nm_ if n.startswith(("19_meanfield_zap_n24", "19_clamp_zap_n24"))]
     if last_:
         move_after_("19_w0_blocks", last_[-1])
+    # the linearised dynamics, one slide per law, after its network tests: the mean field and the clamp (2026-10-10)
+    for n_, b_ in jacobian_slides(S):
+        r_ = n_[len("19_jacobian_"):]
+        at_ = [i for i, n in enumerate([n for n, _ in deck]) if n in (f"19_run_{r_}", f"19_meanfield_{r_}", f"19_clamp_{r_}")]
+        deck.insert(max(at_) + 1 if at_ else len(deck), (n_, b_))
+        open(os.path.join(SL, n_ + ".tex"), "w").write(b_)
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
     ed_ = [n for n in nm_ if n.startswith("19_edges_")]
     if ed_:
