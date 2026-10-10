@@ -13,8 +13,20 @@ such pairs are: one neuron with cos(dphi) < 0 (RED, half a cycle off the stimulu
 A neuron counts when its R2 beats the NULL: the same fit at off periods (OFF_S, no stimulus power there), the 99.9th
 percentile over all neurons and off periods.
 
-    PYTHONPATH=src:tools python tools/exp17_phase.py [--movie]
--> presentation/figs/phase_rotation.png [, presentation/Movies/phase_rotation.mp4], data/phase_rotation.json, data/phase_rotation.npz
+    PYTHONPATH=src:tools python tools/exp17_phase.py [--movie] [--model <run>] [--select antiphase|quiet|lagged]
+-> presentation/figs/<name>.png [, presentation/Movies/<name>.mp4], data/<name>.json (, .npz)
+   <name> = phase_rotation[_quiet|_lagged][_model | _model_<run>] (_model alone: 22.3, zap_n22_markall)
+
+THE TWO OTHER SELECTIONS (Cedric, 2026-10-10: "a twin of 29 for neurons that are not correlated to the stimuli and
+not silent, sorted by non-correlation; a twin for neurons that are correlated but have a large lag, sorted by lag"),
+both made on the RECORDING, so the model's panel shows the same neurons in the same rows:
+  quiet    not correlated: R2 below the null's median (as little 60-s power as a typical neuron at an off period);
+           not silent: the dF/F SD over the block at least the median SD of the significant (antiphase-map) neurons;
+           rows by R2, the least correlated first; one colour (orange)
+  lagged   significant (R2 above the null, as the antiphase map) and in QUADRATURE: |sin dphi| > |cos dphi|, the phase
+           lag (dphi mod 2 pi) / 2 pi x P_S between 7.5 and 22.5 s or 37.5 and 52.5 s behind the stimulus -- neither
+           in phase (the blue group) nor half a cycle off (the red); rows by lag; colour by lag (a cyclic map)
+With --model the antiphase map is the model's own selection (as before); quiet and lagged keep the recording's.
 """
 import json
 import os
@@ -44,7 +56,11 @@ def fit(X, period):
 
 
 MODEL = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
-SUF = "_model" if MODEL else ""
+SEL = sys.argv[sys.argv.index("--select") + 1] if "--select" in sys.argv else "antiphase"
+if SEL not in ("antiphase", "quiet", "lagged"):
+    raise SystemExit("--select antiphase | quiet | lagged")
+SUF = ("" if SEL == "antiphase" else f"_{SEL}") + ("" if not MODEL else "_model" if MODEL == "zap_n22_markall"
+                                                   else f"_model_{MODEL}")
 
 
 def traces(z):
@@ -96,6 +112,8 @@ def main():
            "red_blue_phase_gap_deg": float(np.degrees(np.abs(np.angle(np.exp(1j * dphi[red]).mean()
                                                                       / np.exp(1j * dphi[blue]).mean())))),
            "per_region": per_region}
+    if SEL != "antiphase":
+        return other(z, A, ins, reg, names, off, bn, f0, f1, ok, r2, dphi, sig, thr, null)
     if MODEL:
         # THE TWIN'S AGREEMENT with the recording's map: of the neurons oscillating in both, the share in the same group
         rp = np.load(os.path.join(EXP, "data", "phase_rotation.npz"))
@@ -141,6 +159,74 @@ def main():
     if "--movie" in sys.argv:
         from exp17_artr import movie
         movie(build, scs_rgb=base, Zc=Zm, n=g1 - g0, name=f"phase_rotation{SUF}")
+
+def other(z, A, ins, reg, names, off, bn, f0, f1, ok, r2, dphi, sig, thr, null):
+    """The quiet and lagged twins (see the docstring): the selection on the recording, the traces of MODEL or of the
+    recording, the layout of the antiphase map."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from exp17_artr import twin_figure, smooth3, zs
+    if MODEL:                                             # the selection is the recording's: its fit again
+        Xr = np.asarray(z["dff"][f0:f1], np.float64)
+        ok = Xr.std(0) > 1e-6
+        r2s, phs = fit(z["stimulus"][f0:f1, COL:COL + 1].astype(np.float64), P_S)
+        r2, ph = fit(Xr, P_S)
+        null = np.concatenate([fit(Xr[:, ok], p)[0] for p in OFF_S])
+        thr = float(np.percentile(null, 99.9))
+        dphi = np.angle(np.exp(1j * (ph - phs[0])))
+        sig = ok & (r2 > thr)
+        sd = Xr.std(0)
+    else:
+        sd = np.asarray(z["dff"][f0:f1], np.float64).std(0)
+    lag = np.mod(dphi, 2 * np.pi) / (2 * np.pi) * P_S                 # s behind the stimulus, [0, P_S)
+    if SEL == "quiet":
+        sd_min, r2_max = float(np.median(sd[sig])), float(np.median(null))
+        m = ok & (sd >= sd_min) & (r2 < r2_max)
+        ii = np.flatnonzero(m)[np.argsort(r2[m])]                     # the least correlated first
+        rgb = np.tile([[1.0, 0.62, 0.10]], (len(ii), 1))
+        key, rule = r2[ii], {"sd_min": sd_min, "r2_max_null_median": r2_max}
+        seg = [(f"R2 {r2[ii].min():.3f} .. {r2[ii].max():.3f}", 0, len(ii))]
+    else:
+        m = sig & (np.abs(np.sin(dphi)) > np.abs(np.cos(dphi)))
+        ii = np.flatnonzero(m)[np.argsort(lag[m])]
+        rgb = plt.get_cmap("hsv")(lag[ii] / P_S)[:, :3]
+        key, rule = lag[ii], {"r2_min": thr, "quadrature": "|sin dphi| > |cos dphi|"}
+        seg = [(f"lag {lag[ii].min():.0f} .. {lag[ii].max():.0f} s", 0, len(ii))]
+    g0, g1 = int(off[bn.index("open loop")]), int(off[bn.index("dark") + 1])
+    t = (np.arange(g0, g1) - g0) * DT / 60
+    Xg = np.asarray(traces(z)[g0:g1][:, ii], np.float32)
+    Zm = smooth3(zs(Xg))
+    stim = np.asarray(z["stimulus"][g0:g1, COL], np.float32)
+    if SEL == "quiet":
+        tr = [(Zm.mean(1), "white", f"their mean ({len(ii):,})")]          # white: the stimulus line is orange
+    else:
+        q = (lag[ii] < P_S / 2)
+        tr = [(Zm[:, q].mean(1), "#ffd23a", f"a quarter cycle behind, {int(q.sum()):,}"),
+              (Zm[:, ~q].mean(1), "#3ad0ff", f"a quarter cycle ahead, {int((~q).sum()):,}")]
+    marks = [(0.0, "open loop")] + [((int(off[bn.index(b)]) - g0) * DT / 60, b) for b in ("rotation", "dark")]
+    rows_ = (np.arange(len(ii)), seg, max(1, int(np.ceil(len(ii) / 600))))
+    doc = {"select": SEL, "rule": rule, "period_s": P_S, "neurons": int(len(ii)),
+           "key_quantiles_10_50_90": [float(np.quantile(key, q_)) for q_ in (0.1, 0.5, 0.9)],
+           "left_right": [int((A[ii, 0] < MID).sum()), int((A[ii, 0] >= MID).sum())]}
+    if MODEL:
+        R = np.asarray(z["dff"][g0:g1][:, ii], np.float32)
+        Rc, Mc = R - R.mean(0), Xg - Xg.mean(0)
+        rr = (Rc * Mc).sum(0) / np.maximum(np.sqrt((Rc ** 2).sum(0) * (Mc ** 2).sum(0)), 1e-12)
+        doc["model"] = MODEL
+        doc["model_vs_recording_r_10_50_90"] = [float(np.quantile(rr, q_)) for q_ in (0.1, 0.5, 0.9)]
+    json.dump(doc, open(os.path.join(EXP, "data", f"phase_rotation{SUF}.json"), "w"), indent=1)
+    print(json.dumps(doc, indent=1))
+
+    def build():
+        return twin_figure(A, ins, ii, rgb, t, tr, stim, marks, Z=Zm, rows=rows_, caption="")
+    fig, _, _ = build()
+    fig.savefig(os.path.join(EXP, "presentation", "figs", f"phase_rotation{SUF}.png"), dpi=130, facecolor="black")
+    plt.close(fig)
+    if "--movie" in sys.argv:
+        from exp17_artr import movie
+        movie(build, scs_rgb=rgb, Zc=Zm, n=g1 - g0, name=f"phase_rotation{SUF}")
+
 
 if __name__ == "__main__":
     main()
