@@ -1599,6 +1599,106 @@ def prelim_slides(S, after):
                                           deck_title=f"batch {b_} $\\cdot$ preliminary results"))]
 
 
+def clamp_slides(S, deck):
+    """THE INPUT-NEURON CLAMP TEST (Cedric, 2026-10-10: "the clamp rollout ... launch them on 22 to 26"): one slide per
+    law tools/exp17_clamp.py has scored (data/clamp_<run>.json, figs/clamp_<run>.png): left the four rollouts on the
+    free neurons, right the clamp's definition, the neuron counts, the bars and the two gaps with their p values. Each
+    goes right after its law's mean-field slide, or for batches 25 and 26 after the batch's results slide, in run order;
+    its .tex is written here, as this runs after the deck's slides are written. -> the deck with them."""
+    import yaml as yaml_
+    from plexus import trainer as T
+    from plexus.paths import graphs_data_path
+    from exp17_clamp import RUNS
+    from exp17_vrest_blocks import MARKERS
+    zs_ = {"W_short": "W^{short}", "W_mid": "W^{mid}", "W_long": "W^{long}", "A_send": "a_j"}
+    for run, num in RUNS.items():
+        jp_ = os.path.join(EXP, "data", f"clamp_{run}.json")
+        if not (os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "figs", f"clamp_{run}.png"))):
+            continue
+        J = json.load(open(jp_))
+        L_, T_ = J["laws"], {(t["a"], t["b"]): t for t in J["tests"]}
+        spec = T.load(run)
+        op = next(o for o in yaml_.safe_load(open(os.path.join(ROOT, spec["model"])))["operators"]
+                  if o.get("op") == "state_diffuse")
+        M = np.asarray(np.load(graphs_data_path(str(op["input_mask"])))[str(op.get("input_mask_array", "mask"))]) != 0
+        M = M if M.ndim == 2 else np.repeat(M[:, None], int(op.get("forcing_dim", 22)), 1)
+        cl = np.asarray(np.load(graphs_data_path(J["mask"]))[J["array"]]) != 0
+        feat = [k for k in range(M.shape[1]) if k not in MARKERS]
+        if M[~cl][:, feat].any():                     # the test's premise: no stimulus feature enters a free neuron
+            raise ValueError(f"clamp_slides({run}): a free neuron reads a stimulus feature")
+        vid_ = bool(op.get("video_mask"))
+        what_in = ("the neurons the encoder's output $e_{n(t),i}$ enters (video\\_mask)" if vid_ else
+                   "the neurons the stimulus features of $u(t)$ enter")
+        offs = ("the 9 block markers ($B_{i,m(k)}$, marker $m(k)$ = 1 in block $k$)"
+                if bool(M[~cl][:, list(MARKERS)].all()) else
+                "their offset $\\Delta V_{i,k}$ in block $k$ (rest\\_block)" if op.get("rest_per_block") else "nothing")
+        zero_ = "$" + " = ".join(zs_.get(z_, z_) for z_ in J["zero"]) + " = 0$"
+        n_free = J["n_neurons"] - J["n_clamped"]
+
+        def pq(p):
+            pm_ = 1 / (J["resamples"] + 1)
+            if p <= pm_ * 1.0001:
+                return f"p $<$ {pm_ * 1.0001:.0e}".replace("e-0", "e-")
+            return f"p {p:.3f}" if p >= 1e-3 else f"p {p:.1e}".replace("e-0", "e-")
+        lab_ = {"full": "full", "W = 0": "$W = 0$", "clamp_in": "clamp\\_in", "clamp_in, W = 0": "clamp\\_in, $W = 0$"}
+        rows_ = "".join(f"{lab_[k]} & {J['rollouts'][k].replace('_', chr(92) + '_')} & {S.qv(L_[k]['brain_mean_r']['estimate'])}"
+                        f" & {S.qv(L_[k]['local_r']['estimate'])} $\\pm$ {L_[k]['local_r']['sd_over_neurons']:.2f} \\\\\n"
+                        for k in lab_)
+        gaps_ = "\\\\\n".join(f"{lab_[a]} $-$ {lab_[b]}: brain-mean r {T_[(a, b)]['brain_mean_r']['difference']:+.3f} "
+                              f"({pq(T_[(a, b)]['brain_mean_r']['p'])}), per-neuron r "
+                              f"{T_[(a, b)]['local_r']['difference']:+.3f} ({pq(T_[(a, b)]['local_r']['p'])})"
+                              for a, b in (("clamp_in", "clamp_in, W = 0"), ("full", "W = 0")))
+        right_ = (S.head("the clamp")
+                  + "{\\scriptsize\\raggedright Input neurons: the " + f"{J['n_clamped']:,}" + " nonzero in "
+                    "\\texttt{" + J["array"].replace("_", "\\_") + "} of " + J["mask"].split("/")[-1].replace("_", "\\_")
+                  + ", " + what_in + ". clamp\\_in: the trained " + num + " rolled out over the 2 h, the input neurons "
+                    "given their recorded dF/F every tick, the other " + f"{n_free:,}" + " free, the drive on; a free "
+                    "neuron reads " + ("neither the video nor a" if vid_ else "no") + " stimulus feature, only " + offs
+                  + ". clamp\\_in, $W = 0$: the same with " + zero_
+                  + ". full and $W = 0$: the free rollouts without the clamp.\\par}" + S.SEC_GAP
+                  + S.head("the four rollouts, on the free neurons")
+                  + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}l@{\\hspace{5pt}}r@{\\hspace{5pt}}r@{}}\n"
+                    "& rollout & brain-mean r & per-neuron r \\\\\n\\hline\n" + rows_ + "\\end{tabular}\\par}\\vspace{2pt}\n"
+                  + "{\\scriptsize\\raggedright Scored: " + f"{J['n_free_scored']:,}" + " of the " + f"{n_free:,}"
+                  + " free neurons (finite in all four, recorded residual moving), the " + f"{J['frames']['movie_steady']}"
+                  + " of the " + f"{J['frames']['movie']}" + " movie frames after block 1 of " + f"{J['blocks'] + 1}"
+                  + f" (block 1, the first {J['block_min']:.1f} min, left out). Brain-mean r: Pearson r of the learned "
+                    "and recorded mean dF/F over these neurons; per-neuron r: each neuron's learned and recorded traces, "
+                    "each regressed on its own mean over these neurons, then correlated (mean $\\pm$ SD over the "
+                    "neurons). Largest difference between $W = 0$ and clamp\\_in, $W = 0$ on these neurons: "
+                  + f"{J['max_abs_w0_minus_clamp_in_w0']:.2g}" + " dF/F.\\par}" + S.SEC_GAP
+                  + S.head("the gaps")
+                  + "{\\scriptsize\\raggedright " + gaps_ + "\\\\[2pt]\n"
+                    "Paired block bootstrap over time, " + f"{J['blocks']} blocks of {J['block_min']:.1f} min, "
+                    f"{J['resamples']:,} resamples, two-sided.\\par}}")
+        mf_ = f"19_meanfield_{run}"
+        nm_ = [n for n, _ in deck]
+        if mf_ in nm_:
+            import re as re_
+            dt_ = re_.search(r"\\begin\{frame\}\[t\]\{(.*)\}\n", dict(deck)[mf_]).group(1)
+            dt_ = dt_.replace("the mean-field control", "the input-neuron clamp")
+            at_ = nm_.index(mf_) + 1
+        else:
+            b_ = num.split(".")[0]
+            anc_ = next((a_ for a_ in (f"{b_}_prelim", {"25": "25_bio_mask", "26": "26_video_input"}.get(b_)) if a_ in nm_),
+                        None)
+            if anc_ is None:
+                continue
+            dt_ = f"batch {num} $\\cdot$ {S._tex(run)} $\\cdot$ the input-neuron clamp"
+            at_ = nm_.index(anc_) + 1
+        while at_ < len(nm_) and nm_[at_].startswith("19_clamp_"):    # after the batch's earlier clamp slides
+            at_ += 1
+        body_ = S.frame_narrow("the input-neuron clamp", f"figs/clamp_{run}.png", right_,
+                               f"tools/exp17_clamp.py {run} (data/clamp_{run}.json)", deck_title=dt_,
+                               left=0.52, height=0.70, img_top="0.10\\textheight")
+        body_ = (body_.replace("\\vspace*{\\bandgap}\n\\begin{columns}[T,onlytextwidth]",       # centred in height, as
+                               "\\vspace*{\\bandgap}\n\\vspace*{\\fill}\\begin{columns}[c,onlytextwidth]", 1)   # the mean-field slide
+                 .replace("\\end{columns}\n\\end{frame}", "\\end{columns}\\vspace*{\\fill}\n\\end{frame}", 1))
+        open(os.path.join(SL, f"19_clamp_{run}.tex"), "w").write(body_)
+        deck.insert(at_, (f"19_clamp_{run}", body_))
+    return deck
+
+
 def flow_slides(S, run, num, law_txt, msg_txt, dt):
     """THE FLOW OF THE PRUNED LAW (Cedric, 2026-10-08: "flow movies like the first deck's slides 21 and 23, after pruning
     the edges, at two resolutions, coarse and middle"): tools/exp17_flow_pruned.py's two movies, smoothed over 25 um
