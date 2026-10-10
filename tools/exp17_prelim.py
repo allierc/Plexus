@@ -41,7 +41,7 @@ GD = os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData"
 RUNS = os.path.join(GD, "log", "training", "zapbench")
 
 REFS = {"22.3": "zap_n22_markall", "24.10": "zap_n24_ph_edge_blk"}
-# (arm, run, comparator); the arms of one law take the colour slots in order, so the same mask has the same colour on
+# (arm, run, law reference); the arms of one law take the colour slots in order, so the same mask has the same colour on
 # both laws
 BATCHES = {
     25: [("25.1", "zap_n25_bio", "22.3"), ("25.2", "zap_n25_bio_eff", "22.3"), ("25.3", "zap_n25_bio_eff_perm", "22.3"),
@@ -50,6 +50,23 @@ BATCHES = {
     26: [("26.1", "zap_n26_vid", "22.3"), ("26.2", "zap_n26_vid_bio", "22.3"),
          ("26.3", "zap_n26_ph_vid", "24.10"), ("26.4", "zap_n26_ph_vid_bio", "24.10")],
 }
+# FAIR COMPARISONS ONLY (Cedric, 2026-10-10: "we need to report always fair comparison ... put the results in blank if
+# not available"). The tables compare each arm with the run it differs from in one thing: its law's reference, except a
+# permuted mask, compared with the same mask unpermuted (25.3 with 25.2, 25.6 with 25.5: the permutation the one
+# difference). Each arm's no-W twin (its inputs, W not learned, no Omega; with W = 0 the two laws coincide, so one
+# twin serves an arm of each law) and the seed spread of the references and of 26.1 (seed 0 against seed 1 of one
+# spec) are read once the run has landed, blank until then.
+CMP = {"25.3": "25.2", "25.6": "25.5"}
+NOW_TWIN = {"25.1": ("25.7", "zap_n25_bio_now"), "25.4": ("25.7", "zap_n25_bio_now"),
+            "25.2": ("25.8", "zap_n25_bio_eff_now"), "25.5": ("25.8", "zap_n25_bio_eff_now"),
+            "25.3": ("25.9", "zap_n25_bio_eff_perm_now"), "25.6": ("25.9", "zap_n25_bio_eff_perm_now"),
+            "26.1": ("26.5", "zap_n26_vid_now"), "26.3": ("26.5", "zap_n26_vid_now"),
+            "26.2": ("26.6", "zap_n26_vid_bio_now"), "26.4": ("26.6", "zap_n26_vid_bio_now")}
+SEED_PAIRS = {25: [("22.3", "zap_n22_markall", "22.23", "zap_n22_markall_s1"),
+                   ("24.10", "zap_n24_ph_edge_blk", "24.12", "zap_n24_ph_edge_blk_s1")],
+              26: [("26.1", "zap_n26_vid", "26.7", "zap_n26_vid_s1"),
+                   ("22.3", "zap_n22_markall", "22.23", "zap_n22_markall_s1"),
+                   ("24.10", "zap_n24_ph_edge_blk", "24.12", "zap_n24_ph_edge_blk_s1")]}
 # categorical slots 1-3 of the dataviz palette's dark steps (blue, orange, aqua), validated all-pairs on black;
 # the comparator dashed in a neutral light grey
 COLOURS = ["#3987e5", "#d95926", "#199e70"]
@@ -120,7 +137,7 @@ def test_metrics(run: str, total: int) -> dict | None:
     # them while this reads: a broken npz (BadZipFile, a short read, a missing key) is "not tested yet", never a crash
     try:
         bm = S.bm_metrics(ln)
-        lr = S.local_r(ln, REC)
+        lr = S.local_r(ln, REC, flat0=True)          # one neuron set for every run, a flat learned trace scored 0
         z_ = np.load(ln)
         n_bm, n_mv = int(np.asarray(z_["mean_obs_all"]).size), int(np.asarray(z_["frames"]).size)
     except Exception as e_:                          # noqa: BLE001
@@ -129,9 +146,33 @@ def test_metrics(run: str, total: int) -> dict | None:
     if bm is None or lr is None:
         return None
     return {"brain_mean_r": float(bm["r"]), "brain_mean_rmse": float(bm["rmse"]), "per_neuron_r": float(lr["mean"]),
-            "per_neuron_r_sd": float(lr["sd"]), "per_neuron_n": int(lr["n"]), "it": it_,
+            "per_neuron_r_sd": float(lr["sd"]), "per_neuron_n": int(lr["n"]), "per_neuron_flat0": int(lr["n_flat_scored_0"]),
+            "it": it_,
             "brain_mean_frames": n_bm, "movie_frames": n_mv, "free_end_s": float(T_["free_t_s"][-1]),
             "movie_npz": mv, "movie_npz_mtime": os.path.getmtime(mv)}
+
+
+def landed_test(run: str) -> dict | None:
+    """A control's or seed twin's test as test_metrics reads it; None until the run has landed (or its directory exists)."""
+    if not os.path.exists(os.path.join(RUNS, run, "config.yaml")):
+        return None
+    return test_metrics(run, total_updates(run)[0])
+
+
+def inputs_of(run: str) -> dict:
+    """What the run's state_diffuse reads, from its model spec: the neurons reading a block marker, the neurons reading a
+    stimulus feature (or the video), and whether it has a learned offset per block (rest_per_block)."""
+    import yaml
+    from plexus.paths import graphs_data_path
+    from exp17_vrest_blocks import MARKERS
+    op = next(o for o in yaml.safe_load(open(os.path.join(ROOT, "config", "zapbench", f"{run}.yaml")))["operators"]
+              if o.get("op") == "state_diffuse")
+    M = np.asarray(np.load(graphs_data_path(*str(op["input_mask"]).split("/")))[str(op.get("input_mask_array", "mask"))]) != 0
+    F = int(op.get("forcing_dim", 22))
+    M = M.reshape(M.shape[0], -1) if M.ndim == 2 else np.repeat(M.reshape(-1, 1), F, 1)
+    feat = [k for k in range(M.shape[1]) if k not in MARKERS]
+    return {"markers": int(M[:, list(MARKERS)].any(1).sum()), "features": int(M[:, feat].any(1).sum()),
+            "rest_per_block": bool(op.get("rest_per_block", False))}
 
 
 def at_update(H: dict, it: int) -> tuple[float, float] | None:
@@ -160,27 +201,45 @@ def collect(batch: int) -> tuple[dict, dict]:
                                  "test": test_metrics(REFS[k], tot_)}
     HA = {}
     slot = {k: 0 for k in refs}
+    run_of = {a: r for a, r, _ in arms} | {k: REFS[k] for k in refs}
     for arm, run, ref in arms:
         H = read_history(run)
         HA[arm] = H
         tot_, se_ = total_updates(run)
         e_it = H["eval_it"][-1] if H["eval_it"] else None
-        row = {"arm": arm, "run": run, "ref": ref, "ref_run": REFS[ref], "colour": COLOURS[slot[ref]],
+        cmp_ = CMP.get(arm, ref)                     # the run this arm differs from in one thing
+        row = {"arm": arm, "run": run, "ref": ref, "ref_run": REFS[ref], "cmp": cmp_, "cmp_run": run_of[cmp_],
+               "colour": COLOURS[slot[ref]],
                "updates_total": tot_, "save_every": se_, "it_reached": H["it_reached"],
-               "history_mtime": stamp(H["mtime"]), "eval_it": e_it, "test": test_metrics(run, tot_)}
+               "history_mtime": stamp(H["mtime"]), "eval_it": e_it, "test": test_metrics(run, tot_),
+               "inputs": inputs_of(run), "cmp_inputs": inputs_of(run_of[cmp_])}
         slot[ref] += 1
+        if arm in NOW_TWIN:                          # its no-W twin: blank until it lands
+            nw_, nr_ = NOW_TWIN[arm]
+            row["now"] = {"arm": nw_, "run": nr_, "test": landed_test(nr_)}
         if e_it is not None:
             row["skill_short"], row["skill_long"] = H["skill_short"][-1], H["skill_long"][-1]
-            c_ = at_update(HR[ref], e_it)
+            c_ = at_update(HA[cmp_] if cmp_ in HA else HR[cmp_], e_it)
             if c_:
                 row["ref_skill_short"], row["ref_skill_long"] = c_
                 row["d_skill_short"] = row["skill_short"] - c_[0]
                 row["d_skill_long"] = row["skill_long"] - c_[1]
-        rt_ = out["comparators"][ref]["test"]
+        rt_ = (out["comparators"][cmp_]["test"] if cmp_ in out["comparators"]
+               else next(r_["test"] for r_ in out["runs"] if r_["arm"] == cmp_))
+        row["cmp_test"] = rt_
         if row["test"] and rt_:
             row["d_brain_mean_r"] = row["test"]["brain_mean_r"] - rt_["brain_mean_r"]
             row["d_per_neuron_r"] = row["test"]["per_neuron_r"] - rt_["per_neuron_r"]
         out["runs"].append(row)
+    out["comparator_inputs"] = {k: inputs_of(REFS[k]) for k in refs}
+    out["seed_pairs"] = []                           # seed 0 against seed 1 of one spec: blank until seed 1 lands
+    for a_, ra_, b_, rb_ in SEED_PAIRS.get(batch, []):
+        ta_, tb_ = landed_test(ra_), landed_test(rb_)
+        sp_ = {"a": a_, "a_run": ra_, "b": b_, "b_run": rb_, "test_a": ta_, "test_b": tb_}
+        if ta_ and tb_:
+            sp_["d_brain_mean_r"] = abs(ta_["brain_mean_r"] - tb_["brain_mean_r"])
+            sp_["d_per_neuron_r"] = abs(ta_["per_neuron_r"] - tb_["per_neuron_r"])
+        out["seed_pairs"].append(sp_)
     return out, {"arms": HA, "refs": HR}
 
 

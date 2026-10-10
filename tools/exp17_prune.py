@@ -37,6 +37,9 @@ sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
 SETS = ("short", "mid", "long")
 SEED_SPREAD = {"brain_mean_r": 0.009, "per_neuron_r": 0.005}     # 19.25 vs 19.26 (tools/exp17_meanfield_stats.py --n19)
+# the runs that spread is measured on, named on the pruned-mesh slides (exp17 deck, 2026-10-10, "always fair
+# comparison"): batch 19's nominal, not the pruned law's own seed twin
+SEED_SPREAD_FROM = ("19.25", "19.26", "zap_n19_nom", "zap_n19_nom_s1")
 
 
 def gmm2(x, it=200):

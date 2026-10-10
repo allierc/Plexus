@@ -56,23 +56,32 @@ LAWS_N19 = (("19.25 graph", "zap_n19_nom", ""), ("19.25, W = 0 at inference", "z
             ("19.41 mean field", "zap_n19_mf", ""), ("19.40 no W", "zap_n19_now", ""))
 SEEDS_N19 = (("19.25, seed 0", "zap_n19_nom", ""), ("19.26, seed 1", "zap_n19_nom_s1", ""))
 # `--n22` (Cedric, 2026-10-09: "replace all slides with batch 19 with the new results from batch 22, markall"): 22.3
-# (markall, 19.27's twin without checkpointing) against batch 22's controls -- 22.17 the mean field and 22.16 no W, the
-# twins of 19.41 / 19.40, trained on the NOMINAL inputs, not markall's -- and the nominal's seed pair, 22.1 / 22.2
+# (markall, 19.27's twin without checkpointing) against its controls and its seed twin.
 # the W0 rollout zeroes W_short and W_mid only (config/training/zapbench/zap_n22_markall.yaml, rollouts: W0), so named
 # (Cedric, 2026-10-10: "it is simply W_ij = 0"): the Wall0 rollout, every edge weight 0 (W_short, W_mid AND W_long)
+# FAIR CONTROLS ONLY (Cedric, 2026-10-10: "we need to report always fair comparison ... put the results in blank if not
+# available"): a control differs from its law in the coupling alone -- the same inputs (input mask, markers or
+# rest_per_block), the same time functions, the same training; the seed spread from the law's own seed twin. 22.16 /
+# 22.17 (22.1's inputs, no markers) and the seed pairs 22.1 / 22.2, 23.1 / 23.2, 24.2 / 24.3 (other specs) are retired:
+#   22.21 zap_n22_markall_now  markall's inputs, W not learned (starts and stays 0), no Omega: with W = 0 the laws of
+#                              22.3, 23.3 and 24.10 reduce to the same per-neuron model, so it serves all three
+#   22.22 zap_n22_markall_mf   markall's inputs, m_i = a_i mean_j tanh z_j, Omega as 22.3: for 22.3 and 23.3
+#   24.11 zap_n24_mf_blk       24.10's inputs and rest_per_block, the mean field, no Omega (24.10 has none)
+#   22.23 / 23.10 / 24.12      22.3 / 23.3 / 24.10 with seed 1
+# Until a run has landed (results/<run>_test.json and <run><suffix>_movie.npz) its bar is EMPTY and its tests pending.
 LAWS_N22 = (("22.3 graph", "zap_n22_markall", ""), ("22.3, W_ij = 0", "zap_n22_markall", "_Wall0"),
-            ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
-SEEDS_N22 = (("22.1, seed 0", "zap_n22_nom", ""), ("22.2, seed 1", "zap_n22_nom_s1", ""))
+            ("22.22 mean field", "zap_n22_markall_mf", ""), ("22.21 no W", "zap_n22_markall_now", ""))
+SEEDS_N22 = (("22.3, seed 0", "zap_n22_markall", ""), ("22.23, seed 1", "zap_n22_markall_s1", ""))
 # `--n23` (Cedric, 2026-10-10: "a twin of 27 for 23.3"): the lattice grid; its W0 rollout zeroes a_j (A_send), so every
-# corner's encoded value and every message is 0: W_ij = 0. The controls are graph-free (22.16 no W, 22.17 mean field)
+# corner's encoded value and every message is 0: W_ij = 0. The controls are graph-free (22.21 no W, 22.22 mean field)
 LAWS_N23 = (("23.3 graph", "zap_n23_markall", ""), ("23.3, W_ij = 0", "zap_n23_markall", "_W0"),
-            ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
-SEEDS_N23 = (("23.1, seed 0", "zap_n23_nom", ""), ("23.2, seed 1", "zap_n23_nom_s1", ""))
+            ("22.22 mean field", "zap_n22_markall_mf", ""), ("22.21 no W", "zap_n22_markall_now", ""))
+SEEDS_N23 = (("23.3, seed 0", "zap_n23_markall", ""), ("23.10, seed 1", "zap_n23_markall_s1", ""))
 # `--n24` (Cedric, 2026-10-10: "add the twin of 27 to 24.10"): the angle law, its Wall0 rollout (every edge weight 0),
-# the graph-free controls, and the angle law's seed pair (24.2 / 24.3, zap_n24_ph seeds 0 and 1)
+# the graph-free controls on its own inputs, and its own seed twin
 LAWS_N24 = (("24.10 graph", "zap_n24_ph_edge_blk", ""), ("24.10, W_ij = 0", "zap_n24_ph_edge_blk", "_Wall0"),
-            ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
-SEEDS_N24 = (("24.2, seed 0", "zap_n24_ph", ""), ("24.3, seed 1", "zap_n24_ph_s1", ""))
+            ("24.11 mean field", "zap_n24_mf_blk", ""), ("22.21 no W", "zap_n22_markall_now", ""))
+SEEDS_N24 = (("24.10, seed 0", "zap_n24_ph_edge_blk", ""), ("24.12, seed 1", "zap_n24_ph_edge_blk_s1", ""))
 # the tests from the graph only (Cedric, 2026-10-10: "draw * only from graph to others, not between others")
 TESTS_G = ((0, 1), (0, 2), (0, 3))
 
@@ -150,6 +159,18 @@ def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None, tag=""):
     rec = TR.load(T.load(laws[0][1])["task"]["reference"]["trace_recording"])
     LAWS_ = laws
     laws = tuple(laws) + tuple(seeds or ())
+
+    def landed(n, v):          # the run tested (<run>_test.json, or <run><suffix>_test.json, exp20) and this rollout's movie written
+        d_ = os.path.join(T.out_dir(T.load(n), None), "results")
+        return (any(os.path.exists(os.path.join(d_, f_)) for f_ in (f"{n}_test.json", f"{n}{v}_test.json"))
+                and os.path.exists(os.path.join(d_, f"{n}{v}_movie.npz")))
+    pending = {k: n for k, n, v in laws if not landed(n, v)}       # FAIR CONTROLS ONLY: an empty bar until it lands
+    if LAWS_[0][0] in pending:
+        raise FileNotFoundError(f"{LAWS_[0][1]}: not landed")
+    for k, n in pending.items():
+        print(f"[pending] {k}: {n} not landed, its bar left empty")
+    LAWS_ = tuple(LAWS_)
+    laws = tuple(x for x in laws if x[0] not in pending)
     Z = {k: np.load(os.path.join(T.out_dir(T.load(n), None), "results", f"{n}{v}_movie.npz")) for k, n, v in laws}
     fr = Z[LAWS_[0][0]]["frames"]
     # the frame interval of the recording, from the first law whose test json exists (<run><suffix>_test.json for a
@@ -219,9 +240,16 @@ def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None, tag=""):
                                                                float(np.percentile(boot[k][m], 97.5))]}
                           for m in ("brain_mean_r", "local_r")}
         doc["laws"][k]["local_r"]["sd_over_neurons"] = sd_n[k]
+    for k, n in pending.items():                       # not landed: no value, the run named
+        doc["laws"][k] = {"pending": n}
     for i, j in tests:
         a, b = LAWS_[i][0], LAWS_[j][0]
         t = {"a": a, "b": b}
+        if a in pending or b in pending:
+            t["pending"] = [pending[x] for x in (a, b) if x in pending]
+            doc["tests"].append(t)
+            print(f"[test] {a} - {b}: pending ({', '.join(t['pending'])})")
+            continue
         for m in ("brain_mean_r", "local_r"):
             d = est[a][m] - est[b][m]
             ds = boot[a][m] - boot[b][m]
@@ -234,11 +262,16 @@ def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None, tag=""):
                                                for m in ("brain_mean_r", "local_r")))
     if seeds:
         s0, s1 = seeds[0][0], seeds[1][0]
-        doc["seed_pair"] = {"a": s0, "b": s1, **{m: abs(est[s0][m] - est[s1][m]) for m in ("brain_mean_r", "local_r")}}
+        doc["seed_pair"] = {"a": s0, "b": s1, "runs": [seeds[0][1], seeds[1][1]]}
+        if s0 in pending or s1 in pending:
+            doc["seed_pair"]["pending"] = [pending[x] for x in (s0, s1) if x in pending]
+        else:
+            doc["seed_pair"].update({m: abs(est[s0][m] - est[s1][m]) for m in ("brain_mean_r", "local_r")})
         print("[seed]", doc["seed_pair"])
     doc["raw"] = RAW
     doc["law_order"] = [k for k, _, _ in LAWS_]
-    doc["law_runs"] = {k: [n, v] for k, n, v in laws}      # each bar's run and rollout suffix (the deck reads what it zeroes)
+    doc["pending"] = pending
+    doc["law_runs"] = {k: [n, v] for k, n, v in tuple(LAWS_) + tuple(seeds or ())}   # each bar's run and rollout suffix (the deck reads what it zeroes)
     doc["test_pairs"] = [list(t) for t in tests]
     doc["tag"] = tag
     json.dump(doc, open(os.path.join(exp_dir, "data", f"meanfield_stats{tag}{SUF}.json"), "w"), indent=1)
@@ -258,25 +291,32 @@ def draw(doc, exp_dir=EXP):
     fig, axs = plt.subplots(1, 2, figsize=(9.0, 5.6), facecolor="black")
     for ax, m, ttl in zip(axs, ("brain_mean_r", "local_r"), ("a  brain-mean r", "b  per-neuron r, brain mean kept"
                                                               if doc.get("raw") else "b  per-neuron r, brain mean removed")):
-        v = [doc["laws"][k][m]["estimate"] for k in names]
-        lo = [v[i] - doc["laws"][k][m]["ci95"][0] for i, k in enumerate(names)]
-        hi = [doc["laws"][k][m]["ci95"][1] - v[i] for i, k in enumerate(names)]
+        # a law not landed (FAIR CONTROLS ONLY, 2026-10-10): no bar, "--" where its value would be, "pending" under it
+        on = [i for i, k in enumerate(names) if "pending" not in doc["laws"][k]]
+        v = [doc["laws"][names[i]][m]["estimate"] for i in on]
+        lo = [v[q] - doc["laws"][names[i]][m]["ci95"][0] for q, i in enumerate(on)]
+        hi = [doc["laws"][names[i]][m]["ci95"][1] - v[q] for q, i in enumerate(on)]
         x = np.arange(len(names))
-        ax.bar(x, v, color=[col(q) for q in v], width=0.66)
-        ax.errorbar(x, v, yerr=[lo, hi], fmt="none", ecolor="white", capsize=4, lw=1.2)
-        for i, q in enumerate(v):
+        ax.bar(on, v, color=[col(q) for q in v], width=0.66)
+        ax.errorbar(on, v, yerr=[lo, hi], fmt="none", ecolor="white", capsize=4, lw=1.2)
+        for i, q in zip(on, v):
             ax.text(i, 0.02, f"{q:+.3f}", ha="center", va="bottom", color="black", fontsize=10, weight="bold")
+        for i in sorted(set(range(len(names))) - set(on)):
+            ax.text(i, 0.02, "--", ha="center", va="bottom", color="white", fontsize=10, weight="bold")
         top = max(np.array(v) + np.array(hi))
         step = 0.085 * top
-        for h, (i, j) in enumerate(sorted(pairs, key=lambda t: abs(t[1] - t[0]))):
+        live = [(i, j) for i, j in pairs if i in on and j in on]
+        for h, (i, j) in enumerate(sorted(live, key=lambda t: abs(t[1] - t[0]))):
             t = next(t for t in doc["tests"] if t["a"] == names[i] and t["b"] == names[j])
             y = top + step * (0.7 + h)
             ax.plot([i, i, j, j], [y - 0.02 * top, y, y, y - 0.02 * top], color="white", lw=1.0)
             ax.text((i + j) / 2, y + 0.005 * top, t[m]["stars"], ha="center", va="bottom", color="white", fontsize=13)
         ax.set_ylim(0, top + step * (len(pairs) + 1.0))
+        ax.set_xlim(-0.6, len(names) - 0.4)
         ax.set_xticks(x)
         ax.set_xticklabels([n.replace(", ", ",\n").replace(" graph", "\ngraph").replace(" mean", "\nmean")
-                            .replace(" no W", "\nno W").replace("W_ij", "$W_{ij}$") for n in names], fontsize=9)
+                            .replace(" no W", "\nno W").replace("W_ij", "$W_{ij}$")
+                            + ("\npending" if "pending" in doc["laws"][n] else "") for n in names], fontsize=9)
         ax.set_title(ttl, loc="left", fontsize=13)   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         for s_ in ("top", "right"):
             ax.spines[s_].set_visible(False)
