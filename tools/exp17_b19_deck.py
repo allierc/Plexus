@@ -2253,6 +2253,70 @@ def write_slides():
                                   if os.path.exists(os.path.join(PRES, "Movies", "artr.mp4")) else col2_("artr.png", tR2_)), "tools/exp17_artr.py",
                                   deck_title="in the Z-Brain atlas $\\cdot$ the ARTR, from the activity")))
                 at_ += 1
+            jsm_ = os.path.join(EXP, "data", "slow_mode_zapbench_destripe.json")   # Cedric, 2026-10-10: the slow mode of
+            if os.path.exists(jsm_) and os.path.exists(os.path.join(PRES, "Movies", "slow_mode_2h.mp4")):   # the recording, as movies
+                SM_ = json.load(open(jsm_))                            # (tools/exp17_slow_mode.py), after the ARTR slide
+                mv2_ = lambda stem_, txt_: ("\\vspace*{0.09\\textheight}\\begin{columns}[c,onlytextwidth]\n"   # noqa: E731
+                                            "\\begin{column}{0.78\\textwidth}\\centering\\playmovie[\\linewidth]{Movies/"
+                                            + stem_ + "}\\end{column}\n\\begin{column}{0.20\\textwidth}\\centering\\fitcol{%\n"
+                                            + txt_ + "}\\end{column}\n\\end{columns}")     # the ARTR slide's layout
+                lo_m, hi_m = SM_["band_s"]
+                pw_ = SM_["brain_mean_power"]["session"]
+                mv_ = SM_["movies"]["slow_mode_2h"]
+                tM1_ = (head("the slow band")
+                        + "{\\scriptsize\\raggedright Every neuron's dF/F band-passed to periods of " + f"{lo_m:g}-{hi_m:g}"
+                        + " s (Butterworth, order 4, forward-backward over the continuous recording), z-scored per neuron "
+                          "over the session; the brain mean of the same band in green, in dF/F.\\par}\\vspace{6pt}\n"
+                        + head("the numbers")
+                        + "{\\scriptsize\\raggedright First principal component of the slow band: "
+                        + f"{100 * SM_['pc_share_of_slow_band_variance'][0]:.0f}" + " \\% of its variance, r "
+                        + f"{SM_['pc1_r_with_slow_brain_mean']:.2f}" + " with the slow brain mean. The raw brain mean's power: "
+                        + f"{100 * pw_['> 250 s']:.0f}" + " \\% at periods above 250 s, " + f"{100 * pw_['60-250 s']:.0f}"
+                        + " \\% at 60-250 s, " + f"{100 * pw_['10-60 s']:.0f}" + " \\% at 10-60 s, " + f"{100 * pw_['< 10 s']:.0f}"
+                        + " \\% below 10 s. A neuron's r with the brain mean: median "
+                        + f"{SM_['median_r_neuron_vs_brain_mean']:.2f}" + ".\\par}\\vspace{6pt}\n"
+                        + head("the movie")
+                        + "{\\scriptsize\\raggedright The " + f"{SM_['neurons_inside_atlas']:,}" + " neurons inside the atlas, "
+                          "red above their own mean, blue below (z clipped at $\\pm$" + f"{SM_['z_clip']:g}" + "); under them "
+                          "the raster of z by region, head to tail, within a region the earliest neuron first (its lead over "
+                          "the brain mean from the phase of their cross-spectrum, tools/exp17\\_brain\\_mean\\_lag.py), averaged in "
+                        + f"{mv_['raster_rows']:,}" + " bins of consecutive rows; the whole 2 h in " + f"{mv_['frames']}"
+                        + " frames.\\par}")
+                deck.insert(at_, ("00j_slow_mode", S.frame_wide("the slow mode", mv2_("slow_mode_2h", tM1_),
+                                  "tools/exp17_slow_mode.py (data/slow_mode_zapbench_destripe.json)",
+                                  deck_title="in the Z-Brain atlas $\\cdot$ the slow mode, periods "
+                                             + f"{lo_m:g} to {hi_m:g}" + " s")))
+                at_ += 1
+                desc_ = {"gain": "Forward grating; the feedback gain (how far the scene moves per swim) switches low / "
+                                 "high every 30 s", "dark": "Nothing shown", "dots": "Random dots; three 20-s episodes of "
+                         "all dots moving right", "flash": "The whole field turns light, then dark, every 30 s",
+                         "taxis": "The left or the right half of the field lit, 20 s each", "turning": "Grating forward, "
+                         "left, right, back: 30 s moving, 30 s still", "position": "A 1-s forward pulse, a 3 / 6 / 9-s "
+                         "delay, 30 s of forward grating", "open loop": "Forward grating, swims change nothing (15 min)",
+                         "rotation": "The grating rotates one way for 30 s, then the other"}
+                rb_ = SM_["regions_by_lead"]
+                for stem_, blk_ in [(k_, k_[len("slow_mode_"):].replace("_", " ")) for k_ in SM_["movies"] if k_ != "slow_mode_2h"]:
+                    if not os.path.exists(os.path.join(PRES, "Movies", stem_ + ".mp4")):
+                        continue
+                    pb_, mb_ = SM_["brain_mean_power"][blk_], SM_["movies"][stem_]
+                    tM2_ = (head(f"the {blk_} block")
+                            + "{\\scriptsize\\raggedright " + desc_.get(blk_, "") + ". The regions' slow-band means (each "
+                              "region's z averaged over its neurons, the block mean removed), stacked in the order of their "
+                              "median lead over the brain mean, the earliest at the top; red leads by more than 1 s, blue "
+                              "trails by more; every frame of the block (" + f"{mb_['frames']}" + " frames, "
+                            + f"{mb_['seconds']:.0f}" + " s of movie).\\par}\\vspace{6pt}\n"
+                            + head("the brain mean in this block")
+                            + "{\\scriptsize\\raggedright sd " + f"{1000 * pb_['sd']:.1f}" + " $\\times$ 10$^{-3}$ dF/F; power "
+                            + f"{100 * pb_['10-60 s']:.0f}" + " \\% at periods of 10-60 s, " + f"{100 * pb_['60-250 s']:.0f}"
+                            + " \\% at 60-250 s; peak period " + f"{pb_['peak_period_s']:.0f}" + " s.\\par}\\vspace{6pt}\n"
+                            + head("median lead, s")
+                            + rows([(r_["region"], f"{r_['median_lead_s']:+.2f}") for r_ in rb_[:3]]
+                                   + [("...", "")] + [(r_["region"], f"{r_['median_lead_s']:+.2f}") for r_ in rb_[-3:]]))
+                    deck.insert(at_, (f"00j_{stem_}", S.frame_wide(f"the slow mode, the {blk_} block", mv2_(stem_, tM2_),
+                                      "tools/exp17_slow_mode.py (data/slow_mode_zapbench_destripe.json)",
+                                      deck_title="in the Z-Brain atlas $\\cdot$ the slow mode, the " + blk_
+                                                 + " block, every frame")))
+                    at_ += 1
             jp_ = os.path.join(EXP, "data", "phase_rotation.json")    # Cedric, 2026-10-07: the antiphase map on the fish
             if os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "figs", "phase_rotation.png")):
                 PH_ = json.load(open(jp_))
@@ -2836,7 +2900,8 @@ def write_slides():
         pos3_ = [n for n, _ in deck].index("00j_atlas_regions") + 1
         for k_, nb_ in enumerate(("00j_atlas_sub", "00j_block_gain", "00j_block_dots", "00j_block_flash", "00j_block_taxis",
                                     "00j_block_turning", "00j_block_position", "00j_block_open_loop", "00j_block_rotation",
-                                    "00j_block_dark", "00j_lateral", "00j_artr", "00j_phase")):
+                                    "00j_block_dark", "00j_lateral", "00j_artr", "00j_slow_mode", "00j_slow_mode_gain",
+                                    "00j_slow_mode_dark", "00j_phase")):   # the slow mode after the ARTR (2026-10-10)
             if nb_ in [n for n, _ in deck]:                  # the block twins follow the atlas slide, in this order
                 it3_ = deck.pop([n for n, _ in deck].index(nb_))
                 deck.insert(pos3_, it3_)
