@@ -1,19 +1,6 @@
-name: zap_n23_markall
-model: config/zapbench/zap_n23_markall.yaml
+name: zap_n25_bio_now
+model: config/zapbench/zap_n25_bio_now.yaml
 learnable:
-- param: A_send
-  op: state_diffuse
-  lr: 0.0009
-  title: 'each neuron''s signed output a_j: its excitatory (> 0) or inhibitory (<
-    0) identity'
-- param: W_grid
-  op: state_diffuse
-  lr: 0.0009
-  title: 'one weight per grid edge (squared: transport only)'
-- param: G_recv
-  op: state_diffuse
-  lr: 0.0018
-  title: each neuron's receiving gain (squared)
 - block: tau
   of: neuron
   lr: 0.0018
@@ -26,10 +13,6 @@ learnable:
   of: neuron
   lr: 0.0018
   title: each neuron's weights on the 22 stimulus features
-- param: omega_mlp
-  op: state_diffuse
-  lr: 1.0e-06
-  title: the modulation's SIREN weights
 task:
   reference:
     trace_recording: zapbench_destripe
@@ -50,23 +33,9 @@ task:
   warmup: 10
   rollouts:
   - name: nominal
-  - name: W0
-    zero:
-    - A_send
   - name: no_stimulus
     drive: 'off'
-  - name: clamp_in
-    clamp:
-      mask: zebrafish/input_mask_destripe_bal20.npz
-      array: mask
-  - name: clamp_in_W0
-    zero:
-    - A_send
-    clamp:
-      mask: zebrafish/input_mask_destripe_bal20.npz
-      array: mask
 training:
-  resume: best
   optimizer: adam
   lr: 0.0018
   schedule: none

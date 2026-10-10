@@ -97,6 +97,7 @@ def build(pdf, out=None, dpi=220, title=None):
     d = fitz.open(pdf)
     W, H = d[0].rect.width, d[0].rect.height
     slides, movies = [], set()
+    stamp = int(os.path.getmtime(pdf))
     for p in range(d.page_count):
         pg = d[p]
         img = f"slides/{p + 1:03d}.png"
@@ -113,7 +114,9 @@ def build(pdf, out=None, dpi=220, title=None):
             movies.add(f)
             r = ln["from"]
             mv.append({"src": f, "x": 100 * r.x0 / W, "y": 100 * r.y0 / H, "w": 100 * r.width / W, "h": 100 * r.height / H})
-        slides.append({"img": img, "title": lines[0] if lines else f"slide {p + 1}", "movies": mv})
+        # ?v=<build time>: a browser that cached an older build's slide images loads the new ones (Cedric, 2026-10-10:
+        # "I do not see the modifications" -- the page showed a cached 61-page build after the 65-page one was served)
+        slides.append({"img": f"{img}?v={stamp}", "title": lines[0] if lines else f"slide {p + 1}", "movies": mv})
     for f in sorted(movies):
         dst = os.path.join(out, f)
         os.makedirs(os.path.dirname(dst), exist_ok=True)

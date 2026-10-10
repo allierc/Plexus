@@ -1,27 +1,13 @@
-name: zap_n26_vid_bio
-model: config/zapbench/zap_n26_vid_bio.yaml
+name: zap_n24_mf_blk
+model: config/zapbench/zap_n24_mf_blk.yaml
 learnable:
-- param: W_short
+- param: W_mean
   op: state_diffuse
   lr: 0.0009
   prior:
     l1: 7.5e-05
     l2: 7.5e-07
-  title: one weight per short edge (the finest level, every neuron's Delaunay neighbours)
-- param: W_mid
-  op: state_diffuse
-  lr: 0.0009
-  prior:
-    l1: 7.5e-05
-    l2: 7.5e-07
-  title: one weight per middle edge (the 16- and 32-um levels)
-- param: W_long
-  op: state_diffuse
-  lr: 0.0009
-  prior:
-    l1: 7.5e-05
-    l2: 7.5e-07
-  title: one weight per long edge (level 2, the 64-um cubes)
+  title: each neuron's gain on the brain mean of tanh(z)
 - block: tau
   of: neuron
   lr: 0.0018
@@ -30,25 +16,17 @@ learnable:
   of: neuron
   lr: 0.0018
   title: each neuron's rest value
+- block: rest_block
+  of: neuron
+  lr: 0.0018
+  title: each neuron's rest offset per stimulus block
 - block: input
   of: neuron
   lr: 0.0018
   title: each neuron's weights on the 22 stimulus features
-- param: omega_mlp
-  op: state_diffuse
-  lr: 1.0e-06
-  title: the modulation's SIREN weights
-- param: video_theta
-  op: state_diffuse
-  lr: 0.001
-  title: the video encoder's convolutions and linear map, flat
-- param: video_out
-  op: state_diffuse
-  lr: 0.0018
-  title: each neuron's output weights on the encoder's 16 features (0 outside the video mask)
 task:
   reference:
-    trace_recording: zapbench_destripe_video
+    trace_recording: zapbench_destripe
     split: all
     test_stride: 8
   drive:
@@ -68,27 +46,9 @@ task:
   - name: nominal
   - name: W0
     zero:
-    - W_short
-    - W_mid
+    - W_mean
   - name: no_stimulus
     drive: 'off'
-  - name: Wall0
-    zero:
-    - W_short
-    - W_mid
-    - W_long
-  - name: clamp_in
-    clamp:
-      mask: zebrafish/input_mask_destripe_bio.npz
-      array: mask
-  - name: clamp_in_W0
-    zero:
-    - W_short
-    - W_mid
-    - W_long
-    clamp:
-      mask: zebrafish/input_mask_destripe_bio.npz
-      array: mask
 training:
   optimizer: adam
   lr: 0.0018

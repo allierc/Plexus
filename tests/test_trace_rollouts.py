@@ -70,3 +70,38 @@ def test_zeroed_restores(monkeypatch):
 
 def test_learnables_key_is_still_static_after_the_test_above():
     assert isinstance(T.Learnables.__dict__["key"], staticmethod)
+
+
+def test_clamp_mask_from_a_file(tmp_path):
+    """`clamp: {mask:, array:}` (exp17, 2026-10-10): the elements nonzero in the npz's array, one value per element."""
+    g = np.random.default_rng(1)
+    P = g.uniform(0, 100, (500, 3))
+    m = (g.uniform(size=500) < 0.2).astype(np.float32)
+    np.savez(tmp_path / "m.npz", mask=m, other=1.0 - m, by_input=np.ones((500, 3)))
+    f = str(tmp_path / "m.npz")                         # absolute: graphs_data_path joins it as given
+    assert np.array_equal(T._clamp_mask({"mask": f}, P), m != 0)
+    assert np.array_equal(T._clamp_mask({"mask": f, "array": "other"}, P), m == 0)
+    for bad in ({"mask": f, "array": "by_input"}, {"mask": f}):     # [N, F], and a length other than N
+        with pytest.raises(ValueError):
+            T._clamp_mask(bad, P if bad.get("array") else P[:400])
+    box = [{"box": [[0, 50], [0, 100]]}]
+    assert np.array_equal(T._clamp_mask({"rois": box}, P), T._roi_mask(box, P))   # the ROI path unchanged
+
+
+@pytest.mark.parametrize("cl", [
+    {"mask": "zebrafish/m.npz", "rois": [{"box": [[0, 1], [0, 1]]}]},   # both
+    {"array": "mask"},                                                   # no file
+    {"mask": "zebrafish/m.npy"},
+    {"mask": "zebrafish/m.npz", "array": "a b"},
+])
+def test_clamp_mask_refusals(cl):
+    with pytest.raises(ValueError):
+        T._check_rollouts("spec", _spec([{"name": "a", "clamp": cl}]), "trace_recording")
+
+
+def test_clamp_mask_accepted_on_a_trace_law_only():
+    ok = [{"name": "clamp_in", "clamp": {"mask": "zebrafish/input_mask_destripe_bal20.npz", "array": "mask"}},
+          {"name": "clamp_in_W0", "zero": ["W_short"], "clamp": {"mask": "zebrafish/input_mask_destripe_bal20.npz"}}]
+    T._check_rollouts("spec", _spec(ok), "trace_recording")
+    with pytest.raises(ValueError):
+        T._check_rollouts("spec", _spec(ok[:1], drive=False), "field_recording")

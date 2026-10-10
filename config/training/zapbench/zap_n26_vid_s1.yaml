@@ -1,5 +1,5 @@
-name: zap_n26_vid_bio
-model: config/zapbench/zap_n26_vid_bio.yaml
+name: zap_n26_vid_s1
+model: config/zapbench/zap_n26_vid_s1.yaml
 learnable:
 - param: W_short
   op: state_diffuse
@@ -77,25 +77,13 @@ task:
     - W_short
     - W_mid
     - W_long
-  - name: clamp_in
-    clamp:
-      mask: zebrafish/input_mask_destripe_bio.npz
-      array: mask
-  - name: clamp_in_W0
-    zero:
-    - W_short
-    - W_mid
-    - W_long
-    clamp:
-      mask: zebrafish/input_mask_destripe_bio.npz
-      array: mask
 training:
   optimizer: adam
   lr: 0.0018
   schedule: none
   clip: 1.0
   batch: 4
-  seed: 0
+  seed: 1
   save_every: 500
   select: last
   stages:

@@ -1,5 +1,5 @@
-name: zap_n26_vid_bio
-model: config/zapbench/zap_n26_vid_bio.yaml
+name: zap_n24_ph_edge_blk_s1
+model: config/zapbench/zap_n24_ph_edge_blk_s1.yaml
 learnable:
 - param: W_short
   op: state_diffuse
@@ -30,25 +30,33 @@ learnable:
   of: neuron
   lr: 0.0018
   title: each neuron's rest value
+- block: rest_block
+  of: neuron
+  lr: 0.0018
+  title: each neuron's rest offset per stimulus block
 - block: input
   of: neuron
   lr: 0.0018
   title: each neuron's weights on the 22 stimulus features
-- param: omega_mlp
-  op: state_diffuse
-  lr: 1.0e-06
-  title: the modulation's SIREN weights
-- param: video_theta
-  op: state_diffuse
-  lr: 0.001
-  title: the video encoder's convolutions and linear map, flat
-- param: video_out
+- param: phi_short
   op: state_diffuse
   lr: 0.0018
-  title: each neuron's output weights on the encoder's 16 features (0 outside the video mask)
+  title: one phase per short edge, rad
+- param: phi_mid
+  op: state_diffuse
+  lr: 0.0018
+  title: one phase per mid edge, rad
+- param: phi_long
+  op: state_diffuse
+  lr: 0.0018
+  title: one phase per long edge, rad
+- param: alpha_mlp
+  op: state_diffuse
+  lr: 1.0e-05
+  title: the broadcast angle's SIREN weights
 task:
   reference:
-    trace_recording: zapbench_destripe_video
+    trace_recording: zapbench_destripe
     split: all
     test_stride: 8
   drive:
@@ -70,32 +78,20 @@ task:
     zero:
     - W_short
     - W_mid
-  - name: no_stimulus
-    drive: 'off'
   - name: Wall0
     zero:
     - W_short
     - W_mid
     - W_long
-  - name: clamp_in
-    clamp:
-      mask: zebrafish/input_mask_destripe_bio.npz
-      array: mask
-  - name: clamp_in_W0
-    zero:
-    - W_short
-    - W_mid
-    - W_long
-    clamp:
-      mask: zebrafish/input_mask_destripe_bio.npz
-      array: mask
+  - name: no_stimulus
+    drive: 'off'
 training:
   optimizer: adam
   lr: 0.0018
   schedule: none
   clip: 1.0
   batch: 4
-  seed: 0
+  seed: 1
   save_every: 500
   select: last
   stages:
