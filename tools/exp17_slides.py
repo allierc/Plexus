@@ -1368,15 +1368,19 @@ def qv(v, fmt="{:+.3f}", big=False):
     return f"{{\\normalsize\\textbf{{{t}}}}}" if big else t
 
 
-def local_r(npz, rec_name):
+def local_r(npz, rec_name, flat0=False):
     """THE LOCAL METRIC (Cedric, 2026-10-05: "computed per neuron, print mean +- SD"): per neuron, the correlation over the
     free rollout's movie frames between its learned and its recorded trace, each first regressed on its OWN brain mean
     (the learned trace on the learned brain mean, the recorded on the recorded) -- the part of a neuron's activity the
     shared brain-wide signal does not carry. {mean, sd, n} over the neurons whose recorded residual moves; cached in
-    <npz>.local_r.json. None without the npz."""
+    <npz>.local_r.json. None without the npz.
+    `flat0` (exp17, 2026-10-10, "always fair comparison"): ONE neuron set for every model on the recording -- every neuron
+    whose recorded residual moves, a flat (or non-finite) learned residual scored r = 0, as tools/exp17_meanfield_stats.py
+    scores it -- instead of dropping the neurons whose learned residual is flat, which gives each model its own set;
+    cached in <npz>.local_r0.json."""
     if not os.path.exists(npz):
         return None
-    cj = npz + ".local_r.json"
+    cj = npz + (".local_r0.json" if flat0 else ".local_r.json")
     if os.path.exists(cj) and os.path.getmtime(cj) > os.path.getmtime(npz):
         c_ = json.load(open(cj))
         if c_.get("v") == 2:
@@ -1389,7 +1393,6 @@ def local_r(npz, rec_name):
     P = z["pred"].astype(np.float64)
     X = _REC[rec_name]["dff"][fr].astype(np.float64)
     fin = np.isfinite(P).all(0)                 # a silenced (exploding) neuron's trace is NaN: left out of both brain
-    P, X = P[:, fin], X[:, fin]                 # means, or it poisons every neuron's regression (2026-10-05)
 
     def resid(A):
         A = A - A.mean(0)
@@ -1397,6 +1400,20 @@ def local_r(npz, rec_name):
         b = b - b.mean()
         beta = (A * b[:, None]).sum(0) / max(float((b * b).sum()), 1e-30)
         return A - b[:, None] * beta[None]
+    if flat0:                                   # the set from the recording alone; the learned brain mean over the
+        Rx = resid(X)                           # finite neurons, a non-finite one's residual 0 (scored 0)
+        Rp = np.zeros_like(P)
+        Rp[:, fin] = resid(P[:, fin])
+        sp, sx = Rp.std(0), Rx.std(0)
+        ok = sx > 1e-9
+        live = (sp > 1e-9)[ok]
+        r = np.zeros(int(ok.sum()))
+        r[live] = (Rp[:, ok][:, live] * Rx[:, ok][:, live]).mean(0) / (sp[ok][live] * sx[ok][live])
+        out = {"mean": float(r.mean()), "sd": float(r.std()), "n": int(ok.sum()), "n_flat_scored_0": int((~live).sum()),
+               "n_left_out_nonfinite": 0, "v": 2}
+        json.dump(out, open(cj, "w"))
+        return out
+    P, X = P[:, fin], X[:, fin]                 # means, or it poisons every neuron's regression (2026-10-05)
     Rp, Rx = resid(P), resid(X)
     sp, sx = Rp.std(0), Rx.std(0)
     ok = (sx > 1e-9) & (sp > 1e-9) & np.isfinite(sp)

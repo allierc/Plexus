@@ -899,7 +899,120 @@ def vrest_slides_(S, run, num, lab):
     return out
 
 
-def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_now"), mf_=("22.17", "zap_n22_mf"), desc=None,
+GD_RUNS = os.path.join(os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData"), "log", "training",
+                       "zapbench")
+
+
+def landed_(run, suffix=""):
+    """FAIR CONTROLS ONLY (Cedric, 2026-10-10: "we need to report always fair comparison ... put the results in blank if
+    not available"): a run's rollout npz once the run has landed -- results/<run>_test.json and <run><suffix>_movie.npz
+    -- else None, and the deck leaves its cells blank ("--") with the run named as pending."""
+    r_ = os.path.join(GD_RUNS, run, "results")
+    f_ = os.path.join(r_, f"{run}{suffix}_movie.npz")
+    return f_ if os.path.exists(f_) and os.path.exists(os.path.join(r_, f"{run}_test.json")) else None
+
+
+def updates_(run):
+    """The updates a run applied, from its history.jsonl (one row per applied update; a resumed run's rows past its
+    resume point dropped): (applied, asked for by its training spec, the update it resumed from or None)."""
+    from plexus import trainer as T
+    its = []
+    for l_ in open(os.path.join(GD_RUNS, run, "results", "history.jsonl")):
+        try:
+            its.append(int(json.loads(l_)["it"]))
+        except (json.JSONDecodeError, KeyError, ValueError):
+            continue
+    app, res = [], None
+    for it in its:
+        if app and it <= app[-1]:
+            res = it - 1
+            while app and app[-1] > res:
+                app.pop()
+        app.append(it)
+    return len(app), sum(int(s_["iters"]) for s_ in T.load(run)["training"]["stages"]), res
+
+
+def inputs_(run):
+    """What a run's state_diffuse reads and learns, from its specs: the neurons a stimulus feature enters, the neurons the
+    block markers enter, a learned offset per block (rest_per_block), Omega, the model, W learned or not, the training."""
+    import yaml as yaml_
+    from plexus import trainer as T
+    from plexus.paths import graphs_data_path
+    from exp17_vrest_blocks import MARKERS
+    spec = T.load(run)
+    op = next(o for o in yaml_.safe_load(open(os.path.join(ROOT, spec["model"])))["operators"] if o.get("op") == "state_diffuse")
+    M = np.asarray(np.load(graphs_data_path(*str(op["input_mask"]).split("/")))[str(op.get("input_mask_array", "mask"))]) != 0
+    F = int(op.get("forcing_dim", 22))
+    M = M.reshape(M.shape[0], -1) if M.ndim == 2 else np.repeat(M.reshape(-1, 1), F, 1)
+    feat = [k for k in range(M.shape[1]) if k not in MARKERS]
+    tr_ = {k: v for k, v in spec["training"].items() if k != "resume"}
+    return {"feat": M[:, feat].any(1), "mark": M[:, list(MARKERS)].any(1), "rpb": bool(op.get("rest_per_block", False)),
+            "omega": str(op.get("modulation", "none")) == "siren", "model": str(op["model"]),
+            "W": any(str(l_.get("param", "")).startswith("W_") for l_ in spec["learnable"]), "training": tr_}
+
+
+def control_(num_c, run_c, num_l, run_l):
+    """One dry line on a graph-free control, read from its specs against its law's: its coupling, Omega, inputs and
+    training; anything else that differs named after "not matched"."""
+    Ic, Il = inputs_(run_c), inputs_(run_l)
+    mf_ = Ic["model"] == "neuron_graph_meanfield"
+    cpl = "$m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$" if mf_ else ("W not learned, $m_i = 0$" if not Ic["W"] else Ic["model"])
+    off = lambda I: I["rpb"] or bool(I["mark"].all())                  # noqa: E731   one offset per neuron and block
+    how = lambda I: "$\\Delta V_{i,k}$" if I["rpb"] else "the 9 marker weights"   # noqa: E731
+    nm = []
+    if np.array_equal(Ic["feat"], Il["feat"]) and np.array_equal(Ic["mark"], Il["mark"]) and Ic["rpb"] == Il["rpb"]:
+        inp = f"{num_l}'s inputs"
+    elif np.array_equal(Ic["feat"], Il["feat"]) and off(Ic) and off(Il):
+        inp = (f"the features into the same {int(Il['feat'].sum()):,} neurons as {num_l}, one offset per neuron and block "
+               f"({how(Ic)}; {num_l}: {how(Il)})")
+    else:
+        inp = (f"the features into {int(Ic['feat'].sum()):,} neurons, the markers into {int(Ic['mark'].sum()):,}")
+        nm.append(f"inputs ({num_l}: {int(Il['feat'].sum()):,} and {int(Il['mark'].sum()):,})")
+    if mf_ and Ic["omega"] != Il["omega"]:
+        nm.append("$\\Omega$")
+    if Ic["training"] != Il["training"]:
+        nm.append("training settings")
+    om = ("times $\\Omega_i(t)$" if Ic["omega"] else "no $\\Omega$") if mf_ else "no $\\Omega$"
+    return (f"{num_c}: {cpl}, {om}, {inp}, trained from scratch with {num_l}'s training settings"
+            + ("; not matched: " + ", ".join(nm) if nm else ""))
+
+
+def prune_seed_(run, num, PR):
+    """The pruned-mesh slides' threshold criterion (tools/exp17_prune.py): a level's edges below t removable when the
+    pruned law's two r move by less than a seed spread -- 19.25 / 19.26's, batch 19's nominal, not the law's own seed
+    twin (FAIR COMPARISONS ONLY, 2026-10-10): said in one line, the own twin named, its spread once it has landed."""
+    from exp17_prune import SEED_SPREAD_FROM
+    tw_ = {"zap_n22_markall": ("22.23", "zap_n22_markall_s1"), "zap_n23_markall": ("23.10", "zap_n23_markall_s1")}[run]
+    ss_ = PR["seed_spread"]
+    return ("{\\scriptsize\\raggedright The threshold: the largest $t$ tested whose cut moves the free rollout's brain-mean r "
+            f"by less than {ss_['brain_mean_r']:.3f} and its per-neuron r by less than {ss_['per_neuron_r']:.3f}, the seed "
+            f"spread of {SEED_SPREAD_FROM[0]} / {SEED_SPREAD_FROM[1]}. Not matched: batch 19's nominal, not {num}; {num}'s "
+            f"own seed twin, {tw_[0]} {S_tex_(tw_[1])}, "
+            + ("landed, the thresholds not yet recomputed" if landed_(tw_[1]) else "pending") + ".\\par}")
+
+
+def S_tex_(s_):
+    """A run name in LaTeX text (its underscores escaped)."""
+    return s_.replace("_", "\\_")
+
+
+def eye_candidates_():
+    """The appendix's model-against-bank match (tools/exp17_eye_zapbench.py): per recorded neuron the best of the model
+    cells of its pool and side against the best of the stimulus bank, picked on half the cycles, scored on the other --
+    the two sides choose among different numbers of candidates, said in one line (FAIR COMPARISONS ONLY, 2026-10-10)."""
+    from plexus import trainer as T
+    import exp17_eye_zapbench as E_
+    ty_ = E_.model_types(T.load(E_.RUN))
+    per_ = []
+    for name_, prefs_, _m, _b in E_.POOLS:
+        c_ = sorted(sum(c for t, c in ty_ if any(t.startswith(p_) for p_ in prefs_) and t[-1] == sd_) for sd_ in "LR")
+        per_.append(f"{name_} {c_[0]}" + (f"-{c_[1]}" if c_[1] != c_[0] else ""))
+    return ("{\\scriptsize\\raggedright Not matched: the candidates per neuron, the model its pool's cells on its side ("
+            + ", ".join(per_) + f"), the bank {2 * E_.N_BANK} ({E_.N_BANK} time constants, both signs).\\par}}")
+
+
+def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.21", "zap_n22_markall_now"),
+                 mf_=("22.22", "zap_n22_markall_mf"), desc=None,
                  label=None, law=None, eq=None, time_=None, note=None, law_slide=True):
     """THE RUN'S SLIDES (Cedric, 2026-10-07: "with 19.20 make the first deck's slides 12, 13, 15, 16, a tau-by-region
     slide, and prepare slide 17"; 2026-10-08: "make all the slides with 19.25", the new nominal, its controls landed;
@@ -923,21 +1036,24 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
     rep = json.load(open(os.path.join(res, "report.json")))
     L = law_of(run)
 
-    def ctrl(n_):                                        # a control's movie npz once it has landed, else None
-        f_ = os.path.join(GD_, "log", "training", "zapbench", n_, "results", f"{n_}_movie.npz")
-        return f_ if os.path.exists(f_) else None
+    ctrl = landed_                                       # a control's movie npz once it has landed, else None
     lines = [("full model", os.path.join(res, f"{run}_movie.npz")),
              ("W0 rollout", os.path.join(res, f"{run}_W0_movie.npz")),   # what it zeroes: from its spec, below
              ("no stimulus", os.path.join(res, f"{run}_no_stimulus_movie.npz")),
              ] + ([(f"no W ({now_[0]})", ctrl(now_[1])), (f"mean field ({mf_[0]})", ctrl(mf_[1]))] if now_ else [])
-    bm_, loc_ = "", ""
+    bm_, loc_, n_pn = "", "", None
     for lab, f_ in lines:
         big_ = lab == "full model"
         lab_t = (f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{lab}}}}}" if big_ else lab)
         m_ = S.bm_metrics(f_) if f_ else None
-        l_ = S.local_r(f_, "zapbench_destripe") if f_ else None
-        bm_ += lab_t + (f" & {S.qv(m_['r'], big=big_)} & {m_['rmse']:.4f} \\\\\n" if m_ else " & & \\\\\n")
-        loc_ += lab_t + (f" & {S.qv(l_['mean'], big=big_)} $\\pm$ {l_['sd']:.3f} \\\\\n" if l_ else " & \\\\\n")
+        # one neuron set for every row (2026-10-10, "always fair comparison"): every neuron whose recorded residual
+        # moves, a flat learned trace scored 0 -- not each row's own set of moving learned traces
+        l_ = S.local_r(f_, "zapbench_destripe", flat0=True) if f_ else None
+        n_pn = n_pn or (l_ or {}).get("n")
+        bm_ += lab_t + (f" & {S.qv(m_['r'], big=big_)} & {m_['rmse']:.4f} \\\\\n" if m_ else " & -- & -- \\\\\n")
+        loc_ += lab_t + (f" & {S.qv(l_['mean'], big=big_)} $\\pm$ {l_['sd']:.3f} \\\\\n" if l_ else " & -- \\\\\n")
+    pend_ = [c_ for c_ in ((now_, mf_) if now_ else ()) if not ctrl(c_[1])]
+    ua_, ut_, ur_ = updates_(run)
     stg = rep.get("stages") or []
     right = (S.head(f"batch {num}: {rt}")
              + "{\\footnotesize\\raggedright " + eq_narrow(L["lines"]) + "\\par}" + S.SEC_GAP
@@ -945,15 +1061,25 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                "& r & RMSE \\\\\n\\hline\n" + bm_ + "\\end{tabular}\\par}" + S.SEC_GAP
              + S.head("per-neuron r, brain mean removed") + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{}}\n"
                "& mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + loc_ + "\\end{tabular}\\par}\\vspace{2pt}\n"
-             + "{\\tiny\\color{gray} W0 rollout: the trained law run with " + L["w0"] + "; no stimulus: $u = 0$\\par}"
+             + "{\\tiny\\color{gray} W0 rollout: the trained law run with " + L["w0"] + "; no stimulus: $u = 0$"
+             # what u = 0 also removes differs between the laws (2026-10-10): the markers are columns of u, Delta V is not
+             + (", $\\Delta V_{i,k}$ kept" if L["op"].get("rest_per_block") else
+                ", the 9 markers included" if inputs_(run)["mark"].all() else "") + "; per-neuron "
+               "r: the mean over the " + (f"{n_pn:,} " if n_pn else "") + "neurons whose recorded residual moves, a flat "
+               "learned trace scored 0\\par}"
                "\\vspace{1pt}\n"
-             + ("{\\tiny\\color{gray} the controls, 22.1's spec (no markers) trained from scratch: " + now_[0]
-                + " no W learned ($m_i = 0$) and no $\\Omega$; " + mf_[0] + " $m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$\\par}"
+             + ("{\\tiny\\color{gray} the graph-free controls, " + control_(now_[0], now_[1], num, run) + "; "
+                + control_(mf_[0], mf_[1], num, run)
+                + ("; pending: " + ", ".join(f"{c_[0]} {S._tex(c_[1])}" for c_ in pend_) if pend_ else "") + "\\par}"
                 if now_ else "")
              + S.SEC_GAP
-             + S.head("training") + S.rows([("updates", f"{rep.get('iters', 0):,} (horizons {stg[0][0]}..{stg[-1][0]})" if stg else "--"),
-                                         ("time", time_ or f"{rep.get('seconds', 0) / 3600:.1f} h"),
-                                         ("weights", f"{rep.get('n_params', 0):,}")])
+             + S.head("training") + S.rows(([("updates", f"{ua_:,} of {ut_:,} applied"),          # history.jsonl
+                                           ("", (f"resumed from {ur_:,}; " if ur_ else "")
+                                            + (f"horizons {stg[0][0]}..{stg[-1][0]}" if stg else ""))] if ua_ < ut_ else
+                                          [("updates", f"{rep.get('iters', 0):,}"
+                                            + (f" (horizons {stg[0][0]}..{stg[-1][0]})" if stg else ""))])
+                                         + [("time", time_ or f"{rep.get('seconds', 0) / 3600:.1f} h"),
+                                            ("weights", f"{rep.get('n_params', 0):,}")])
              + ("{\\scriptsize\\raggedright " + note + "\\par}" if note else ""))
     if law_slide:                                      # the law's own slide, in slide 24's look, before the run
         lL_, lR_ = law_block_(L["spec"], L["title"] + f" ({num})", eq_aligned(L["lines"]),
@@ -1086,12 +1212,19 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
     jm_ = os.path.join(EXP, "data", f"meanfield_stats{tg_}.json")
     if tg_ and os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", f"meanfield_stats{tg_}.png")):
         ST_ = json.load(open(jm_))
+        if any(landed_(*ST_["law_runs"][k_]) for k_ in (ST_.get("pending") or {})):
+            # a pending control or seed twin has landed since the stats were written: recompute them (its bar, tests
+            # and the seed spread filled), so the fair runs are picked up by the deck's own build
+            print(f"[b19 deck] meanfield_stats{tg_}: a pending run has landed, recomputing")
+            subprocess.run([sys.executable, os.path.join(ROOT, "tools", "exp17_meanfield_stats.py"), f"--{tg_[1:]}"],
+                           check=True)
+            ST_ = json.load(open(jm_))
         L_ = ST_["laws"]
         T_ = {(t["a"], t["b"]): t for t in ST_["tests"]}
         g_, w0_, m_, n_ = ST_["law_order"]
         FR_ = ST_["frames"]
         bmw_ = S.bm_metrics(os.path.join(res, f"{run}_movie.npz"))          # the run slide's two numbers, as it reads them
-        lcw_ = S.local_r(os.path.join(res, f"{run}_movie.npz"), "zapbench_destripe")
+        lcw_ = S.local_r(os.path.join(res, f"{run}_movie.npz"), "zapbench_destripe", flat0=True)
         tx_ = lambda k_: k_.replace("W_ij", "$W_{ij}$")                    # noqa: E731   a bar's label in LaTeX
 
         def pq(p):
@@ -1108,17 +1241,53 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                   "every $m_i = 0$" if {"W_short", "W_mid", "W_long"} <= set(zr_) else "")
         mod_ = str(L["op"].get("modulation", "none")) == "siren"
         num_ = g_.split()[0]
-        # the seed pair's spec against this run's (the config diffs, 2026-10-10): 22.1 / 23.1 the law without the
-        # markers; 24.2 24.10's law with one phase per region pair and alpha(t) of t alone
-        s0_, s1_ = ST_["seed_pair"]["a"], ST_["seed_pair"]["b"]
-        sd_ = {"_n22": "22.3's law without the markers", "_n23": "23.3's law without the markers",
-               "_n24": "24.10's law with one $\\varphi$ per region pair and $\\alpha(t)$ of $t$ alone"}[tg_]
+        # FAIR CONTROLS ONLY (Cedric, 2026-10-10: "we need to report always fair comparison ... put the results in
+        # blank if not available"): the controls on this law's own inputs, the seed spread from its own seed twin
+        # (tools/exp17_meanfield_stats.py); a run not landed leaves its row, its test and the seed spread blank, named
+        pend_ = ST_.get("pending") or {}
+        run_of_ = {k_: v_[0] for k_, v_ in ST_["law_runs"].items()}
+        ctl_ = {m_: (m_.split()[0], run_of_[m_]), n_: (n_.split()[0], run_of_[n_])}
+        sp_ = ST_["seed_pair"]
+        s0_, s1_ = sp_["a"], sp_["b"]
         rows_mf = ""
         for k in (g_, w0_, m_, n_):
-            b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
             big_ = k == g_
-            rows_mf += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{tx_(k)}}}}}" if big_ else tx_(k))
-                        + f" & {S.qv(b_['estimate'], big=big_)} & {S.qv(l_['estimate'], big=big_)} $\\pm$ {l_['sd_over_neurons']:.2f} \\\\\n")
+            lab_ = f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{tx_(k)}}}}}" if big_ else tx_(k)
+            if k in pend_:
+                rows_mf += lab_ + " & -- & -- \\\\\n"
+                continue
+            b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
+            rows_mf += lab_ + f" & {S.qv(b_['estimate'], big=big_)} & {S.qv(l_['estimate'], big=big_)} $\\pm$ {l_['sd_over_neurons']:.2f} \\\\\n"
+
+        def test_(b2_):
+            nm_ = "$W_{ij} = 0$" if b2_ == w0_ else b2_.split(" ", 1)[1]
+            t_ = T_[(g_, b2_)]
+            if "pending" in t_:
+                return "graph $-$ " + nm_ + ": --, pending"
+            return ("graph $-$ " + nm_ + f": brain-mean r {t_['brain_mean_r']['difference']:+.3f} ({pq(t_['brain_mean_r']['p'])}), "
+                    f"per-neuron r {t_['local_r']['difference']:+.3f} ({pq(t_['local_r']['p'])})")
+        if "pending" in sp_:
+            seed_ = (f"Seed spread: {s0_.split(',')[0]} and {s1_.split(',')[0]} ({S._tex(sp_['runs'][1])}), the same spec, "
+                     "seeds 0 and 1: --, pending.")
+        else:
+            seed_ = (f"Seed spread: {s0_.split(',')[0]} and {s1_.split(',')[0]}, the same spec, seeds 0 and 1: brain-mean r "
+                     f"{L_[s0_]['brain_mean_r']['estimate']:+.3f} and {L_[s1_]['brain_mean_r']['estimate']:+.3f}, per-neuron r "
+                     f"{L_[s0_]['local_r']['estimate']:+.3f} and {L_[s1_]['local_r']['estimate']:+.3f} (this slide's frames "
+                     f"and neurons); differences {sp_['brain_mean_r']:.3f} and {sp_['local_r']:.3f}.")
+        # the updates each landed run applied (history.jsonl), named when one applied fewer than its spec asks for or
+        # they differ (23.3 was resumed)
+        U_ = {num_: updates_(run)}
+        U_.update({c_[0]: updates_(c_[1]) for k_, c_ in ctl_.items() if k_ not in pend_})
+        if "pending" not in sp_:
+            U_[s1_.split(",")[0]] = updates_(sp_["runs"][1])
+        upd_ = ""
+        if len({u_[0] for u_ in U_.values()}) > 1 or any(u_[0] < u_[1] for u_ in U_.values()):
+            upd_ = ("\\\\[2pt]\nUpdates applied (history.jsonl): "
+                    + "; ".join(f"{a_} {u_[0]:,} of {u_[1]:,}" + (f", resumed from update {u_[2]:,}" if u_[2] else "")
+                                for a_, u_ in U_.items())
+                    + ("; not matched" if len({u_[0] for u_ in U_.values()}) > 1 else "") + ".")
+        ctl_txt_ = "; ".join(control_(c_[0], c_[1], num_, run) + (", pending" if k_ in pend_ else "")
+                             for k_, c_ in ctl_.items())
         right_mf = (S.head("the previous slide and this one")
                     + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
                       f"{num_} graph & frames & neurons & brain-mean r & per-neuron r \\\\\n\\hline\n"
@@ -1129,9 +1298,9 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                       "\\end{tabular}\\par}\\vspace{2pt}\n"
                     + "{\\scriptsize\\raggedright frames: the free frames (brain-mean r) / the movie's frames (per-neuron r). "
                       f"This slide leaves out block 1 of {ST_['blocks'] + 1} (the first {ST_['block_min']:.1f} min, the "
-                      "transient from the recorded start) and scores per-neuron r over the neurons every bar can score "
-                      "(finite in every law, recorded residual moving), a flat learned trace scored 0; the previous slide "
-                      "over the neurons whose recorded and learned residuals both move. The bars are this slide's point "
+                      "transient from the recorded start) and scores per-neuron r over the neurons finite in every landed "
+                      "law with a moving recorded residual; the previous slide over every neuron with a moving recorded "
+                      "residual; on both a flat learned trace scored 0. The bars are this slide's point "
                       "values; the bootstrap gives only the 95 \\% intervals and the p values.\\par}" + S.SEC_GAP
                     + S.head("the bars")
                     + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
@@ -1141,23 +1310,14 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                     + ("times $\\Omega_i(t)$" if mod_ else "no $\\Omega$") + ". "
                       "$W_{ij} = 0$: the trained " + num_ + " rolled out with " + zero_
                     + (", " + nomsg_ if nomsg_ else "") + ". "
-                      "Mean field (" + m_.split()[0] + "): $m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$, times $\\Omega_i(t)$; "
-                      "no W (" + n_.split()[0] + "): $m_i = 0$, no $\\Omega$. The two controls: graph-free, 22.1's spec "
-                      "(no markers), trained from scratch.\\par}" + S.SEC_GAP
+                      "The graph-free controls: " + ctl_txt_ + ". --: not landed.\\par}" + S.SEC_GAP
                     + S.head("the tests")
                     + "{\\scriptsize\\raggedright \\textbf{Null:} two laws follow the recording equally well. \\textbf{Method:} "
                       f"a paired block bootstrap over time, the {ST_['blocks']} blocks of {ST_['block_min']:.1f} min after "
                       f"block 1, {ST_['resamples']:,} resamples, the same blocks for every law, p two-sided.\\par}}\\vspace{{3pt}}\n"
                     + "{\\scriptsize\\raggedright "
-                    + "\\\\\n".join("graph $-$ " + ("$W_{ij} = 0$" if b2_ == w0_ else b2_.split(" ", 1)[1]) + ": brain-mean r "
-                                    + f"{T_[(g_, b2_)]['brain_mean_r']['difference']:+.3f} ({pq(T_[(g_, b2_)]['brain_mean_r']['p'])}), "
-                                    + f"per-neuron r {T_[(g_, b2_)]['local_r']['difference']:+.3f} ({pq(T_[(g_, b2_)]['local_r']['p'])})"
-                                    for b2_ in (w0_, m_, n_))
-                    + "\\\\[2pt]\n"
-                      f"Seed pair: {s0_.split(',')[0]} and {s1_.split(',')[0]}, {sd_}, seeds 0 and 1: brain-mean r "
-                      f"{L_[s0_]['brain_mean_r']['estimate']:+.3f} and {L_[s1_]['brain_mean_r']['estimate']:+.3f}, per-neuron r "
-                      f"{L_[s0_]['local_r']['estimate']:+.3f} and {L_[s1_]['local_r']['estimate']:+.3f} (this slide's frames "
-                      f"and neurons); differences {ST_['seed_pair']['brain_mean_r']:.3f} and {ST_['seed_pair']['local_r']:.3f}.\\par}}")
+                    + "\\\\\n".join(test_(b2_) for b2_ in (w0_, m_, n_))
+                    + "\\\\[2pt]\n" + seed_ + upd_ + "\\par}")
         out.append((f"19_meanfield_{run}", S.frame_narrow("the mean-field control", f"figs/meanfield_stats{tg_}.png", right_mf,
                                                           f"tools/exp17_meanfield_stats.py --{tg_[1:]} (data/meanfield_stats{tg_}.json)",
                                                           deck_title=dt + " $\\cdot$ the mean-field control",
@@ -1337,15 +1497,41 @@ def prelim_slides(S, after):
         sk_ += (sw_(r) + f" & {r['eval_it']:,} & {f3_(r['skill_short'])} & {f3_(r['ref_skill_short'])} & "
                 f"{f3_(r['d_skill_short'])} & {f3_(r['skill_long'])} & {f3_(r['ref_skill_long'])} & "
                 f"{f3_(r['d_skill_long'])} \\\\\n")
+    # FAIR COMPARISONS ONLY (Cedric, 2026-10-10): each arm against the run it differs from in one thing (r["cmp"]: its
+    # law's reference, a permuted mask its unpermuted twin), its no-W twin beside it, blank ("--") until it lands
     te_ = ""
     for r in R:
-        t_, c_ = r["test"], C[r["ref"]]["test"]
+        t_, c_ = r["test"], r.get("cmp_test", C[r["ref"]]["test"])
+        nw_ = (r.get("now") or {}).get("test")
         if not (t_ and c_):
-            te_ += sw_(r) + " & \\multicolumn{6}{l}{not tested} \\\\\n"
+            te_ += sw_(r) + " & \\multicolumn{8}{l}{not tested} \\\\\n"
             continue
         te_ += (sw_(r) + f" & {t_['brain_mean_r']:.3f} & {c_['brain_mean_r']:.3f} & {f3_(r['d_brain_mean_r'])} & "
-                f"{t_['per_neuron_r']:.3f} & {c_['per_neuron_r']:.3f} & {f3_(r['d_per_neuron_r'])} \\\\\n")
-    refs_ = "; ".join(f"{k} ({S._tex(v['run'])}) for {arms_([r for r in R if r['ref'] == k])}" for k, v in C.items())
+                + (f"{nw_['brain_mean_r']:.3f}" if nw_ else "--") + " & "
+                f"{t_['per_neuron_r']:.3f} & {c_['per_neuron_r']:.3f} & {f3_(r['d_per_neuron_r'])} & "
+                + (f"{nw_['per_neuron_r']:.3f}" if nw_ else "--") + " \\\\\n")
+    cmp_ = {}
+    for r in R:
+        cmp_.setdefault(r.get("cmp", r["ref"]), []).append(r)
+    refs_ = "; ".join(f"{k}" + (f" ({S._tex(C[k]['run'])})" if k in C else ", the same mask unpermuted")
+                      + f" for {arms_(v)}" for k, v in cmp_.items())
+    tw_ = {}
+    for r in R:
+        if r.get("now"):
+            tw_.setdefault((r["now"]["arm"], r["now"]["run"]), []).append(r)
+    nwt_ = "; ".join(f"{a} ({S._tex(n)}) for {arms_(v)}" for (a, n), v in tw_.items())
+    nwp_ = [a for (a, n), v in tw_.items() if not v[0]["now"]["test"]]
+    # the seed spread: seed 0 against seed 1 of one spec
+    sdp_ = "; ".join(f"{p['a']} / {p['b']} " + (f"{p['d_brain_mean_r']:.3f} / {p['d_per_neuron_r']:.3f}" if "d_brain_mean_r" in p
+                                                else f"-- ({S._tex(p['b_run'])} pending)")
+                     for p in J.get("seed_pairs", []))
+    # not matched (beyond the one thing compared): the block markers into the comparator's neurons, read from the specs
+    nm_ = [r for r in R if r.get("inputs") and r["inputs"]["markers"] != r["cmp_inputs"]["markers"]]
+    nmt_ = ("Not matched: " + "; ".join(
+        f"{c} reads the 9 block markers into {v[0]['cmp_inputs']['markers']:,} neurons"
+        + (" on top of its $\\Delta V_{i,k}$" if v[0]["cmp_inputs"]["rest_per_block"] else "")
+        + f", {arms_(v)} into " + (f"{v[0]['inputs']['markers']:,}" if v[0]["inputs"]["markers"] else "none")
+        for c, v in {r["cmp"]: [x for x in nm_ if x["cmp"] == r["cmp"]] for r in nm_}.items()) + "." if nm_ else "")
     se_ = R[0]["save_every"]
     ss_, sl_ = J["short_steps"], J["long_steps"]
     hz_ = [h for _, h in next(iter(C.values()))["stages"]]
@@ -1359,27 +1545,33 @@ def prelim_slides(S, after):
            + "per-neuron r: per neuron, r of the learned "
            "against the recorded trace over the movie's " + (span_("movie_frames") + " " if ta_ else "") + "frames, "
            "each first regressed on its own brain mean, the mean over the "
-           + (span_("per_neuron_n") + " " if ta_ else "") + "neurons whose recorded residual varies")
+           + (span_("per_neuron_n") + " " if ta_ else "") + "neurons whose recorded residual varies, a flat learned trace "
+           "scored 0")
     right_ = (S.head("live skill at the latest logged update")
               + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r"
                 "@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
                 f"& & \\multicolumn{{3}}{{c}}{{steps {ss_[0]}-{ss_[1]}}} & \\multicolumn{{3}}{{c}}{{steps {sl_[0]}-{sl_[1]}}} \\\\\n"
                 "& update & arm & ref & $\\Delta$ & arm & ref & $\\Delta$ \\\\\n\\hline\n" + sk_
               + "\\end{tabular}\\par}\\vspace{2pt}\n"
-              + "{\\tiny\\color{gray} ref: the comparator at the same update, " + refs_ + "; $\\Delta$ = arm $-$ ref, "
+              + "{\\tiny\\color{gray} ref: the arm's comparator at the same update, " + refs_
+              + "; $\\Delta$ = arm $-$ ref, "
                 "from the unrounded values. Live skill: 1 $-$ MSE / the best mean baseline's MSE, per step ahead, on the "
                 "trainer's fixed evaluation origins, "
                 f"logged every {se_:,} updates; the mean over steps {ss_[0]}-{ss_[1]} and over steps {sl_[0]}-{sl_[1]}\\par}}"
               + S.SEC_GAP
               + S.head("the test: the free rollout of the session")
-              + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{6pt}}r"
-                "@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
-                "& \\multicolumn{3}{c}{brain-mean r} & \\multicolumn{3}{c}{per-neuron r} \\\\\n"
-                "& arm & ref & $\\Delta$ & arm & ref & $\\Delta$ \\\\\n\\hline\n" + te_
+              + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r"
+                "@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
+                "& \\multicolumn{4}{c}{brain-mean r} & \\multicolumn{4}{c}{per-neuron r} \\\\\n"
+                "& arm & ref & $\\Delta$ & no W & arm & ref & $\\Delta$ & no W \\\\\n\\hline\n" + te_
               + "\\end{tabular}\\par}\\vspace{2pt}\n"
-              + "{\\tiny\\color{gray} " + fn_ + "\\par}")
-    cap_ = (f"Left {list(C)[0]}'s law, right {list(C)[-1]}'s law; solid the arms, dashed the comparator over the same "
-            "updates; dotted verticals: the stage edges, the rollout horizon " + f"{hz_[0]} to {hz_[-1]}" + " steps; "
+              + "{\\tiny\\color{gray} ref and $\\Delta$ as above; no W: the arm's no-W twin (the same features into the same "
+                "neurons, one offset per neuron and block, W not learned, no $\\Omega$; with W = 0 the two laws coincide), " + nwt_
+              + ("; --: pending" if nwp_ else "") + ". Seed spread, $|$seed 0 $-$ seed 1$|$ of one spec, brain-mean r / "
+                "per-neuron r: " + sdp_ + ". " + fn_ + "\\par}"
+              + ("\\vspace{2pt}{\\scriptsize\\raggedright " + nmt_ + "\\par}" if nmt_ else ""))
+    cap_ = (f"Left {list(C)[0]}'s law, right {list(C)[-1]}'s law; solid the arms, dashed the law's reference run "
+            f"({', '.join(C)}) over the same updates; dotted verticals: the stage edges, the rollout horizon " + f"{hz_[0]} to {hz_[-1]}" + " steps; "
             f"training loss: the logged loss of each update, the mean over the {se_:,} updates before each evaluation")
     body_ = ("{\\fontsize{5.6}{6.8}\\selectfont\\raggedright " + st_ + "\\par}\\vspace{4pt}\n"
              "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.56\\textwidth}\\centering"
@@ -2098,7 +2290,7 @@ def write_slides():
         right_pw = (S.head("the mesh, pruned: 22.3")
                     + "{\\scriptsize\\raggedright The triangular mesh's 256-\\textmu m window, level by level; after each level, its edges whose learned "
                       "weight is below the level's threshold in both directions marked red, then removed.\\par}\\vspace{6pt}\n"
-                    + lines_)
+                    + lines_ + prune_seed_("zap_n22_markall", "22.3", PR_))
         deck.append(("19_prune_window", S.frame("the mesh, the weights near 0 removed",
                                                 "\\playmovie{Movies/b19_tri_window_prune}", right_pw,
                                                 "tools/exp17_b19_deck.py --prune-movie; tools/exp17_prune.py",
@@ -2158,7 +2350,7 @@ def write_slides():
     # every slide built on 20.3 with 23.3"): 20.3's twin without checkpointing, which crashed on a NaN gradient and was
     # resumed from update 47,500 -- its history.jsonl logs 815 of the 1,500 updates after that, the gradient guard skipped
     # the other 685 -- so it sits below 20.3; 20.3's numbers are read from its own free rollout
-    deck += [x for x in slides_run19(S, run="zap_n23_markall", num="23.3", now_=None,
+    deck += [x for x in slides_run19(S, run="zap_n23_markall", num="23.3",       # its controls 22.21 / 22.22 (the defaults)
                                      label="baseline per block, lattice grid", time_="7.8 h + 0.3 h resumed", law=True)
              if not x[0].startswith("19_edges_")]
     deck += vrest_slides_(S, "zap_n23_markall", "23.3", "baseline per block, lattice grid")
@@ -2186,7 +2378,7 @@ def write_slides():
                       "its sending corner or reads its receiving one, so training never moved it from its start, 1.0 -- or "
                       "its coupling $W_{grid}^2$ is below the level's threshold, in both directions. The thresholds tested: "
                       "quantiles of the live weights.\\par}\\vspace{5pt}\n"
-                    + lines2_)
+                    + lines2_ + prune_seed_("zap_n23_markall", "23.3", GP_))
         new_ = [("20_prune_window", S.frame("the lattice grid, the weights near 0 removed",
                                             "\\playmovie{Movies/b20_grid_window_prune}", right_gw,
                                             "tools/exp17_b19_deck.py --prune-grid; tools/exp17_prune.py zap_n23_markall",
@@ -2232,7 +2424,7 @@ def write_slides():
         A_ = json.load(open(ja_))
         T_ = json.load(open(jt_))
         mv_ = os.path.join(S.GD, "log", "training", "zapbench", run_, "results", f"{run_}_movie.npz")
-        pn_ = S.local_r(mv_, "zapbench_destripe")["mean"] if os.path.exists(mv_) else float("nan")
+        pn_ = S.local_r(mv_, "zapbench_destripe", flat0=True)["mean"] if os.path.exists(mv_) else float("nan")   # as the run slide
         # 2026-10-09: the law read by law_of from the run's specs, best.pt and cell_ops (was hand-written: its W_mid row
         # read "the 16- and 32-um levels", the mesh's mid set is the 32-um level alone)
         La_ = law_of(run_)
@@ -2261,7 +2453,8 @@ def write_slides():
             # test, the learned constants, tau and V_rest by region, the V_rest offsets per block (exp17_param_maps,
             # exp17_tau_regions [--vrest], exp17_vrest_blocks, exp17_run_movie); no Omega, so no modulation slide
             lab24_ = "the angle, $\\varphi$ per edge + block"
-            deck += [x for x in slides_run19(S, run=run_, num=num_, now_=None, label=lab24_, law=True, law_slide=False)
+            deck += [x for x in slides_run19(S, run=run_, num=num_, mf_=("24.11", "zap_n24_mf_blk"), label=lab24_, law=True,
+                                             law_slide=False)                # its controls: 22.21, 24.11 (fair, 2026-10-10)
                      if not x[0].startswith("19_edges_")]           # its law: the angle slide above
             deck += vrest_slides_(S, run_, num_, lab24_)
     # Cedric, 2026-10-09: batch 25 (the input mask by region, running) and batch 26 (the stimulus video, planned), each
@@ -2325,7 +2518,8 @@ def write_slides():
                      "\\\\[2pt]\\begin{tabular}{@{}lrrr@{}}pool & n & model & bank \\\\ \\hline " + rows_
                    + "\\end{tabular}\\\\[2pt]"
                      f"Side: mean r {cv_['L']:.3f} with the atlas's low-x half as the fish's left, {cv_['R']:.3f} "
-                     "the other way.\\par}")
+                     "the other way.\\par}"
+                   + eye_candidates_())
         deck.append(("90c_eye_rotation", S.frame_narrow(
             "the rotation block: model cells and the recorded neurons most like them", "figs/eye_zapbench_rotation.png",
             right_r, "tools/exp17_eye_zapbench.py (data/eye_zapbench.json)", left=0.70,
@@ -2343,6 +2537,15 @@ def write_slides():
         import re as re_                               # the deck title: the run and what it is, no "batch"
         t_ = (f"{recs_[n_]['row']['batch']} {APPENDIX_CURVES[n_]} $\\cdot$ the forecast error, step by step")
         body_ = sl_[f"{n_}_curves"].replace(f"figs/{n_}_curves_bm.png", f"figs/{n_}_curves_a.png").replace("\\textbf{batch ", "\\textbf{")
+        # FAIR COMPARISONS ONLY (2026-10-10): the published U-Net is scored on the same test windows, neurons and
+        # metric, but reads other inputs and trains on another loss -- said in one line on its legend row
+        an_ = "its published error on these test windows"
+        if an_ in body_:
+            body_ = body_.replace(an_, an_ + "; not matched: it reads the imaging volume's last 4 frames and no stimulus, "
+                                  "trained on MAE (Lueckmann et al. 2025, App. C.5); the law reads the traces and the "
+                                  "recorded stimulus, trained on MSE", 1)
+        else:
+            print(f"[b19 deck] {n_}_curves: the U-Net legend row not found, its not-matched line not added")
         deck.append((f"91_curves_{n_}", re_.sub(r"\\begin\{frame\}\[t\]\{.*\}\n", lambda m_: "\\begin{frame}[t]{" + t_ + "}\n",
                                                 body_, count=1)))
     # Cedric, 2026-10-09 ("figures are not well centered vertically"): the movie-or-figure + text slides centred in
