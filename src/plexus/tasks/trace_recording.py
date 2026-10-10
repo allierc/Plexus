@@ -179,6 +179,210 @@ def skills(model_c: np.ndarray, mean_c: np.ndarray) -> dict:
             "n_conditions_long_positive": int((sk_c[:, l0:l1].mean(1) > 0).sum())}
 
 
+# ============================================================================== the free rollout's network metrics
+# (the graph phase, Cedric 2026-10-10): ONE implementation of what the deck printed from five -- the brain-mean
+# metrics, the per-neuron r with the brain mean removed, the steady window, the per-block scores and the paired block
+# bootstrap. tools/exp17_slides.bm_metrics / local_r, tools/exp17_meanfield_stats and tools/exp17_w0_blocks are the
+# originals these were ported from, number for number (tests/test_graph_metrics.py).
+def brain_mean_metrics(obs, pred) -> dict:
+    """{r, r2, rmse, n}: the learned brain-mean trace against the recorded one over the frames where both are finite:
+    Pearson r, R2 = 1 - sum (p - o)^2 / sum (o - mean o)^2, the RMSE in the traces' units."""
+    o, p = np.asarray(obs, np.float64).reshape(-1), np.asarray(pred, np.float64).reshape(-1)
+    ok = np.isfinite(o) & np.isfinite(p)
+    o, p = o[ok], p[ok]
+    den = ((o - o.mean()) ** 2).sum()
+    return {"r": float(np.corrcoef(o, p)[0, 1]) if len(o) > 1 and o.std() > 0 and p.std() > 0 else float("nan"),
+            "r2": float(1 - ((p - o) ** 2).sum() / den) if den > 0 else float("nan"),
+            "rmse": float(np.sqrt(((p - o) ** 2).mean())) if len(o) else float("nan"), "n": int(len(o))}
+
+
+def remove_brain_mean(A, b=None):
+    """A [T, N] with each column regressed on the brain mean b [T] (default A's own mean over its columns), both
+    centred: the part of each trace the shared signal does not carry."""
+    A = np.asarray(A, np.float64)
+    A = A - A.mean(0)
+    b = A.mean(1) if b is None else np.asarray(b, np.float64)
+    b = b - b.mean()
+    beta = (A * b[:, None]).sum(0) / max(float((b * b).sum()), 1e-30)
+    return A - b[:, None] * beta[None]
+
+
+def per_neuron_r(P, X, neuron_set="recording", flat="zero") -> dict:
+    """THE PER-NEURON r, BRAIN MEAN REMOVED (Cedric, 2026-10-05): per neuron, the correlation over the frames of its
+    learned trace P[:, i] and its recorded trace X[:, i], each first regressed on its OWN brain mean -- the learned on
+    the learned brain mean over the finite neurons (a silenced neuron's trace is NaN), the recorded on the recorded.
+    `neuron_set` "recording": every neuron whose recorded residual moves (sd > 1e-9), ONE set for every law (the deck's
+    flat0 = True, 2026-10-10: "always fair comparison"); "finite": only the neurons whose learned trace is finite and
+    whose learned residual moves (the deck's older default, each law its own set). `flat` "zero": a flat or non-finite
+    learned residual scores r = 0; "drop": left out. -> {mean, sd, n, n_flat, r [N] (NaN outside the set)}."""
+    P, X = np.asarray(P, np.float64), np.asarray(X, np.float64)
+    fin = np.isfinite(P).all(0)
+    N = P.shape[1]
+    r = np.full(N, np.nan)
+    if neuron_set == "recording":
+        Rx = remove_brain_mean(X)
+        Rp = np.zeros_like(P)
+        Rp[:, fin] = remove_brain_mean(P[:, fin])
+        sp, sx = Rp.std(0), Rx.std(0)
+        ok = sx > 1e-9
+        live = ok & (sp > 1e-9)
+        r[live] = (Rp[:, live] * Rx[:, live]).mean(0) / (sp[live] * sx[live])
+        if flat == "zero":
+            r[ok & ~live] = 0.0
+        n_flat = int((ok & ~live).sum())
+    else:
+        Rp, Rx = remove_brain_mean(P[:, fin]), remove_brain_mean(X[:, fin])
+        sp, sx = Rp.std(0), Rx.std(0)
+        ok_f = (sx > 1e-9) & (sp > 1e-9) & np.isfinite(sp)
+        rf = np.full(int(fin.sum()), np.nan)
+        rf[ok_f] = (Rp[:, ok_f] * Rx[:, ok_f]).mean(0) / (sp[ok_f] * sx[ok_f])
+        if flat == "zero":
+            rf[(sx > 1e-9) & ~ok_f] = 0.0
+        r[fin] = rf
+        n_flat = int(((sx > 1e-9) & ~ok_f).sum())
+    v = r[np.isfinite(r)]
+    return {"mean": float(v.mean()) if len(v) else float("nan"), "sd": float(v.std()) if len(v) else float("nan"),
+            "n": int(len(v)), "n_flat": n_flat, "r": r}
+
+
+def steady_blocks(n_frames: int, n_blocks: int = 24, skip: int = 1):
+    """The free frames (0 .. n_frames - 1) cut into `n_blocks` equal blocks (tools/exp17_meanfield_stats' blocks of ~5
+    min over 2 h): -> (block id per frame [F], keep [F]: the frames after the first `skip` blocks, the opening transient
+    from the recorded start left out)."""
+    f = np.arange(int(n_frames))
+    blk = np.minimum(f * n_blocks // max(int(n_frames), 1), n_blocks - 1)
+    return blk, blk >= skip
+
+
+def brain_mean_block_sums(o, p, blk):
+    """Per block the sums r needs of the two brain-mean traces: [nb, 6] = n, sum o, p, oo, pp, op (both traces centred
+    over the finite frames first)."""
+    o, p = np.asarray(o, np.float64), np.asarray(p, np.float64)
+    ok = np.isfinite(o) & np.isfinite(p)
+    o, p = o - o[ok].mean(), p - p[ok].mean()
+    S = np.zeros((int(blk.max()) + 1, 6))
+    for k, v in enumerate((np.ones_like(o), o, p, o * o, p * p, o * p)):
+        np.add.at(S[:, k], blk[ok], v[ok])
+    return S
+
+
+def r_from_sums(S):
+    """Pearson r from summed (n, o, p, oo, pp, op) [..., 6]."""
+    S = np.asarray(S, np.float64)
+    n, so, sp_, soo, spp, sop = (S[..., k] for k in range(6))
+    c = sop / n - so * sp_ / n ** 2
+    return c / np.sqrt((soo / n - (so / n) ** 2) * (spp / n - (sp_ / n) ** 2))
+
+
+def block_sums(P, X, blk, keep, device="cpu"):
+    """Per block and neuron, the 9 sums the per-neuron r needs (P, X, PP, XX, PX, P ap, P ax, X ap, X ax; ap / ax the
+    learned / recorded brain mean per frame, over the finite neurons), plus per block n, ap, ax, ap ap, ax ax, ap ax:
+    -> (per [nb, 9, n_keep] torch, sc [nb, 6] torch). The neurons `keep` are the common set; a resampling of the blocks
+    is then a weighted sum of these."""
+    P, X = np.asarray(P, np.float64), np.asarray(X, np.float64)
+    fin = np.isfinite(P).all(0)
+    ap = torch.as_tensor(np.nan_to_num(P[:, fin] - P[:, fin].mean(0)).mean(1), device=device)
+    ax = torch.as_tensor((X[:, fin] - X[:, fin].mean(0)).mean(1), device=device)
+    Pk = torch.as_tensor(P[:, keep], device=device)
+    Xk = torch.as_tensor(X[:, keep], device=device)
+    Pk, Xk = Pk - Pk.mean(0), Xk - Xk.mean(0)
+    blk = np.asarray(blk)
+    nb = int(blk.max()) + 1
+    oh = torch.zeros(nb, len(blk), dtype=torch.float64, device=device)
+    oh[torch.as_tensor(blk, device=device), torch.arange(len(blk), device=device)] = 1.0
+    per = torch.stack([oh @ q for q in (Pk, Xk, Pk * Pk, Xk * Xk, Pk * Xk, Pk * ap[:, None], Pk * ax[:, None],
+                                        Xk * ap[:, None], Xk * ax[:, None])], 1)
+    sc = torch.stack([oh @ q for q in (torch.ones_like(ap), ap, ax, ap * ap, ax * ax, ap * ax)], 1)
+    return per, sc
+
+
+def local_r_from_sums(per, sc, vfull=None, per_neuron=False):
+    """The per-neuron r (brain mean removed) from summed sums: per [..., 9, N], sc [..., 6]; a FLAT learned residual
+    (variance below 1e-6 of its full-data value `vfull`, or below 1e-12) scored 0, |r| <= 1. -> (the mean over the
+    neurons, the learned residual's variance), or the per-neuron r with `per_neuron`."""
+    n = sc[..., 0:1]
+    m = lambda k: per[..., k, :] / n                                    # noqa: E731
+    s = lambda k: sc[..., k:k + 1] / n                                  # noqa: E731
+    C = lambda a, ma, mb: a - ma * mb                                   # noqa: E731
+    cPX, cPP, cXX = C(m(4), m(0), m(1)), C(m(2), m(0), m(0)), C(m(3), m(1), m(1))
+    cPap, cPax, cXap, cXax = C(m(5), m(0), s(1)), C(m(6), m(0), s(2)), C(m(7), m(1), s(1)), C(m(8), m(1), s(2))
+    vap, vax, capax = s(3) - s(1) ** 2, s(4) - s(2) ** 2, s(5) - s(1) * s(2)
+    bp, bx = cPap / vap, cXax / vax
+    cov = cPX - bx * cPax - bp * cXap + bp * bx * capax
+    vp, vx = cPP - bp * cPap, cXX - bx * cXax
+    floor = 1e-12 if vfull is None else torch.clamp_min(1e-6 * vfull, 1e-12)
+    live = (vp > floor) & (vx > 1e-12)
+    r = torch.where(live, cov / torch.sqrt(vp.clamp_min(1e-30) * vx.clamp_min(1e-30)), torch.zeros_like(cov)).clamp(-1, 1)
+    return r if per_neuron else (r.mean(-1), vp)
+
+
+def stars(p: float) -> str:
+    return "***" if p < 1e-3 else "**" if p < 1e-2 else "*" if p < 0.05 else "n.s."
+
+
+def paired_block_bootstrap(bm: dict, loc: dict, pairs, resamples: int = 10000, seed: int = 0, device="cpu") -> dict:
+    """THE PAIRED BLOCK BOOTSTRAP over time (tools/exp17_meanfield_stats): the null "two laws follow the recording
+    equally well". `bm` {law: [nb, 6] brain-mean block sums}, `loc` {law: (per, sc, vfull)} from `block_sums` on one
+    neuron set; the same resampled blocks for every law; two-sided p = (1 + #|d* - d| >= |d|) / (1 + B). -> {laws:
+    {law: {brain_mean_r: {estimate, ci95}, local_r: {estimate, ci95, sd_over_neurons}}}, tests: [{a, b, brain_mean_r:
+    {difference, ci95, p, stars, sd, sigmas}, local_r: {...}}], blocks, resamples}."""
+    laws = list(bm)
+    nb = int(np.asarray(bm[laws[0]]).shape[0])
+    bmt = {k: torch.as_tensor(np.asarray(v), dtype=torch.float64, device=device) for k, v in bm.items()}
+    est, boot, sd_n = {}, {k: {"brain_mean_r": [], "local_r": []} for k in laws}, {}
+    for k in laws:
+        per, sc, vfull = loc[k]
+        est[k] = {"brain_mean_r": float(r_from_sums(bmt[k].sum(0).cpu().numpy())),
+                  "local_r": float(local_r_from_sums(per.sum(0), sc.sum(0), vfull)[0])}
+        sd_n[k] = float(local_r_from_sums(per.sum(0), sc.sum(0), vfull, per_neuron=True).std())
+    g = torch.Generator(device="cpu").manual_seed(int(seed))
+    for a in range(0, int(resamples), 250):
+        b_ = min(250, int(resamples) - a)
+        idx = torch.randint(nb, (b_, nb), generator=g)
+        W = torch.zeros(b_, nb, dtype=torch.float64).scatter_add_(1, idx, torch.ones(b_, nb, dtype=torch.float64)).to(device)
+        for k in laws:
+            boot[k]["brain_mean_r"].append(r_from_sums((W @ bmt[k]).cpu().numpy()))
+            per, sc, vfull = loc[k]
+            boot[k]["local_r"].append(local_r_from_sums(torch.einsum("bk,kmn->bmn", W, per), W @ sc, vfull)[0].cpu().numpy())
+    boot = {k: {m: np.concatenate(v) for m, v in d.items()} for k, d in boot.items()}
+    doc = {"blocks": nb, "resamples": int(resamples), "laws": {}, "tests": []}
+    for k in laws:
+        doc["laws"][k] = {m: {"estimate": est[k][m], "ci95": [float(np.percentile(boot[k][m], 2.5)),
+                                                               float(np.percentile(boot[k][m], 97.5))]}
+                          for m in ("brain_mean_r", "local_r")}
+        doc["laws"][k]["local_r"]["sd_over_neurons"] = sd_n[k]
+    for a, b in pairs:
+        t = {"a": a, "b": b}
+        for m in ("brain_mean_r", "local_r"):
+            d = est[a][m] - est[b][m]
+            ds = boot[a][m] - boot[b][m]
+            p = (1 + int((np.abs(ds - d) >= abs(d)).sum())) / (1 + int(resamples))
+            sd = float(ds.std())
+            t[m] = {"difference": float(d), "ci95": [float(np.percentile(ds, 2.5)), float(np.percentile(ds, 97.5))],
+                    "p": float(p), "stars": stars(p), "sd": sd, "sigmas": float(d / sd) if sd > 0 else float("nan")}
+        doc["tests"].append(t)
+    return doc
+
+
+def block_scores(X, P, device="cpu") -> dict:
+    """One window's scores of predicted P against recorded X, both [t, N] (tools/exp17_w0_blocks.scores): the brain-mean
+    r, and the per-neuron r (brain mean removed, a flat learned residual 0) with its SD and count over the neurons
+    finite in P with a moving recorded residual."""
+    X = torch.as_tensor(np.asarray(X, np.float32), device=device)
+    P = torch.as_tensor(np.asarray(P, np.float32), device=device)
+    mx, mp = X.mean(1), torch.nanmean(P, 1)                 # the learned brain mean over the finite (not silenced) neurons
+    bm = float(torch.corrcoef(torch.stack([mx, mp]))[0, 1])
+
+    def resid(A, m):
+        Ac, mc = A - A.mean(0), m - m.mean()
+        return Ac - mc[:, None] * ((Ac * mc[:, None]).sum(0) / (mc * mc).sum())[None]
+    rx, rp = resid(X, mx), resid(P, mp)
+    sx, sp_ = rx.std(0), rp.std(0)
+    keep = (sx > 1e-9) & torch.isfinite(P).all(0)
+    r = torch.where(sp_ > 1e-9, (rx * rp).sum(0) / ((len(X) - 1) * (sx * sp_).clamp(min=1e-12)), 0.0)[keep]
+    return {"brain_mean_r": bm, "per_neuron_r": float(r.mean()), "per_neuron_sd": float(r.std()), "neurons": int(keep.sum())}
+
+
 # ============================================================================== figures
 def render_curves(res: dict, path: str, names, gates: dict | None = None, history: list | None = None,
                   brain_mean: tuple | None = None):
