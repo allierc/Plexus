@@ -1285,6 +1285,113 @@ def batch26_slide(S):
                                             deck_title="batch 26 $\\cdot$ the stimulus video as input, planned"))
 
 
+def prelim_slides(S, after):
+    """THE PRELIMINARY RESULTS OF BATCHES 25 AND 26 (Cedric, 2026-10-10: "add a few results slides to 25 and 26, with
+    preliminary results"): one slide per batch, right after its description slide `after` (25_bio_mask, 26_video_input),
+    from tools/exp17_prelim.py (data/prelim_b<n>.json, figs/prelim_b<n>.png). The first line: the training state read
+    from each run's history.jsonl; left the live skill and the training loss against updates; right per arm the live
+    skill at its latest logged update against its comparator's at the same update and, once the arm is tested, the 2-h
+    free rollout's brain-mean r and per-neuron r against the comparator's. -> [(name, tex)], [] before the tool has run."""
+    b_ = {"25_bio_mask": 25, "26_video_input": 26}.get(after)
+    jp_ = os.path.join(EXP, "data", f"prelim_b{b_}.json")
+    if b_ is None or not (os.path.exists(jp_) and os.path.exists(os.path.join(PRES, "figs", f"prelim_b{b_}.png"))):
+        return []
+    J = json.load(open(jp_))
+    R, C = J["runs"], J["comparators"]
+    tot_ = R[0]["updates_total"]
+
+    def arms_(rs):                                      # "25.1-25.6" for the whole batch, else listed
+        a_ = [r["arm"] for r in rs]
+        if len(a_) == len(R) and len(a_) > 2:
+            return f"{a_[0]}-{a_[-1]}"
+        return a_[0] if len(a_) == 1 else ", ".join(a_[:-1]) + " and " + a_[-1]
+
+    def when_(rs):                                      # the history.jsonl mtimes, one date
+        t_ = sorted(r["history_mtime"] for r in rs)
+        d0_, d1_ = t_[0].split()[0], t_[-1].split()[0]
+        if t_[0] == t_[-1]:
+            return t_[0]
+        return f"{t_[0]} to {t_[-1].split()[1] if d0_ == d1_ else t_[-1]}"
+    run_ = [r for r in R if r["it_reached"] < r["updates_total"]]
+    done_ = [r for r in R if r["it_reached"] >= r["updates_total"]]
+    test_ = [r for r in R if r["test"]]
+    if run_:
+        at_ = [f"{r['arm']} at {r['it_reached']:,}" for r in run_]
+        st_ = ("Training in progress: " + (at_[0] if len(at_) == 1 else ", ".join(at_[:-1]) + " and " + at_[-1])
+               + f" of {tot_:,} updates (history.jsonl last written {when_(run_)})"
+               + (f"; {arms_(done_)} finished, {tot_:,} updates (history.jsonl last written {when_(done_)})" if done_ else ""))
+    else:
+        st_ = (f"Training finished: {arms_(done_)} at {tot_:,} of {tot_:,} updates (history.jsonl last written "
+               f"{when_(done_)})")
+    st_ += (f". Tested: {arms_(test_)}." if test_ else ". None tested yet.")
+
+    def sw_(r):                                         # the arm's colour in the figure, a short line before its label
+        return f"\\textcolor[HTML]{{{r['colour'][1:].upper()}}}{{\\rule[0.4ex]{{8pt}}{{1.4pt}}}}\\,{r['arm']}"
+    def f3_(v):                                         # signed, a true minus
+        return f"{v:+.3f}".replace("-", "$-$")
+    sk_ = ""
+    for r in R:
+        if r.get("ref_skill_short") is None:
+            sk_ += sw_(r) + " & " + (f"{r['eval_it']:,}" if r["eval_it"] else "--") + " & \\multicolumn{6}{l}{--} \\\\\n"
+            continue
+        sk_ += (sw_(r) + f" & {r['eval_it']:,} & {f3_(r['skill_short'])} & {f3_(r['ref_skill_short'])} & "
+                f"{f3_(r['d_skill_short'])} & {f3_(r['skill_long'])} & {f3_(r['ref_skill_long'])} & "
+                f"{f3_(r['d_skill_long'])} \\\\\n")
+    te_ = ""
+    for r in R:
+        t_, c_ = r["test"], C[r["ref"]]["test"]
+        if not (t_ and c_):
+            te_ += sw_(r) + " & \\multicolumn{6}{l}{not tested} \\\\\n"
+            continue
+        te_ += (sw_(r) + f" & {t_['brain_mean_r']:.3f} & {c_['brain_mean_r']:.3f} & {f3_(r['d_brain_mean_r'])} & "
+                f"{t_['per_neuron_r']:.3f} & {c_['per_neuron_r']:.3f} & {f3_(r['d_per_neuron_r'])} \\\\\n")
+    refs_ = "; ".join(f"{k} ({S._tex(v['run'])}) for {arms_([r for r in R if r['ref'] == k])}" for k, v in C.items())
+    se_ = R[0]["save_every"]
+    ss_, sl_ = J["short_steps"], J["long_steps"]
+    hz_ = [h for _, h in next(iter(C.values()))["stages"]]
+    ta_ = [r["test"] for r in R if r["test"]] + [c["test"] for c in C.values() if c["test"]]
+
+    def span_(k_, f_="{:,}"):                           # one value over the tested runs, else its range
+        v_ = sorted({t[k_] for t in ta_})
+        return f_.format(v_[0]) if len(v_) == 1 else f_.format(v_[0]) + "-" + f_.format(v_[-1])
+    fn_ = ("brain-mean r: Pearson r of the learned against the recorded brain-mean dF/F over the free rollout's "
+           + (span_("brain_mean_frames") + " frames (to " + span_("free_end_s", "{:,.0f}") + " s); " if ta_ else "frames; ")
+           + "per-neuron r: per neuron, r of the learned "
+           "against the recorded trace over the movie's " + (span_("movie_frames") + " " if ta_ else "") + "frames, "
+           "each first regressed on its own brain mean, the mean over the "
+           + (span_("per_neuron_n") + " " if ta_ else "") + "neurons whose recorded residual varies")
+    right_ = (S.head("live skill at the latest logged update")
+              + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{5pt}}r@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r"
+                "@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
+                f"& & \\multicolumn{{3}}{{c}}{{steps {ss_[0]}-{ss_[1]}}} & \\multicolumn{{3}}{{c}}{{steps {sl_[0]}-{sl_[1]}}} \\\\\n"
+                "& update & arm & ref & $\\Delta$ & arm & ref & $\\Delta$ \\\\\n\\hline\n" + sk_
+              + "\\end{tabular}\\par}\\vspace{2pt}\n"
+              + "{\\tiny\\color{gray} ref: the comparator at the same update, " + refs_ + "; $\\Delta$ = arm $-$ ref, "
+                "from the unrounded values. Live skill: 1 $-$ MSE / the best mean baseline's MSE, per step ahead, on the "
+                "trainer's fixed evaluation origins, "
+                f"logged every {se_:,} updates; the mean over steps {ss_[0]}-{ss_[1]} and over steps {sl_[0]}-{sl_[1]}\\par}}"
+              + S.SEC_GAP
+              + S.head("the test: the free rollout of the session")
+              + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{\\hspace{6pt}}r"
+                "@{\\hspace{4pt}}r@{\\hspace{4pt}}r@{}}\n"
+                "& \\multicolumn{3}{c}{brain-mean r} & \\multicolumn{3}{c}{per-neuron r} \\\\\n"
+                "& arm & ref & $\\Delta$ & arm & ref & $\\Delta$ \\\\\n\\hline\n" + te_
+              + "\\end{tabular}\\par}\\vspace{2pt}\n"
+              + "{\\tiny\\color{gray} " + fn_ + "\\par}")
+    cap_ = (f"Left {list(C)[0]}'s law, right {list(C)[-1]}'s law; solid the arms, dashed the comparator over the same "
+            "updates; dotted verticals: the stage edges, the rollout horizon " + f"{hz_[0]} to {hz_[-1]}" + " steps; "
+            f"training loss: the logged loss of each update, the mean over the {se_:,} updates before each evaluation")
+    body_ = ("{\\fontsize{5.6}{6.8}\\selectfont\\raggedright " + st_ + "\\par}\\vspace{4pt}\n"
+             "\\begin{columns}[T,onlytextwidth]\n\\begin{column}{0.56\\textwidth}\\centering"
+             f"\\includegraphics[width=\\linewidth,height=0.66\\textheight,keepaspectratio]{{figs/prelim_b{b_}.png}}\\par"
+             "\\vspace{3pt}{\\tiny\\raggedright\\color{gray} " + cap_ + "\\par}\\end{column}\n"
+             "\\begin{column}{0.42\\textwidth}\\setlength{\\colheight}{0.66\\textheight}\\fitcol{%\n" + right_
+             + "}\\end{column}\n\\end{columns}")
+    return [(f"{b_}_prelim", S.frame_wide(f"batch {b_} preliminary results", body_,
+                                          f"tools/exp17_prelim.py (data/prelim_b{b_}.json)",
+                                          deck_title=f"batch {b_} $\\cdot$ preliminary results"))]
+
+
 def flow_slides(S, run, num, law_txt, msg_txt, dt):
     """THE FLOW OF THE PRUNED LAW (Cedric, 2026-10-08: "flow movies like the first deck's slides 21 and 23, after pruning
     the edges, at two resolutions, coarse and middle"): tools/exp17_flow_pruned.py's two movies, smoothed over 25 um
@@ -2163,6 +2270,7 @@ def write_slides():
         it_ = f_(S)
         if it_:
             deck.append(it_)
+            deck += prelim_slides(S, it_[0])            # its preliminary results right after it (2026-10-10)
     deck.append(("90_appendix", S.frame_wide("appendix", "\\vspace*{0.30\\textheight}\\centering{\\Huge appendix}\\par",
                                              "Cedric, 2026-10-07", deck_title="multi-level GNN on fish 2 $\\cdot$ appendix")))
     # THE EYE CIRCUIT ON ZAPBENCH'S 2-H SESSION (Cedric, 2026-10-08: "replace slide 48 with the new 2H data", "rotation
