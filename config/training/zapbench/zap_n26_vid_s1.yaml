@@ -1,0 +1,117 @@
+name: zap_n26_vid_s1
+model: config/zapbench/zap_n26_vid_s1.yaml
+learnable:
+- param: W_short
+  op: state_diffuse
+  lr: 0.0009
+  prior:
+    l1: 7.5e-05
+    l2: 7.5e-07
+  title: one weight per short edge (the finest level, every neuron's Delaunay neighbours)
+- param: W_mid
+  op: state_diffuse
+  lr: 0.0009
+  prior:
+    l1: 7.5e-05
+    l2: 7.5e-07
+  title: one weight per middle edge (the 16- and 32-um levels)
+- param: W_long
+  op: state_diffuse
+  lr: 0.0009
+  prior:
+    l1: 7.5e-05
+    l2: 7.5e-07
+  title: one weight per long edge (level 2, the 64-um cubes)
+- block: tau
+  of: neuron
+  lr: 0.0018
+  title: each neuron's rate 1/tau
+- block: rest
+  of: neuron
+  lr: 0.0018
+  title: each neuron's rest value
+- block: input
+  of: neuron
+  lr: 0.0018
+  title: each neuron's weights on the 22 stimulus features
+- param: omega_mlp
+  op: state_diffuse
+  lr: 1.0e-06
+  title: the modulation's SIREN weights
+- param: video_theta
+  op: state_diffuse
+  lr: 0.001
+  title: the video encoder's convolutions and linear map, flat
+- param: video_out
+  op: state_diffuse
+  lr: 0.0018
+  title: each neuron's output weights on the encoder's 16 features (0 outside the video mask)
+task:
+  reference:
+    trace_recording: zapbench_destripe_video
+    split: all
+    test_stride: 8
+  drive:
+    set: stimulus
+    block: u
+    window:
+    - 0
+    - 0
+  observe:
+    set: neuron
+    block: dff
+  loss:
+  - term: trace_mse
+    reduction: norm2
+  warmup: 10
+  rollouts:
+  - name: nominal
+  - name: W0
+    zero:
+    - W_short
+    - W_mid
+  - name: no_stimulus
+    drive: 'off'
+  - name: Wall0
+    zero:
+    - W_short
+    - W_mid
+    - W_long
+training:
+  optimizer: adam
+  lr: 0.0018
+  schedule: none
+  clip: 1.0
+  batch: 4
+  seed: 1
+  save_every: 500
+  select: last
+  stages:
+  - horizon: 1
+    iters: 12000
+  - horizon: 2
+    iters: 6000
+  - horizon: 3
+    iters: 4000
+  - horizon: 4
+    iters: 3000
+  - horizon: 5
+    iters: 2400
+  - horizon: 10
+    iters: 2400
+  - horizon: 15
+    iters: 2400
+  - horizon: 20
+    iters: 2400
+  - horizon: 25
+    iters: 2400
+  - horizon: 30
+    iters: 2400
+  - horizon: 35
+    iters: 2400
+  - horizon: 40
+    iters: 2400
+  - horizon: 45
+    iters: 2400
+  - horizon: 50
+    iters: 2400
