@@ -680,7 +680,8 @@ def vrest_slides_(S, run, num, lab):
                    + "{\\scriptsize\\raggedright (a) the brain mean of the baseline per block, over the recorded brain "
                      "mean; (b) each region's mean per block. Middle: the fish from above and from the side, one block per "
                      "frame, each neuron coloured by dV$_{i,k}$ minus dV$_{i,\\mathrm{gain}}$ (red raised, blue lowered), its "
-                     "opacity growing with the size of the change.\\par}\\vspace{6pt}\n"
+                     "opacity growing with the size of the change; under it, panel a's traces, the block shown under a grey bar.\\par}"
+                     "\\vspace{6pt}\n"
                    + head("values")
                    + "{\\scriptsize\\raggedright Per block, r over the neurons between dV$_{i,k}$ and the neuron's recorded "
                      "shift (its block mean minus its recording mean): " + f"{min(rk_.values()):+.2f}" + " to "
