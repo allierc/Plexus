@@ -22,7 +22,7 @@ flat (the no-W twin: 40 %), so the deck's local r of those rows comes from the o
 without that block their r is 0 / 0. On a resample both come from
 weighted sums per block (local r: 9 sums per neuron per block), so a resample costs a matrix product.
 
-    PYTHONPATH=src:tools python tools/exp17_meanfield_stats.py [--raw] [--n19 | --n22]
+    PYTHONPATH=src:tools python tools/exp17_meanfield_stats.py [--raw] [--n19 | --n22 | --n23 | --n24]
 Another experiment (exp20, 2026-10-05) calls main(laws, tests, seeds, exp_dir, raw) with its own runs: laws = ((label,
 run name, rollout suffix "" or "_W0"), ...), tests = ((i, j), ...) indices into laws, seeds = a (label, run, "") pair of
 one spec trained with two seeds, or None; every run's free rollout must share its frames.
@@ -59,9 +59,22 @@ SEEDS_N19 = (("19.25, seed 0", "zap_n19_nom", ""), ("19.26, seed 1", "zap_n19_no
 # (markall, 19.27's twin without checkpointing) against batch 22's controls -- 22.17 the mean field and 22.16 no W, the
 # twins of 19.41 / 19.40, trained on the NOMINAL inputs, not markall's -- and the nominal's seed pair, 22.1 / 22.2
 # the W0 rollout zeroes W_short and W_mid only (config/training/zapbench/zap_n22_markall.yaml, rollouts: W0), so named
-LAWS_N22 = (("22.3 graph", "zap_n22_markall", ""), ("22.3, W short, mid = 0", "zap_n22_markall", "_W0"),
+# (Cedric, 2026-10-10: "it is simply W_ij = 0"): the Wall0 rollout, every edge weight 0 (W_short, W_mid AND W_long)
+LAWS_N22 = (("22.3 graph", "zap_n22_markall", ""), ("22.3, W_ij = 0", "zap_n22_markall", "_Wall0"),
             ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
 SEEDS_N22 = (("22.1, seed 0", "zap_n22_nom", ""), ("22.2, seed 1", "zap_n22_nom_s1", ""))
+# `--n23` (Cedric, 2026-10-10: "a twin of 27 for 23.3"): the lattice grid; its W0 rollout zeroes a_j (A_send), so every
+# corner's encoded value and every message is 0: W_ij = 0. The controls are graph-free (22.16 no W, 22.17 mean field)
+LAWS_N23 = (("23.3 graph", "zap_n23_markall", ""), ("23.3, W_ij = 0", "zap_n23_markall", "_W0"),
+            ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
+SEEDS_N23 = (("23.1, seed 0", "zap_n23_nom", ""), ("23.2, seed 1", "zap_n23_nom_s1", ""))
+# `--n24` (Cedric, 2026-10-10: "add the twin of 27 to 24.10"): the angle law, its Wall0 rollout (every edge weight 0),
+# the graph-free controls, and the angle law's seed pair (24.2 / 24.3, zap_n24_ph seeds 0 and 1)
+LAWS_N24 = (("24.10 graph", "zap_n24_ph_edge_blk", ""), ("24.10, W_ij = 0", "zap_n24_ph_edge_blk", "_Wall0"),
+            ("22.17 mean field", "zap_n22_mf", ""), ("22.16 no W", "zap_n22_now", ""))
+SEEDS_N24 = (("24.2, seed 0", "zap_n24_ph", ""), ("24.3, seed 1", "zap_n24_ph_s1", ""))
+# the tests from the graph only (Cedric, 2026-10-10: "draw * only from graph to others, not between others")
+TESTS_G = ((0, 1), (0, 2), (0, 3))
 
 
 def stars(p):
@@ -196,6 +209,10 @@ def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None, tag=""):
            f"first, the opening transient, left out), {B} resamples, two-sided, the resampled differences shifted to the null",
            "block_min": (f1 - f0 + 1) * frame_s / N_BLOCKS / 60, "blocks": nb, "resamples": B,
            "neurons": int(keep.sum()),
+           # the frames scored (Cedric, 2026-10-10: "numbers are not the same between slide 26 and 27"): the brain-mean r
+           # over the free frames, the per-neuron r over the movie's frames; all of them, and those after block 1
+           "frames": {"free": int(brain_mean_sums(Z[LAWS_[0][0]], nblk_t)[:, 0].sum()),
+                      "free_steady": int(blk_bm[LAWS_[0][0]][:, 0].sum()), "movie": int(len(fr)), "movie_steady": int(st.sum())},
            "laws": {}, "tests": [], "seed_pair": {}}
     for k, _, _ in laws:
         doc["laws"][k] = {m: {"estimate": est[k][m], "ci95": [float(np.percentile(boot[k][m], 2.5)),
@@ -221,6 +238,7 @@ def main(laws=LAWS, tests=TESTS, seeds=SEEDS, exp_dir=EXP, raw=None, tag=""):
         print("[seed]", doc["seed_pair"])
     doc["raw"] = RAW
     doc["law_order"] = [k for k, _, _ in LAWS_]
+    doc["law_runs"] = {k: [n, v] for k, n, v in laws}      # each bar's run and rollout suffix (the deck reads what it zeroes)
     doc["test_pairs"] = [list(t) for t in tests]
     doc["tag"] = tag
     json.dump(doc, open(os.path.join(exp_dir, "data", f"meanfield_stats{tag}{SUF}.json"), "w"), indent=1)
@@ -258,7 +276,7 @@ def draw(doc, exp_dir=EXP):
         ax.set_ylim(0, top + step * (len(pairs) + 1.0))
         ax.set_xticks(x)
         ax.set_xticklabels([n.replace(", ", ",\n").replace(" graph", "\ngraph").replace(" mean", "\nmean")
-                            .replace(" no W", "\nno W") for n in names], fontsize=9)
+                            .replace(" no W", "\nno W").replace("W_ij", "$W_{ij}$") for n in names], fontsize=9)
         ax.set_title(ttl, loc="left", fontsize=13)   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         for s_ in ("top", "right"):
             ax.spines[s_].set_visible(False)
@@ -272,12 +290,17 @@ def draw(doc, exp_dir=EXP):
 
 
 if __name__ == "__main__":
-    tag_ = "_n19" if "--n19" in sys.argv else ("_n22" if "--n22" in sys.argv else "")
+    tag_ = "_n19" if "--n19" in sys.argv else ("_n22" if "--n22" in sys.argv else ("_n23" if "--n23" in sys.argv else
+                                                                                 ("_n24" if "--n24" in sys.argv else "")))
     if "--draw" in sys.argv:
         draw(json.load(open(os.path.join(EXP, "data", f"meanfield_stats{tag_}{SUF}.json"))))
     elif tag_ == "_n19":
         main(LAWS_N19, TESTS, SEEDS_N19, tag=tag_)
     elif tag_ == "_n22":
-        main(LAWS_N22, TESTS, SEEDS_N22, tag=tag_)
+        main(LAWS_N22, TESTS_G, SEEDS_N22, tag=tag_)
+    elif tag_ == "_n23":
+        main(LAWS_N23, TESTS_G, SEEDS_N23, tag=tag_)
+    elif tag_ == "_n24":
+        main(LAWS_N24, TESTS_G, SEEDS_N24, tag=tag_)
     else:
         main()

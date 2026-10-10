@@ -1077,53 +1077,89 @@ def slides_run19(S, run="zap_n22_markall", num="22.3", now_=("22.16", "zap_n22_n
                                                       "tools/exp17_edges.py --amplitude", left=0.69,
                                                       deck_title=dt + " $\\cdot$ edge weights")))
     # the mean-field control (Cedric, 2026-10-07; filled 2026-10-08 once 19.40 / 19.41 landed; 22.3 against 22.17 / 22.16
-    # since 2026-10-09): the bars and the paired block-bootstrap tests from tools/exp17_meanfield_stats.py --n22, in batch
-    # 15.17's slide's words. The controls are the NOMINAL's twins (no markers), so graph - mean field also carries the
-    # markers' gain: 22.1, the nominal's graph without them, is quoted beside them
-    jm_ = os.path.join(EXP, "data", "meanfield_stats_n22.json")
-    if run == "zap_n22_markall" and os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", "meanfield_stats_n22.png")):
-        nl_ = S.local_r(os.path.join(GD_, "log", "training", "zapbench", "zap_n22_nom", "results", "zap_n22_nom_movie.npz"),
-                        "zapbench_destripe")
+    # since 2026-10-09): the bars and the paired block-bootstrap tests from tools/exp17_meanfield_stats.py --n22 / --n23 /
+    # --n24. 2026-10-10 (Cedric): its twins for 23.3 and 24.10; the second bar "simply W_ij = 0", the rollout that zeroes
+    # every message (read from the run's spec); the tests from the graph only; and first, "numbers are not the same
+    # between slide 26 and 27 ... print it first": the run slide's scores (the whole rollout, S.bm_metrics / S.local_r as
+    # that slide reads them) beside this slide's (the 23 blocks after the transient, one neuron set for every law)
+    tg_ = {"zap_n22_markall": "_n22", "zap_n23_markall": "_n23", "zap_n24_ph_edge_blk": "_n24"}.get(run, "")
+    jm_ = os.path.join(EXP, "data", f"meanfield_stats{tg_}.json")
+    if tg_ and os.path.exists(jm_) and os.path.exists(os.path.join(PRES, "figs", f"meanfield_stats{tg_}.png")):
         ST_ = json.load(open(jm_))
         L_ = ST_["laws"]
         T_ = {(t["a"], t["b"]): t for t in ST_["tests"]}
         g_, w0_, m_, n_ = ST_["law_order"]
+        FR_ = ST_["frames"]
+        bmw_ = S.bm_metrics(os.path.join(res, f"{run}_movie.npz"))          # the run slide's two numbers, as it reads them
+        lcw_ = S.local_r(os.path.join(res, f"{run}_movie.npz"), "zapbench_destripe")
+        tx_ = lambda k_: k_.replace("W_ij", "$W_{ij}$")                    # noqa: E731   a bar's label in LaTeX
 
         def pq(p):
-            return f"p {p:.3f}" if p >= 1e-3 else f"p $<$ {1 / (ST_['resamples'] + 1) * 1.0001:.0e}".replace("e-0", "e-")
+            pm_ = 1 / (ST_["resamples"] + 1)
+            if p <= pm_ * 1.0001:                                          # no resample as far out: below the resolution
+                return f"p $<$ {pm_ * 1.0001:.0e}".replace("e-0", "e-")
+            return f"p {p:.3f}" if p >= 1e-3 else f"p {p:.1e}".replace("e-0", "e-")
+        # what the W_ij = 0 bar zeroes: its rollout's `zero:` list in the run's training spec
+        zr_ = next(r_.get("zero") or [] for r_ in L["spec"]["task"]["rollouts"]
+                   if r_.get("name") == ST_["law_runs"][w0_][1].lstrip("_"))
+        zs_ = {"W_short": "W^{short}", "W_mid": "W^{mid}", "W_long": "W^{long}", "A_send": "a_j"}
+        zero_ = "$" + " = ".join(zs_[z_] for z_ in zr_) + " = 0$"
+        nomsg_ = ("every $c_k = 0$, so every $m_i = 0$" if "A_send" in zr_ else
+                  "every $m_i = 0$" if {"W_short", "W_mid", "W_long"} <= set(zr_) else "")
+        mod_ = str(L["op"].get("modulation", "none")) == "siren"
+        num_ = g_.split()[0]
+        # the seed pair's spec against this run's (the config diffs, 2026-10-10): 22.1 / 23.1 the law without the
+        # markers; 24.2 24.10's law with one phase per region pair and alpha(t) of t alone
+        s0_, s1_ = ST_["seed_pair"]["a"], ST_["seed_pair"]["b"]
+        sd_ = {"_n22": "22.3's law without the markers", "_n23": "23.3's law without the markers",
+               "_n24": "24.10's law with one $\\varphi$ per region pair and $\\alpha(t)$ of $t$ alone"}[tg_]
         rows_mf = ""
         for k in (g_, w0_, m_, n_):
             b_, l_ = L_[k]["brain_mean_r"], L_[k]["local_r"]
             big_ = k == g_
-            rows_mf += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{k}}}}}" if big_ else k)
+            rows_mf += ((f"\\rule{{0pt}}{{2.7ex}}{{\\normalsize\\textbf{{{tx_(k)}}}}}" if big_ else tx_(k))
                         + f" & {S.qv(b_['estimate'], big=big_)} & {S.qv(l_['estimate'], big=big_)} $\\pm$ {l_['sd_over_neurons']:.2f} \\\\\n")
-        t1, t2, t3 = T_[(g_, m_)], T_[(m_, n_)], T_[(g_, w0_)]
-        right_mf = (S.head("the mean-field control, 2 h free rollout")
-                    + "{\\scriptsize\\raggedright\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
-                      "& brain-mean r & per-neuron r, removed, mean $\\pm$ SD \\\\\n\\hline\n" + rows_mf
+        right_mf = (S.head("the previous slide and this one")
+                    + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{\\hspace{6pt}}r@{}}\n"
+                      f"{num_} graph & frames & neurons & brain-mean r & per-neuron r \\\\\n\\hline\n"
+                      f"previous slide: the whole 2 h & {FR_['free']:,} / {FR_['movie']:,} & {lcw_['n']:,} & "
+                      f"{S.qv(bmw_['r'])} & {S.qv(lcw_['mean'])} \\\\\n"
+                      f"this slide: blocks 2-{ST_['blocks'] + 1} & {FR_['free_steady']:,} / {FR_['movie_steady']:,} & "
+                      f"{ST_['neurons']:,} & {S.qv(L_[g_]['brain_mean_r']['estimate'])} & {S.qv(L_[g_]['local_r']['estimate'])} \\\\\n"
+                      "\\end{tabular}\\par}\\vspace{2pt}\n"
+                    + "{\\scriptsize\\raggedright frames: the free frames (brain-mean r) / the movie's frames (per-neuron r). "
+                      f"This slide leaves out block 1 of {ST_['blocks'] + 1} (the first {ST_['block_min']:.1f} min, the "
+                      "transient from the recorded start) and scores per-neuron r over the neurons every bar can score "
+                      "(finite in every law, recorded residual moving), a flat learned trace scored 0; the previous slide "
+                      "over the neurons whose recorded and learned residuals both move. The bars are this slide's point "
+                      "values; the bootstrap gives only the 95 \\% intervals and the p values.\\par}" + S.SEC_GAP
+                    + S.head("the bars")
+                    + "{\\scriptsize\\begin{tabular}{@{}l@{\\hspace{6pt}}r@{\\hspace{6pt}}l@{}}\n"
+                      "& brain-mean r & per-neuron r, mean $\\pm$ SD over the neurons \\\\\n\\hline\n" + rows_mf
                     + "\\end{tabular}\\par}\\vspace{3pt}\n"
-                    + "{\\scriptsize\\raggedright graph (22.3): $m_i = \\sum_s\\sum_{j \\to i} W^s_{ij}\\tanh z_j$, times "
-                      "$\\Omega_i(t)$; mean field (22.17): $m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$, times $\\Omega_i(t)$; no W "
-                      "(22.16): $m_i = 0$, no $\\Omega$; " + L["w0"] + ": the W0 rollout of the trained 22.3. The two controls "
-                      "are 22.1's spec (no markers), trained from scratch"
-                    + (f"; 22.1, the nominal's graph without the markers: per-neuron r {nl_['mean']:.3f}" if nl_ else "")
-                    + ".\\par}" + S.SEC_GAP
-                    + S.head("the test")
+                    + "{\\scriptsize\\raggedright graph (" + num_ + "): $" + "$, $".join(L["lines"][1:]) + "$, "
+                    + ("times $\\Omega_i(t)$" if mod_ else "no $\\Omega$") + ". "
+                      "$W_{ij} = 0$: the trained " + num_ + " rolled out with " + zero_
+                    + (", " + nomsg_ if nomsg_ else "") + ". "
+                      "Mean field (" + m_.split()[0] + "): $m_i = a_i\\,\\tfrac1N\\sum_j \\tanh z_j$, times $\\Omega_i(t)$; "
+                      "no W (" + n_.split()[0] + "): $m_i = 0$, no $\\Omega$. The two controls: graph-free, 22.1's spec "
+                      "(no markers), trained from scratch.\\par}" + S.SEC_GAP
+                    + S.head("the tests")
                     + "{\\scriptsize\\raggedright \\textbf{Null:} two laws follow the recording equally well. \\textbf{Method:} "
-                      f"a paired block bootstrap over time, {ST_['blocks']} blocks of {ST_['block_min']:.1f} min (the first, "
-                      f"the transient, left out), {ST_['resamples']:,} resamples, the same blocks for every law, p two-sided; "
-                      f"per-neuron r over the same {ST_['neurons']:,} neurons, a flat learned trace scored 0.\\par}}\\vspace{{3pt}}\n"
-                    + "{\\scriptsize\\raggedright graph $-$ mean field: brain-mean r " + f"{t1['brain_mean_r']['difference']:+.3f} "
-                      f"({pq(t1['brain_mean_r']['p'])}), per-neuron r {t1['local_r']['difference']:+.3f} ({pq(t1['local_r']['p'])})\\\\\n"
-                      f"mean field $-$ no W: {t2['brain_mean_r']['difference']:+.3f} ({pq(t2['brain_mean_r']['p'])}), "
-                      f"{t2['local_r']['difference']:+.3f} ({pq(t2['local_r']['p'])})\\\\\n"
-                      "graph $-$ its " + L["w0"] + f": {t3['brain_mean_r']['difference']:+.3f} ({pq(t3['brain_mean_r']['p'])}), "
-                      f"{t3['local_r']['difference']:+.3f} ({pq(t3['local_r']['p'])})\\\\[2pt]\n"
-                      f"Retraining with another seed ({ST_['seed_pair']['a'].split(',')[0]} against "
-                      f"{ST_['seed_pair']['b'].split(',')[0]}, the nominal's spec) moves brain-mean r by "
-                      f"{ST_['seed_pair']['brain_mean_r']:.3f} and per-neuron r by {ST_['seed_pair']['local_r']:.4f}.\\par}}")
-        out.append((f"19_meanfield_{run}", S.frame_narrow("the mean-field control", "figs/meanfield_stats_n22.png", right_mf,
-                                                          "tools/exp17_meanfield_stats.py --n22 (data/meanfield_stats_n22.json)",
+                      f"a paired block bootstrap over time, the {ST_['blocks']} blocks of {ST_['block_min']:.1f} min after "
+                      f"block 1, {ST_['resamples']:,} resamples, the same blocks for every law, p two-sided.\\par}}\\vspace{{3pt}}\n"
+                    + "{\\scriptsize\\raggedright "
+                    + "\\\\\n".join("graph $-$ " + ("$W_{ij} = 0$" if b2_ == w0_ else b2_.split(" ", 1)[1]) + ": brain-mean r "
+                                    + f"{T_[(g_, b2_)]['brain_mean_r']['difference']:+.3f} ({pq(T_[(g_, b2_)]['brain_mean_r']['p'])}), "
+                                    + f"per-neuron r {T_[(g_, b2_)]['local_r']['difference']:+.3f} ({pq(T_[(g_, b2_)]['local_r']['p'])})"
+                                    for b2_ in (w0_, m_, n_))
+                    + "\\\\[2pt]\n"
+                      f"Seed pair: {s0_.split(',')[0]} and {s1_.split(',')[0]}, {sd_}, seeds 0 and 1: brain-mean r "
+                      f"{L_[s0_]['brain_mean_r']['estimate']:+.3f} and {L_[s1_]['brain_mean_r']['estimate']:+.3f}, per-neuron r "
+                      f"{L_[s0_]['local_r']['estimate']:+.3f} and {L_[s1_]['local_r']['estimate']:+.3f} (this slide's frames "
+                      f"and neurons); differences {ST_['seed_pair']['brain_mean_r']:.3f} and {ST_['seed_pair']['local_r']:.3f}.\\par}}")
+        out.append((f"19_meanfield_{run}", S.frame_narrow("the mean-field control", f"figs/meanfield_stats{tg_}.png", right_mf,
+                                                          f"tools/exp17_meanfield_stats.py --{tg_[1:]} (data/meanfield_stats{tg_}.json)",
                                                           deck_title=dt + " $\\cdot$ the mean-field control",
                                                           left=0.50, height=0.70, img_top="0.12\\textheight")))
     return out
@@ -2244,12 +2280,13 @@ def write_slides():
         if nb_ in nm_ and run_i:
             it_ = deck.pop(nm_.index(nb_))
             deck.insert([n for n, _ in deck].index(nm_[run_i[0]]) + 1 + k_, it_)
-    nm_ = [n for n, _ in deck]
-    mf_i = [i for i, n in enumerate(nm_) if n.startswith("19_meanfield_")]
-    run_i = [i for i, n in enumerate(nm_) if n.startswith("19_run_")]
-    if mf_i and run_i:
-        it_ = deck.pop(mf_i[0])
-        deck.insert([n for n, _ in deck].index(nm_[run_i[0]]) + 1, it_)    # right after the run (Cedric, 2026-10-08)
+    # each mean-field slide right after its own run's slide (Cedric, 2026-10-08; 23.3's and 24.10's twins since 2026-10-10)
+    for mfn_ in [n for n, _ in deck if n.startswith("19_meanfield_")]:
+        nm_ = [n for n, _ in deck]
+        rn_ = "19_run_" + mfn_[len("19_meanfield_"):]
+        if rn_ in nm_:
+            it_ = deck.pop(nm_.index(mfn_))
+            deck.insert([n for n, _ in deck].index(rn_) + 1, it_)
     nm_ = [n for n, _ in deck]                         # Cedric, 2026-10-08: the pruned mesh replaces the edge slide
     ed_ = [n for n in nm_ if n.startswith("19_edges_")]
     if ed_:

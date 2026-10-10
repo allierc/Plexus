@@ -62,6 +62,11 @@ task:
     zero:
     - W_short
     - W_mid
+  - name: Wall0
+    zero:
+    - W_short
+    - W_mid
+    - W_long
   - name: no_stimulus
     drive: 'off'
 training:
