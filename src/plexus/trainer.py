@@ -87,7 +87,7 @@ _KEYS = {
              "movie_metric", "record"},
     "record": {"set", "block", "every_s"},
     "rollout": {"name", "zero", "drive", "clamp", "messages"},
-    "clamp": {"rois"},
+    "clamp": {"rois", "mask", "array"},
     "roi": {"box", "sphere", "units"},
     "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
                   "recording", "beats", "field_recording", "coarsen", "points", "split", "normalise",
@@ -130,7 +130,8 @@ def _check_rollouts(path, s, kind):
     """`task.rollouts` (Cedric, 2026-10-03): the free rollouts the test phase makes besides the nominal one, each a
     named VARIANT of the same learned model -- `zero:` learnables set to 0 (the network's W: "W = 0"), `drive: off`
     (no known stimulus), `clamp: {rois: [...]}` (the elements inside the ROIs given their RECORDED value every frame:
-    measured leaders or hypothesised input neurons; they are left out of every score). Trace references, and field
+    measured leaders or hypothesised input neurons; they are left out of every score), or, on a trace law, `clamp:
+    {mask: <npz>, array: mask}` (the elements nonzero in that array: exp17's input neurons). Trace references, and field
     references (exp19, 2026-10-03): there `messages: off` is the W = 0 of a message-passing law (`diffuse[graphcast]`'s
     `messages`), `zero: [I]` / `[I_mlp]` removes its learned forcing (the field's stand-in for a stimulus, it has no
     drive), and `clamp:` gives the voxels inside the ROIs their recorded values (x, y, z in um from the voxel size)."""
@@ -163,6 +164,9 @@ def _check_rollouts(path, s, kind):
             raise ValueError(f"{w}: `drive: off` but the task has no drive")
         if "clamp" in ro:
             _refuse_unread(f"{w}.clamp", ro["clamp"], _KEYS["clamp"])
+            if "mask" in ro["clamp"] or "array" in ro["clamp"]:
+                _check_clamp_mask(w, ro["clamp"], kind)
+                continue
             rois = ro["clamp"].get("rois") or []
             if not rois:
                 raise ValueError(f"{w}.clamp needs `rois:` (a list of box / sphere)")
@@ -209,6 +213,33 @@ def _roi_mask(rois, pos):
             k = ((pos - c) ** 2).sum(1) <= rad ** 2
         m |= k
     return m
+
+
+def _check_clamp_mask(w, c, kind):
+    """`clamp: {mask: <npz under graphs_data>, array: <name, default mask>}` (exp17, 2026-10-10): the elements whose
+    value in that array is nonzero are given their recorded traces -- the input neurons, the rest left free. A trace
+    law's neuron mask; the file is read when the rollout is made (_clamp_mask), where its length is checked."""
+    if "rois" in c:
+        raise ValueError(f"{w}.clamp: `rois:` or `mask:`, not both")
+    if not isinstance(c.get("mask"), str) or not c["mask"].endswith(".npz"):
+        raise ValueError(f"{w}.clamp: `mask:` is an npz under graphs_data (e.g. zebrafish/input_mask_destripe_bal20.npz)")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", str(c.get("array", "mask"))):
+        raise ValueError(f"{w}.clamp: `array:` is the name of one array of the npz (default mask)")
+    if kind != "trace_recording":
+        raise ValueError(f"{w}.clamp: `mask:` is a trace law's neuron mask; a field recording clamps `rois:`")
+
+
+def _clamp_mask(c, pos):
+    """bool [N]: a rollout's `clamp:` elements -- inside its `rois:` (_roi_mask), or nonzero in its `mask:` file's
+    `array:` (one value per element)."""
+    if "rois" in c:
+        return _roi_mask(c["rois"], pos)
+    from plexus.paths import graphs_data_path
+    m = np.asarray(np.load(graphs_data_path(str(c["mask"])))[str(c.get("array", "mask"))])
+    if m.shape != (len(pos),):
+        raise ValueError(f"clamp mask {c['mask']} [{c.get('array', 'mask')}]: shape {m.shape}, one value per element "
+                         f"({len(pos)}) wanted")
+    return m != 0
 
 
 @contextlib.contextmanager
@@ -3191,9 +3222,9 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None):
     variant = variant or {}
     clamp = None
     if "clamp" in variant:
-        clamp = torch.as_tensor(_roi_mask(variant["clamp"]["rois"], box["rec"]["pos_um"]), device=X.device)
+        clamp = torch.as_tensor(_clamp_mask(variant["clamp"], box["rec"]["pos_um"]), device=X.device)
         if not bool(clamp.any()) or bool(clamp.all()):
-            raise ValueError(f"rollout `{variant.get('name')}`: its ROIs hold {int(clamp.sum())} of {len(clamp)} elements; "
+            raise ValueError(f"rollout `{variant.get('name')}`: its clamp holds {int(clamp.sum())} of {len(clamp)} elements; "
                              "a clamp needs some elements given and some free")
     w = _warmup(spec)
     o0 = box["n_in"] - 1 + w                # the free rollout's first origin, after its warm-up

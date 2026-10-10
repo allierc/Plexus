@@ -64,6 +64,23 @@ task:
     - W_mid
   - name: no_stimulus
     drive: 'off'
+  - name: Wall0
+    zero:
+    - W_short
+    - W_mid
+    - W_long
+  - name: clamp_in
+    clamp:
+      mask: zebrafish/input_mask_destripe_bio.npz
+      array: mask
+  - name: clamp_in_W0
+    zero:
+    - W_short
+    - W_mid
+    - W_long
+    clamp:
+      mask: zebrafish/input_mask_destripe_bio.npz
+      array: mask
 training:
   optimizer: adam
   lr: 0.0018

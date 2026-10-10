@@ -55,6 +55,16 @@ task:
     - A_send
   - name: no_stimulus
     drive: 'off'
+  - name: clamp_in
+    clamp:
+      mask: zebrafish/input_mask_destripe_bal20.npz
+      array: mask
+  - name: clamp_in_W0
+    zero:
+    - A_send
+    clamp:
+      mask: zebrafish/input_mask_destripe_bal20.npz
+      array: mask
 training:
   resume: best
   optimizer: adam
