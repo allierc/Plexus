@@ -107,7 +107,7 @@ def main():
         ycur -= TT / FH + hv
         a = fig.add_axes([0.01, ycur, wf, hv])
         a.axis("off")
-        a.set_title(ttl + ": the cells all five folds sign alike", fontsize=10, loc="left", x=0.0, pad=2)
+        a.set_title(ttl + ": the cells all five folds sign alike", fontsize=14, loc="left", x=0.0, pad=2)   # panel titles at the deck's one size on the page, ~4 pt (Cedric, 2026-10-09: the modulation movie's titles)
         Y = yd if view == "top" else A[:, 2]
         a.scatter(xd[ins & (cons == 0)], Y[ins & (cons == 0)], s=0.08, color="0.13", lw=0, rasterized=True)   # the outline only
         a.scatter(xd[cons == 1], Y[cons == 1], s=0.35, color=RED, lw=0, rasterized=True)
