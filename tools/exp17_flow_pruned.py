@@ -4,7 +4,15 @@ after pruning the edges, at two resolutions, coarse and middle; then for 20.3, a
 The first deck's flow (tools/exp17_wind.py, exp17_wind_views.py): every message deposited as an arrow from sender to
 receiver at 1/4, 1/2 and 3/4 of the edge, gridded, smoothed over `sigma` um, excitatory (m > 0) and inhibitory (m < 0)
 apart; long-lived particles drift through the two fields, red and cyan, over the RECORDED dF/F in grey; three views
-(from above, oblique from 45 deg above, from the side) and the brain-mean dF/F. The two resolutions are its two
+(from above, oblique from 45 deg above, from the side) and the brain-mean dF/F. HERE (Cedric, 2026-10-09: "remove the
+oblique view, keep top and side below one another, same size, same position as in other slides"): from above over
+from the side in one column, the baseline-per-block movies' geometry (exp17_vrest_blocks.movie), the strip below.
+THE DOMAIN (Cedric, 2026-10-09: "too many flows that come from outside the zebrafish brain"; "the side view biased by
+neurons at the bottom"): only the neurons registered INSIDE the Z-Brain brain (data/atlas_destripe.npz `inside`,
+95,248 of 100,759) place edges, corners, the grey and the mask; the 5,511 others sit around the brain after
+registration (top view y 39 .. 492 um against 97 .. 428 for the inside ones, side view z down to 55 um against 77) and
+widened the old mask (occupancy blurred over 25 um, > 0.2). The mask now: occupancy blurred over MASK_UM = 8 um,
+> 0.3, holes filled; particles die when they leave it. The two resolutions are its two
 smoothings: COARSE 25 um (the first deck's slide 21) and MIDDLE 10 um (its slide 23).
 Here, the PRUNED law (tools/exp17_prune.py, data/prune_<run>.json): only the kept edges carry messages, and the
 activity is the pruned law's own free rollout (data/prune/<run>/results/<run>_joint_movie.npz, 800 frames over the 2 h);
@@ -29,6 +37,7 @@ import torch
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "tools")]
 EXP = os.path.join(ROOT, "experiments", "exp17_zapbench_graphcast")
+MASK_UM = 8.0            # the brain mask's smoothing, um (the old 25 um mask reached ~40 um past the outermost neurons)
 
 
 def atlas_frame(A):
@@ -61,8 +70,9 @@ def edges(run, device):
     assert np.array_equal(om_["frames"], fr), "Omega and the pruned rollout on different frames"
     om = torch.as_tensor(om_["omega"].astype(np.float32), device=device)
     phi = torch.tanh(torch.as_tensor((pred - mu) / sd, device=device))
-    P3 = atlas_frame(np.load(os.path.join(EXP, "data", "atlas_destripe.npz"))["atlas_um"].astype(np.float64))
-    info = {"spec": spec, "rec": rec, "fr": fr, "pred": pred, "P3": P3}
+    za = np.load(os.path.join(EXP, "data", "atlas_destripe.npz"))
+    P3, ins = atlas_frame(za["atlas_um"].astype(np.float64)), za["inside"].astype(bool)
+    info = {"spec": spec, "rec": rec, "fr": fr, "pred": pred, "P3": P3, "sel": np.flatnonzero(ins)}
     if "state_diffuse.W_grid" not in fit:                                 # the neuron graph: neuron-to-neuron edges
         from exp17_ablation import neuron_graph_op
         op = neuron_graph_op(spec, "cpu")
@@ -73,6 +83,7 @@ def edges(run, device):
                 continue
             w_ = fit[f"state_diffuse.W_{s}"].float().reshape(-1)
             k_ = w_.abs() >= th.get(s, 0.0)
+            k_ &= torch.as_tensor(ins[op._E[s][0].cpu().numpy()] & ins[op._E[s][1].cpu().numpy()])   # both ends inside
             snd.append(op._E[s][0].cpu()[k_]); rcv.append(op._E[s][1].cpu()[k_]); w.append(w_[k_])
             kept[s] = (int(k_.sum()), int(len(w_)))
         info["kept"] = kept
@@ -92,7 +103,10 @@ def edges(run, device):
     a = (fit["state_diffuse.A_send"].float().numpy() if op.sign == "neuron" else np.ones(op.n_elements))
     g = fit["state_diffuse.G_recv"].float().numpy() ** 2 / 8.0
     nread = np.maximum(np.bincount(cs, minlength=nm), 1)
-    C3 = np.stack([np.bincount(cs, weights=P3[cr, d], minlength=nm) / nread for d in range(3)], 1)   # corner positions
+    ni = np.bincount(cs[ins[cr]], minlength=nm)                         # a corner placed by its INSIDE neurons only
+    C3 = np.stack([np.bincount(cs[ins[cr]], weights=P3[cr[ins[cr]], d], minlength=nm) / np.maximum(ni, 1)
+                   for d in range(3)], 1)
+    keep &= (ni[E["ms"]] > 0) & (ni[E["mr"]] > 0)
     nfed = np.maximum(np.bincount(gr, minlength=nm), 1)
     gs_t, gr_t = torch.as_tensor(gs, device=device), torch.as_tensor(gr, device=device)
     cs_t, cr_t = torch.as_tensor(cs, device=device), torch.as_tensor(cr, device=device)
@@ -107,7 +121,8 @@ def fields(run, view, sigma, pieces, cells=160, device="cuda:0"):
     """exp17_wind.fields' output (wind, speed, act, inside, grid, fr, rec, pred, P) for the pruned law in `view`."""
     import exp17_wind as W
     X3, snd, rcv, w, S, O, info = pieces
-    Pn = project(info["P3"], view)                                      # the neurons: the grid, the grey
+    sel = info["sel"]
+    Pn = project(info["P3"][sel], view)                                 # the INSIDE neurons: the grid, the grey, the mask
     pad = 0.03 * np.ptp(Pn[:, 0])
     x0, y0 = Pn[:, 0].min() - pad, Pn[:, 1].min() - pad
     h = (np.ptp(Pn[:, 0]) + 2 * pad) / cells
@@ -142,21 +157,22 @@ def fields(run, view, sigma, pieces, cells=160, device="cuda:0"):
             V[2].index_add_(0, c, ai * u[:, 0]); V[3].index_add_(0, c, ai * u[:, 1])
         Sm = blur(V.reshape(4, ny, nx), sigma).cpu().numpy()
         wind["ex"][f], wind["in"][f] = Sm[:2], Sm[2:]
-        A_ = torch.zeros(ny * nx, device=device).index_add_(0, cell_of(Pt), torch.as_tensor(pred[f], device=device)) / cnt
+        A_ = torch.zeros(ny * nx, device=device).index_add_(0, cell_of(Pt), torch.as_tensor(pred[f][sel], device=device)) / cnt
         act[f] = blur(A_.reshape(1, ny, nx), W.SIGMA_UM)[0].cpu().numpy()
-    ins = (blur((inside > 0).float().reshape(1, ny, nx), W.SIGMA_UM)[0] > 0.2).cpu().numpy()
+    from scipy.ndimage import binary_fill_holes
+    ins = binary_fill_holes((blur((inside > 0).float().reshape(1, ny, nx), MASK_UM)[0] > 0.3).cpu().numpy())
     sp = {k: np.linalg.norm(v, axis=1) for k, v in wind.items()}
     print(f"[flow] {run} {view}: {len(snd):,} edges, grid {nx} x {ny} ({h:.1f} um cells), sigma {sigma} um; 99th pct "
           f"speed ex {np.percentile(sp['ex'][:, ins], 99):.3g}, in {np.percentile(sp['in'][:, ins], 99):.3g}", flush=True)
     return dict(wind=wind, speed=sp, act=act, inside=ins, grid=(x0, y0, h), fr=fr, rec=info["rec"], pred=pred, P=Pn,
-                sigma=sigma)
+                sigma=sigma, sel=sel)
 
 
 def main(run, sigma, n_part=5000, device="cuda:0"):
     import exp17_wind_views as WV
     pieces = edges(run, device)
     print(f"[flow] {run}: kept edges per level {pieces[-1]['kept']}", flush=True)
-    V = {v: fields(run, v, sigma, pieces, device=device) for v in ("top", "oblique", "side")}
+    V = {v: fields(run, v, sigma, pieces, device=device) for v in ("top", "side")}
     bg = {}
     for v, D in V.items():
         a = WV.recorded_act(D)
