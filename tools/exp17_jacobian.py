@@ -31,10 +31,11 @@ the step 1 / the Gershgorin bound of J, at most 0.05 s), |z_i(t)| integrated ove
 regions (PULSE, made disjoint: a neuron in two of them belongs to neither) and the rest of the brain as a seventh row.
 Against W = 0, where z_i(t) = exp(-t / tau_i) on the pulsed region only (the diagonal, exactly).
 
-THE NULL: batch 17's random graph 17.7 (zap_g17_random: the same degrees, the senders drawn uniformly) is the plain
-neuron_graph law with Omega = 1 and no rate bounds, on the ephys recording: comparable to its spatial twin 17.9
-(zap_g17_mesh3, the same law on the multi-level mesh), not to 22.3-24.10. Run both: `tools/exp17_jacobian.py
-zap_g17_random zap_g17_mesh3`.
+THE NULL, NOT USED: batch 17's random graph 17.7 (zap_g17_random: the same degrees, the senders drawn uniformly) is
+the only random-graph run, and its law is not 22.3-24.10's: no Omega, no rate bounds (1/tau_i from 0 to 23 /s, 1 % of
+the neurons below 6e-4 /s), the ephys recording. Its leak-only spectrum reaches 0 /s, so "slower than the slowest
+leak" is empty, and its rightmost eigenvalues sit in a cluster of thousands within ~1e-3 /s of 0: the Krylov-Schur
+solve for the 50 had not converged after 20 min (2026-10-10). A random-graph twin of a bounded law would be the null.
 
 BATCHES 25 AND 26 are run with this tool when they land (results/<run>_test.json present): `--landed` lists them.
 
