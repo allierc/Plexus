@@ -92,6 +92,10 @@ def context(spec, device="cpu", root=None) -> dict:
     if st["inputs"]:
         mask_file = st["inputs"]
         mask_in = np.asarray(T._clamp_mask(st["inputs"], rec["pos_um"]))
+    elif getattr(op, "video_mask", None) is not None:
+        # a video law: the stimulus enters through the encoder at the video mask's neurons; its `input` block carries
+        # the release features only where its own mask lets them in (exp17 26.x: the block markers alone)
+        mask_in = op.video_mask.detach().cpu().numpy().reshape(-1) != 0
     elif getattr(op, "input_mask", None) is not None:
         # THE INPUT ELEMENTS: those whose mask lets in a stimulus column that VARIES -- a column changing at most twice
         # over the recording is a block marker (on once, off once; exp17's 9 markers reach every neuron in the markall
@@ -166,7 +170,7 @@ def rollout(ctx, name, variant, every_frame=False, n_frames=None):
              and (tr is None or os.path.exists(tr)))
     if fresh and not ctx["force"]:
         summary = json.load(open(sj))
-        if summary.get("variant", v_rec) == v_rec:                # a summary without `variant` predates the check
+        if summary.get("variant_spec", v_rec) == v_rec:           # a summary without `variant_spec` predates the check
             return {"movie": mv, "free": os.path.join(gd, f"{stem}_{name}_free.npz"), "traces": tr, "summary": summary,
                     "cached": True}
     t1 = time.time()
@@ -174,7 +178,7 @@ def rollout(ctx, name, variant, every_frame=False, n_frames=None):
                          variant=v, res_dir=gd, traces_path=tr, n_frames=n_frames)[0]
     free = {k: (v_ if not isinstance(v_, np.generic) else v_.item()) for k, v_ in free.items()}
     free["seconds"] = time.time() - t1
-    free["variant"] = v_rec
+    free["variant_spec"] = v_rec                                   # the trainer's `variant` is the name alone
     json.dump(free, open(sj, "w"), indent=1, default=_json_default)
     cuts = "".join(f", {p} {c['cut']}/{c['of']} cut" for p, c in free.get("prune", {}).items()) \
         if isinstance(free.get("prune"), dict) else ""
@@ -602,15 +606,21 @@ def test_prune_b(ctx, doc):
     learn_names = {e.get("param") or e.get("block") for e in spec["learnable"]}
     if "input" not in learn_names or "input" not in B or "drive" not in spec["task"]:
         raise NotImplementedError("prune_b: the law has no learned input weights to cut")
-    cols = ctx.get("stim_cols")
-    Bm = B["input"].double().cpu().numpy().reshape(ctx["N"], -1)
+    from plexus import trainer as T
+    param = "video_out" if "video_out" in learn_names else "input"          # a video law: the encoder's output rows b_i
+    cols = ctx.get("stim_cols") if param == "input" else None
+    src = B["input"] if param == "input" else ctx["learn"].p[T._learnable_key(spec, param)].detach()
+    Bm = src.double().cpu().numpy().reshape(ctx["N"], -1)
     bn = np.linalg.norm(Bm[:, cols] if cols else Bm, axis=1)
     inp = bn > 0
+    if not inp.any():
+        raise NotImplementedError(f"prune_b: every row of `{param}` is 0, nothing to cut")
     nom = movie_scores(ctx, nominal(ctx)["movie"])["steady"]
     spread = seed_spread(ctx, doc)
     rows = []
     for j, q in enumerate(ctx["st"]["prune_b"]["quantiles"]):
-        r = rollout(ctx, f"zero_in_{j}", {"zero_input": {"quantile": float(q), **({"columns": cols} if cols else {})}})
+        r = rollout(ctx, f"zero_in_{j}", {"zero_input": {"quantile": float(q), **({"columns": cols} if cols else {}),
+                                                         **({"param": param} if param != "input" else {})}})
         zi = r["summary"].get("zero_input", {})
         row = {"quantile": float(q), "threshold": zi.get("threshold"), "n_cut": zi.get("n_cut"), "n_input": zi.get("n_input"),
                "scores": movie_scores(ctx, r["movie"]), "file": r["movie"]}
@@ -623,8 +633,9 @@ def test_prune_b(ctx, doc):
     rem = [row for row in rows if row["removable"]]
     chosen = max(rem, key=lambda row: row["quantile"]) if rem else None
     return {"ruler": {"window": "steady", "seed_spread": spread}, "n_input": int(inp.sum()), "B_norm": _q(bn[inp]),
-            "columns": len(cols) if cols else "all", "columns_rule": "the stimulus columns (changing more than twice over "
-            "the recording); the block markers kept" if cols else "every column of the input block",
+            "param": param, "columns": len(cols) if cols else "all",
+            "columns_rule": "the stimulus columns (changing more than twice over the recording); the block markers kept"
+            if cols else f"every column of `{param}`",
             "ladder": rows, "quantile": chosen["quantile"] if chosen else None,
             "n_needed": (chosen["n_input"] - chosen["n_cut"]) if chosen else None}
 
@@ -1249,7 +1260,8 @@ def figure_card(ctx, doc, path):
         a.set_xticklabels(tg, rotation=60, ha="right", fontsize=6)
         a.set_yticks(range(len(srcs)))
         a.set_yticklabels(srcs, fontsize=7)
-        fig.colorbar(im, ax=a, fraction=0.03, label="log10 integrated |response|, z s")
+        cb = fig.colorbar(im, ax=a, fraction=0.03, pad=0.01)
+        cb.set_label("log10 integrated |response|, z s", fontsize=8, labelpad=2)
     a.set_title("e  a pulse into a region (rows): the response of each (columns)", fontsize=10, loc="left")
     # (f)
     a = axs[1, 2]

@@ -32,6 +32,7 @@ def _spec(rollouts, drive=True, graph=None):
     [{"name": "a", "zero_input": {"mask": "zebrafish/m.npy"}}],           # an npz
     [{"name": "a", "zero_input": {"quantile": 0.5, "columns": []}}],      # columns: a non-empty list of indices
     [{"name": "a", "zero_input": {"quantile": 0.5, "columns": [0, -1]}}],
+    [{"name": "a", "zero_input": {"quantile": 0.5, "param": "video_out"}}],   # param: a learnable of the spec
     [{"name": "a", "pulse": {"rois": [{"box": [[0, 1], [0, 1]]}], "level_z": 2.0, "start_s": 0.0}}],   # no duration
     [{"name": "a", "pulse": {"rois": [{"box": [[0, 1], [0, 1]]}], "mask": "zebrafish/m.npz", "level_z": 2.0,
                              "start_s": 0.0, "duration_s": 5.0}}],        # rois and mask
@@ -51,6 +52,7 @@ def test_graph_kinds_accepted_on_a_trace_law_only():
           {"name": "b_half", "zero_input": {"quantile": 0.5}}, {"name": "b_t", "zero_input": {"threshold": 0.3}},
           {"name": "b_m", "zero_input": {"mask": "zebrafish/m.npz", "array": "mask"}},
           {"name": "b_c", "zero_input": {"quantile": 0.5, "columns": [1]}},
+          {"name": "b_p", "zero_input": {"quantile": 0.5, "param": "W_mid"}},
           {"name": "pulse_x", "drive": "off", "pulse": {"rois": [{"box": [[0, 0.2], [0, 1]], "units": "fraction"}],
                                                         "level_z": 2.0, "start_s": 120.0, "duration_s": 10.0}},
           {"name": "pulse_m", "pulse": {"mask": "zebrafish/m.npz", "level_z": 1.0, "start_s": 0.0, "duration_s": 1.0}},

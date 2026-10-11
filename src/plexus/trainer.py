@@ -224,12 +224,14 @@ def _check_zero_input(w, c, s, kind, names):
     every neuron)."""
     if kind != "trace_recording":
         raise ValueError(f"{w}: `zero_input:` is a trace law's variant (its elements' stimulus weights)")
-    if "drive" not in s["task"] or "input" not in names:
-        raise ValueError(f"{w}: `zero_input:` needs a task drive and the `input` block among the learnables")
     if not isinstance(c, dict) or len([k for k in ("quantile", "threshold", "mask") if k in c]) != 1 \
-            or set(c) - {"quantile", "threshold", "mask", "array", "columns"}:
+            or set(c) - {"quantile", "threshold", "mask", "array", "columns", "param"}:
         raise ValueError(f"{w}: `zero_input:` is one of {{quantile: q}}, {{threshold: t}}, {{mask: <npz>, array: <name>}}"
-                         " (+ columns: [j, ...])")
+                         " (+ columns: [j, ...], param: <learnable>)")
+    param = c.get("param", "input")
+    if "drive" not in s["task"] or param not in names:
+        raise ValueError(f"{w}: `zero_input:` needs a task drive and `{param}` among the learnables (the elements' input "
+                         "weights: the `input` block by default, `param:` names another, e.g. video_out)")
     if "columns" in c and not (isinstance(c["columns"], (list, tuple)) and len(c["columns"]) > 0
                                and all(isinstance(j, int) and not isinstance(j, bool) and j >= 0 for j in c["columns"])):
         raise ValueError(f"{w}.zero_input: `columns:` a non-empty list of column indices of the `input` block")
@@ -427,13 +429,14 @@ def _input_rows(learn, spec, box, c):
     """`zero_input:` -- the elements whose `input` rows the variant cuts (bool [N]) and the cut's record: the input
     elements are those with a nonzero row of B (|B_i| its L2 norm); `quantile:` cuts the input elements below that
     quantile of their |B_i|, `threshold:` those below t, `mask:` the elements nonzero in the file's array; with
-    `columns:` the norm and the cut run over those columns of B only."""
-    k = _learnable_key(spec, "input")
+    `columns:` the norm and the cut run over those columns of B only; `param:` names the learnable holding the rows
+    (default the `input` block; a video law's `video_out`)."""
+    k = _learnable_key(spec, c.get("param", "input"))
     B = learn.p[k].detach().reshape(learn.p[k].shape[0], -1)
     cols = _input_cols(c, B.shape[1])
     norm = (B[:, cols] if cols is not None else B).norm(2, dim=1)
     inp = norm > 0
-    rec = {"n_input": int(inp.sum()), "columns": len(cols) if cols is not None else "all"}
+    rec = {"n_input": int(inp.sum()), "columns": len(cols) if cols is not None else "all", "param": c.get("param", "input")}
     if "mask" in c:
         sel = torch.as_tensor(_clamp_mask(c, box["rec"]["pos_um"]), device=B.device) & inp
         rec["by"] = "mask"
@@ -459,7 +462,7 @@ def _input_cols(c, width):
 def _input_zeroed(learn, spec, box, c):
     """`zero_input:` applied: the selected rows of the `input` block (their `columns:` when given) at 0, restored on
     exit; yields the cut's record."""
-    k = _learnable_key(spec, "input")
+    k = _learnable_key(spec, c.get("param", "input"))
     sel, rec = _input_rows(learn, spec, box, c)
     with torch.no_grad():
         saved = learn.p[k].detach().clone()
