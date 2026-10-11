@@ -987,16 +987,19 @@ def test_impulse(ctx, doc):
         if first_movie is None and ctx["st"]["movies"]:
             first_movie = os.path.join(ctx["gd"], f"{ctx['stem']}_pulse_{re.sub(r'[^A-Za-z0-9_]+', '_', sname)}.mp4")
             try:
-                response_movie(ctx, dz, t_rel, settle, dur, sname, first_movie)
+                response_movie(ctx, dz, t_rel, settle, dur, sname, first_movie, src=(lab == sk))
                 out["movie"] = first_movie
             except Exception as e:
                 print(f"[graph] pulse movie failed: {type(e).__name__}: {e}")
     return out
 
 
-def response_movie(ctx, dz, t_rel, settle, dur, sname, path, fps=12, dpi=90):
+def response_movie(ctx, dz, t_rel, settle, dur, sname, path, fps=12, dpi=90, src=None):
     """The pulse's response on the brain: every neuron coloured by its response dz (blue below the resting rollout,
-    red above, clipped at +-1 z), from above (head left) and from the side, the pulse's window marked."""
+    red above), from above (head left) and from the side, the pulse's window marked. The colour scale is set by the
+    response OUTSIDE the pulsed region (`src`, bool [N]): its 99.5th percentile of |dz| after the pulse starts, so the
+    propagated response is visible and the pulsed region saturates; the poster (.png) is the frame where that outside
+    response peaks."""
     import shutil
     import subprocess
     import tempfile
@@ -1006,6 +1009,11 @@ def response_movie(ctx, dz, t_rel, settle, dur, sname, path, fps=12, dpi=90):
     from matplotlib.colors import LinearSegmentedColormap
     from plexus.tasks.trace_recording import _ffmpeg
     pos = ctx["pos"] if ctx["regions"] is None else ctx["regions"]["pos"]
+    on = t_rel >= settle
+    outside = dz[:, ~src] if src is not None and (~src).any() else dz
+    out_m = np.nan_to_num(np.nanmean(np.abs(outside), 1))
+    vmax = float(max(np.nanpercentile(np.abs(np.nan_to_num(outside[on])), 99.5) if on.any() else 1.0, 1e-3))
+    k_poster = int(np.flatnonzero(on)[np.argmax(out_m[on])]) if on.any() else len(t_rel) // 2
     cm = LinearSegmentedColormap.from_list("resp", ["#4a7bff", "black", "#ff4a4a"])
     plt.style.use("dark_background")
     fig = plt.figure(figsize=(12, 6.2), facecolor="black")
@@ -1028,10 +1036,11 @@ def response_movie(ctx, dz, t_rel, settle, dur, sname, path, fps=12, dpi=90):
     at.set_ylabel("mean |response|, z", fontsize=9)
     bar = at.axvline(t_rel[0], color="w", lw=1.2)
     txt = fig.text(0.98, 0.98, "", ha="right", va="top", fontsize=10)
-    fig.text(0.02, 0.98, f"pulse into {sname}: the response, learned minus resting rollout", fontsize=11, va="top")
+    fig.text(0.02, 0.98, f"pulse into {sname}: the response, learned minus resting rollout (colour +-{vmax:.2f} z; the pulsed "
+             "region saturates)", fontsize=11, va="top")
     tmp = tempfile.mkdtemp(prefix="pulse_")
     for i in range(len(t_rel)):
-        c = cm(np.clip((np.nan_to_num(dz[i][order]) + 1.0) / 2.0, 0, 1))
+        c = cm(np.clip((np.nan_to_num(dz[i][order]) / vmax + 1.0) / 2.0, 0, 1))
         for sc in scs:
             sc.set_facecolors(c)
         bar.set_xdata([t_rel[i]] * 2)
@@ -1040,7 +1049,7 @@ def response_movie(ctx, dz, t_rel, settle, dur, sname, path, fps=12, dpi=90):
     plt.close(fig)
     subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
                     "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", "libx264", path], check=True)
-    shutil.copy(os.path.join(tmp, f"{len(t_rel) // 2:05d}.png"), path.replace(".mp4", ".png"))
+    shutil.copy(os.path.join(tmp, f"{k_poster:05d}.png"), path.replace(".mp4", ".png"))
     shutil.rmtree(tmp)
 
 
