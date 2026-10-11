@@ -102,12 +102,13 @@ def context(spec, device="cpu", root=None) -> dict:
         # laws and name no input), a column changing more is a stimulus feature
         m = op.input_mask.detach().cpu().numpy()
         S_ = np.asarray(rec["stimulus"]) if "stimulus" in rec else None
-        if m.ndim == 2 and m.shape[1] > 1 and S_ is not None and S_.shape[1] == m.shape[1]:
-            varying = (np.diff(S_, axis=0) != 0).sum(0) > 2
+        varying = (np.diff(S_, axis=0) != 0).sum(0) > 2 if S_ is not None and S_.ndim == 2 else None
+        if m.ndim == 2 and m.shape[1] > 1 and varying is not None and S_.shape[1] == m.shape[1]:
             mask_in = (m[:, varying] != 0).any(1) if varying.any() else (m != 0).any(1)
-            stim_cols = [int(j) for j in np.flatnonzero(varying)] if varying.any() and not varying.all() else None
         else:
             mask_in = (m != 0).any(1) if m.ndim == 2 else (m.reshape(-1) != 0)
+        if varying is not None and varying.any() and not varying.all():     # the stimulus columns, whatever the mask's shape
+            stim_cols = [int(j) for j in np.flatnonzero(varying)]
     elif "input" in R["blocks"]:
         mask_in = np.linalg.norm(R["blocks"]["input"].cpu().numpy().reshape(N, -1), axis=1) > 0
     if mask_in is not None and mask_file is None:
@@ -611,6 +612,8 @@ def test_prune_b(ctx, doc):
     cols = ctx.get("stim_cols") if param == "input" else None
     src = B["input"] if param == "input" else ctx["learn"].p[T._learnable_key(spec, param)].detach()
     Bm = src.double().cpu().numpy().reshape(ctx["N"], -1)
+    if cols and max(cols) >= Bm.shape[1]:                                   # the block is not laid out per stimulus column
+        cols = None
     bn = np.linalg.norm(Bm[:, cols] if cols else Bm, axis=1)
     inp = bn > 0
     if not inp.any():
