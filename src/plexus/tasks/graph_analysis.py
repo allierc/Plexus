@@ -851,11 +851,14 @@ def test_spectrum(ctx, doc):
             res["M_spectral_radius"] = float(np.abs(vals).max()) if vals is not None else None
             if isinstance(info, str):
                 res["M_spectral_radius_error"] = info
+        t_lr = time.time()
         vals, vecs, info = _eigs(AJ, int(sp_["k"]), "LR", N)
         if isinstance(info, str):
             res["eigs_error"] = info
             return res
         res["solver"] = info
+        print(f"[graph] spectrum {tag}: {int(sp_['k'])} eigenvalues of largest real part in {time.time() - t_lr:.0f} s "
+              f"({info.get('solver')}, {info.get('restarts', '-')} restarts), abscissa {vals.real.max():+.4f} /s", flush=True)
         o = np.argsort(-vals.real)
         vals, vecs = vals[o], vecs[:, o]
         res["abscissa_per_s"] = float(vals[0].real)
