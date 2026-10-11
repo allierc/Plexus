@@ -3422,8 +3422,11 @@ class StateDiffuseNeuronGraphMeanField(StateDiffuseNeuronGraph):
         a = self.W_mean.detach().double().cpu().numpy()
         if omega is not None:
             a = a * np.asarray(torch.as_tensor(omega).reshape(-1).double().cpu())
-        return LinearOperator((N, N), matvec=lambda v: a * float(d @ np.asarray(v).reshape(-1)) / N,
-                              rmatvec=lambda v: d * float(a @ np.asarray(v).reshape(-1)) / N, dtype=np.float64)
+        op = LinearOperator((N, N), matvec=lambda v: a * float(d @ np.asarray(v).reshape(-1)) / N,
+                            rmatvec=lambda v: d * float(a @ np.asarray(v).reshape(-1)) / N, dtype=np.float64)
+        import scipy.sparse as sps
+        op.factors = (sps.csr_matrix(a[:, None]), sps.csr_matrix(d[None, :] / N))    # M = a (d^T / N), right to left
+        return op
 
 
 @register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral", model="neuron_grid",

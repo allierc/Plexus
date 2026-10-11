@@ -52,8 +52,9 @@ import torch
 TESTS = ("constants", "silence", "blocks", "controls", "clamp", "prune_w", "prune_b", "spectrum", "impulse", "leadlag",
          "memorise")
 DEFAULTS = {"steady_skip_min": 5.0, "bootstrap": {"blocks": 24, "resamples": 10000, "seed": 0},
-            "prune": {"ladder": 7, "span": [1.0 / 9.0, 3.0]}, "prune_b": {"quantiles": [0.5, 0.7, 0.8, 0.9, 0.95, 0.98]},
-            "spectrum": {"k": 50, "k_imag": 20, "state": "recording_mean"},
+            "prune": {"ladder": 7, "span": [1.0 / 9.0, 3.0], "quantiles": [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7]},
+            "prune_b": {"quantiles": [0.5, 0.7, 0.8, 0.9, 0.95, 0.98]},
+            "spectrum": {"k": 50, "k_imag": 20, "state": "recording_mean", "solver": "krylov_schur"},
             "pulse": {"level_z": 2.0, "duration_s": 10.0, "settle_s": 120.0, "window_s": 120.0, "regions": None},
             "movies": True, "every_frame": True}
 SEED_SPREAD = {"brain_mean_r": 0.009, "per_neuron_r": 0.005}     # exp17 19.25 vs 19.26, the fallback when no seed twin
@@ -87,7 +88,7 @@ def context(spec, device="cpu", root=None) -> dict:
     st = settings(spec)
     X = np.asarray(rec["dff"], np.float32)
     N = X.shape[1]
-    mask_in, mask_file = None, None
+    mask_in, mask_file, stim_cols = None, None, None
     if st["inputs"]:
         mask_file = st["inputs"]
         mask_in = np.asarray(T._clamp_mask(st["inputs"], rec["pos_um"]))
@@ -100,6 +101,7 @@ def context(spec, device="cpu", root=None) -> dict:
         if m.ndim == 2 and m.shape[1] > 1 and S_ is not None and S_.shape[1] == m.shape[1]:
             varying = (np.diff(S_, axis=0) != 0).sum(0) > 2
             mask_in = (m[:, varying] != 0).any(1) if varying.any() else (m != 0).any(1)
+            stim_cols = [int(j) for j in np.flatnonzero(varying)] if varying.any() and not varying.all() else None
         else:
             mask_in = (m != 0).any(1) if m.ndim == 2 else (m.reshape(-1) != 0)
     elif "input" in R["blocks"]:
@@ -142,7 +144,8 @@ def context(spec, device="cpu", root=None) -> dict:
     return dict(spec=spec, R=R, op=op, learn=R["learn"], box=box, device=device, out=out, stem=stem, gd=gd, st=st,
                 rec=rec, X=X, N=N, T=int(X.shape[0]), o0=o0, n_free=int(X.shape[0]) - 1 - o0,
                 frame_s=T._frame_s(rec), offsets=[int(v) for v in rec["offsets"]], names=list(rec["names"]),
-                cond=np.asarray(rec["condition"]).astype(int), mask_in=mask_in, mask_file=mask_file, regions=regions,
+                cond=np.asarray(rec["condition"]).astype(int), mask_in=mask_in, mask_file=mask_file, stim_cols=stim_cols,
+                regions=regions,
                 pos=np.asarray(rec["pos_um"], np.float64), norm=box["norm"], ck_mtime=os.path.getmtime(ck_file),
                 force=bool(spec.get("_force", False)))
 
@@ -157,20 +160,28 @@ def rollout(ctx, name, variant, every_frame=False, n_frames=None):
     mv = os.path.join(gd, f"{stem}_{name}_movie.npz")
     tr = os.path.join(gd, f"{stem}_{name}_traces.npy") if every_frame else None
     sj = os.path.join(gd, f"{stem}_{name}_summary.json")
+    v = {"name": name, **variant}
+    v_rec = json.loads(json.dumps(v, default=_json_default))     # the cache is reused only for the SAME variant
     fresh = (os.path.exists(mv) and os.path.exists(sj) and os.path.getmtime(mv) > ctx["ck_mtime"]
              and (tr is None or os.path.exists(tr)))
     if fresh and not ctx["force"]:
-        return {"movie": mv, "free": os.path.join(gd, f"{stem}_{name}_free.npz"), "traces": tr, "summary": json.load(open(sj)),
-                "cached": True}
+        summary = json.load(open(sj))
+        if summary.get("variant", v_rec) == v_rec:                # a summary without `variant` predates the check
+            return {"movie": mv, "free": os.path.join(gd, f"{stem}_{name}_free.npz"), "traces": tr, "summary": summary,
+                    "cached": True}
     t1 = time.time()
-    v = {"name": name, **variant}
     free = T._trace_free(ctx["spec"], ctx["learn"], ctx["box"], ctx["device"], ctx["out"], f"{stem}_{name}",
                          variant=v, res_dir=gd, traces_path=tr, n_frames=n_frames)[0]
     free = {k: (v_ if not isinstance(v_, np.generic) else v_.item()) for k, v_ in free.items()}
     free["seconds"] = time.time() - t1
-    json.dump(free, open(sj, "w"), indent=1)
+    free["variant"] = v_rec
+    json.dump(free, open(sj, "w"), indent=1, default=_json_default)
+    cuts = "".join(f", {p} {c['cut']}/{c['of']} cut" for p, c in free.get("prune", {}).items()) \
+        if isinstance(free.get("prune"), dict) else ""
+    zi = free.get("zero_input")
+    cuts += f", inputs cut {zi['n_cut']}/{zi['n_input']}" if isinstance(zi, dict) else ""
     print(f"[graph] rollout {name} ({time.time() - t1:.0f} s): brain-mean r {free['brain_mean_r']:+.3f}, R2 denoised "
-          f"{free['r2_denoised']:+.3f}, {free['silenced']} silenced", flush=True)
+          f"{free['r2_denoised']:+.3f}, {free['silenced']} silenced{cuts}", flush=True)
     return {"movie": mv, "free": os.path.join(gd, f"{stem}_{name}_free.npz"), "traces": tr, "summary": free, "cached": False}
 
 
@@ -515,17 +526,20 @@ def crossing(w, m, s):
 
 
 def _ladder_judge(ctx, doc, nominal_steady, rows, spread):
-    """Which rungs are removable: both steady metrics within the seed spread of the nominal's."""
+    """Which rungs are removable: neither steady metric more than the seed spread BELOW the nominal's (a rung that
+    scores better than the nominal is removable too: the lattice grid's weak weights, 23.3)."""
     for row in rows:
         s = row["scores"]["steady"]
         row["delta"] = {m: s[m] - nominal_steady[m] for m in ("brain_mean_r", "per_neuron_r")}
-        row["removable"] = bool(all(abs(row["delta"][m]) <= spread[m] for m in ("brain_mean_r", "per_neuron_r")))
+        row["removable"] = bool(all(row["delta"][m] >= -spread[m] for m in ("brain_mean_r", "per_neuron_r")))
 
 
 def test_prune_w(ctx, doc):
     """THE PRUNING LADDER per edge set (tools/exp17_prune.py): the two-Gaussian threshold on log10 strength, rollouts
-    along a geometric ladder around it, removable while both steady metrics stay within the seed spread; then the
-    joint cut of every set at its threshold."""
+    along a geometric ladder around it, removable while neither steady metric falls more than the seed spread; then
+    the joint cut of every set at its threshold. A set without a dead mode (the mixture's lower component under 10 %
+    of the weights, or wider than two decades, or a crossing outside the 1st-99th percentile: the lattice grid) gets
+    the deck's grid rule instead: the ladder is the nonzero weights' own quantiles (`prune.quantiles`)."""
     op, spec = ctx["op"], ctx["spec"]
     learn_names = {e.get("param") or e.get("block") for e in spec["learnable"]}
     sets = {s: v for s, v in op.prune_sets().items() if v[0] in learn_names}
@@ -545,11 +559,17 @@ def test_prune_w(ctx, doc):
         lg = np.log10(pos)
         w_, m_, sd_ = gmm2(lg)
         t_star = 10 ** crossing(w_, m_, sd_)
-        lad = t_star * np.geomspace(float(pr["span"][0]), float(pr["span"][1]), int(pr["ladder"]))
+        p01, p99 = np.percentile(pos, [1, 99])
+        if w_[0] < 0.1 or sd_[0] > 2.0 or not (p01 <= t_star <= p99):
+            rule, qs = "quantile", [float(q) for q in pr["quantiles"]]
+            lad, tag = np.quantile(pos, qs), "q"
+        else:
+            rule, qs = "gmm", None
+            lad, tag = t_star * np.geomspace(float(pr["span"][0]), float(pr["span"][1]), int(pr["ladder"])), ""
         rows = []
         for j, t in enumerate(lad):
             tp = to_param(t)
-            r = rollout(ctx, f"prune_{s}_{j}", {"prune": {"thresholds": {param: float(tp)}}})
+            r = rollout(ctx, f"prune_{s}_{tag}{j}", {"prune": {"thresholds": {param: float(tp)}}})
             cut = r["summary"].get("prune", {}).get(param, {})
             rows.append({"threshold": float(t), "threshold_param": float(tp), "cut": cut.get("cut"), "of": cut.get("of"),
                          "kept_share": (1 - cut["cut"] / cut["of"]) if cut.get("of") else None,
@@ -559,7 +579,7 @@ def test_prune_w(ctx, doc):
         chosen = max(rem, key=lambda row: row["threshold"]) if rem else None
         out["per_set"][s] = {"learnable": param, "n": int(len(st_)), "n_zero": int((st_ == 0).sum()),
                              "gmm": {"weights": w_.tolist(), "means_log10": m_.tolist(), "sds_log10": sd_.tolist()},
-                             "crossing": float(t_star), "ladder": rows,
+                             "crossing": float(t_star), "ladder_rule": rule, "quantiles": qs, "ladder": rows,
                              "threshold": chosen["threshold"] if chosen else None,
                              "kept_share": chosen["kept_share"] if chosen else None}
         if chosen:
@@ -575,18 +595,22 @@ def test_prune_w(ctx, doc):
 
 def test_prune_b(ctx, doc):
     """THE LADDER ON THE INPUT WEIGHTS (Cedric, 2026-10-10): the input neurons below a quantile of |B_i| silenced, the
-    rollout as the ruler; where the survivors sit when regions are given."""
+    rollout as the ruler; where the survivors sit when regions are given. |B_i| and the cut run over the STIMULUS
+    columns of the input block (those changing more than twice over the recording) when the law also carries block
+    markers to every neuron (the markall laws): the markers stay, so the ladder removes stimulus weights, not context."""
     spec, B = ctx["spec"], ctx["R"]["blocks"]
     learn_names = {e.get("param") or e.get("block") for e in spec["learnable"]}
     if "input" not in learn_names or "input" not in B or "drive" not in spec["task"]:
         raise NotImplementedError("prune_b: the law has no learned input weights to cut")
-    bn = np.linalg.norm(B["input"].double().cpu().numpy().reshape(ctx["N"], -1), axis=1)
+    cols = ctx.get("stim_cols")
+    Bm = B["input"].double().cpu().numpy().reshape(ctx["N"], -1)
+    bn = np.linalg.norm(Bm[:, cols] if cols else Bm, axis=1)
     inp = bn > 0
     nom = movie_scores(ctx, nominal(ctx)["movie"])["steady"]
     spread = seed_spread(ctx, doc)
     rows = []
     for j, q in enumerate(ctx["st"]["prune_b"]["quantiles"]):
-        r = rollout(ctx, f"prune_b_{j}", {"zero_input": {"quantile": float(q)}})
+        r = rollout(ctx, f"zero_in_{j}", {"zero_input": {"quantile": float(q), **({"columns": cols} if cols else {})}})
         zi = r["summary"].get("zero_input", {})
         row = {"quantile": float(q), "threshold": zi.get("threshold"), "n_cut": zi.get("n_cut"), "n_input": zi.get("n_input"),
                "scores": movie_scores(ctx, r["movie"]), "file": r["movie"]}
@@ -599,6 +623,8 @@ def test_prune_b(ctx, doc):
     rem = [row for row in rows if row["removable"]]
     chosen = max(rem, key=lambda row: row["quantile"]) if rem else None
     return {"ruler": {"window": "steady", "seed_spread": spread}, "n_input": int(inp.sum()), "B_norm": _q(bn[inp]),
+            "columns": len(cols) if cols else "all", "columns_rule": "the stimulus columns (changing more than twice over "
+            "the recording); the block markers kept" if cols else "every column of the input block",
             "ladder": rows, "quantile": chosen["quantile"] if chosen else None,
             "n_needed": (chosen["n_input"] - chosen["n_cut"]) if chosen else None}
 
@@ -658,14 +684,123 @@ def _mode_where(v, pos, lab=None, names=None):
     return out
 
 
+def _csr_torch(M, device, dtype=torch.float64):
+    """A scipy sparse matrix as a torch CSR tensor on `device`."""
+    import warnings
+    import scipy.sparse as sps
+    M = sps.csr_matrix(M)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")                            # "sparse CSR tensor support is in beta"
+        return torch.sparse_csr_tensor(torch.as_tensor(M.indptr, dtype=torch.int64), torch.as_tensor(M.indices, dtype=torch.int64),
+                                       torch.as_tensor(M.data, dtype=dtype), size=M.shape).to(device)
+
+
+def _factors(M):
+    """The coupling M as sparse factors applied right to left ([M] for a sparse matrix, the grid's (Dec, Hop, Enc), the
+    mean field's rank-one pair); None for a LinearOperator without `factors`."""
+    import scipy.sparse as sps
+    if sps.issparse(M):
+        return [M]
+    return list(M.factors) if getattr(M, "factors", None) is not None else None
+
+
+class _Krylov:
+    """A = diag(r) (F_1 ... F_n - leak I) as a complex matvec on `device` (tools/exp17_jacobian.py's Jac): the Jacobian
+    per second with r = 1/tau and leak 1; the coupling M alone with r = 1, leak 0."""
+
+    def __init__(self, factors, r, device, leak=1.0):
+        self.t = [_csr_torch(f, device) for f in factors]
+        self.r = torch.as_tensor(np.asarray(r, np.float64), device=device)[:, None]
+        self.leak, self.N, self.dev = float(leak), len(r), device
+
+    def mv_c(self, x):                                             # complex128 [N] -> complex128 [N]
+        X = torch.stack([x.real, x.imag], 1)
+        y = X
+        for f in reversed(self.t):
+            y = f @ y
+        y = self.r * (y - self.leak * X)
+        return torch.complex(y[:, 0], y[:, 1])
+
+    def dense(self):
+        N = self.N
+        D = torch.eye(N, dtype=torch.float64, device=self.dev)
+        for f in reversed(self.t):
+            D = f @ D
+        return (self.r * (D - self.leak * torch.eye(N, dtype=torch.float64, device=self.dev))).cpu().numpy()
+
+
+def _krylov_schur(A, k, which, m=None, tol=1e-5, maxit=4000, seed=0):
+    """THE k EIGENPAIRS OF A WITH THE LARGEST Re (LR), |Im| (LI) OR |lambda| (LM), Krylov-Schur on A's device (Stewart
+    2002, SIAM J. Matrix Anal. Appl. 23:601; tools/exp17_jacobian.py): an m-step Arnoldi factorisation (complex, classical
+    Gram-Schmidt twice), the Schur form of H_m reordered so the wanted Ritz values lead, truncated to them, extended
+    again; converged when every wanted pair's residual |A x - lambda x| / |x| < tol max(|lambda|, 0.01). Each restart
+    keeps the k wanted and a buffer of k / 2 more (the k-th sits in a dense cluster of slow modes). ARPACK on the CPU
+    gives the same pairs in 10-40 min per call at 100,000 neurons; this takes seconds to minutes on the GPU."""
+    import scipy.linalg as sl
+    dev, N = A.dev, A.N
+    m = min(m or max(4 * k, k + 80), N - 1)
+    g = np.random.default_rng(seed).standard_normal(N)
+    V = torch.zeros(N, m + 1, dtype=torch.complex128, device=dev)
+    H = np.zeros((m + 1, m), np.complex128)
+    V[:, 0] = torch.as_tensor(g / np.linalg.norm(g), device=dev)
+    key = {"LR": lambda x: x.real, "LI": lambda x: np.abs(x.imag), "LM": lambda x: np.abs(x)}[which]
+    p, nmv = 0, 0
+    for it in range(maxit):
+        for j in range(p, m):
+            w = A.mv_c(V[:, j])
+            nmv += 1
+            Vj = V[:, :j + 1]
+            h = Vj.conj().T @ w
+            w = w - Vj @ h
+            h2 = Vj.conj().T @ w                                   # the second pass (DGKS)
+            w = w - Vj @ h2
+            h = (h + h2).cpu().numpy()
+            b = float(torch.linalg.vector_norm(w))
+            H[:j + 1, j] = h
+            H[j + 1, j] = b
+            V[:, j + 1] = w / max(b, 1e-300)
+        T, Q = sl.schur(H[:m, :m], output="complex")
+        kb = min(k + max(10, k // 2), m - 20) if m > 20 else k
+        th_ = np.sort(key(np.diag(T)))[::-1][kb - 1]
+        T, Q, sdim = sl.schur(H[:m, :m], output="complex",
+                              sort=lambda x: key(np.array([x]))[0] >= th_ - 1e-14 * max(1, abs(th_)))
+        p = min(max(sdim, kb), m - 10) if m > 10 else max(sdim, kb)
+        ev, Y = np.linalg.eig(T[:p, :p])
+        bq = H[m, m - 1] * Q[m - 1, :p]                            # the residual row after the truncation
+        res = np.abs(bq @ Y) / np.linalg.norm(Y, axis=0)
+        o = np.argsort(-key(ev))[:k]
+        ok = res[o] < tol * np.maximum(np.abs(ev[o]), 1e-2)
+        Qt = torch.as_tensor(Q[:, :p], device=dev)
+        Vn = V[:, :m] @ Qt
+        if ok.all() or it == maxit - 1:
+            X = (Vn @ torch.as_tensor(Y[:, o], device=dev)).cpu().numpy()
+            return ev[o], X / np.linalg.norm(X, axis=0), {"solver": "krylov_schur", "restarts": it + 1, "matvecs": nmv,
+                                                           "max_residual": float(res[o].max()), "converged": bool(ok.all()), "m": m}
+        V[:, :p] = Vn
+        V[:, p] = V[:, m]
+        H[:] = 0
+        H[:p, :p] = T[:p, :p]
+        H[p, :p] = bq
+
+
 def _eigs(A, k, which, N):
-    from scipy.sparse.linalg import eigs
+    """k eigenpairs of A (largest real part LR, |imaginary| LI, modulus LM) -> (vals, vecs, info | error string): a
+    `_Krylov` operator goes to the Krylov-Schur solver on its device (dense numpy below 2,000 elements, exact), a scipy
+    matrix or LinearOperator to ARPACK on the CPU."""
     k = int(min(k, max(1, N - 2)))
     try:
+        if isinstance(A, _Krylov):
+            if N <= 2000:
+                vals, vecs = np.linalg.eig(A.dense())
+                key = {"LR": vals.real, "LI": np.abs(vals.imag), "LM": np.abs(vals)}[which]
+                o = np.argsort(-key)[:k]
+                return vals[o], vecs[:, o], {"solver": "dense"}
+            return _krylov_schur(A, k, which)
+        from scipy.sparse.linalg import eigs
         vals, vecs = eigs(A, k=k, which=which, tol=1e-6, maxiter=20000, ncv=min(N, max(2 * k + 1, 20)))
+        return vals, vecs, {"solver": "arpack"}
     except Exception as e:
         return None, None, f"{type(e).__name__}: {e}"
-    return vals, vecs, None
 
 
 def test_spectrum(ctx, doc):
@@ -694,17 +829,22 @@ def test_spectrum(ctx, doc):
             rs = np.asarray(M.sum(1)).ravel()
             res["row_sum_gain"] = _q(rs)
             res["nnz"] = int(M.nnz)
+        F = _factors(M)
+        on_device = F is not None and sp_.get("solver", "krylov_schur") == "krylov_schur"
+        AM = _Krylov(F, np.ones(N), ctx["device"], leak=0.0) if on_device else M       # M alone
+        AJ = _Krylov(F, r, ctx["device"], leak=1.0) if on_device else J                # diag(r) (M - I)
         if sps.issparse(M) and M.nnz == 0:
             res["M_spectral_radius"] = 0.0                     # no coupling at all
         else:
-            vals, vecs, err = _eigs(M, 6, "LM", N)
+            vals, vecs, info = _eigs(AM, 6, "LM", N)
             res["M_spectral_radius"] = float(np.abs(vals).max()) if vals is not None else None
-            if err:
-                res["M_spectral_radius_error"] = err
-        vals, vecs, err = _eigs(J, int(sp_["k"]), "LR", N)
-        if err:
-            res["eigs_error"] = err
+            if isinstance(info, str):
+                res["M_spectral_radius_error"] = info
+        vals, vecs, info = _eigs(AJ, int(sp_["k"]), "LR", N)
+        if isinstance(info, str):
+            res["eigs_error"] = info
             return res
+        res["solver"] = info
         o = np.argsort(-vals.real)
         vals, vecs = vals[o], vecs[:, o]
         res["abscissa_per_s"] = float(vals[0].real)
@@ -717,7 +857,9 @@ def test_spectrum(ctx, doc):
                                  "period_s": float(2 * np.pi / abs(vals[i].imag)) if abs(vals[i].imag) > 1e-12 else None,
                                  **_mode_where(vecs[:, i], pos, lab, names)} for i in range(min(8, len(vals)))]
         res["n_brainwide_slow"] = int(sum(1 for m in res["leading_modes"] if m["n_eff"] > 0.01 * N))
-        vi, vvi, err = _eigs(J, int(sp_["k_imag"]), "LI", N)
+        vi, vvi, info_i = _eigs(AJ, int(sp_["k_imag"]), "LI", N)
+        if isinstance(info_i, str):
+            res["oscillatory_error"] = info_i
         if vi is not None:
             oi = np.argsort(-np.abs(vi.imag))
             res["oscillatory"] = [{"re_per_s": float(vi[i].real), "im_per_s": float(vi[i].imag),

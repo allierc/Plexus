@@ -30,6 +30,8 @@ def _spec(rollouts, drive=True, graph=None):
     [{"name": "a", "zero_input": {"quantile": 0.5, "threshold": 1.0}}],   # one of them
     [{"name": "a", "zero_input": {"threshold": -1.0}}],
     [{"name": "a", "zero_input": {"mask": "zebrafish/m.npy"}}],           # an npz
+    [{"name": "a", "zero_input": {"quantile": 0.5, "columns": []}}],      # columns: a non-empty list of indices
+    [{"name": "a", "zero_input": {"quantile": 0.5, "columns": [0, -1]}}],
     [{"name": "a", "pulse": {"rois": [{"box": [[0, 1], [0, 1]]}], "level_z": 2.0, "start_s": 0.0}}],   # no duration
     [{"name": "a", "pulse": {"rois": [{"box": [[0, 1], [0, 1]]}], "mask": "zebrafish/m.npz", "level_z": 2.0,
                              "start_s": 0.0, "duration_s": 5.0}}],        # rois and mask
@@ -48,6 +50,7 @@ def test_graph_kinds_accepted_on_a_trace_law_only():
     ok = [{"name": "cut", "prune": {"thresholds": {"W_short": 0.027, "W_mid": 0.072}}},
           {"name": "b_half", "zero_input": {"quantile": 0.5}}, {"name": "b_t", "zero_input": {"threshold": 0.3}},
           {"name": "b_m", "zero_input": {"mask": "zebrafish/m.npz", "array": "mask"}},
+          {"name": "b_c", "zero_input": {"quantile": 0.5, "columns": [1]}},
           {"name": "pulse_x", "drive": "off", "pulse": {"rois": [{"box": [[0, 0.2], [0, 1]], "units": "fraction"}],
                                                         "level_z": 2.0, "start_s": 120.0, "duration_s": 10.0}},
           {"name": "pulse_m", "pulse": {"mask": "zebrafish/m.npz", "level_z": 1.0, "start_s": 0.0, "duration_s": 1.0}},
@@ -93,6 +96,14 @@ def test_input_rows_quantile_threshold_mask(tmp_path):
     with T._input_zeroed(L, spec, box, {"threshold": 2.0}) as rec:
         assert rec["n_cut"] == 2 and L.p["n.input"].tolist() == [[0.0, 0.0], [0.0, 0.0], [3.0, 4.0], [0.0, 0.0]]
     assert L.p["n.input"].tolist() == [[0.0, 0.0], [1.0, 0.0], [3.0, 4.0], [0.1, 0.1]]
+    # columns [1]: |B_i| over column 1 only = 0, 0, 4, 0.1 -> the input elements are 2 and 3, their median 2.05
+    sel, rec = T._input_rows(L, spec, box, {"quantile": 0.5, "columns": [1]})
+    assert sel.tolist() == [False, False, False, True] and rec["n_input"] == 2 and rec["columns"] == 1
+    with T._input_zeroed(L, spec, box, {"quantile": 0.5, "columns": [1]}) as rec:
+        assert L.p["n.input"].tolist() == [[0.0, 0.0], [1.0, 0.0], [3.0, 4.0], [0.1, 0.0]]     # column 0 kept
+    assert L.p["n.input"].tolist() == [[0.0, 0.0], [1.0, 0.0], [3.0, 4.0], [0.1, 0.1]]
+    with pytest.raises(ValueError):
+        T._input_rows(L, spec, box, {"quantile": 0.5, "columns": [2]})                       # beyond the block's width
 
 
 def test_pulse_holds_the_selected_elements_for_its_frames():

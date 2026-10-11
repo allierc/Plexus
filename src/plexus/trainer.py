@@ -219,14 +219,20 @@ def _check_zero_input(w, c, s, kind, names):
     """`zero_input: {quantile: q} | {threshold: t} | {mask: <npz>, array: <name>}` (Cedric, 2026-10-10: "set a
     threshold on B_i to identify the input neurons"): the rows of the `input` block (B_i, the elements' weights on the
     stimulus) set to 0 for the elements whose |B_i| is below the q-th quantile of the input elements' (those with a
-    nonzero row), or below t, or who are nonzero in the mask's array; restored after."""
+    nonzero row), or below t, or who are nonzero in the mask's array; restored after. `columns: [j, ...]` restricts
+    |B_i| and the cut to those columns of the block (exp17: the stimulus features, not the block markers that reach
+    every neuron)."""
     if kind != "trace_recording":
         raise ValueError(f"{w}: `zero_input:` is a trace law's variant (its elements' stimulus weights)")
     if "drive" not in s["task"] or "input" not in names:
         raise ValueError(f"{w}: `zero_input:` needs a task drive and the `input` block among the learnables")
     if not isinstance(c, dict) or len([k for k in ("quantile", "threshold", "mask") if k in c]) != 1 \
-            or set(c) - {"quantile", "threshold", "mask", "array"}:
-        raise ValueError(f"{w}: `zero_input:` is one of {{quantile: q}}, {{threshold: t}}, {{mask: <npz>, array: <name>}}")
+            or set(c) - {"quantile", "threshold", "mask", "array", "columns"}:
+        raise ValueError(f"{w}: `zero_input:` is one of {{quantile: q}}, {{threshold: t}}, {{mask: <npz>, array: <name>}}"
+                         " (+ columns: [j, ...])")
+    if "columns" in c and not (isinstance(c["columns"], (list, tuple)) and len(c["columns"]) > 0
+                               and all(isinstance(j, int) and not isinstance(j, bool) and j >= 0 for j in c["columns"])):
+        raise ValueError(f"{w}.zero_input: `columns:` a non-empty list of column indices of the `input` block")
     if "quantile" in c and not (isinstance(c["quantile"], (int, float)) and 0 <= float(c["quantile"]) < 1):
         raise ValueError(f"{w}.zero_input: `quantile:` in [0, 1)")
     if "threshold" in c and not (isinstance(c["threshold"], (int, float)) and float(c["threshold"]) >= 0):
@@ -298,14 +304,16 @@ def _check_graph(path, s, kind):
         raise ValueError(f"{path}: task.graph.regions is an atlas npz (regions, names, inside, atlas_um)")
     if "steady_skip_min" in g and not (isinstance(g["steady_skip_min"], (int, float)) and g["steady_skip_min"] >= 0):
         raise ValueError(f"{path}: task.graph.steady_skip_min is a number of minutes >= 0")
-    for k, keys in (("bootstrap", {"blocks", "resamples", "seed"}), ("prune", {"ladder", "span"}),
-                    ("prune_b", {"quantiles"}), ("spectrum", {"k", "k_imag", "state"}),
+    for k, keys in (("bootstrap", {"blocks", "resamples", "seed"}), ("prune", {"ladder", "span", "quantiles"}),
+                    ("prune_b", {"quantiles"}), ("spectrum", {"k", "k_imag", "state", "solver"}),
                     ("pulse", {"level_z", "duration_s", "settle_s", "window_s", "regions"})):
         if k in g:
             if not isinstance(g[k], dict) or set(g[k]) - keys:
                 raise ValueError(f"{path}: task.graph.{k} is a dict with keys among {sorted(keys)}")
     if "spectrum" in g and g["spectrum"].get("state", "recording_mean") not in ("recording_mean", "rest"):
         raise ValueError(f"{path}: task.graph.spectrum.state is recording_mean (default) or rest")
+    if "spectrum" in g and g["spectrum"].get("solver", "krylov_schur") not in ("krylov_schur", "arpack"):
+        raise ValueError(f"{path}: task.graph.spectrum.solver is krylov_schur (default, on the device) or arpack (CPU)")
     for k in ("movies", "every_frame"):
         if k in g and not isinstance(g[k], bool):
             raise ValueError(f"{path}: task.graph.{k} is true or false")
@@ -418,12 +426,14 @@ def _pruned(learn, spec, thresholds):
 def _input_rows(learn, spec, box, c):
     """`zero_input:` -- the elements whose `input` rows the variant cuts (bool [N]) and the cut's record: the input
     elements are those with a nonzero row of B (|B_i| its L2 norm); `quantile:` cuts the input elements below that
-    quantile of their |B_i|, `threshold:` those below t, `mask:` the elements nonzero in the file's array."""
+    quantile of their |B_i|, `threshold:` those below t, `mask:` the elements nonzero in the file's array; with
+    `columns:` the norm and the cut run over those columns of B only."""
     k = _learnable_key(spec, "input")
-    B = learn.p[k].detach()
-    norm = B.reshape(B.shape[0], -1).norm(2, dim=1)
+    B = learn.p[k].detach().reshape(learn.p[k].shape[0], -1)
+    cols = _input_cols(c, B.shape[1])
+    norm = (B[:, cols] if cols is not None else B).norm(2, dim=1)
     inp = norm > 0
-    rec = {"n_input": int(inp.sum())}
+    rec = {"n_input": int(inp.sum()), "columns": len(cols) if cols is not None else "all"}
     if "mask" in c:
         sel = torch.as_tensor(_clamp_mask(c, box["rec"]["pos_um"]), device=B.device) & inp
         rec["by"] = "mask"
@@ -435,14 +445,30 @@ def _input_rows(learn, spec, box, c):
     return sel, rec
 
 
+def _input_cols(c, width):
+    """`zero_input.columns` as python ints, checked against the block's width; None when the whole row is meant."""
+    if not c.get("columns"):
+        return None
+    cols = [int(j) for j in c["columns"]]
+    if max(cols) >= width:
+        raise ValueError(f"zero_input: `columns:` index {max(cols)} beyond the input block's {width} columns")
+    return cols
+
+
 @contextlib.contextmanager
 def _input_zeroed(learn, spec, box, c):
-    """`zero_input:` applied: the selected rows of the `input` block at 0, restored on exit; yields the cut's record."""
+    """`zero_input:` applied: the selected rows of the `input` block (their `columns:` when given) at 0, restored on
+    exit; yields the cut's record."""
     k = _learnable_key(spec, "input")
     sel, rec = _input_rows(learn, spec, box, c)
     with torch.no_grad():
         saved = learn.p[k].detach().clone()
-        learn.p[k][sel] = 0.0
+        P = learn.p[k].view(learn.p[k].shape[0], -1)
+        cols = _input_cols(c, P.shape[1])
+        if cols is None:
+            P[sel] = 0.0
+        else:
+            P[sel.nonzero(as_tuple=True)[0][:, None], torch.as_tensor(cols, device=P.device)[None, :]] = 0.0
     try:
         yield rec
     finally:
