@@ -51,6 +51,8 @@ Output, one folder per run under the model's own folder, mirroring `config/train
         results/report.json          what training did
         results/<name>_test.json     the held-out rollout
         results/<name>_test.png      the analysis figure
+        results/<name>_graph.json    the graph phase (`-o graph`, a trace run): what the learned graph does
+        results/graph/               its rollouts (cached), the card, the pulse movie
 """
 from __future__ import annotations
 
@@ -84,10 +86,14 @@ _KEYS = {
     "learnable": {"block", "of", "with", "lr", "bounds", "over", "K", "extent", "param", "op",
                   "prior", "field", "levels", "features", "log2_table", "base", "scale", "title"},
     "task": {"reference", "drive", "observe", "loss", "settle_s", "u_weight", "mask", "warmup", "rollouts",
-             "movie_metric", "record"},
+             "movie_metric", "record", "graph"},
     "record": {"set", "block", "every_s"},
-    "rollout": {"name", "zero", "drive", "clamp", "messages"},
+    "rollout": {"name", "zero", "drive", "clamp", "messages", "prune", "zero_input", "pulse", "clock"},
     "clamp": {"rois", "mask", "array"},
+    # THE GRAPH PHASE (`-o graph`, exp17 2026-10-10): what the trained law's graph does -- its settings, declared
+    "graph": {"controls", "tests", "inputs", "regions", "steady_skip_min", "bootstrap", "prune", "prune_b", "spectrum",
+              "pulse", "movies", "every_frame"},
+    "graph_controls": {"no_w", "mean_field", "seed", "random"},
     "roi": {"box", "sphere", "units"},
     "reference": {"corpus", "n_train", "n_val", "n_test", "context", "shape", "size", "centre",
                   "recording", "beats", "field_recording", "coarsen", "points", "split", "normalise",
@@ -162,6 +168,17 @@ def _check_rollouts(path, s, kind):
             raise ValueError(f"{w}: `messages:` is a field law's switch (diffuse[graphcast]); a trace law zeroes its W")
         if ro.get("drive") == "off" and "drive" not in s["task"]:
             raise ValueError(f"{w}: `drive: off` but the task has no drive")
+        # THE GRAPH PHASE'S VARIANTS (exp17, 2026-10-10): weights below a threshold cut (`prune:`), the input of some
+        # elements cut (`zero_input:`), some elements held at a level for a while (`pulse:`, the virtual perturbation),
+        # the frame clock the law's functions of time read shifted or frozen (`clock:`)
+        if "prune" in ro:
+            _check_prune(w, ro["prune"], names, kind)
+        if "zero_input" in ro:
+            _check_zero_input(w, ro["zero_input"], s, kind, names)
+        if "pulse" in ro:
+            _check_pulse(w, ro["pulse"], kind)
+        if "clock" in ro:
+            _check_clock(w, ro["clock"], kind)
         if "clamp" in ro:
             _refuse_unread(f"{w}.clamp", ro["clamp"], _KEYS["clamp"])
             if "mask" in ro["clamp"] or "array" in ro["clamp"]:
@@ -181,6 +198,127 @@ def _check_rollouts(path, s, kind):
                     raise ValueError(f"{w}.clamp.rois[{i}]: `box:` is [[lo, hi], [lo, hi]] or with a third [lo, hi]")
                 if "sphere" in r and len(r["sphere"]) != 4:
                     raise ValueError(f"{w}.clamp.rois[{i}]: `sphere:` is [x, y, z, r]")
+
+
+def _check_prune(w, p, names, kind):
+    """`prune: {thresholds: {<learnable>: t, ...}}` (exp17's pruning ladder, Cedric 2026-10-08 / 2026-10-10): every
+    value of that learnable whose magnitude is below t is set to 0 for the rollout and restored after -- an edge set's
+    weak edges removed, the law otherwise untouched."""
+    if kind != "trace_recording":
+        raise ValueError(f"{w}: `prune:` is a trace law's variant (its edge weights cut below a threshold)")
+    if not isinstance(p, dict) or set(p) != {"thresholds"} or not isinstance(p["thresholds"], dict) or not p["thresholds"]:
+        raise ValueError(f"{w}: `prune:` is {{thresholds: {{<learnable>: t, ...}}}} (t >= 0, one per learnable cut)")
+    for k, t in p["thresholds"].items():
+        if k not in names:
+            raise ValueError(f"{w}.prune: {k!r} is not a learnable of this run (its learnables: {sorted(names)})")
+        if not isinstance(t, (int, float)) or isinstance(t, bool) or t < 0:
+            raise ValueError(f"{w}.prune: the threshold of {k!r} is a number >= 0, it is {t!r}")
+
+
+def _check_zero_input(w, c, s, kind, names):
+    """`zero_input: {quantile: q} | {threshold: t} | {mask: <npz>, array: <name>}` (Cedric, 2026-10-10: "set a
+    threshold on B_i to identify the input neurons"): the rows of the `input` block (B_i, the elements' weights on the
+    stimulus) set to 0 for the elements whose |B_i| is below the q-th quantile of the input elements' (those with a
+    nonzero row), or below t, or who are nonzero in the mask's array; restored after. `columns: [j, ...]` restricts
+    |B_i| and the cut to those columns of the block (exp17: the stimulus features, not the block markers that reach
+    every neuron)."""
+    if kind != "trace_recording":
+        raise ValueError(f"{w}: `zero_input:` is a trace law's variant (its elements' stimulus weights)")
+    if not isinstance(c, dict) or len([k for k in ("quantile", "threshold", "mask") if k in c]) != 1 \
+            or set(c) - {"quantile", "threshold", "mask", "array", "columns", "param"}:
+        raise ValueError(f"{w}: `zero_input:` is one of {{quantile: q}}, {{threshold: t}}, {{mask: <npz>, array: <name>}}"
+                         " (+ columns: [j, ...], param: <learnable>)")
+    param = c.get("param", "input")
+    if "drive" not in s["task"] or param not in names:
+        raise ValueError(f"{w}: `zero_input:` needs a task drive and `{param}` among the learnables (the elements' input "
+                         "weights: the `input` block by default, `param:` names another, e.g. video_out)")
+    if "columns" in c and not (isinstance(c["columns"], (list, tuple)) and len(c["columns"]) > 0
+                               and all(isinstance(j, int) and not isinstance(j, bool) and j >= 0 for j in c["columns"])):
+        raise ValueError(f"{w}.zero_input: `columns:` a non-empty list of column indices of the `input` block")
+    if "quantile" in c and not (isinstance(c["quantile"], (int, float)) and 0 <= float(c["quantile"]) < 1):
+        raise ValueError(f"{w}.zero_input: `quantile:` in [0, 1)")
+    if "threshold" in c and not (isinstance(c["threshold"], (int, float)) and float(c["threshold"]) >= 0):
+        raise ValueError(f"{w}.zero_input: `threshold:` >= 0")
+    if "mask" in c:
+        _check_clamp_mask(f"{w}.zero_input", c, kind)
+
+
+def _check_pulse(w, p, kind):
+    """`pulse: {rois: [...] | mask: <npz>, array:, level_z: 2.0, start_s: 120, duration_s: 10}` (the virtual
+    perturbation, Cedric 2026-10-10): the selected elements HELD at the level mu + level_z sd (the law's own
+    normalisation) from start_s after the rollout's first free frame for duration_s, as `clamp:` holds recorded
+    frames, then released; every element stays in the scores. With `drive: off` it is a pulse into the resting law."""
+    if kind != "trace_recording":
+        raise ValueError(f"{w}: `pulse:` is a trace law's variant")
+    if not isinstance(p, dict) or set(p) - {"rois", "mask", "array", "level_z", "start_s", "duration_s"}:
+        raise ValueError(f"{w}: `pulse:` is {{rois | mask (+ array), level_z, start_s, duration_s}}")
+    if ("rois" in p) == ("mask" in p):
+        raise ValueError(f"{w}.pulse: the elements by `rois:` or by `mask:`, one of them")
+    if "mask" in p:
+        _check_clamp_mask(f"{w}.pulse", p, kind)
+    elif not p["rois"]:
+        raise ValueError(f"{w}.pulse needs `rois:` (a list of box / sphere)")
+    for k, lo in (("level_z", None), ("start_s", 0.0), ("duration_s", 1e-9)):
+        v = p.get(k)
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or (lo is not None and float(v) < lo):
+            raise ValueError(f"{w}.pulse: `{k}:` is a number" + (f" >= {lo:g}" if lo else "") + f", it is {v!r}")
+
+
+def _check_clock(w, c, kind):
+    """`clock: {shift_frames: n} | {freeze_at: f}` (the time-memorisation test, 2026-10-10): the frame clock the law's
+    functions of absolute time read (Omega(x, t), alpha(t): FRAME_CLOCK) shifted by n frames, or frozen at frame f,
+    while the stimulus keeps its true time. A law with no function of time is unchanged by it."""
+    if kind != "trace_recording":
+        raise ValueError(f"{w}: `clock:` is a trace law's variant")
+    if not isinstance(c, dict) or len(c) != 1 or set(c) - {"shift_frames", "freeze_at"}:
+        raise ValueError(f"{w}: `clock:` is {{shift_frames: n}} or {{freeze_at: f}}")
+    v = list(c.values())[0]
+    if not isinstance(v, int) or isinstance(v, bool) or ("freeze_at" in c and v < 0):
+        raise ValueError(f"{w}.clock: an integer frame count (freeze_at >= 0), it is {v!r}")
+
+
+def _check_graph(path, s, kind):
+    """`task.graph` (the graph phase, `-o graph`; exp17, Cedric 2026-10-10): the trained controls to compare with
+    (`controls: {no_w, mean_field, seed, random}`, training spec names of runs trained without the graph, with the
+    mean field, with another seed, on a random graph), the tests to run, the input neurons (`inputs: {mask, array}`,
+    default the law's own input mask), the regions (an atlas npz: `regions` [N, R] bool, `names`, `inside`,
+    `atlas_um`), the steady window, the bootstrap, the pruning ladders, the spectrum and the pulse settings, movies
+    on / off, every-frame traces on / off. Absent: the phase runs every test that applies with its defaults."""
+    g = s["task"].get("graph")
+    if g is None:
+        return
+    if kind != "trace_recording":
+        raise ValueError(f"{path}: task.graph is the graph phase of a trace_recording task")
+    _refuse_unread(f"{path}: task.graph", g, _KEYS["graph"])
+    c = g.get("controls") or {}
+    _refuse_unread(f"{path}: task.graph.controls", c, _KEYS["graph_controls"])
+    for k, v in c.items():
+        if v is not None and not isinstance(v, str):
+            raise ValueError(f"{path}: task.graph.controls.{k} is a training spec name (or null), it is {v!r}")
+    if "tests" in g:
+        from plexus.tasks.graph_analysis import TESTS
+        bad = [t for t in (g["tests"] or []) if t not in TESTS]
+        if not isinstance(g["tests"], list) or bad:
+            raise ValueError(f"{path}: task.graph.tests names tests among {list(TESTS)}; unknown: {bad}")
+    if "inputs" in g:
+        _check_clamp_mask(f"{path}: task.graph.inputs", g["inputs"], kind)
+    if "regions" in g and not (isinstance(g["regions"], str) and g["regions"].endswith(".npz")):
+        raise ValueError(f"{path}: task.graph.regions is an atlas npz (regions, names, inside, atlas_um)")
+    if "steady_skip_min" in g and not (isinstance(g["steady_skip_min"], (int, float)) and g["steady_skip_min"] >= 0):
+        raise ValueError(f"{path}: task.graph.steady_skip_min is a number of minutes >= 0")
+    for k, keys in (("bootstrap", {"blocks", "resamples", "seed"}), ("prune", {"ladder", "span", "quantiles"}),
+                    ("prune_b", {"quantiles"}), ("spectrum", {"k", "k_imag", "state", "solver"}),
+                    ("pulse", {"level_z", "duration_s", "settle_s", "window_s", "regions"})):
+        if k in g:
+            if not isinstance(g[k], dict) or set(g[k]) - keys:
+                raise ValueError(f"{path}: task.graph.{k} is a dict with keys among {sorted(keys)}")
+    if "spectrum" in g and g["spectrum"].get("state", "recording_mean") not in ("recording_mean", "rest"):
+        raise ValueError(f"{path}: task.graph.spectrum.state is recording_mean (default) or rest")
+    if "spectrum" in g and g["spectrum"].get("solver", "krylov_schur") not in ("krylov_schur", "arpack"):
+        raise ValueError(f"{path}: task.graph.spectrum.solver is krylov_schur (default, on the device) or arpack (CPU)")
+    for k in ("movies", "every_frame"):
+        if k in g and not isinstance(g[k], bool):
+            raise ValueError(f"{path}: task.graph.{k} is true or false")
 
 
 def _brain_mean_metrics(obs, pred):
@@ -257,6 +395,111 @@ def _zeroed(learn, spec, names):
         with torch.no_grad():
             for k, v in saved.items():
                 learn.p[k].copy_(v)
+
+
+def _learnable_key(spec, name):
+    """The `learn.p` key of the learnable called `name` (a `param:` or a `block:`)."""
+    for e in spec["learnable"]:
+        if (e.get("param") or e.get("block")) == name:
+            return Learnables.key(e)
+    raise ValueError(f"{name!r} is not a learnable of this run")
+
+
+@contextlib.contextmanager
+def _pruned(learn, spec, thresholds):
+    """`prune:` -- each named learnable's values of magnitude below its threshold set to 0, restored on exit; yields
+    {name: {"cut": n, "of": n_total, "threshold": t}}."""
+    saved, cut = {}, {}
+    with torch.no_grad():
+        for nm, t in thresholds.items():
+            k = _learnable_key(spec, nm)
+            saved[k] = learn.p[k].detach().clone()
+            m = learn.p[k].abs() < float(t)
+            learn.p[k][m] = 0.0
+            cut[nm] = {"cut": int(m.sum()), "of": int(m.numel()), "threshold": float(t)}
+    try:
+        yield cut
+    finally:
+        with torch.no_grad():
+            for k, v in saved.items():
+                learn.p[k].copy_(v)
+
+
+def _input_rows(learn, spec, box, c):
+    """`zero_input:` -- the elements whose `input` rows the variant cuts (bool [N]) and the cut's record: the input
+    elements are those with a nonzero row of B (|B_i| its L2 norm); `quantile:` cuts the input elements below that
+    quantile of their |B_i|, `threshold:` those below t, `mask:` the elements nonzero in the file's array; with
+    `columns:` the norm and the cut run over those columns of B only; `param:` names the learnable holding the rows
+    (default the `input` block; a video law's `video_out`)."""
+    k = _learnable_key(spec, c.get("param", "input"))
+    B = learn.p[k].detach().reshape(learn.p[k].shape[0], -1)
+    cols = _input_cols(c, B.shape[1])
+    norm = (B[:, cols] if cols is not None else B).norm(2, dim=1)
+    inp = norm > 0
+    rec = {"n_input": int(inp.sum()), "columns": len(cols) if cols is not None else "all", "param": c.get("param", "input")}
+    if "mask" in c:
+        sel = torch.as_tensor(_clamp_mask(c, box["rec"]["pos_um"]), device=B.device) & inp
+        rec["by"] = "mask"
+    else:
+        t = float(torch.quantile(norm[inp].float(), float(c["quantile"]))) if "quantile" in c else float(c["threshold"])
+        sel = inp & (norm < t)
+        rec.update(by="quantile" if "quantile" in c else "threshold", threshold=t)
+    rec["n_cut"] = int(sel.sum())
+    return sel, rec
+
+
+def _input_cols(c, width):
+    """`zero_input.columns` as python ints, checked against the block's width; None when the whole row is meant."""
+    if not c.get("columns"):
+        return None
+    cols = [int(j) for j in c["columns"]]
+    if max(cols) >= width:
+        raise ValueError(f"zero_input: `columns:` index {max(cols)} beyond the input block's {width} columns")
+    return cols
+
+
+@contextlib.contextmanager
+def _input_zeroed(learn, spec, box, c):
+    """`zero_input:` applied: the selected rows of the `input` block (their `columns:` when given) at 0, restored on
+    exit; yields the cut's record."""
+    k = _learnable_key(spec, c.get("param", "input"))
+    sel, rec = _input_rows(learn, spec, box, c)
+    with torch.no_grad():
+        saved = learn.p[k].detach().clone()
+        P = learn.p[k].view(learn.p[k].shape[0], -1)
+        cols = _input_cols(c, P.shape[1])
+        if cols is None:
+            P[sel] = 0.0
+        else:
+            P[sel.nonzero(as_tuple=True)[0][:, None], torch.as_tensor(cols, device=P.device)[None, :]] = 0.0
+    try:
+        yield rec
+    finally:
+        with torch.no_grad():
+            learn.p[k].copy_(saved)
+
+
+def _pulse_fn(p, box, frame_s):
+    """`pulse:` -- (perturb(k, block) -> block or None, record): the selected elements held at mu + level_z sd (the
+    law's normalisation: `box["norm"]`) over the free frames [start, start + duration), every history column of
+    the observed block, as `clamp:` holds recorded frames."""
+    sel = torch.as_tensor(_clamp_mask(p, box["rec"]["pos_um"]), device=box["X"].device)
+    if not bool(sel.any()) or bool(sel.all()):
+        raise ValueError(f"pulse: {int(sel.sum())} of {len(sel)} elements selected; a pulse needs some and not all")
+    mu, sd, _ = box["norm"]
+    level = float(mu + float(p["level_z"]) * sd)
+    k0 = int(round(float(p["start_s"]) / frame_s))
+    nk = max(1, int(round(float(p["duration_s"]) / frame_s)))
+
+    def perturb(k, blk):
+        if k0 <= k < k0 + nk:
+            v = blk.clone()
+            v[sel] = level
+            return v
+        return None
+    rec = {"n_pulsed": int(sel.sum()), "level_dff": level, "level_z": float(p["level_z"]), "start_frame": k0,
+           "frames": nk}
+    return perturb, rec
 
 
 def _loss_terms(task, kind):
@@ -406,6 +649,7 @@ def load(path_or_name) -> dict:
             raise ValueError(f"{path}: task.loss term {term['term']!r}: reduction "
                              f"{term.get('reduction')!r}; only `mse` takes one of {list(REDUCTIONS)}")
     _check_rollouts(path, s, kind)
+    _check_graph(path, s, kind)
     tr = s["training"]
     _refuse_unread(f"{path}: training", tr, _KEYS["training"])
     if kind == "shape":
@@ -2692,6 +2936,42 @@ def _trace_setup(spec, device):
     return dict(rec=rec, X=X, S=S, n_in=b - a, norm=norm, T=int(X.shape[0]), split=split, lab=lab)
 
 
+def restore_trace(spec, device="cpu", root=None):
+    """A LANDED TRACE RUN, RESTORED FOR ANALYSIS (the graph phase; the tools that read a trained law): its learnables
+    from models/<checkpoint or best>.pt, the recording and the normalisation (`_trace_setup`), and the law's operator
+    with the fitted parameters set on it by a one-frame engine run (`learn.ready`), so `op.W_*`, `op.norm`, the frame
+    clock and the per-element blocks (tau, rest, input: `blocks`) read as every rollout reads them. Honours
+    `spec["_checkpoint"]`. -> dict(out, stem, ckpt, it, learn, box, op, H, blocks)."""
+    engine.quiet(True)
+    out = out_dir(spec, root)
+    ckn = spec.get("_checkpoint")
+    stem = f"{spec['name']}_{ckn}" if ckn else spec["name"]
+    ck = torch.load(os.path.join(out, "models", f"{ckn or 'best'}.pt"), weights_only=False, map_location=device)
+    learn = Learnables(spec["learnable"], device)
+    learn.restore(ck["fitted"])
+    box = _trace_setup(spec, device)
+    got = {}
+
+    def ready(H):
+        learn.ready(H)
+        for op in H.operators:
+            if getattr(op, "NORM_FROM_REFERENCE", False):
+                op.norm = box["norm"]
+        _clock(H, 0, box["T"])
+        got["H"] = H
+    with torch.no_grad():
+        engine.run(_model(spec, train=False, n_frames=1), device=device, progress=False, grad=False,
+                   on_seeded=learn.inject, on_ready=ready)
+    H = got["H"]
+    ops = [o for nm, o in zip(H.operator_names, H.operators) if nm == "state_diffuse"]
+    if len(ops) != 1:
+        raise ValueError(f"restore_trace: {len(ops)} state_diffuse operators in the model, one expected")
+    lvl = H.level(spec["task"]["observe"]["set"])
+    blocks = {k: lvl.state[:, a:b].detach() for k, (a, b) in lvl.state_schema.items()}
+    return dict(out=out, stem=stem, ckpt=ckn or "best", it=ck.get("it"), learn=learn, box=box, op=ops[0], H=H,
+                blocks=blocks)
+
+
 def _frame_s(rec) -> float:
     """Seconds per recorded frame: the recording's own clock (`t_s`), else ZAPBench's 0.914 s (exp17's default; every
     exp17 recording has t_s = frame x 0.914, so its numbers do not move). exp20's sessions run at 1.117 s."""
@@ -3187,18 +3467,24 @@ def trace_rollouts(name, device="cuda:0", root=None, names=None):
     return res
 
 
-def _render_variant(spec, out, stem, nm):
-    """results/movie_<nm>.mp4: a rollout variant's movie, recorded LEFT and the variant RIGHT."""
+def _render_variant(spec, out, stem, nm, res_dir=None, variant=None, path=None):
+    """results/movie_<nm>.mp4: a rollout variant's movie, recorded LEFT and the variant RIGHT. `res_dir` (default
+    results/) holds the variant's movie npz; `variant` is its entry (default: the spec's `task.rollouts` entry called
+    `nm`); `path` the mp4 to write (default <res_dir>/movie_<nm>.mp4)."""
     from plexus.tasks import trace_recording as TR
+    rd = res_dir or os.path.join(out, "results")
     rec = TR.load(spec["task"]["reference"]["trace_recording"])
-    mv = np.load(os.path.join(out, "results", f"{stem}_{nm}_movie.npz"))
+    mv = np.load(os.path.join(rd, f"{stem}_{nm}_movie.npz"))
     fr = mv["frames"]
-    v = next(r for r in spec["task"]["rollouts"] if r["name"] == nm)
+    v = variant or next(r for r in spec["task"]["rollouts"] if r["name"] == nm)
     rec_ref = str(spec["task"]["reference"].get("trace_recording"))
     what = ", ".join(([f"{', '.join(v['zero'])} = 0"] if v.get("zero") else []) + (["no stimulus"] if v.get("drive") == "off"
-                     else []) + ([f"{int(mv['clamped'].sum()):,} given"] if "clamp" in v else []))
+                     else []) + ([f"{int(mv['clamped'].sum()):,} given"] if "clamp" in v else [])
+                     + ([f"|w| < {', '.join(f'{t:g}' for t in v['prune']['thresholds'].values())} cut"] if "prune" in v else [])
+                     + (["inputs cut"] if "zero_input" in v else []) + (["a pulse"] if "pulse" in v else [])
+                     + ([f"clock {v['clock']}"] if v.get("clock") else []))
     TR.render_movie(rec["dff"][fr], mv["pred"].astype(np.float32), fr, rec.get("pos_view", rec["pos_um"]), mv["r2_raw"], mv["r2_denoised"],
-                    _frame_s(rec), rec["condition"][fr], rec["names"], os.path.join(out, "results", f"movie_{nm}.mp4"),
+                    _frame_s(rec), rec["condition"][fr], rec["names"], path or os.path.join(rd, f"movie_{nm}.mp4"),
                     r2_t=mv["r2_t"], r2_raw_all=mv["r2_raw_all"], r2_den_all=mv["r2_denoised_all"],
                     silenced_all=mv["silenced_all"], mean_obs_all=mv["mean_obs_all"], mean_pred_all=mv["mean_pred_all"],
                     cond_all=mv["cond_all"], split_all=mv["split_all"],
@@ -3210,16 +3496,23 @@ def _render_variant(spec, out, stem, nm):
 SILENCE_RANGE = (-1.0, 3.0)   # dF/F; the free rollout freezes an element outside it (finding 21)
 
 
-def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None):
+def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None, res_dir=None, traces_path=None,
+                n_frames=None):
     """ONE FREE ROLLOUT of the whole recording from the law's first `inputs` frames: R^2 per frame over the elements,
     raw and against the denoised recording (results/<stem>_free.npz), and THE MOVIE sampled from this same rollout
     (Cedric, 2026-10-02: the whole 2 h, not a 200-frame restart): `n_movie` frames evenly spaced over it, the learned
     frame and the recorded one (results/<stem>_movie.npz). Returns (free summary, r2 raw, r2 denoised, first origin,
     frames, finite). `variant`, one entry of `task.rollouts` (None: the nominal rollout): its `zero:` learnables at 0,
-    its `drive: off`, its `clamp:` elements given their recorded frames and left out of R2 and the brain mean."""
+    its `drive: off`, its `clamp:` elements given their recorded frames and left out of R2 and the brain mean; the
+    graph phase's kinds too (`prune:`, `zero_input:`, `pulse:`, `clock:`), each recorded in the summary. `res_dir`:
+    where the npz go (default results/); `traces_path`: an .npy written with EVERY predicted frame, float16 [T, N],
+    NaN before the first free frame and for silenced elements (the every-frame traces of the graph phase); `n_frames`:
+    only that many free frames from the start (a short rollout: the graph phase's pulses), default the whole recording."""
     from plexus.tasks import trace_recording as TR
     X, T = box["X"], box["T"]
     variant = variant or {}
+    rd = res_dir or os.path.join(out, "results")
+    os.makedirs(rd, exist_ok=True)
     clamp = None
     if "clamp" in variant:
         clamp = torch.as_tensor(_clamp_mask(variant["clamp"], box["rec"]["pos_um"]), device=X.device)
@@ -3228,11 +3521,19 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None):
                              "a clamp needs some elements given and some free")
     w = _warmup(spec)
     o0 = box["n_in"] - 1 + w                # the free rollout's first origin, after its warm-up
-    n = T - 1 - o0
+    n = T - 1 - o0 if n_frames is None else max(1, min(int(n_frames), T - 1 - o0))
     sim = _model(spec, train=False, n_frames=w + n - 1)
     Xd = TR.denoise(X)
     r2r, r2d, finite = np.zeros(n), np.zeros(n), True
     keep = set(np.unique(np.linspace(0, n - 1, min(n_movie, n)).round().astype(int)).tolist())
+    rec_v, perturb, traces = {}, None, None
+    if "pulse" in variant:
+        perturb, rec_v["pulse"] = _pulse_fn(variant["pulse"], box, _frame_s(box["rec"]))
+    if variant.get("clock"):
+        rec_v["clock"] = dict(variant["clock"])
+    if traces_path:
+        traces = np.lib.format.open_memmap(traces_path, mode="w+", dtype=np.float16, shape=(T, X.shape[1]))
+        traces[:o0 + 1] = np.nan
     mv = []
     # RUNAWAY ELEMENTS SILENCED (Cedric, 2026-10-02; finding 21): an element whose value leaves SILENCE_RANGE (dF/F; the
     # recording is clipped to [-0.25, 1.5]) or is not finite is frozen at its recorded mean for the rest of the
@@ -3268,13 +3569,25 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None):
         r2r[k] = r2(p, X[tt], alive)
         r2d[k] = r2(p, Xd[tt], alive)
         mean_obs[k], mean_pred[k] = float(X[tt][alive].mean()), float(p[alive].mean())
-        if k in keep:
+        if k in keep or traces is not None:
             q = p.clone()
             q[dead] = float("nan")                  # drawn blank in the movie
-            mv.append(q.half().cpu().numpy())
-    with torch.no_grad(), _zeroed(learn, spec, variant.get("zero", [])):
+            qh = q.half().cpu().numpy()
+            if k in keep:
+                mv.append(qh)
+            if traces is not None:
+                traces[tt] = qh
+    with torch.no_grad(), _zeroed(learn, spec, variant.get("zero", [])), contextlib.ExitStack() as stack:
+        if "prune" in variant:
+            rec_v["prune"] = stack.enter_context(_pruned(learn, spec, variant["prune"]["thresholds"]))
+        if "zero_input" in variant:
+            rec_v["zero_input"] = stack.enter_context(_input_zeroed(learn, spec, box, variant["zero_input"]))
         _trace_rollout_stream(sim, learn, spec, box, o0, n, device, on_pred, silence=silence, w=w,
-                              drive_on=variant.get("drive", "on") == "on", clamp=clamp)
+                              drive_on=variant.get("drive", "on") == "on", clamp=clamp, perturb=perturb,
+                              clock=variant.get("clock"))
+    if traces is not None:
+        traces.flush()
+        del traces
     free = {"r2_raw": float(np.nanmean(r2r)), "r2_raw_sd": float(np.nanstd(r2r)), "r2_denoised": float(np.nanmean(r2d)),
             "r2_denoised_sd": float(np.nanstd(r2d)), "finite": 1.0 if finite else 0.0, "origin": o0, "frames": n,
             "silenced": int(n_dead[-1]), "silenced_first_t_s": (float((o0 + 1 + int(np.argmax(n_dead > 0))) * _frame_s(box["rec"]))
@@ -3288,11 +3601,12 @@ def _trace_free(spec, learn, box, device, out, stem, n_movie=800, variant=None):
             # network dynamics"): R2 = 1 - sum_t (pred_t - obs_t)^2 / sum_t (obs_t - mean obs)^2 and the RMSE in dF/F,
             # between the recorded and learned brain-mean traces over every free frame
             **_brain_mean_metrics(mean_obs, mean_pred),
-            "variant": variant.get("name", "nominal"), "n_clamped": int(clamp.sum()) if clamp is not None else 0}
-    np.savez_compressed(os.path.join(out, "results", f"{stem}_free.npz"), r2_raw=r2r, r2_denoised=r2d, silenced=n_dead)
+            "variant": variant.get("name", "nominal"), "n_clamped": int(clamp.sum()) if clamp is not None else 0,
+            **rec_v}
+    np.savez_compressed(os.path.join(rd, f"{stem}_free.npz"), r2_raw=r2r, r2_denoised=r2d, silenced=n_dead)
     ks = np.array(sorted(keep))
     fr_m = o0 + 1 + ks
-    np.savez_compressed(os.path.join(out, "results", f"{stem}_movie.npz"), frames=fr_m, pred=np.stack(mv),
+    np.savez_compressed(os.path.join(rd, f"{stem}_movie.npz"), frames=fr_m, pred=np.stack(mv),
                         r2_raw=r2r[ks], r2_denoised=r2d[ks], r2_t=o0 + 1 + np.arange(n), r2_raw_all=r2r,
                         r2_denoised_all=r2d, silenced=n_dead[ks], silenced_all=n_dead, kind="free",
                         mean_obs_all=mean_obs, mean_pred_all=mean_pred, variant=variant.get("name", "nominal"),
@@ -3326,19 +3640,24 @@ def trace_movie(name, device="cuda:0", root=None):
     return free
 
 
-def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=None, w=0, drive_on=True, clamp=None):
+def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=None, w=0, drive_on=True, clamp=None,
+                          perturb=None, clock=None):
     """A long rollout (the free one), each frame handed to `on_pred(k, frame)` and dropped, not stacked. `silence`,
     when given, edits the observed block before each frame is read (`silence(block) -> block or None`): the free
     rollout freezes its runaway elements with it. `drive_on` False writes the drive as 0 every frame (a rollout
     variant with no stimulus); `clamp` (bool [N]) overwrites those elements with their RECORDED frames every tick,
-    before the frame is read and before the next step reads them (a rollout variant with given leaders)."""
+    before the frame is read and before the next step reads them (a rollout variant with given leaders).
+    `perturb(k, block) -> block or None` (k the free step) edits the observed block after the clamp and before the
+    silence (a rollout variant with a pulse); `clock` ({shift_frames: n} or {freeze_at: f}) moves the frame clock the
+    law's functions of absolute time read, while the stimulus keeps its true time (the time-memorisation test)."""
     t = spec["task"]
     obs, drv, X, S, T = t["observe"], t.get("drive"), box["X"], box["S"], box["T"]
     o = o - w                                  # `w` warm-up ticks of recorded frames first, then n free ones
     x0 = torch.stack([X[o - j] for j in range(box["n_in"])], 1)
+    clock = clock or {}
 
     def window(H, tc):
-        _clock(H, tc, T)
+        _clock(H, int(clock["freeze_at"]) if "freeze_at" in clock else tc + int(clock.get("shift_frames", 0)), T)
         if drv is None:
             return
         lv = H.level(drv["set"])
@@ -3372,6 +3691,12 @@ def _trace_rollout_stream(sim, learn, spec, box, o, n, device, on_pred, silence=
             st = lv.state.clone()
             st[clamp, a:b] = torch.stack([X[o + tick + 1 - j][clamp] for j in range(box["n_in"])], 1).to(st.dtype)
             lv.state = st
+        if perturb is not None:                # the pulsed elements: held at their level while the pulse lasts
+            blk = perturb(tick - w, lv.state[..., a:b])
+            if blk is not None:
+                st = lv.state.clone()
+                st[..., a:b] = blk
+                lv.state = st
         if silence is not None:
             blk = silence(lv.state[..., a:b])
             if blk is not None:
@@ -3484,17 +3809,37 @@ def _analyse_trace(spec, device="cpu", root=None):
     return clus
 
 
-PHASES = {"train": train, "test": test, "analyse": analyse}
+def graph(spec, device="cpu", root=None):
+    """IS THE LEARNED GRAPH DOING SOMETHING, WHAT, AND HOW (exp17, Cedric 2026-10-10): the graph phase of a trace
+    run, after `test` and `analyse` -- the graph silenced, cut and compared with trained controls, its linearised
+    dynamics, its response to a pulse, its constants; scores in results/<stem>_graph.json, figures and movies under
+    results/graph/. `plexus.tasks.graph_analysis.run` does the work."""
+    if spec.get("_kind") != "trace_recording":
+        raise ValueError("graph: the phase of a trace_recording task (a neuron-graph law fitted to a recording)")
+    from plexus.tasks.graph_analysis import run as _run
+    return _run(spec, device=device, root=root)
 
 
-def run_phases(name_or_path, phases, device="cpu", root=None, checkpoint=None):
-    """`Plexus_Main.py -o train_test_analyse <name>` lands here. `checkpoint` (a trace run's test/analyse only):
-    score models/<checkpoint>.pt, e.g. `stage_05`, and write its results under <name>_<checkpoint>_*."""
+PHASES = {"train": train, "test": test, "analyse": analyse, "graph": graph}
+
+
+def run_phases(name_or_path, phases, device="cpu", root=None, checkpoint=None, controls=None, regions=None):
+    """`Plexus_Main.py -o train_test_analyse <name>` lands here. `checkpoint` (a trace run's test/analyse/graph only):
+    score models/<checkpoint>.pt, e.g. `stage_05`, and write its results under <name>_<checkpoint>_*. `controls`
+    ({no_w, mean_field, seed, random}: run names) are the graph phase's trained controls, the CLI twin of
+    `task.graph.controls` (`--graph-controls`)."""
     spec = load(name_or_path)
     if checkpoint:
         if "train" in phases:
-            raise ValueError("--checkpoint scores a saved checkpoint: test / plot only, not train")
+            raise ValueError("--checkpoint scores a saved checkpoint: test / plot / graph only, not train")
         spec["_checkpoint"] = str(checkpoint)
+    if controls:
+        bad = sorted(set(controls) - _KEYS["graph_controls"])
+        if bad:
+            raise ValueError(f"--graph-controls: {bad} are not controls; the controls are {sorted(_KEYS['graph_controls'])}")
+        spec["_graph_controls"] = dict(controls)
+    if regions:
+        spec["_graph_regions"] = str(regions)          # the graph phase's atlas (--graph-regions)
     for ph in phases:
         PHASES[ph](spec, device=device, root=root)
 
